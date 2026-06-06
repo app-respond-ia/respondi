@@ -105,7 +105,7 @@ export async function signupTrial(formData: FormData) {
   const supabase = await createClient()
   await supabase.auth.signInWithPassword({ email, password })
 
-  redirect('/app')
+  redirect('/dashboard')
 }
 
 export async function resetPasswordForEmail(formData: FormData) {

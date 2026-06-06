@@ -12,14 +12,22 @@ export async function middleware(request: NextRequest) {
   const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route)) || pathname === '/'
 
   // Rutas protegidas por rol
-  const protectedRoutes = ['/app', '/superadmin', '/agente', '/operario']
+  const protectedRoutes = ['/dashboard', '/superadmin', '/agente', '/operario']
   const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
+
+  // Función helper para redirigir copiando las cookies
+  const redirectWithCookies = (url: URL | string) => {
+    const response = NextResponse.redirect(new URL(url, request.url))
+    // Importantísimo: propagar cookies para no perder sesión en Vercel Edge
+    supabaseResponse.cookies.getAll().forEach((cookie) => {
+      response.cookies.set(cookie.name, cookie.value, cookie)
+    })
+    return response
+  }
 
   // Si no hay usuario y trata de acceder a una ruta protegida
   if (!user && isProtectedRoute) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/login'
-    return NextResponse.redirect(url)
+    return redirectWithCookies('/login')
   }
 
   // Si hay usuario, verificamos su rol para enrutamiento
@@ -36,22 +44,24 @@ export async function middleware(request: NextRequest) {
     // Determinar la ruta base según el rol
     let roleBasePath = ''
     if (role === 'super_admin') roleBasePath = '/superadmin'
-    else if (role === 'admin') roleBasePath = '/app'
+    else if (role === 'admin') roleBasePath = '/dashboard'
     else if (role === 'agente') roleBasePath = '/agente'
     else if (role === 'operario') roleBasePath = '/operario'
 
+    // Si el usuario está logueado pero no tiene registro en public.users
+    // significa que inició sesión con Google sin haber pasado por el trial o invitación.
+    if (!roleBasePath && isPublicRoute && pathname !== '/registro-trial') {
+      return redirectWithCookies('/registro-trial')
+    }
+
     // Si está en una ruta pública (ej. login) y está autenticado, lo mandamos a su panel
     if (isPublicRoute && roleBasePath) {
-      const url = request.nextUrl.clone()
-      url.pathname = roleBasePath
-      return NextResponse.redirect(url)
+      return redirectWithCookies(roleBasePath)
     }
 
     // Si está en una ruta protegida, validar que coincida con su rol
     if (isProtectedRoute && roleBasePath && !pathname.startsWith(roleBasePath)) {
-      const url = request.nextUrl.clone()
-      url.pathname = roleBasePath
-      return NextResponse.redirect(url)
+      return redirectWithCookies(roleBasePath)
     }
   }
 

@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="color-scheme" content="light">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Respondi · Lista de precios</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: { display:['Sora','sans-serif'], body:['Inter','sans-serif'] },
+        fontWeight: { 400:'400', 500:'500', 600:'600', 700:'700' },
+        colors: {
+          brand: {
+            50:'#f5f3ff',100:'#ede9fe',200:'#ddd6fe',300:'#c4b5fd',400:'#a78bfa',
+            500:'#8b5cf6',600:'#7c3aed',700:'#6d28d9',800:'#5b21b6',900:'#4c1d95',
+          },
+          ink: { 900:'#1c1530',700:'#3b3155',500:'#6b6486',400:'#9b95ad' }
+        }
+      }
+    }
+  }
+</script>
+<style>
+  :root { color-scheme: light; }
+  html, body { background-color: #ffffff !important; color: #1c1530 !important; }
+  body { font-family: 'Inter', sans-serif; }
+  h1,h2,h3,.font-display { font-family: 'Sora', sans-serif; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background:#ddd6fe; border-radius:8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+</style>
+</head>
+<body class="bg-slate-50 text-ink-900 antialiased" style="background-color:#f8fafc;color:#1c1530;">
+
+<!-- =========================================================
+     LISTA DE PRECIOS  ·  pantalla interna del admin
+     Patrón: TABLA DE DATOS con filas.
+     Fiel a la tabla price_list del anteproyecto + campo `tipo`.
+     ========================================================= -->
+
+<div class="min-h-screen lg:flex">
+
+  <!-- ================= SIDEBAR ================= -->
+  <aside id="sidebar"
+    class="fixed inset-y-0 left-0 z-40 w-72 bg-ink-900 text-white
+           transform -translate-x-full transition-transform duration-300 ease-out
+           lg:translate-x-0 lg:static lg:z-auto flex flex-col">
+
+    <div class="flex items-center gap-3 px-6 h-20 border-b border-white/10">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600
+                  flex items-center justify-center shadow-lg shadow-brand-600/30">
+        <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M8 10h8M8 14h5M21 12c0 4.418-4.03 8-9 8a9.7 9.7 0 01-4-.85L3 20l1.1-3.3A7.6 7.6 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+        </svg>
+      </div>
+      <div>
+        <p class="font-display font-700 text-lg leading-none">Respondi</p>
+        <p class="text-[11px] text-brand-300 mt-1 tracking-wide">Panel de administración</p>
+      </div>
+    </div>
+
+    <nav class="flex-1 px-3 py-5 space-y-1 overflow-y-auto">
+      <p class="px-3 pb-2 text-[11px] uppercase tracking-wider text-ink-400 font-600">General</p>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-400 hover:bg-white/5 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        Dashboard
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-400 hover:bg-white/5 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/><path stroke-linecap="round" stroke-linejoin="round" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/></svg>
+        Métricas
+      </a>
+
+      <p class="px-3 pt-5 pb-2 text-[11px] uppercase tracking-wider text-ink-400 font-600">Operación</p>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-400 hover:bg-white/5 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a2 2 0 01-2-2v-1m0-9V5a2 2 0 012-2h6a2 2 0 012 2v6a2 2 0 01-2 2H9l-4 4V8a2 2 0 012-2h2z"/></svg>
+        Casos
+        <span class="ml-auto text-[11px] font-600 px-1.5 py-0.5 rounded-md bg-brand-500 text-white">5</span>
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-400 hover:bg-white/5 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.7 9.7 0 01-4-.85L3 20l1.1-3.3A7.6 7.6 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+        Conversaciones
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-400 hover:bg-white/5 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+        Novedades del día
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-400 hover:bg-white/5 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+        Blacklist
+      </a>
+
+      <p class="px-3 pt-5 pb-2 text-[11px] uppercase tracking-wider text-ink-400 font-600">Configuración</p>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-400 hover:bg-white/5 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+        Perfil del comercio
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-400 hover:bg-white/5 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        Skills de IA
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-brand-600 text-white font-500 shadow-lg shadow-brand-900/40">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.99 1.99 0 013 12V7a4 4 0 014-4z"/></svg>
+        Lista de precios
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-400 hover:bg-white/5 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        Reglas de casos
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-400 hover:bg-white/5 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.99 1.99 0 013 12V7a4 4 0 014-4z"/></svg>
+        Etiquetas
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-400 hover:bg-white/5 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.7 9.7 0 01-4-.85L3 20l1.1-3.3A7.6 7.6 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+        Canales
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-400 hover:bg-white/5 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-6a4 4 0 11-8 0 4 4 0 018 0zm6 3a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        Usuarios
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-400 hover:bg-white/5 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        Audit log
+      </a>
+    </nav>
+
+    <div class="px-3 py-4 border-t border-white/10">
+      <div class="flex items-center gap-3 px-3 py-2">
+        <div class="w-9 h-9 rounded-full bg-brand-500 flex items-center justify-center font-600 text-sm">MR</div>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-500 truncate">María Rodríguez</p>
+          <p class="text-[11px] text-ink-400 truncate">Administradora</p>
+        </div>
+        <svg class="w-5 h-5 text-ink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+      </div>
+    </div>
+  </aside>
+
+  <div id="overlay" class="fixed inset-0 bg-ink-900/50 z-30 hidden lg:hidden"></div>
+
+  <!-- ================= COLUMNA PRINCIPAL ================= -->
+  <div class="flex-1 flex flex-col min-w-0">
+
+    <header class="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-slate-200">
+      <div class="flex items-center gap-3 px-4 sm:px-6 lg:px-8 h-20">
+        <button id="menuBtn" class="lg:hidden p-2 -ml-2 rounded-lg hover:bg-slate-100 transition" aria-label="Abrir menú">
+          <svg class="w-6 h-6 text-ink-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <div class="flex items-center gap-2">
+          <span class="hidden sm:inline text-xs text-ink-500 font-500">Sucursal</span>
+          <button class="flex items-center gap-2 pl-3 pr-2 py-2 rounded-xl border border-slate-200
+                         bg-white hover:border-brand-300 hover:bg-brand-50 transition group">
+            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+            <span class="font-500 text-sm">Tienda Centro</span>
+            <svg class="w-4 h-4 text-ink-400 group-hover:text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+          </button>
+        </div>
+        <div class="flex-1"></div>
+        <button class="relative p-2 rounded-lg hover:bg-slate-100 transition" aria-label="Notificaciones">
+          <svg class="w-6 h-6 text-ink-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+          <span class="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-brand-600 rounded-full ring-2 ring-white"></span>
+        </button>
+        <div class="lg:hidden w-9 h-9 rounded-full bg-brand-500 text-white flex items-center justify-center font-600 text-sm">MR</div>
+      </div>
+    </header>
+
+    <!-- ================= CONTENIDO ================= -->
+    <main class="flex-1 px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-6xl w-full mx-auto">
+
+      <!-- Encabezado + acciones -->
+      <div class="flex items-start justify-between gap-4 flex-wrap mb-6">
+        <div>
+          <h1 class="font-display font-700 text-2xl sm:text-3xl text-ink-900">Lista de precios</h1>
+          <p class="text-ink-500 mt-1">Productos y servicios que tu agente de IA usa para responder.</p>
+        </div>
+        <div class="flex gap-2">
+          <button data-import class="inline-flex items-center gap-2 px-4 h-11 rounded-xl border border-slate-300
+                         bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            Importar Excel
+          </button>
+          <button data-add class="inline-flex items-center gap-2 px-4 h-11 rounded-xl bg-brand-600 hover:bg-brand-700
+                         text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+            Añadir ítem
+          </button>
+        </div>
+      </div>
+
+      <!-- Filtros: tipo + búsqueda -->
+      <div class="flex items-center gap-3 flex-wrap mb-5">
+        <div class="inline-flex p-1 rounded-xl bg-white border border-slate-200">
+          <button class="ftype-btn px-4 py-1.5 rounded-lg text-sm font-600 bg-brand-600 text-white transition">Todos</button>
+          <button class="ftype-btn px-4 py-1.5 rounded-lg text-sm font-500 text-ink-500 transition">Productos</button>
+          <button class="ftype-btn px-4 py-1.5 rounded-lg text-sm font-500 text-ink-500 transition">Servicios</button>
+        </div>
+        <div class="relative flex-1 min-w-[180px]">
+          <svg class="w-5 h-5 text-ink-400 absolute left-3.5 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <input type="text" placeholder="Buscar ítem..."
+            class="w-full h-11 pl-11 pr-4 rounded-xl border border-slate-300 bg-white text-sm
+                   placeholder:text-ink-400 focus:outline-none focus:border-brand-500
+                   focus:ring-4 focus:ring-brand-100 transition">
+        </div>
+      </div>
+
+      <!-- ===== TABLA (ordenador) ===== -->
+      <div class="hidden md:block bg-white rounded-2xl border border-slate-200 overflow-hidden">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-slate-200 text-left text-ink-500">
+              <th class="font-600 px-5 py-3">Ítem</th>
+              <th class="font-600 px-5 py-3">Tipo</th>
+              <th class="font-600 px-5 py-3">Precio</th>
+              <th class="font-600 px-5 py-3">Disponibilidad</th>
+              <th class="font-600 px-5 py-3 text-right">Acciones</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            <tr class="hover:bg-slate-50 transition">
+              <td class="px-5 py-3.5">
+                <p class="font-600 text-ink-900">Torta de chocolate</p>
+                <p class="text-xs text-ink-400">Torta húmeda de chocolate, 8 porciones</p>
+              </td>
+              <td class="px-5 py-3.5"><span class="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-500">Producto</span></td>
+              <td class="px-5 py-3.5 font-600 text-ink-900">$25,00</td>
+              <td class="px-5 py-3.5"><span class="inline-flex items-center gap-1.5 text-xs font-500 text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Disponible</span></td>
+              <td class="px-5 py-3.5">
+                <div class="flex items-center justify-end gap-1">
+                  <button data-edit class="p-1.5 rounded-lg text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition" aria-label="Editar"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
+                  <button class="p-1.5 rounded-lg text-ink-400 hover:text-red-500 hover:bg-red-50 transition" aria-label="Eliminar"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+                </div>
+              </td>
+            </tr>
+            <tr class="hover:bg-slate-50 transition">
+              <td class="px-5 py-3.5">
+                <p class="font-600 text-ink-900">Cupcakes surtidos (x6)</p>
+                <p class="text-xs text-ink-400">Caja de 6 cupcakes, sabores variados</p>
+              </td>
+              <td class="px-5 py-3.5"><span class="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-500">Producto</span></td>
+              <td class="px-5 py-3.5 font-600 text-ink-900">$12,00</td>
+              <td class="px-5 py-3.5"><span class="inline-flex items-center gap-1.5 text-xs font-500 text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Disponible</span></td>
+              <td class="px-5 py-3.5">
+                <div class="flex items-center justify-end gap-1">
+                  <button data-edit class="p-1.5 rounded-lg text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition" aria-label="Editar"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
+                  <button class="p-1.5 rounded-lg text-ink-400 hover:text-red-500 hover:bg-red-50 transition" aria-label="Eliminar"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+                </div>
+              </td>
+            </tr>
+            <tr class="hover:bg-slate-50 transition">
+              <td class="px-5 py-3.5">
+                <p class="font-600 text-ink-900">Torta personalizada para eventos</p>
+                <p class="text-xs text-ink-400">Diseño a medida, se cotiza según tamaño</p>
+              </td>
+              <td class="px-5 py-3.5"><span class="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-500">Servicio</span></td>
+              <td class="px-5 py-3.5 font-600 text-ink-900">Desde $40,00</td>
+              <td class="px-5 py-3.5"><span class="inline-flex items-center gap-1.5 text-xs font-500 text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Disponible</span></td>
+              <td class="px-5 py-3.5">
+                <div class="flex items-center justify-end gap-1">
+                  <button data-edit class="p-1.5 rounded-lg text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition" aria-label="Editar"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
+                  <button class="p-1.5 rounded-lg text-ink-400 hover:text-red-500 hover:bg-red-50 transition" aria-label="Eliminar"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+                </div>
+              </td>
+            </tr>
+            <tr class="hover:bg-slate-50 transition">
+              <td class="px-5 py-3.5">
+                <p class="font-600 text-ink-900">Pan dulce artesanal</p>
+                <p class="text-xs text-ink-400">Unidad</p>
+              </td>
+              <td class="px-5 py-3.5"><span class="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-500">Producto</span></td>
+              <td class="px-5 py-3.5 font-600 text-ink-900">$2,50</td>
+              <td class="px-5 py-3.5"><span class="inline-flex items-center gap-1.5 text-xs font-500 text-ink-400"><span class="w-1.5 h-1.5 rounded-full bg-slate-300"></span>No disponible</span></td>
+              <td class="px-5 py-3.5">
+                <div class="flex items-center justify-end gap-1">
+                  <button data-edit class="p-1.5 rounded-lg text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition" aria-label="Editar"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
+                  <button class="p-1.5 rounded-lg text-ink-400 hover:text-red-500 hover:bg-red-50 transition" aria-label="Eliminar"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ===== TARJETAS (móvil) ===== -->
+      <div class="md:hidden space-y-3">
+        <div class="bg-white rounded-2xl border border-slate-200 p-4">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <p class="font-600 text-ink-900">Torta de chocolate</p>
+              <p class="text-xs text-ink-400 mt-0.5">Torta húmeda de chocolate, 8 porciones</p>
+            </div>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-500 shrink-0">Producto</span>
+          </div>
+          <div class="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
+            <span class="font-700 text-ink-900">$25,00</span>
+            <span class="inline-flex items-center gap-1.5 text-xs font-500 text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Disponible</span>
+            <div class="flex gap-1">
+              <button data-edit class="p-1.5 rounded-lg text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
+              <button class="p-1.5 rounded-lg text-ink-400 hover:text-red-500 hover:bg-red-50 transition"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+            </div>
+          </div>
+        </div>
+        <div class="bg-white rounded-2xl border border-slate-200 p-4">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <p class="font-600 text-ink-900">Torta personalizada para eventos</p>
+              <p class="text-xs text-ink-400 mt-0.5">Diseño a medida, se cotiza según tamaño</p>
+            </div>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-500 shrink-0">Servicio</span>
+          </div>
+          <div class="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
+            <span class="font-700 text-ink-900">Desde $40,00</span>
+            <span class="inline-flex items-center gap-1.5 text-xs font-500 text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Disponible</span>
+            <div class="flex gap-1">
+              <button data-edit class="p-1.5 rounded-lg text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
+              <button class="p-1.5 rounded-lg text-ink-400 hover:text-red-500 hover:bg-red-50 transition"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between mt-5 text-sm text-ink-400">
+        <span>24 ítems en total</span>
+        <span>Sin conversión de moneda · cada ítem usa su propia divisa</span>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- =========================================================
+     POPUP · Añadir / Editar ítem
+     Una sola ventana modal que sirve para las dos cosas.
+     Oculta por defecto (hidden). Se abre con los botones.
+     ========================================================= -->
+<div id="modal" class="fixed inset-0 z-50 hidden">
+  <!-- fondo oscuro -->
+  <div id="modalBg" class="absolute inset-0 bg-ink-900/50 backdrop-blur-sm"></div>
+
+  <!-- caja del popup -->
+  <div class="relative min-h-full flex items-center justify-center p-4">
+    <div class="w-full max-w-lg bg-white rounded-2xl shadow-2xl">
+
+      <!-- Cabecera -->
+      <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+        <h2 id="modalTitle" class="font-display font-700 text-lg text-ink-900">Añadir ítem</h2>
+        <button id="modalClose" class="p-1.5 rounded-lg text-ink-400 hover:text-ink-700 hover:bg-slate-100 transition" aria-label="Cerrar">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- Formulario -->
+      <div class="px-6 py-5 space-y-4">
+        <div>
+          <label class="block text-sm font-500 text-ink-700 mb-1.5">Nombre del ítem</label>
+          <input type="text" placeholder="Ej. Torta de chocolate"
+            class="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition">
+        </div>
+
+        <!-- Tipo: producto / servicio -->
+        <div>
+          <label class="block text-sm font-500 text-ink-700 mb-1.5">Tipo</label>
+          <div class="grid grid-cols-2 gap-3">
+            <label class="flex items-center gap-2.5 p-3 rounded-xl border border-brand-300 bg-brand-50 cursor-pointer">
+              <input type="radio" name="tipo" checked class="w-4 h-4 text-brand-600 focus:ring-brand-400">
+              <span class="text-sm font-500 text-ink-800">Producto</span>
+            </label>
+            <label class="flex items-center gap-2.5 p-3 rounded-xl border border-slate-200 bg-white cursor-pointer hover:border-brand-300 transition">
+              <input type="radio" name="tipo" class="w-4 h-4 text-brand-600 focus:ring-brand-400">
+              <span class="text-sm font-500 text-ink-800">Servicio</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Tipo de precio: exacto / desde / a consultar -->
+        <div>
+          <label class="block text-sm font-500 text-ink-700 mb-1.5">Tipo de precio</label>
+          <div class="grid grid-cols-3 gap-2">
+            <label class="flex items-center justify-center p-2.5 rounded-lg border border-brand-300 bg-brand-50 cursor-pointer">
+              <input type="radio" name="precio_tipo" value="exacto" checked class="peer sr-only">
+              <span class="text-xs font-500 text-ink-800">Exacto</span>
+            </label>
+            <label class="flex items-center justify-center p-2.5 rounded-lg border border-slate-200 bg-white cursor-pointer hover:border-brand-300 transition">
+              <input type="radio" name="precio_tipo" value="desde" class="peer sr-only">
+              <span class="text-xs font-500 text-ink-800">Desde</span>
+            </label>
+            <label class="flex items-center justify-center p-2.5 rounded-lg border border-slate-200 bg-white cursor-pointer hover:border-brand-300 transition">
+              <input type="radio" name="precio_tipo" value="consultar" class="peer sr-only">
+              <span class="text-xs font-500 text-ink-800">A consultar</span>
+            </label>
+          </div>
+          <p id="precioHint" class="text-xs text-ink-400 mt-1.5">Precio fijo del ítem.</p>
+        </div>
+
+        <!-- Precio + moneda (se desactivan si "a consultar") -->
+        <div class="grid grid-cols-[1fr_auto] gap-3">
+          <div>
+            <label class="block text-sm font-500 text-ink-700 mb-1.5">Precio</label>
+            <input id="precioInput" type="text" placeholder="0,00"
+              class="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition disabled:bg-slate-50 disabled:text-ink-400">
+          </div>
+          <div class="w-28">
+            <label class="block text-sm font-500 text-ink-700 mb-1.5">Moneda</label>
+            <select id="monedaInput" class="w-full h-12 px-3 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition disabled:bg-slate-50 disabled:text-ink-400">
+              <option>USD</option>
+              <option>EUR</option>
+              <option>VES</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-500 text-ink-700 mb-1.5">Descripción</label>
+          <textarea rows="3" placeholder="Describe el ítem para que la IA lo use al responder..."
+            class="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white resize-none placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition"></textarea>
+        </div>
+
+        <!-- Disponibilidad -->
+        <label class="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer">
+          <span class="text-sm font-500 text-ink-700">Disponible</span>
+          <input type="checkbox" checked class="w-5 h-5 rounded text-brand-600 focus:ring-brand-400">
+        </label>
+      </div>
+
+      <!-- Pie con botones -->
+      <div class="flex justify-end gap-3 px-6 py-4 border-t border-slate-100">
+        <button id="modalCancel" class="px-5 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition">
+          Cancelar
+        </button>
+        <button class="px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition">
+          Guardar ítem
+        </button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- =========================================================
+     POPUP · Importar desde Excel
+     Tres vistas dentro del mismo popup:
+       · impInicio   → descargar plantilla + subir archivo
+       · impError    → panel de errores fila por fila (todo o nada)
+       · impExito    → confirmación de importación correcta
+     ========================================================= -->
+<div id="impModal" class="fixed inset-0 z-50 hidden">
+  <div id="impBg" class="absolute inset-0 bg-ink-900/50 backdrop-blur-sm"></div>
+  <div class="relative min-h-full flex items-center justify-center p-4">
+    <div class="w-full max-w-lg bg-white rounded-2xl shadow-2xl">
+
+      <!-- Cabecera -->
+      <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+        <h2 class="font-display font-700 text-lg text-ink-900">Importar desde Excel</h2>
+        <button id="impClose" class="p-1.5 rounded-lg text-ink-400 hover:text-ink-700 hover:bg-slate-100 transition" aria-label="Cerrar">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- ===== Vista INICIO ===== -->
+      <div id="impInicio" class="px-6 py-5">
+        <!-- Paso 1: plantilla -->
+        <div class="flex items-start gap-3 p-4 rounded-xl border border-slate-200 bg-slate-50 mb-4">
+          <span class="w-7 h-7 rounded-lg bg-brand-100 text-brand-700 font-600 text-sm flex items-center justify-center shrink-0">1</span>
+          <div class="flex-1">
+            <p class="font-600 text-ink-900 text-sm">Descarga la plantilla</p>
+            <p class="text-sm text-ink-500 mt-0.5 mb-3">Usa nuestra plantilla para que los datos se carguen correctamente. No cambies las columnas.</p>
+            <button class="inline-flex items-center gap-2 px-4 h-10 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+              Descargar plantilla .xlsx
+            </button>
+          </div>
+        </div>
+
+        <!-- Paso 2: subir -->
+        <div class="flex items-start gap-3 p-4 rounded-xl border border-slate-200 bg-slate-50">
+          <span class="w-7 h-7 rounded-lg bg-brand-100 text-brand-700 font-600 text-sm flex items-center justify-center shrink-0">2</span>
+          <div class="flex-1">
+            <p class="font-600 text-ink-900 text-sm">Sube tu archivo relleno</p>
+            <p class="text-sm text-ink-500 mt-0.5 mb-3">Arrastra el Excel aquí o selecciónalo.</p>
+            <div class="rounded-xl border-2 border-dashed border-slate-300 bg-white p-6 text-center">
+              <svg class="w-8 h-8 text-ink-400 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.9A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+              <p class="text-sm text-ink-500">Arrastra tu archivo o <span class="text-brand-600 font-600">búscalo en tu equipo</span></p>
+              <p class="text-xs text-ink-400 mt-1">Formato .xlsx · máx. 5 MB</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Botones demo para ver las otras vistas -->
+        <div class="flex gap-2 mt-5">
+          <button id="demoError" class="flex-1 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition">Ver ejemplo con errores</button>
+          <button id="demoExito" class="flex-1 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 transition">Ver importación correcta</button>
+        </div>
+      </div>
+
+      <!-- ===== Vista ERROR ===== -->
+      <div id="impError" class="px-6 py-5 hidden">
+        <div class="flex items-center gap-3 p-3.5 rounded-xl bg-red-50 border border-red-200 mb-4">
+          <svg class="w-6 h-6 text-red-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0L3.16 16.25A2 2 0 005 19z"/></svg>
+          <div>
+            <p class="font-600 text-red-900 text-sm">No se importó nada</p>
+            <p class="text-sm text-red-700">Encontramos 3 errores. Corrígelos en el Excel y vuelve a subirlo.</p>
+          </div>
+        </div>
+        <div class="space-y-2 max-h-64 overflow-y-auto">
+          <div class="flex items-start gap-2.5 p-3 rounded-lg border border-slate-200 bg-white">
+            <span class="text-xs font-600 px-2 py-0.5 rounded bg-red-100 text-red-700 shrink-0">Fila 5</span>
+            <p class="text-sm text-ink-700">La moneda "dólares" no es válida. Usa USD, EUR o VES.</p>
+          </div>
+          <div class="flex items-start gap-2.5 p-3 rounded-lg border border-slate-200 bg-white">
+            <span class="text-xs font-600 px-2 py-0.5 rounded bg-red-100 text-red-700 shrink-0">Fila 8</span>
+            <p class="text-sm text-ink-700">Falta el nombre del ítem.</p>
+          </div>
+          <div class="flex items-start gap-2.5 p-3 rounded-lg border border-slate-200 bg-white">
+            <span class="text-xs font-600 px-2 py-0.5 rounded bg-red-100 text-red-700 shrink-0">Fila 12</span>
+            <p class="text-sm text-ink-700">El tipo de precio es "consultar" pero hay un precio escrito. Debe ir vacío.</p>
+          </div>
+        </div>
+        <button id="volverInicio" class="w-full h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 mt-5 transition">
+          Volver a subir archivo
+        </button>
+      </div>
+
+      <!-- ===== Vista ÉXITO ===== -->
+      <div id="impExito" class="px-6 py-8 hidden text-center">
+        <div class="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center mx-auto mb-4">
+          <svg class="w-7 h-7 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+        </div>
+        <h3 class="font-display font-700 text-xl text-ink-900">¡Importación correcta!</h3>
+        <p class="text-ink-500 mt-1 mb-5">Se cargaron 18 ítems en tu lista de precios.</p>
+        <button id="cerrarExito" class="px-6 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 transition">
+          Ver mi lista
+        </button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('overlay');
+  const menuBtn = document.getElementById('menuBtn');
+  menuBtn.addEventListener('click', () => {
+    sidebar.classList.remove('-translate-x-full');
+    overlay.classList.remove('hidden');
+  });
+  overlay.addEventListener('click', () => {
+    sidebar.classList.add('-translate-x-full');
+    overlay.classList.add('hidden');
+  });
+
+  // Filtro por tipo (producto / servicio)
+  const ftypeBtns = document.querySelectorAll('.ftype-btn');
+  ftypeBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      ftypeBtns.forEach(b => {
+        b.classList.remove('bg-brand-600','text-white','font-600');
+        b.classList.add('text-ink-500','font-500');
+      });
+      btn.classList.add('bg-brand-600','text-white','font-600');
+      btn.classList.remove('text-ink-500','font-500');
+    });
+  });
+
+  // ----- Popup de añadir / editar ítem -----
+  const modal       = document.getElementById('modal');
+  const modalTitle  = document.getElementById('modalTitle');
+  const modalClose  = document.getElementById('modalClose');
+  const modalCancel = document.getElementById('modalCancel');
+  const modalBg     = document.getElementById('modalBg');
+
+  function openModal(modo) {
+    // modo 'añadir' o 'editar' — solo cambia el título
+    modalTitle.textContent = modo === 'editar' ? 'Editar ítem' : 'Añadir ítem';
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeModal() {
+    modal.classList.add('hidden');
+    document.body.style.overflow = '';
+  }
+
+  // El botón "Añadir ítem" abre el popup en modo añadir
+  document.querySelectorAll('[data-add]').forEach(b =>
+    b.addEventListener('click', () => openModal('añadir')));
+  // Los botones de editar (lápiz) abren el popup en modo editar
+  document.querySelectorAll('[data-edit]').forEach(b =>
+    b.addEventListener('click', () => openModal('editar')));
+
+  // ----- Popup de importación de Excel -----
+  const impModal  = document.getElementById('impModal');
+  const impBg     = document.getElementById('impBg');
+  const impClose  = document.getElementById('impClose');
+  const vInicio   = document.getElementById('impInicio');
+  const vError    = document.getElementById('impError');
+  const vExito    = document.getElementById('impExito');
+
+  function showImpView(v) {
+    vInicio.classList.add('hidden');
+    vError.classList.add('hidden');
+    vExito.classList.add('hidden');
+    v.classList.remove('hidden');
+  }
+  function openImp() {
+    showImpView(vInicio);
+    impModal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeImp() {
+    impModal.classList.add('hidden');
+    document.body.style.overflow = '';
+  }
+
+  document.querySelectorAll('[data-import]').forEach(b =>
+    b.addEventListener('click', openImp));
+  impClose.addEventListener('click', closeImp);
+  impBg.addEventListener('click', closeImp);
+
+  // botones demo para ver las distintas vistas
+  document.getElementById('demoError').addEventListener('click', () => showImpView(vError));
+  document.getElementById('demoExito').addEventListener('click', () => showImpView(vExito));
+  document.getElementById('volverInicio').addEventListener('click', () => showImpView(vInicio));
+  document.getElementById('cerrarExito').addEventListener('click', closeImp);
+
+
+  // ----- Selector de tipo de precio (exacto / desde / a consultar) -----
+  const tipoRadios = document.querySelectorAll('input[name="precio_tipo"]');
+  const precioInput = document.getElementById('precioInput');
+  const monedaInput = document.getElementById('monedaInput');
+  const precioHint  = document.getElementById('precioHint');
+
+  tipoRadios.forEach(r => {
+    r.addEventListener('change', () => {
+      // resaltar visualmente el seleccionado
+      tipoRadios.forEach(rr => {
+        const wrap = rr.closest('label');
+        if (rr.checked) {
+          wrap.classList.remove('border-slate-200','bg-white');
+          wrap.classList.add('border-brand-300','bg-brand-50');
+        } else {
+          wrap.classList.remove('border-brand-300','bg-brand-50');
+          wrap.classList.add('border-slate-200','bg-white');
+        }
+      });
+
+      // cambiar texto de ayuda y desactivar campos si aplica
+      if (r.value === 'exacto') {
+        precioHint.textContent = 'Precio fijo del ítem.';
+        precioInput.disabled = false; monedaInput.disabled = false;
+        precioInput.placeholder = '0,00';
+      } else if (r.value === 'desde') {
+        precioHint.textContent = 'Se mostrará como "Desde $X". Útil para servicios con precio variable.';
+        precioInput.disabled = false; monedaInput.disabled = false;
+        precioInput.placeholder = '0,00';
+      } else {
+        precioHint.textContent = 'No se muestra precio. Se indica "A consultar" al cliente.';
+        precioInput.disabled = true; monedaInput.disabled = true;
+        precioInput.value = '';
+      }
+    });
+  });
+</script>
+
+</body>
+</html>

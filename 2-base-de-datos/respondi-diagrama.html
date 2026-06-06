@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="color-scheme" content="light">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Respondi · Diagrama de base de datos</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root { color-scheme: light; }
+  html, body { background:#f8fafc; color:#1c1530; margin:0; }
+  body { font-family:'Inter',sans-serif; }
+  h1 { font-family:'Sora',sans-serif; }
+  .wrap { max-width:1400px; margin:0 auto; padding:32px 20px; }
+  .head { display:flex; align-items:center; gap:12px; margin-bottom:8px; }
+  .logo { width:44px; height:44px; border-radius:12px; background:linear-gradient(135deg,#a78bfa,#7c3aed);
+          display:flex; align-items:center; justify-content:center; box-shadow:0 8px 20px rgba(124,58,237,.3); }
+  .sub { color:#6b6486; margin:0 0 24px; }
+  .card { background:#fff; border:1px solid #e2e8f0; border-radius:16px; padding:16px; overflow:auto; }
+  .legend { background:#fff; border:1px solid #e2e8f0; border-radius:16px; padding:14px 18px; margin-bottom:16px;
+            display:flex; gap:24px; flex-wrap:wrap; font-size:14px; }
+  .legend b { color:#3b3155; }
+  .hint { color:#9b95ad; font-size:13px; margin-top:14px; }
+  .mermaid { width:100%; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="head">
+    <div class="logo">
+      <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/></svg>
+    </div>
+    <div>
+      <h1 style="margin:0; font-size:26px;">Diagrama de base de datos</h1>
+    </div>
+  </div>
+  <p class="sub">Respondi · 25 tablas y sus relaciones · multi-tenant</p>
+
+  <div class="legend">
+    <span><b>Cómo leer las líneas:</b></span>
+    <span>‖——o&lt; &nbsp; uno-a-muchos (una fila se relaciona con varias)</span>
+    <span>‖——‖ &nbsp; uno-a-uno</span>
+    <span><b>PK</b> clave primaria &nbsp;·&nbsp; <b>FK</b> relación con otra tabla</span>
+  </div>
+
+  <div class="card">
+    <pre class="mermaid">
+erDiagram
+    plans {
+        uuid id PK
+        text nombre
+        numeric precio_usd
+        int creditos_mensuales
+        int canales_max
+        int usuarios_max
+        text modelo_ia
+    }
+    vendedores {
+        uuid id PK
+        text nombre
+        numeric porcentaje_comision
+        enum tipo_comision
+    }
+    error_logs {
+        uuid id PK
+        uuid tenant_id FK
+        enum origen
+        bool resuelto
+    }
+    comercios {
+        uuid id PK
+        text nombre
+        uuid plan_id FK
+        uuid id_vendedor FK
+        enum estado
+        date fecha_vencimiento
+    }
+    sucursales {
+        uuid id PK
+        uuid tenant_id FK
+        text nombre
+        enum modo_pausa
+        enum blacklist_modo
+    }
+    users {
+        uuid id PK
+        uuid tenant_id FK
+        uuid branch_id FK
+        enum rol
+        bool invitacion_aceptada
+    }
+    business_profiles {
+        uuid id PK
+        uuid branch_id FK
+        text tono
+    }
+    business_hours {
+        uuid id PK
+        uuid branch_id FK
+        int dia_semana
+    }
+    channels {
+        uuid id PK
+        uuid tenant_id FK
+        uuid branch_id FK
+        enum tipo
+        enum metodo
+        enum estado
+    }
+    skills {
+        uuid id PK
+        uuid branch_id FK
+        text nombre
+    }
+    price_list {
+        uuid id PK
+        uuid branch_id FK
+        numeric precio
+        text precio_tipo
+    }
+    daily_updates {
+        uuid id PK
+        uuid branch_id FK
+        uuid user_id FK
+        enum tipo
+    }
+    case_rules {
+        uuid id PK
+        uuid branch_id FK
+        text tipo_caso
+    }
+    message_categories {
+        uuid id PK
+        uuid branch_id FK
+        text nombre
+        text color
+    }
+    contacts {
+        uuid id PK
+        uuid tenant_id FK
+        enum canal
+        bool blacklist
+    }
+    conversations {
+        uuid id PK
+        uuid contact_id FK
+        uuid branch_id FK
+        enum estado
+        bool ia_pausada
+        uuid atendida_por FK
+    }
+    messages {
+        uuid id PK
+        uuid conversation_id FK
+        enum remitente
+        text contenido
+    }
+    conversation_tags {
+        uuid conversation_id FK
+        uuid category_id FK
+    }
+    cases {
+        uuid id PK
+        uuid conversation_id FK
+        uuid agente_id FK
+        enum tipo
+        enum estatus
+    }
+    case_notes {
+        uuid id PK
+        uuid case_id FK
+        uuid user_id FK
+        text nota
+    }
+    message_quotas {
+        uuid id PK
+        uuid tenant_id FK
+        int saldo
+    }
+    billing {
+        uuid id PK
+        uuid tenant_id FK
+        uuid plan_id FK
+        uuid id_vendedor FK
+        numeric importe_usd
+    }
+    ai_logs {
+        uuid id PK
+        uuid message_id FK
+        enum resultado
+    }
+    audit_log {
+        uuid id PK
+        uuid tenant_id FK
+        uuid user_id FK
+        text accion
+    }
+    notifications {
+        uuid id PK
+        uuid tenant_id FK
+        uuid user_id FK
+        bool leida
+    }
+
+    plans      ||--o{ comercios          : "tiene"
+    vendedores ||--o{ comercios          : "capta"
+    comercios  ||--o{ sucursales         : "tiene"
+    comercios  ||--o{ users              : "emplea"
+    comercios  ||--o{ contacts           : "recibe"
+    comercios  ||--o{ error_logs         : "genera"
+    sucursales ||--o{ users              : "asigna"
+    sucursales ||--|| business_profiles  : "configura"
+    sucursales ||--o{ business_hours     : "abre"
+    sucursales ||--o{ channels           : "conecta"
+    sucursales ||--o{ skills             : "define"
+    sucursales ||--o{ price_list         : "lista"
+    sucursales ||--o{ daily_updates      : "publica"
+    sucursales ||--o{ case_rules         : "aplica"
+    sucursales ||--o{ message_categories : "usa"
+    users      ||--o{ daily_updates      : "carga"
+    users      ||--o{ cases              : "atiende"
+    users      ||--o{ case_notes         : "escribe"
+    contacts   ||--o{ conversations      : "mantiene"
+    conversations ||--o{ messages        : "contiene"
+    conversations ||--o{ conversation_tags : "etiquetada"
+    message_categories ||--o{ conversation_tags : "clasifica"
+    conversations ||--o{ cases           : "escala"
+    cases      ||--o{ case_notes         : "registra"
+    messages   ||--o{ ai_logs            : "traza"
+    comercios  ||--o{ message_quotas     : "consume"
+    comercios  ||--o{ billing            : "paga"
+    plans      ||--o{ billing            : "factura"
+    vendedores ||--o{ billing            : "comisiona"
+    comercios  ||--o{ audit_log          : "audita"
+    comercios  ||--o{ notifications      : "notifica"
+    users      ||--o{ notifications      : "recibe"
+    </pre>
+  </div>
+
+  <p class="hint">Si quieres editarlo o exportarlo como imagen, copia el archivo respondi-diagrama.mermaid en mermaid.live</p>
+
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+      primaryColor: '#ede9fe',
+      primaryBorderColor: '#7c3aed',
+      primaryTextColor: '#1c1530',
+      lineColor: '#a78bfa',
+      fontFamily: 'Inter, sans-serif'
+    }
+  });
+</script>
+
+</body>
+</html>

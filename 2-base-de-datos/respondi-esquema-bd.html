@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="color-scheme" content="light">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Respondi · Esquema de base de datos</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script>
+  tailwind.config = {
+    theme: { extend: {
+      fontFamily: { display:['Sora','sans-serif'], body:['Inter','sans-serif'] },
+      fontWeight: { 400:'400', 500:'500', 600:'600', 700:'700' },
+      colors: {
+        brand: { 50:'#f5f3ff',100:'#ede9fe',200:'#ddd6fe',300:'#c4b5fd',400:'#a78bfa',
+                 500:'#8b5cf6',600:'#7c3aed',700:'#6d28d9',800:'#5b21b6',900:'#4c1d95' },
+        ink: { 900:'#1c1530',700:'#3b3155',500:'#6b6486',400:'#9b95ad' }
+      }
+    }}
+  }
+</script>
+<style>
+  :root { color-scheme: light; }
+  html, body { background-color: #ffffff !important; color: #1c1530 !important; }
+  body { font-family: 'Inter', sans-serif; }
+  h1,h2,h3,.font-display { font-family: 'Sora', sans-serif; }
+  .mono { font-family: ui-monospace, 'SF Mono', Menlo, monospace; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background:#ddd6fe; border-radius:8px; }
+  .fk { color:#7c3aed; }
+  .pk { color:#b45309; font-weight:600; }
+</style>
+</head>
+<body class="bg-slate-50 text-ink-900 antialiased" style="background-color:#f8fafc;color:#1c1530;">
+
+<div class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+
+  <!-- Encabezado -->
+  <div class="mb-8">
+    <div class="flex items-center gap-3 mb-2">
+      <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center shadow-lg shadow-brand-600/30">
+        <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/></svg>
+      </div>
+      <div>
+        <h1 class="font-display font-700 text-2xl sm:text-3xl text-ink-900">Esquema de base de datos</h1>
+        <p class="text-ink-500">Respondi · 25 tablas · multi-tenant con RLS</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leyenda -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-4 mb-6 flex items-center gap-x-6 gap-y-2 flex-wrap text-sm">
+    <span class="font-600 text-ink-700">Cómo leerlo:</span>
+    <span class="flex items-center gap-1.5"><span class="pk mono">PK</span> clave primaria</span>
+    <span class="flex items-center gap-1.5"><span class="fk mono">→ tabla</span> relación (clave foránea)</span>
+    <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded bg-brand-200"></span> lleva tenant_id (aislado por comercio)</span>
+  </div>
+
+  <!-- La jerarquía central, en texto -->
+  <div class="bg-gradient-to-br from-brand-600 to-brand-800 text-white rounded-2xl p-5 mb-8">
+    <p class="text-brand-200 text-sm font-500 mb-2">La estructura central del producto</p>
+    <div class="flex items-center gap-2 flex-wrap font-display font-600 text-sm sm:text-base">
+      <span class="px-3 py-1.5 rounded-lg bg-white/15">Comercio</span>
+      <svg class="w-4 h-4 text-brand-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+      <span class="px-3 py-1.5 rounded-lg bg-white/15">Sucursal</span>
+      <svg class="w-4 h-4 text-brand-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+      <span class="px-3 py-1.5 rounded-lg bg-white/15">Canal</span>
+      <svg class="w-4 h-4 text-brand-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+      <span class="px-3 py-1.5 rounded-lg bg-white/15">Conversación</span>
+      <svg class="w-4 h-4 text-brand-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+      <span class="px-3 py-1.5 rounded-lg bg-white/15">Mensaje</span>
+    </div>
+  </div>
+
+  <!-- BLOQUE 1: GLOBAL -->
+  <div class="mb-8">
+    <div class="flex items-center gap-2 mb-3">
+      <span class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+      <h2 class="font-display font-600 text-lg text-ink-900">Global · solo super-admin (sin tenant)</h2>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+
+      <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div class="bg-slate-100 px-4 py-2 font-600 text-sm text-ink-900 mono">plans</div>
+        <div class="p-4 text-xs space-y-1 mono text-ink-600">
+          <p><span class="pk">id</span></p>
+          <p>nombre · precio_usd</p>
+          <p>creditos_mensuales</p>
+          <p>canales_max · sucursales_max</p>
+          <p>usuarios_max · modelo_ia</p>
+          <p>precio_credito_adicional</p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div class="bg-slate-100 px-4 py-2 font-600 text-sm text-ink-900 mono">vendedores</div>
+        <div class="p-4 text-xs space-y-1 mono text-ink-600">
+          <p><span class="pk">id</span></p>
+          <p>nombre · email</p>
+          <p>datos_fiscales</p>
+          <p>porcentaje_comision</p>
+          <p>tipo_comision</p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div class="bg-slate-100 px-4 py-2 font-600 text-sm text-ink-900 mono">error_logs</div>
+        <div class="p-4 text-xs space-y-1 mono text-ink-600">
+          <p><span class="pk">id</span> · <span class="fk">→ comercios</span></p>
+          <p>origen · descripcion</p>
+          <p>stacktrace · resuelto</p>
+          <p class="text-ink-400">(sin RLS de tenant)</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- BLOQUE 2: ESTRUCTURA -->
+  <div class="mb-8">
+    <div class="flex items-center gap-2 mb-3">
+      <span class="w-2.5 h-2.5 rounded-full bg-brand-500"></span>
+      <h2 class="font-display font-600 text-lg text-ink-900">Estructura del comercio</h2>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+
+      <div class="bg-white rounded-xl border-2 border-brand-300 overflow-hidden">
+        <div class="bg-brand-100 px-4 py-2 font-600 text-sm text-brand-800 mono">comercios <span class="text-[10px] font-500">(tenant)</span></div>
+        <div class="p-4 text-xs space-y-1 mono text-ink-600">
+          <p><span class="pk">id</span></p>
+          <p><span class="fk">→ plans</span> · <span class="fk">→ vendedores</span></p>
+          <p>estado · fecha_vencimiento</p>
+          <p>trial_activo · forma_pago</p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-brand-200 overflow-hidden">
+        <div class="bg-brand-50 px-4 py-2 font-600 text-sm text-ink-900 mono">sucursales</div>
+        <div class="p-4 text-xs space-y-1 mono text-ink-600">
+          <p><span class="pk">id</span> · <span class="fk">→ comercios</span></p>
+          <p>nombre · direccion · activa</p>
+          <p>modo_pausa · timezone</p>
+          <p>blacklist_modo</p>
+          <p class="text-brand-600">+ config blacklist §10</p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-brand-200 overflow-hidden">
+        <div class="bg-brand-50 px-4 py-2 font-600 text-sm text-ink-900 mono">users</div>
+        <div class="p-4 text-xs space-y-1 mono text-ink-600">
+          <p><span class="pk">id</span> <span class="fk">→ auth.users</span></p>
+          <p><span class="fk">→ comercios</span> · <span class="fk">→ sucursales</span></p>
+          <p>rol · email · nombre</p>
+          <p>invitacion_aceptada</p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-brand-200 overflow-hidden">
+        <div class="bg-brand-50 px-4 py-2 font-600 text-sm text-ink-900 mono">business_profiles</div>
+        <div class="p-4 text-xs space-y-1 mono text-ink-600">
+          <p><span class="pk">id</span> · <span class="fk">→ sucursales</span></p>
+          <p>descripcion · tono · idioma</p>
+          <p>mensajes del sistema</p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-brand-200 overflow-hidden">
+        <div class="bg-brand-50 px-4 py-2 font-600 text-sm text-ink-900 mono">business_hours</div>
+        <div class="p-4 text-xs space-y-1 mono text-ink-600">
+          <p><span class="pk">id</span> · <span class="fk">→ sucursales</span></p>
+          <p>dia_semana · apertura</p>
+          <p>cierre · cerrado</p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-brand-200 overflow-hidden">
+        <div class="bg-brand-50 px-4 py-2 font-600 text-sm text-ink-900 mono">channels <span class="text-brand-600 text-[10px]">§11</span></div>
+        <div class="p-4 text-xs space-y-1 mono text-ink-600">
+          <p><span class="pk">id</span> · <span class="fk">→ sucursales</span></p>
+          <p>tipo · metodo · estado</p>
+          <p>identificador_externo</p>
+          <p class="text-brand-600">whaticket | meta_oficial</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- BLOQUE 3: CONFIG IA -->
+  <div class="mb-8">
+    <div class="flex items-center gap-2 mb-3">
+      <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+      <h2 class="font-display font-600 text-lg text-ink-900">Configuración de la IA (por sucursal)</h2>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+
+      <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div class="bg-blue-50 px-4 py-2 font-600 text-sm text-ink-900 mono">skills</div>
+        <div class="p-4 text-xs space-y-1 mono text-ink-600">
+          <p><span class="pk">id</span> · <span class="fk">→ sucursales</span></p>
+          <p>nombre · descripcion · activo</p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div class="bg-blue-50 px-4 py-2 font-600 text-sm text-ink-900 mono">price_list</div>
+        <div class="p-4 text-xs space-y-1 mono text-ink-600">
+          <p><span class="pk">id</span> · <span class="fk">→ sucursales</span></p>
+          <p>nombre · precio · precio_tipo</p>
+          <p>disponible</p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div class="bg-blue-50 px-4 py-2 font-600 text-sm text-ink-900 mono">daily_updates <span class="text-brand-600 text-[10px]">§13</span></div>
+        <div class="p-4 text-xs space-y-1 mono text-ink-600">
+          <p><span class="pk">id</span> · <span class="fk">→ sucursales</span></p>
+          <p>tipo · descripcion</p>
+          <p>vigencia_inicio / fin</p>
+          <p class="text-brand-600">tipo: +otro · agente escribe</p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div class="bg-blue-50 px-4 py-2 font-600 text-sm text-ink-900 mono">case_rules</div>
+        <div class="p-4 text-xs space-y-1 mono text-ink-600">
+          <p><span class="pk">id</span> · <span class="fk">→ sucursales</span></p>
+          <p>nombre · palabras_clave</p>
+          <p>tipo_caso (texto libre)</p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div class="bg-blue-50 px-4 py-2 font-600 text-sm text-ink-900 mono">message_categories <span class="text-brand-600 text-[10px]">§9</span></div>
+        <div class="p-4 text-xs space-y-1 mono text-ink-600">
+          <p><span class="pk">id</span> · <span class="fk">→ sucursales</span></p>
+          <p>nombre · color · orden</p>
+          <p>descripcion_intencion</p>
+          <p class="text-brand-600">= etiquetas/tags</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- BLOQUE 4: CONVERSACIONES -->
+  <div class="mb-8">
+    <div class="flex items-center gap-2 mb-3">
+      <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+      <h2 class="font-display font-600 text-lg text-ink-900">Contactos, conversaciones y casos</h2>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+
+      <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div class="bg-emerald-50 px-4 py-2 font-600 text-sm text-ink-900 mono">contacts</div>
+        <div class="p-4 text-xs space-y-1 mono text-ink-600">
+          <p><span class="pk">id</span> · <span class="fk">→ comercios</span></p>
+          <p>canal · identificador_canal</p>
+          <p>nombre · blacklist</p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div class="bg-emerald-50 px-4 py-2 font-600 text-sm text-ink-900 mono">conversations <span class="text-brand-600 text-[10px]">§12</span></div>
+        <div class="p-4 text-xs space-y-1 mono text-ink-600">
+          <p><span class="pk">id</span> · <span class="fk">→ contacts</span></p>
+          <p>estado · canal · resumen</p>
+          <p>fecha_ultimo_mensaje</p>
+          <p class="text-brand-600">ia_pausada · atendida_por</p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div class="bg-emerald-50 px-4 py-2 font-600 text-sm text-ink-900 mono">messages</div>
+        <div class="p-4 text-xs space-y-1 mono text-ink-600">
+          <p><span class="pk">id</span> · <span class="fk">→ conversations</span></p>
+          <p>remitente · contenido</p>
+          <p>tokens · modelo_ia · entregado</p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div class="bg-emerald-50 px-4 py-2 font-600 text-sm text-ink-900 mono">conversation_tags <span class="text-brand-600 text-[10px]">§9</span></div>
+        <div class="p-4 text-xs space-y-1 mono text-ink-600">
+          <p><span class="fk">→ conversations</span></p>
+          <p><span class="fk">→ message_categories</span></p>
+          <p>aplicada_por (N:M)</p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div class="bg-emerald-50 px-4 py-2 font-600 text-sm text-ink-900 mono">cases</div>
+        <div class="p-4 text-xs space-y-1 mono text-ink-600">
+          <p><span class="pk">id</span> · <span class="fk">→ conversations</span></p>
+          <p><span class="fk">→ users</span> (agente)</p>
+          <p>tipo · estatus · sla_horas</p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div class="bg-emerald-50 px-4 py-2 font-600 text-sm text-ink-900 mono">case_notes</div>
+        <div class="p-4 text-xs space-y-1 mono text-ink-600">
+          <p><span class="pk">id</span> · <span class="fk">→ cases</span></p>
+          <p>nota · timestamp</p>
+          <p class="text-ink-400">(inmutables)</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- BLOQUE 5: FACTURACIÓN Y LOGS -->
+  <div class="mb-8">
+    <div class="flex items-center gap-2 mb-3">
+      <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+      <h2 class="font-display font-600 text-lg text-ink-900">Créditos, facturación y registros</h2>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+
+      <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div class="bg-amber-50 px-4 py-2 font-600 text-sm text-ink-900 mono">message_quotas</div>
+        <div class="p-4 text-xs space-y-1 mono text-ink-600">
+          <p><span class="pk">id</span> · <span class="fk">→ comercios</span></p>
+          <p>tipo · cantidad · saldo</p>
+          <p class="text-ink-400">(ledger de créditos)</p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div class="bg-amber-50 px-4 py-2 font-600 text-sm text-ink-900 mono">billing</div>
+        <div class="p-4 text-xs space-y-1 mono text-ink-600">
+          <p><span class="pk">id</span> · <span class="fk">→ comercios</span></p>
+          <p>importe · forma_pago · estado</p>
+          <p><span class="fk">→ vendedores</span></p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div class="bg-amber-50 px-4 py-2 font-600 text-sm text-ink-900 mono">ai_logs</div>
+        <div class="p-4 text-xs space-y-1 mono text-ink-600">
+          <p><span class="pk">id</span> · <span class="fk">→ messages</span></p>
+          <p>tokens · costo · resultado</p>
+          <p>contexto_snapshot (jsonb)</p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div class="bg-amber-50 px-4 py-2 font-600 text-sm text-ink-900 mono">audit_log</div>
+        <div class="p-4 text-xs space-y-1 mono text-ink-600">
+          <p><span class="pk">id</span> · <span class="fk">→ users</span></p>
+          <p>accion · tabla_afectada</p>
+          <p>valor_anterior / nuevo (jsonb)</p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div class="bg-amber-50 px-4 py-2 font-600 text-sm text-ink-900 mono">notifications</div>
+        <div class="p-4 text-xs space-y-1 mono text-ink-600">
+          <p><span class="pk">id</span> · <span class="fk">→ users</span></p>
+          <p>tipo · titulo · cuerpo · leida</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Nota RLS -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-5">
+    <div class="flex items-start gap-3">
+      <div class="w-10 h-10 rounded-xl bg-brand-100 flex items-center justify-center text-brand-600 shrink-0">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+      </div>
+      <div>
+        <h3 class="font-600 text-ink-900">Seguridad multi-tenant (RLS)</h3>
+        <p class="text-sm text-ink-600 mt-1 leading-relaxed">Cada comercio solo ve sus propios datos: una política de seguridad a nivel de fila filtra todo por <span class="mono text-brand-700">tenant_id</span>. El super-admin (Atsura) tiene acceso total. El agente solo ve los casos que tiene asignados. Las notas de casos no se pueden editar ni borrar. Todo esto está activado en el script SQL.</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="color-scheme" content="light">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Respondi · Audit log</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script>
+  tailwind.config = {
+    theme: { extend: {
+      fontFamily: { display:['Sora','sans-serif'], body:['Inter','sans-serif'] },
+      fontWeight: { 400:'400', 500:'500', 600:'600', 700:'700' },
+      colors: {
+        brand: { 50:'#f5f3ff',100:'#ede9fe',200:'#ddd6fe',300:'#c4b5fd',400:'#a78bfa',
+                 500:'#8b5cf6',600:'#7c3aed',700:'#6d28d9',800:'#5b21b6',900:'#4c1d95' },
+        ink: { 900:'#1c1530',700:'#3b3155',500:'#6b6486',400:'#9b95ad' }
+      }
+    }}
+  }
+</script>
+<style>
+  :root { color-scheme: light; }
+  html, body { background-color: #ffffff !important; color: #1c1530 !important; }
+  body { font-family: 'Inter', sans-serif; }
+  h1,h2,h3,.font-display { font-family: 'Sora', sans-serif; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background:#ddd6fe; border-radius:8px; }
+</style>
+</head>
+<body class="bg-slate-50 text-ink-900 antialiased" style="background-color:#f8fafc;color:#1c1530;">
+
+<div class="min-h-screen lg:flex">
+
+  <aside id="sidebar"
+    class="fixed inset-y-0 left-0 z-40 w-72 bg-ink-900 text-white
+           transform -translate-x-full transition-transform duration-300 ease-out
+           lg:translate-x-0 lg:static lg:z-auto flex flex-col">
+
+    <div class="flex items-center gap-3 px-6 h-20 border-b border-white/10">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600
+                  flex items-center justify-center shadow-lg shadow-brand-600/30">
+        <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M8 10h8M8 14h5M21 12c0 4.418-4.03 8-9 8a9.7 9.7 0 01-4-.85L3 20l1.1-3.3A7.6 7.6 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+        </svg>
+      </div>
+      <div>
+        <p class="font-display font-700 text-lg leading-none">Respondi</p>
+        <p class="text-[11px] text-brand-300 mt-1 tracking-wide">Panel de administración</p>
+      </div>
+    </div>
+
+    <nav class="flex-1 px-3 py-5 space-y-1 overflow-y-auto">
+      <p class="px-3 pb-2 text-[11px] uppercase tracking-wider text-ink-400 font-600">General</p>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-400 hover:bg-white/5 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        Dashboard
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-400 hover:bg-white/5 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/><path stroke-linecap="round" stroke-linejoin="round" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/></svg>
+        Métricas
+      </a>
+
+      <p class="px-3 pt-5 pb-2 text-[11px] uppercase tracking-wider text-ink-400 font-600">Operación</p>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-400 hover:bg-white/5 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a2 2 0 01-2-2v-1m0-9V5a2 2 0 012-2h6a2 2 0 012 2v6a2 2 0 01-2 2H9l-4 4V8a2 2 0 012-2h2z"/></svg>
+        Casos
+        <span class="ml-auto text-[11px] font-600 px-1.5 py-0.5 rounded-md bg-brand-500 text-white">5</span>
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-400 hover:bg-white/5 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.7 9.7 0 01-4-.85L3 20l1.1-3.3A7.6 7.6 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+        Conversaciones
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-400 hover:bg-white/5 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>
+        Chats
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-400 hover:bg-white/5 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+        Novedades del día
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-400 hover:bg-white/5 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+        Blacklist
+      </a>
+
+      <p class="px-3 pt-5 pb-2 text-[11px] uppercase tracking-wider text-ink-400 font-600">Configuración</p>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-400 hover:bg-white/5 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+        Perfil del comercio
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-400 hover:bg-white/5 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        Skills de IA
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-400 hover:bg-white/5 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.99 1.99 0 013 12V7a4 4 0 014-4z"/></svg>
+        Lista de precios
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-400 hover:bg-white/5 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        Reglas de casos
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-400 hover:bg-white/5 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.99 1.99 0 013 12V7a4 4 0 014-4z"/></svg>
+        Etiquetas
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-400 hover:bg-white/5 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.7 9.7 0 01-4-.85L3 20l1.1-3.3A7.6 7.6 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+        Canales
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-400 hover:bg-white/5 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-6a4 4 0 11-8 0 4 4 0 018 0zm6 3a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        Usuarios
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-brand-600 text-white font-500 shadow-lg shadow-brand-900/40">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        Audit log
+      </a>
+    </nav>
+
+    <div class="px-3 py-4 border-t border-white/10">
+      <div class="flex items-center gap-3 px-3 py-2">
+        <div class="w-9 h-9 rounded-full bg-brand-500 flex items-center justify-center font-600 text-sm">MR</div>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-500 truncate">María Rodríguez</p>
+          <p class="text-[11px] text-ink-400 truncate">Administradora</p>
+        </div>
+        <svg class="w-5 h-5 text-ink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+      </div>
+    </div>
+  </aside>
+
+  <div id="overlay" class="fixed inset-0 bg-ink-900/50 z-30 hidden lg:hidden"></div>
+
+  <div class="flex-1 flex flex-col min-w-0">
+
+    <header class="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-slate-200">
+      <div class="flex items-center gap-3 px-4 sm:px-6 lg:px-8 h-20">
+        <button id="menuBtn" class="lg:hidden p-2 -ml-2 rounded-lg hover:bg-slate-100 transition" aria-label="Abrir menú">
+          <svg class="w-6 h-6 text-ink-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <div class="flex items-center gap-2">
+          <span class="hidden sm:inline text-xs text-ink-500 font-500">Sucursal</span>
+          <button class="flex items-center gap-2 pl-3 pr-2 py-2 rounded-xl border border-slate-200 bg-white hover:border-brand-300 hover:bg-brand-50 transition group">
+            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+            <span class="font-500 text-sm">Tienda Centro</span>
+            <svg class="w-4 h-4 text-ink-400 group-hover:text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+          </button>
+        </div>
+        <div class="flex-1"></div>
+        <button class="relative p-2 rounded-lg hover:bg-slate-100 transition" aria-label="Notificaciones">
+          <svg class="w-6 h-6 text-ink-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+          <span class="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-brand-600 rounded-full ring-2 ring-white"></span>
+        </button>
+        <div class="lg:hidden w-9 h-9 rounded-full bg-brand-500 text-white flex items-center justify-center font-600 text-sm">MR</div>
+      </div>
+    </header>
+
+    <main class="flex-1 px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-4xl w-full mx-auto">
+
+      <!-- Encabezado -->
+      <div class="flex items-start justify-between gap-4 flex-wrap mb-5">
+        <div>
+          <h1 class="font-display font-700 text-2xl sm:text-3xl text-ink-900">Audit log</h1>
+          <p class="text-ink-500 mt-1">Registro de todos los cambios hechos en tu Respondi. Te protege ante errores o cambios indebidos.</p>
+        </div>
+        <button class="inline-flex items-center gap-2 px-4 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+          Exportar
+        </button>
+      </div>
+
+      <!-- Filtros -->
+      <div class="flex items-center gap-2 mb-5 flex-wrap">
+        <div class="relative flex-1 min-w-[200px]">
+          <svg class="w-4 h-4 text-ink-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <input type="text" placeholder="Buscar en el registro..."
+            class="w-full h-10 pl-9 pr-3 rounded-lg border border-slate-300 bg-white text-sm placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition">
+        </div>
+        <select class="h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm text-ink-700 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition">
+          <option>Todos los usuarios</option>
+          <option>María Rodríguez</option>
+          <option>Juan Carrasco</option>
+          <option>Laura García</option>
+        </select>
+        <select class="h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm text-ink-700 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition">
+          <option>Toda actividad</option>
+          <option>Precios</option>
+          <option>Skills de IA</option>
+          <option>Usuarios</option>
+          <option>Reglas</option>
+          <option>Canales</option>
+        </select>
+      </div>
+
+      <!-- ===== REGISTRO ===== -->
+
+      <!-- Grupo: HOY -->
+      <p class="text-xs font-700 uppercase tracking-wider text-ink-400 mb-2 mt-1">Hoy</p>
+      <div class="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100 mb-6">
+
+        <!-- entrada: cambio de precio -->
+        <div class="flex items-start gap-3 p-4">
+          <div class="w-9 h-9 rounded-full bg-brand-500 flex items-center justify-center text-white text-xs font-600 shrink-0">MR</div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm text-ink-900"><span class="font-600">María Rodríguez</span> cambió el precio de <span class="font-600">"Torta de tres leches"</span></p>
+            <div class="flex items-center gap-2 mt-1.5 flex-wrap">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-500 bg-slate-100 text-ink-600 line-through">18,00 $</span>
+              <svg class="w-3.5 h-3.5 text-ink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+              <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-600 bg-emerald-100 text-emerald-700">22,00 $</span>
+            </div>
+          </div>
+          <div class="text-right shrink-0">
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-700 uppercase tracking-wide bg-purple-100 text-purple-700">Precios</span>
+            <p class="text-xs text-ink-400 mt-1">11:24</p>
+          </div>
+        </div>
+
+        <!-- entrada: activó skill -->
+        <div class="flex items-start gap-3 p-4">
+          <div class="w-9 h-9 rounded-full bg-brand-500 flex items-center justify-center text-white text-xs font-600 shrink-0">MR</div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm text-ink-900"><span class="font-600">María Rodríguez</span> activó la skill <span class="font-600">"Manejo de reclamos"</span></p>
+            <div class="flex items-center gap-2 mt-1.5 flex-wrap">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-500 bg-slate-100 text-ink-600 line-through">Inactiva</span>
+              <svg class="w-3.5 h-3.5 text-ink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+              <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-600 bg-emerald-100 text-emerald-700">Activa</span>
+            </div>
+          </div>
+          <div class="text-right shrink-0">
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-700 uppercase tracking-wide bg-blue-100 text-blue-700">Skills</span>
+            <p class="text-xs text-ink-400 mt-1">10:02</p>
+          </div>
+        </div>
+
+        <!-- entrada: invitó usuario -->
+        <div class="flex items-start gap-3 p-4">
+          <div class="w-9 h-9 rounded-full bg-brand-500 flex items-center justify-center text-white text-xs font-600 shrink-0">MR</div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm text-ink-900"><span class="font-600">María Rodríguez</span> invitó a un nuevo usuario <span class="font-600">"carlos.mendez@tiendacentro.com"</span> como <span class="font-600">Agente</span></p>
+            <p class="text-xs text-ink-500 mt-1">Pendiente de que acepte la invitación</p>
+          </div>
+          <div class="text-right shrink-0">
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-700 uppercase tracking-wide bg-orange-100 text-orange-700">Usuarios</span>
+            <p class="text-xs text-ink-400 mt-1">09:15</p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Grupo: AYER -->
+      <p class="text-xs font-700 uppercase tracking-wider text-ink-400 mb-2">Ayer · 1 de junio</p>
+      <div class="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100 mb-6">
+
+        <!-- entrada: agente cerró caso -->
+        <div class="flex items-start gap-3 p-4">
+          <div class="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 text-xs font-600 shrink-0">LG</div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm text-ink-900"><span class="font-600">Laura García</span> cerró el <span class="font-600">caso #1042</span> (reclamo de Javier González)</p>
+            <div class="flex items-center gap-2 mt-1.5 flex-wrap">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-500 bg-slate-100 text-ink-600 line-through">Atendiendo</span>
+              <svg class="w-3.5 h-3.5 text-ink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+              <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-600 bg-emerald-100 text-emerald-700">Resuelto</span>
+            </div>
+          </div>
+          <div class="text-right shrink-0">
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-700 uppercase tracking-wide bg-amber-100 text-amber-700">Casos</span>
+            <p class="text-xs text-ink-400 mt-1">14:30</p>
+          </div>
+        </div>
+
+        <!-- entrada: operario cargó novedad -->
+        <div class="flex items-start gap-3 p-4">
+          <div class="w-9 h-9 rounded-full bg-orange-100 flex items-center justify-center text-orange-700 text-xs font-600 shrink-0">JC</div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm text-ink-900"><span class="font-600">Juan Carrasco</span> creó una novedad de tipo <span class="font-600">Stock</span></p>
+            <p class="text-xs text-ink-500 mt-1">"No tenemos tarta de chocolate hasta el viernes..."</p>
+          </div>
+          <div class="text-right shrink-0">
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-700 uppercase tracking-wide bg-blue-100 text-blue-700">Novedades</span>
+            <p class="text-xs text-ink-400 mt-1">18:42</p>
+          </div>
+        </div>
+
+        <!-- entrada: cambió canal -->
+        <div class="flex items-start gap-3 p-4">
+          <div class="w-9 h-9 rounded-full bg-brand-500 flex items-center justify-center text-white text-xs font-600 shrink-0">MR</div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm text-ink-900"><span class="font-600">María Rodríguez</span> conectó el canal <span class="font-600">WhatsApp</span> vía Whaticket</p>
+            <div class="flex items-center gap-2 mt-1.5 flex-wrap">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-500 bg-slate-100 text-ink-600 line-through">Sin conectar</span>
+              <svg class="w-3.5 h-3.5 text-ink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+              <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-600 bg-emerald-100 text-emerald-700">Conectado</span>
+            </div>
+          </div>
+          <div class="text-right shrink-0">
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-700 uppercase tracking-wide bg-emerald-100 text-emerald-700">Canales</span>
+            <p class="text-xs text-ink-400 mt-1">11:08</p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Cargar más -->
+      <div class="text-center">
+        <button class="inline-flex items-center gap-2 px-4 h-10 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition">
+          Cargar más
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+        </button>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script>
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('overlay');
+  const menuBtn = document.getElementById('menuBtn');
+  menuBtn.addEventListener('click', () => { sidebar.classList.remove('-translate-x-full'); overlay.classList.remove('hidden'); });
+  overlay.addEventListener('click', () => { sidebar.classList.add('-translate-x-full'); overlay.classList.add('hidden'); });
+</script>
+
+</body>
+</html>

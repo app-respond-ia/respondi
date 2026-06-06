@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="color-scheme" content="light">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Respondi · Índice del prototipo</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script>
+  tailwind.config = { theme: { extend: {
+    fontFamily: { display:['Sora','sans-serif'], body:['Inter','sans-serif'] },
+    fontWeight: { 400:'400',500:'500',600:'600',700:'700' },
+    colors: { brand:{50:'#f5f3ff',100:'#ede9fe',200:'#ddd6fe',300:'#c4b5fd',400:'#a78bfa',500:'#8b5cf6',600:'#7c3aed',700:'#6d28d9',800:'#5b21b6',900:'#4c1d95'}, ink:{900:'#1c1530',700:'#3b3155',500:'#6b6486',400:'#9b95ad'} }
+  }}}
+</script>
+<style>
+  :root{color-scheme:light}
+  html,body{background:#f8fafc;color:#1c1530}
+  body{font-family:'Inter',sans-serif}
+  h1,h2,h3,.font-display{font-family:'Sora',sans-serif}
+</style>
+</head>
+<body class="antialiased">
+
+<div class="max-w-5xl mx-auto px-4 sm:px-6 py-10">
+
+  <!-- Cabecera -->
+  <div class="flex items-center gap-3 mb-2">
+    <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center shadow-lg shadow-brand-600/30">
+      <svg class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 10h8M8 14h5M21 12c0 4.418-4.03 8-9 8a9.7 9.7 0 01-4-.85L3 20l1.1-3.3A7.6 7.6 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+    </div>
+    <div>
+      <h1 class="font-display font-700 text-3xl text-ink-900">Respondi</h1>
+      <p class="text-ink-500">Prototipo · 30 pantallas</p>
+    </div>
+  </div>
+
+  <p class="text-ink-600 mb-8 max-w-2xl">Pulsa cualquier pantalla para abrirla. Están organizadas por rol. Para la base de datos y las instrucciones, mira las carpetas <span class="font-mono text-sm bg-slate-100 px-1.5 py-0.5 rounded">2-base-de-datos</span> y <span class="font-mono text-sm bg-slate-100 px-1.5 py-0.5 rounded">3-documentos</span>.</p>
+
+  <!-- ENTRADA -->
+  <h2 class="font-display font-600 text-lg text-ink-900 flex items-center gap-2 mb-3">
+    <span class="w-2.5 h-2.5 rounded-full bg-slate-400"></span> Zona de entrada
+  </h2>
+  <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-8">
+    <a href="1-pantallas/entrada/login.html" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-sm transition text-sm font-500 text-ink-700">Iniciar sesión</a>
+    <a href="1-pantallas/entrada/registro-trial.html" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-sm transition text-sm font-500 text-ink-700">Registro / Trial</a>
+    <a href="1-pantallas/entrada/aceptar-invitacion.html" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-sm transition text-sm font-500 text-ink-700">Aceptar invitación</a>
+    <a href="1-pantallas/entrada/recuperar-contrasena.html" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-sm transition text-sm font-500 text-ink-700">Recuperar contraseña</a>
+    <a href="1-pantallas/entrada/onboarding-wizard.html" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-sm transition text-sm font-500 text-ink-700">Onboarding</a>
+  </div>
+
+  <!-- ADMIN -->
+  <h2 class="font-display font-600 text-lg text-ink-900 flex items-center gap-2 mb-3">
+    <span class="w-2.5 h-2.5 rounded-full bg-brand-500"></span> Admin · dueño del comercio
+  </h2>
+  <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-8">
+    <a href="1-pantallas/admin/dashboard.html" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-sm transition text-sm font-500 text-ink-700">Dashboard</a>
+    <a href="1-pantallas/admin/metricas.html" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-sm transition text-sm font-500 text-ink-700">Métricas</a>
+    <a href="1-pantallas/admin/casos.html" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-sm transition text-sm font-500 text-ink-700">Casos</a>
+    <a href="1-pantallas/admin/caso-detalle.html" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-sm transition text-sm font-500 text-ink-700">Detalle de caso</a>
+    <a href="1-pantallas/admin/conversaciones.html" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-sm transition text-sm font-500 text-ink-700">Conversaciones</a>
+    <a href="1-pantallas/admin/conversacion-detalle.html" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-sm transition text-sm font-500 text-ink-700">Detalle conversación</a>
+    <a href="1-pantallas/admin/chats.html" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-sm transition text-sm font-500 text-ink-700">Chats</a>
+    <a href="1-pantallas/admin/novedades.html" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-sm transition text-sm font-500 text-ink-700">Novedades</a>
+    <a href="1-pantallas/admin/blacklist.html" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-sm transition text-sm font-500 text-ink-700">Blacklist</a>
+    <a href="1-pantallas/admin/perfil-comercio.html" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-sm transition text-sm font-500 text-ink-700">Perfil del comercio</a>
+    <a href="1-pantallas/admin/skills.html" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-sm transition text-sm font-500 text-ink-700">Skills de IA</a>
+    <a href="1-pantallas/admin/precios.html" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-sm transition text-sm font-500 text-ink-700">Lista de precios</a>
+    <a href="1-pantallas/admin/reglas.html" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-sm transition text-sm font-500 text-ink-700">Reglas de casos</a>
+    <a href="1-pantallas/admin/etiquetas.html" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-sm transition text-sm font-500 text-ink-700">Etiquetas</a>
+    <a href="1-pantallas/admin/canales.html" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-sm transition text-sm font-500 text-ink-700">Canales</a>
+    <a href="1-pantallas/admin/usuarios.html" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-sm transition text-sm font-500 text-ink-700">Usuarios</a>
+    <a href="1-pantallas/admin/audit-log.html" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-sm transition text-sm font-500 text-ink-700">Audit log</a>
+  </div>
+
+  <!-- AGENTE -->
+  <h2 class="font-display font-600 text-lg text-ink-900 flex items-center gap-2 mb-3">
+    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Agente
+  </h2>
+  <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-8">
+    <a href="1-pantallas/agente/agente-casos.html" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-sm transition text-sm font-500 text-ink-700">Mis casos</a>
+    <a href="1-pantallas/agente/agente-caso-detalle.html" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-sm transition text-sm font-500 text-ink-700">Detalle de caso</a>
+  </div>
+
+  <!-- OPERARIO -->
+  <h2 class="font-display font-600 text-lg text-ink-900 flex items-center gap-2 mb-3">
+    <span class="w-2.5 h-2.5 rounded-full bg-orange-500"></span> Operario
+  </h2>
+  <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-8">
+    <a href="1-pantallas/operario/operario-novedades.html" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-sm transition text-sm font-500 text-ink-700">Novedades del día</a>
+  </div>
+
+  <!-- SUPER-ADMIN -->
+  <h2 class="font-display font-600 text-lg text-ink-900 flex items-center gap-2 mb-3">
+    <span class="w-2.5 h-2.5 rounded-full bg-brand-700"></span> Super-admin · Atsura
+  </h2>
+  <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-8">
+    <a href="1-pantallas/super-admin/superadmin-dashboard.html" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-sm transition text-sm font-500 text-ink-700">Visión general</a>
+    <a href="1-pantallas/super-admin/superadmin-comercios.html" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-sm transition text-sm font-500 text-ink-700">Comercios</a>
+    <a href="1-pantallas/super-admin/superadmin-planes.html" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-sm transition text-sm font-500 text-ink-700">Planes</a>
+    <a href="1-pantallas/super-admin/superadmin-vendedores.html" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-sm transition text-sm font-500 text-ink-700">Vendedores</a>
+    <a href="1-pantallas/super-admin/superadmin-errores.html" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-sm transition text-sm font-500 text-ink-700">Errores del sistema</a>
+  </div>
+
+  <!-- BASE DE DATOS Y DOCS -->
+  <h2 class="font-display font-600 text-lg text-ink-900 flex items-center gap-2 mb-3">
+    <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Base de datos y documentos
+  </h2>
+  <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+    <a href="2-base-de-datos/respondi-diagrama.html" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-sm transition text-sm font-500 text-ink-700">Diagrama de la BD</a>
+    <a href="2-base-de-datos/respondi-esquema-bd.html" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-sm transition text-sm font-500 text-ink-700">Esquema por bloques</a>
+    <a href="2-base-de-datos/respondi-schema.sql" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-sm transition text-sm font-500 text-ink-700">Script SQL</a>
+    <a href="3-documentos/INSTRUCCIONES-Antigravity.md" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-sm transition text-sm font-500 text-ink-700">Instrucciones Antigravity</a>
+    <a href="3-documentos/CAMBIOS-anteproyecto.md" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-sm transition text-sm font-500 text-ink-700">Cambios al anteproyecto</a>
+    <a href="3-documentos/RESUMEN-reunion.md" class="px-4 py-3 rounded-xl bg-white border border-slate-200 hover:border-brand-300 hover:shadow-sm transition text-sm font-500 text-ink-700">Resumen ejecutivo</a>
+  </div>
+
+</div>
+
+</body>
+</html>

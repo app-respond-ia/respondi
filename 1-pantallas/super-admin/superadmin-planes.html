@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="color-scheme" content="light">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Respondi · Planes</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script>
+  tailwind.config = {
+    theme: { extend: {
+      fontFamily: { display:['Sora','sans-serif'], body:['Inter','sans-serif'] },
+      fontWeight: { 400:'400', 500:'500', 600:'600', 700:'700' },
+      colors: {
+        brand: { 50:'#f5f3ff',100:'#ede9fe',200:'#ddd6fe',300:'#c4b5fd',400:'#a78bfa',
+                 500:'#8b5cf6',600:'#7c3aed',700:'#6d28d9',800:'#5b21b6',900:'#4c1d95' },
+        ink: { 900:'#1c1530',700:'#3b3155',500:'#6b6486',400:'#9b95ad' }
+      }
+    }}
+  }
+</script>
+<style>
+  :root { color-scheme: light; }
+  html, body { background-color: #ffffff !important; color: #1c1530 !important; }
+  body { font-family: 'Inter', sans-serif; }
+  h1,h2,h3,.font-display { font-family: 'Sora', sans-serif; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background:#ddd6fe; border-radius:8px; }
+</style>
+</head>
+<body class="bg-slate-50 text-ink-900 antialiased" style="background-color:#f8fafc;color:#1c1530;">
+
+<div class="min-h-screen lg:flex">
+
+  <aside id="sidebar"
+    class="fixed inset-y-0 left-0 z-40 w-72 bg-ink-900 text-white
+           transform -translate-x-full transition-transform duration-300 ease-out
+           lg:translate-x-0 lg:static lg:z-auto flex flex-col">
+
+    <div class="flex items-center gap-3 px-6 h-20 border-b border-white/10">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600
+                  flex items-center justify-center shadow-lg shadow-brand-600/30">
+        <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M8 10h8M8 14h5M21 12c0 4.418-4.03 8-9 8a9.7 9.7 0 01-4-.85L3 20l1.1-3.3A7.6 7.6 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+        </svg>
+      </div>
+      <div>
+        <p class="font-display font-700 text-lg leading-none">Respondi</p>
+        <p class="inline-flex items-center gap-1 text-[11px] text-brand-300 mt-1 tracking-wide">
+          <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm14 3c0 .6-.4 1-1 1H6c-.6 0-1-.4-1-1v-1h14v1z"/></svg>
+          Panel maestro · Atsura
+        </p>
+      </div>
+    </div>
+
+    <nav class="flex-1 px-3 py-5 space-y-1 overflow-y-auto">
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-400 hover:bg-white/5 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        Visión general
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-400 hover:bg-white/5 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+        Comercios
+        <span class="ml-auto text-[11px] font-600 px-1.5 py-0.5 rounded-md bg-white/10 text-white">48</span>
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-brand-600 text-white font-500 shadow-lg shadow-brand-900/40">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.99 1.99 0 013 12V7a4 4 0 014-4z"/></svg>
+        Planes
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-400 hover:bg-white/5 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-6a4 4 0 11-8 0 4 4 0 018 0zm6 3a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        Vendedores
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-400 hover:bg-white/5 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        Errores del sistema
+        <span class="ml-auto text-[11px] font-600 px-1.5 py-0.5 rounded-md bg-red-500 text-white">2</span>
+      </a>
+    </nav>
+
+    <div class="px-3 py-4 border-t border-white/10">
+      <div class="flex items-center gap-3 px-3 py-2">
+        <div class="w-9 h-9 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center font-600 text-sm">AT</div>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-500 truncate">Atsura</p>
+          <p class="text-[11px] text-ink-400 truncate">Super administrador</p>
+        </div>
+        <svg class="w-5 h-5 text-ink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+      </div>
+    </div>
+  </aside>
+
+  <div id="overlay" class="fixed inset-0 bg-ink-900/50 z-30 hidden lg:hidden"></div>
+
+  <div class="flex-1 flex flex-col min-w-0">
+
+    <header class="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-slate-200">
+      <div class="flex items-center gap-3 px-4 sm:px-6 lg:px-8 h-20">
+        <button id="menuBtn" class="lg:hidden p-2 -ml-2 rounded-lg hover:bg-slate-100 transition" aria-label="Abrir menú">
+          <svg class="w-6 h-6 text-ink-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-brand-50 text-brand-700 text-xs font-600 border border-brand-100">
+          <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5z"/></svg>
+          Panel maestro
+        </span>
+        <div class="flex-1"></div>
+        <button class="relative p-2 rounded-lg hover:bg-slate-100 transition" aria-label="Notificaciones">
+          <svg class="w-6 h-6 text-ink-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+          <span class="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white"></span>
+        </button>
+        <div class="lg:hidden w-9 h-9 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-white flex items-center justify-center font-600 text-sm">AT</div>
+      </div>
+    </header>
+
+    <main class="flex-1 px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-5xl w-full mx-auto">
+
+      <div class="flex items-start justify-between gap-4 flex-wrap mb-6">
+        <div>
+          <h1 class="font-display font-700 text-2xl sm:text-3xl text-ink-900">Planes</h1>
+          <p class="text-ink-500 mt-1">Los planes que pueden contratar los comercios. Tú defines precios y límites.</p>
+        </div>
+        <button class="inline-flex items-center gap-2 px-4 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 transition">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+          Nuevo plan
+        </button>
+      </div>
+
+      <!-- Tarjetas de plan -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+
+        <!-- Trial -->
+        <div class="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col">
+          <div class="flex items-center justify-between mb-1">
+            <h3 class="font-display font-600 text-lg text-ink-900">Trial</h3>
+            <span class="text-[10px] font-700 uppercase tracking-wide px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">14 días</span>
+          </div>
+          <p class="font-display font-700 text-3xl text-ink-900 mb-4">$0</p>
+          <dl class="space-y-2 text-sm flex-1">
+            <div class="flex justify-between"><dt class="text-ink-500">Créditos</dt><dd class="text-ink-900 font-500">7/día · 100 total</dd></div>
+            <div class="flex justify-between"><dt class="text-ink-500">Canales</dt><dd class="text-ink-900 font-500">1</dd></div>
+            <div class="flex justify-between"><dt class="text-ink-500">Sucursales</dt><dd class="text-ink-900 font-500">1</dd></div>
+            <div class="flex justify-between"><dt class="text-ink-500">Usuarios</dt><dd class="text-ink-900 font-500">1</dd></div>
+            <div class="flex justify-between"><dt class="text-ink-500">Modelo IA</dt><dd class="text-ink-900 font-500">GPT-4o mini</dd></div>
+          </dl>
+          <button data-edit class="mt-4 w-full h-10 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition">Editar</button>
+        </div>
+
+        <!-- Starter -->
+        <div class="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col">
+          <div class="flex items-center justify-between mb-1">
+            <h3 class="font-display font-600 text-lg text-ink-900">Starter</h3>
+            <span class="inline-flex items-center gap-1 text-[10px] font-600 text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Activo</span>
+          </div>
+          <p class="font-display font-700 text-3xl text-ink-900 mb-4">$29<span class="text-base text-ink-400 font-500">/mes</span></p>
+          <dl class="space-y-2 text-sm flex-1">
+            <div class="flex justify-between"><dt class="text-ink-500">Créditos</dt><dd class="text-ink-900 font-500">1.000/mes</dd></div>
+            <div class="flex justify-between"><dt class="text-ink-500">Canales</dt><dd class="text-ink-900 font-500">1</dd></div>
+            <div class="flex justify-between"><dt class="text-ink-500">Sucursales</dt><dd class="text-ink-900 font-500">1 · +$15 c/u</dd></div>
+            <div class="flex justify-between"><dt class="text-ink-500">Usuarios</dt><dd class="text-ink-900 font-500">2</dd></div>
+            <div class="flex justify-between"><dt class="text-ink-500">Modelo IA</dt><dd class="text-ink-900 font-500">GPT-4o mini</dd></div>
+          </dl>
+          <button data-edit class="mt-4 w-full h-10 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition">Editar</button>
+        </div>
+
+        <!-- Pro · destacado -->
+        <div class="bg-gradient-to-br from-brand-600 to-brand-800 text-white rounded-2xl p-5 flex flex-col shadow-lg shadow-brand-600/20 relative">
+          <span class="absolute -top-2.5 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full bg-white text-brand-700 text-[10px] font-700 uppercase tracking-wide shadow">Más popular</span>
+          <div class="flex items-center justify-between mb-1">
+            <h3 class="font-display font-600 text-lg">Pro</h3>
+            <span class="inline-flex items-center gap-1 text-[10px] font-600 text-brand-100"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Activo</span>
+          </div>
+          <p class="font-display font-700 text-3xl mb-4">$59<span class="text-base text-brand-200 font-500">/mes</span></p>
+          <dl class="space-y-2 text-sm flex-1">
+            <div class="flex justify-between"><dt class="text-brand-200">Créditos</dt><dd class="font-500">2.000/mes</dd></div>
+            <div class="flex justify-between"><dt class="text-brand-200">Canales</dt><dd class="font-500">3</dd></div>
+            <div class="flex justify-between"><dt class="text-brand-200">Sucursales</dt><dd class="font-500">2 · +$20 c/u</dd></div>
+            <div class="flex justify-between"><dt class="text-brand-200">Usuarios</dt><dd class="font-500">5</dd></div>
+            <div class="flex justify-between"><dt class="text-brand-200">Modelo IA</dt><dd class="font-500">GPT-4o</dd></div>
+          </dl>
+          <button data-edit class="mt-4 w-full h-10 rounded-xl bg-white hover:bg-brand-50 text-sm font-600 text-brand-700 transition">Editar</button>
+        </div>
+
+        <!-- Business -->
+        <div class="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col">
+          <div class="flex items-center justify-between mb-1">
+            <h3 class="font-display font-600 text-lg text-ink-900">Business</h3>
+            <span class="inline-flex items-center gap-1 text-[10px] font-600 text-emerald-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Activo</span>
+          </div>
+          <p class="font-display font-700 text-3xl text-ink-900 mb-4">$99<span class="text-base text-ink-400 font-500">/mes</span></p>
+          <dl class="space-y-2 text-sm flex-1">
+            <div class="flex justify-between"><dt class="text-ink-500">Créditos</dt><dd class="text-ink-900 font-500">5.000/mes</dd></div>
+            <div class="flex justify-between"><dt class="text-ink-500">Canales</dt><dd class="text-ink-900 font-500">Todos</dd></div>
+            <div class="flex justify-between"><dt class="text-ink-500">Sucursales</dt><dd class="text-ink-900 font-500">5 · +$15 c/u</dd></div>
+            <div class="flex justify-between"><dt class="text-ink-500">Usuarios</dt><dd class="text-ink-900 font-500">Ilimitados</dd></div>
+            <div class="flex justify-between"><dt class="text-ink-500">Modelo IA</dt><dd class="text-ink-900 font-500">GPT-4o</dd></div>
+          </dl>
+          <button data-edit class="mt-4 w-full h-10 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition">Editar</button>
+        </div>
+
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- POPUP editar plan -->
+<div id="modal" class="fixed inset-0 z-50 hidden">
+  <div id="modalBg" class="absolute inset-0 bg-ink-900/50 backdrop-blur-sm"></div>
+  <div class="relative min-h-full flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-white rounded-2xl shadow-2xl my-8">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+        <h2 class="font-display font-700 text-lg text-ink-900">Editar plan Pro</h2>
+        <button id="modalClose" class="p-1.5 rounded-lg text-ink-400 hover:text-ink-700 hover:bg-slate-100 transition" aria-label="Cerrar">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-500 text-ink-700 mb-1.5">Nombre</label>
+            <input type="text" value="Pro" class="w-full h-11 px-3 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition">
+          </div>
+          <div>
+            <label class="block text-sm font-500 text-ink-700 mb-1.5">Precio (USD/mes)</label>
+            <input type="number" value="59" class="w-full h-11 px-3 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition">
+          </div>
+          <div>
+            <label class="block text-sm font-500 text-ink-700 mb-1.5">Créditos/mes</label>
+            <input type="number" value="2000" class="w-full h-11 px-3 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition">
+          </div>
+          <div>
+            <label class="block text-sm font-500 text-ink-700 mb-1.5">Canales máx.</label>
+            <input type="number" value="3" class="w-full h-11 px-3 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition">
+          </div>
+          <div>
+            <label class="block text-sm font-500 text-ink-700 mb-1.5">Sucursales máx.</label>
+            <input type="number" value="2" class="w-full h-11 px-3 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition">
+          </div>
+          <div>
+            <label class="block text-sm font-500 text-ink-700 mb-1.5">Usuarios máx.</label>
+            <input type="number" value="5" class="w-full h-11 px-3 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition">
+          </div>
+          <div>
+            <label class="block text-sm font-500 text-ink-700 mb-1.5">Crédito extra ($)</label>
+            <input type="number" value="0.02" step="0.01" class="w-full h-11 px-3 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition">
+          </div>
+          <div>
+            <label class="block text-sm font-500 text-ink-700 mb-1.5">Retención (días)</label>
+            <input type="number" value="90" class="w-full h-11 px-3 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition">
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-500 text-ink-700 mb-1.5">Modelo de IA</label>
+          <select class="w-full h-11 px-3 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition">
+            <option>GPT-4o mini</option>
+            <option selected>GPT-4o</option>
+          </select>
+        </div>
+      </div>
+      <div class="flex justify-end gap-3 px-6 py-4 border-t border-slate-100">
+        <button id="modalCancel" class="px-5 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition">Cancelar</button>
+        <button class="px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 transition">Guardar cambios</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('overlay');
+  const menuBtn = document.getElementById('menuBtn');
+  menuBtn.addEventListener('click', () => { sidebar.classList.remove('-translate-x-full'); overlay.classList.remove('hidden'); });
+  overlay.addEventListener('click', () => { sidebar.classList.add('-translate-x-full'); overlay.classList.add('hidden'); });
+
+  const modal = document.getElementById('modal');
+  const modalClose = document.getElementById('modalClose');
+  const modalCancel = document.getElementById('modalCancel');
+  const modalBg = document.getElementById('modalBg');
+  function closeModal() { modal.classList.add('hidden'); document.body.style.overflow = ''; }
+  document.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => {
+    modal.classList.remove('hidden'); document.body.style.overflow = 'hidden';
+  }));
+  modalClose.addEventListener('click', closeModal);
+  modalCancel.addEventListener('click', closeModal);
+  modalBg.addEventListener('click', closeModal);
+</script>
+
+</body>
+</html>

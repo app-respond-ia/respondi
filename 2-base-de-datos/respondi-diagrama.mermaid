@@ -1,0 +1,232 @@
+erDiagram
+
+    %% ============ GLOBAL (solo super-admin) ============
+    plans {
+        uuid id PK
+        text nombre
+        numeric precio_usd
+        int creditos_mensuales
+        int canales_max
+        int sucursales_max
+        int usuarios_max
+        text modelo_ia
+    }
+    vendedores {
+        uuid id PK
+        text nombre
+        text email
+        numeric porcentaje_comision
+        enum tipo_comision
+    }
+    error_logs {
+        uuid id PK
+        uuid tenant_id FK
+        enum origen
+        text descripcion
+        bool resuelto
+    }
+
+    %% ============ ESTRUCTURA DEL COMERCIO ============
+    comercios {
+        uuid id PK
+        text nombre
+        uuid plan_id FK
+        uuid id_vendedor FK
+        enum estado
+        date fecha_vencimiento
+    }
+    sucursales {
+        uuid id PK
+        uuid tenant_id FK
+        text nombre
+        enum modo_pausa
+        enum blacklist_modo
+    }
+    users {
+        uuid id PK
+        uuid tenant_id FK
+        uuid branch_id FK
+        enum rol
+        text email
+        bool invitacion_aceptada
+    }
+    business_profiles {
+        uuid id PK
+        uuid branch_id FK
+        text descripcion
+        text tono
+    }
+    business_hours {
+        uuid id PK
+        uuid branch_id FK
+        int dia_semana
+        time apertura
+        time cierre
+    }
+    channels {
+        uuid id PK
+        uuid tenant_id FK
+        uuid branch_id FK
+        enum tipo
+        enum metodo
+        enum estado
+    }
+
+    %% ============ CONFIGURACION DE LA IA ============
+    skills {
+        uuid id PK
+        uuid branch_id FK
+        text nombre
+        bool activo
+    }
+    price_list {
+        uuid id PK
+        uuid branch_id FK
+        text nombre
+        numeric precio
+        text precio_tipo
+    }
+    daily_updates {
+        uuid id PK
+        uuid branch_id FK
+        uuid user_id FK
+        enum tipo
+        text descripcion
+    }
+    case_rules {
+        uuid id PK
+        uuid branch_id FK
+        text nombre
+        text palabras_clave
+        text tipo_caso
+    }
+    message_categories {
+        uuid id PK
+        uuid branch_id FK
+        text nombre
+        text descripcion_intencion
+        text color
+    }
+
+    %% ============ CONTACTOS Y CONVERSACIONES ============
+    contacts {
+        uuid id PK
+        uuid tenant_id FK
+        enum canal
+        text identificador_canal
+        bool blacklist
+    }
+    conversations {
+        uuid id PK
+        uuid contact_id FK
+        uuid branch_id FK
+        enum estado
+        bool ia_pausada
+        uuid atendida_por FK
+        text resumen
+    }
+    messages {
+        uuid id PK
+        uuid conversation_id FK
+        enum remitente
+        text contenido
+        int tokens_output
+    }
+    conversation_tags {
+        uuid conversation_id FK
+        uuid category_id FK
+        text aplicada_por
+    }
+
+    %% ============ CASOS ============
+    cases {
+        uuid id PK
+        uuid conversation_id FK
+        uuid contact_id FK
+        uuid agente_id FK
+        enum tipo
+        enum estatus
+        int sla_horas
+    }
+    case_notes {
+        uuid id PK
+        uuid case_id FK
+        uuid user_id FK
+        text nota
+    }
+
+    %% ============ CREDITOS, FACTURACION Y LOGS ============
+    message_quotas {
+        uuid id PK
+        uuid tenant_id FK
+        enum tipo
+        int cantidad
+        int saldo
+    }
+    billing {
+        uuid id PK
+        uuid tenant_id FK
+        uuid plan_id FK
+        uuid id_vendedor FK
+        numeric importe_usd
+        enum estado
+    }
+    ai_logs {
+        uuid id PK
+        uuid message_id FK
+        int tokens_output
+        enum resultado
+    }
+    audit_log {
+        uuid id PK
+        uuid tenant_id FK
+        uuid user_id FK
+        text accion
+        text tabla_afectada
+    }
+    notifications {
+        uuid id PK
+        uuid tenant_id FK
+        uuid user_id FK
+        text titulo
+        bool leida
+    }
+
+    %% ============ RELACIONES ============
+    plans      ||--o{ comercios          : "tiene"
+    vendedores ||--o{ comercios          : "capta"
+    comercios  ||--o{ sucursales         : "tiene"
+    comercios  ||--o{ users              : "emplea"
+    comercios  ||--o{ contacts           : "recibe"
+    comercios  ||--o{ error_logs         : "genera"
+
+    sucursales ||--o{ users              : "asigna"
+    sucursales ||--|| business_profiles  : "configura"
+    sucursales ||--o{ business_hours     : "abre"
+    sucursales ||--o{ channels           : "conecta"
+    sucursales ||--o{ skills             : "define"
+    sucursales ||--o{ price_list         : "lista"
+    sucursales ||--o{ daily_updates      : "publica"
+    sucursales ||--o{ case_rules         : "aplica"
+    sucursales ||--o{ message_categories : "usa"
+
+    users      ||--o{ daily_updates      : "carga"
+    users      ||--o{ cases              : "atiende"
+    users      ||--o{ case_notes         : "escribe"
+
+    contacts   ||--o{ conversations      : "mantiene"
+    conversations ||--o{ messages        : "contiene"
+    conversations ||--o{ conversation_tags : "etiquetada"
+    message_categories ||--o{ conversation_tags : "clasifica"
+    conversations ||--o{ cases           : "escala"
+
+    cases      ||--o{ case_notes         : "registra"
+    messages   ||--o{ ai_logs            : "traza"
+
+    comercios  ||--o{ message_quotas     : "consume"
+    comercios  ||--o{ billing            : "paga"
+    plans      ||--o{ billing            : "factura"
+    vendedores ||--o{ billing            : "comisiona"
+    comercios  ||--o{ audit_log          : "audita"
+    comercios  ||--o{ notifications      : "notifica"
+    users      ||--o{ notifications      : "recibe"

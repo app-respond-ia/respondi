@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="color-scheme" content="light">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Respondi · Activa tu comercio</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          display: ['Sora', 'sans-serif'],
+          body: ['Inter', 'sans-serif'],
+        },
+        fontWeight: {
+          400: '400', 500: '500', 600: '600', 700: '700',
+        },
+        colors: {
+          brand: {
+            50:'#f5f3ff',100:'#ede9fe',200:'#ddd6fe',300:'#c4b5fd',400:'#a78bfa',
+            500:'#8b5cf6',600:'#7c3aed',700:'#6d28d9',800:'#5b21b6',900:'#4c1d95',
+          },
+          ink: { 900:'#1c1530',700:'#3b3155',500:'#6b6486',400:'#9b95ad' }
+        }
+      }
+    }
+  }
+</script>
+<style>
+  :root { color-scheme: light; }
+  html, body { background-color: #ffffff !important; color: #1c1530 !important; }
+  body { font-family: 'Inter', sans-serif; }
+  h1,h2,h3,.font-display { font-family: 'Sora', sans-serif; }
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-thumb { background:#ddd6fe; border-radius:8px; }
+  /* transición suave al cambiar de paso */
+  @keyframes stepIn { from {opacity:0; transform:translateY(10px);} to {opacity:1; transform:translateY(0);} }
+  .step-anim { animation: stepIn .35s ease-out both; }
+</style>
+</head>
+<body class="bg-gradient-to-br from-slate-100 via-brand-50 to-slate-100 text-ink-900 antialiased min-h-screen">
+
+<!-- =========================================================
+     WIZARD DE ONBOARDING
+     · Pantalla completa, SIN sidebar (es la bienvenida).
+     · Una tarjeta grande centrada.
+     · Un paso visible cada vez (los demás están ocultos).
+     · Barra de progreso arriba.
+     · Botones Atrás / Continuar funcionan de verdad.
+     ========================================================= -->
+
+<div class="min-h-screen flex flex-col">
+
+  <!-- ====== Cabecera simple ====== -->
+  <header class="flex items-center justify-between px-5 sm:px-8 h-20 max-w-5xl w-full mx-auto">
+    <div class="flex items-center gap-2.5">
+      <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center">
+        <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M8 10h8M8 14h5M21 12c0 4.418-4.03 8-9 8a9.7 9.7 0 01-4-.85L3 20l1.1-3.3A7.6 7.6 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+        </svg>
+      </div>
+      <span class="font-display font-700 text-lg">Respondi</span>
+    </div>
+    <button class="text-sm font-500 text-ink-500 hover:text-ink-700 transition">Guardar y salir</button>
+  </header>
+
+  <!-- ====== Cuerpo: la tarjeta ====== -->
+  <main class="flex-1 flex items-start sm:items-center justify-center px-4 sm:px-6 pb-10">
+    <div class="w-full max-w-2xl">
+
+      <!-- ---- Barra de progreso ---- -->
+      <div class="mb-5 px-1">
+        <div class="flex items-center justify-between mb-2">
+          <p class="text-sm font-600 text-ink-700">
+            Paso <span id="stepNum">1</span> de 6
+          </p>
+          <p class="text-sm font-500 text-brand-600"><span id="stepPct">0</span>% completado</p>
+        </div>
+        <div class="h-2.5 rounded-full bg-white shadow-inner overflow-hidden">
+          <div id="progressBar" class="h-full rounded-full bg-gradient-to-r from-brand-500 to-brand-600
+                                        transition-all duration-500 ease-out" style="width:0%"></div>
+        </div>
+      </div>
+
+      <!-- ---- La tarjeta grande ---- -->
+      <div class="bg-white rounded-3xl shadow-xl shadow-brand-900/5 ring-1 ring-slate-200/70
+                  overflow-hidden">
+
+        <!-- Zona de contenido del paso -->
+        <div class="p-6 sm:p-10 min-h-[420px]">
+
+          <!-- ============ PASO 1 · Datos del comercio ============ -->
+          <section data-step="1" class="step step-anim">
+            <div class="flex items-center gap-3 mb-1">
+              <span class="w-9 h-9 rounded-xl bg-brand-100 text-brand-700 font-display font-700
+                           flex items-center justify-center text-sm">1</span>
+              <span class="text-xs font-600 uppercase tracking-wider text-brand-600">Datos del comercio</span>
+            </div>
+            <h1 class="font-display font-700 text-2xl text-ink-900 mb-1.5">Cuéntanos de tu negocio</h1>
+            <p class="text-ink-500 mb-6">Completa los datos fiscales y comerciales de tu sucursal.</p>
+
+            <!-- ----- Bloque: Datos fiscales (Tab 1) ----- -->
+            <div class="flex items-center gap-2 mb-3">
+              <svg class="w-4 h-4 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              <h2 class="font-display font-600 text-sm text-ink-700">Datos fiscales</h2>
+              <div class="flex-1 h-px bg-slate-100"></div>
+            </div>
+            <div class="space-y-4 mb-7">
+              <div class="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-500 text-ink-700 mb-1.5">Razón social</label>
+                  <input type="text" placeholder="Nombre legal de la empresa"
+                    class="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white
+                           placeholder:text-ink-400 focus:outline-none focus:border-brand-500
+                           focus:ring-4 focus:ring-brand-100 transition">
+                </div>
+                <div>
+                  <label class="block text-sm font-500 text-ink-700 mb-1.5">RIF / NIF</label>
+                  <input type="text" placeholder="J-12345678-9"
+                    class="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white
+                           placeholder:text-ink-400 focus:outline-none focus:border-brand-500
+                           focus:ring-4 focus:ring-brand-100 transition">
+                </div>
+              </div>
+              <div>
+                <label class="block text-sm font-500 text-ink-700 mb-1.5">Responsable legal</label>
+                <input type="text" placeholder="Nombre completo del responsable"
+                  class="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white
+                         placeholder:text-ink-400 focus:outline-none focus:border-brand-500
+                         focus:ring-4 focus:ring-brand-100 transition">
+              </div>
+              <div>
+                <label class="block text-sm font-500 text-ink-700 mb-1.5">Datos bancarios</label>
+                <input type="text" placeholder="Banco, número de cuenta o IBAN"
+                  class="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white
+                         placeholder:text-ink-400 focus:outline-none focus:border-brand-500
+                         focus:ring-4 focus:ring-brand-100 transition">
+              </div>
+            </div>
+
+            <!-- ----- Bloque: Datos comerciales (Tab 2) ----- -->
+            <div class="flex items-center gap-2 mb-3">
+              <svg class="w-4 h-4 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+              <h2 class="font-display font-600 text-sm text-ink-700">Datos comerciales</h2>
+              <div class="flex-1 h-px bg-slate-100"></div>
+            </div>
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-500 text-ink-700 mb-1.5">Nombre comercial</label>
+                <input type="text" placeholder="Ej. Pastelería Dulce Hogar"
+                  class="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white
+                         placeholder:text-ink-400 focus:outline-none focus:border-brand-500
+                         focus:ring-4 focus:ring-brand-100 transition">
+              </div>
+              <div class="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-500 text-ink-700 mb-1.5">Dirección de la sucursal</label>
+                  <input type="text" placeholder="Calle, número, ciudad"
+                    class="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white
+                           placeholder:text-ink-400 focus:outline-none focus:border-brand-500
+                           focus:ring-4 focus:ring-brand-100 transition">
+                </div>
+                <div>
+                  <label class="block text-sm font-500 text-ink-700 mb-1.5">Huso horario</label>
+                  <select class="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white
+                                 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition">
+                    <option>América/Caracas (GMT-4)</option>
+                    <option>Europa/Madrid (GMT+1)</option>
+                    <option>América/Bogotá (GMT-5)</option>
+                    <option>América/México (GMT-6)</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label class="block text-sm font-500 text-ink-700 mb-1.5">Servicios que ofrece</label>
+                <textarea rows="3" placeholder="Describe los productos o servicios de tu negocio..."
+                  class="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white resize-none
+                         placeholder:text-ink-400 focus:outline-none focus:border-brand-500
+                         focus:ring-4 focus:ring-brand-100 transition"></textarea>
+              </div>
+              <div>
+                <label class="block text-sm font-500 text-ink-700 mb-1.5">Políticas del negocio</label>
+                <textarea rows="3" placeholder="Devoluciones, garantías, formas de pago..."
+                  class="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white resize-none
+                         placeholder:text-ink-400 focus:outline-none focus:border-brand-500
+                         focus:ring-4 focus:ring-brand-100 transition"></textarea>
+              </div>
+              <div>
+                <label class="block text-sm font-500 text-ink-700 mb-1.5">Condiciones</label>
+                <textarea rows="3" placeholder="Condiciones de venta, entrega, reservas..."
+                  class="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white resize-none
+                         placeholder:text-ink-400 focus:outline-none focus:border-brand-500
+                         focus:ring-4 focus:ring-brand-100 transition"></textarea>
+              </div>
+            </div>
+          </section>
+
+          <!-- ============ PASO 2 · Horarios ============ -->
+          <section data-step="2" class="step hidden">
+            <div class="flex items-center gap-3 mb-1">
+              <span class="w-9 h-9 rounded-xl bg-brand-100 text-brand-700 font-display font-700
+                           flex items-center justify-center text-sm">2</span>
+              <span class="text-xs font-600 uppercase tracking-wider text-brand-600">Horarios de atención</span>
+            </div>
+            <h1 class="font-display font-700 text-2xl text-ink-900 mb-1.5">¿Cuándo atiende tu negocio?</h1>
+            <p class="text-ink-500 mb-6">Fuera de este horario, la IA enviará un mensaje automático de aviso.</p>
+
+            <div class="space-y-2.5">
+              <!-- Fila de día (se repite) -->
+              <div class="flex items-center gap-3 sm:gap-4">
+                <label class="flex items-center gap-2.5 w-32 sm:w-40 shrink-0">
+                  <input type="checkbox" checked class="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-400">
+                  <span class="text-sm font-500 text-ink-700">Lunes</span>
+                </label>
+                <input type="time" value="09:00" class="flex-1 h-11 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition">
+                <span class="text-ink-400 text-sm">a</span>
+                <input type="time" value="18:00" class="flex-1 h-11 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition">
+              </div>
+              <div class="flex items-center gap-3 sm:gap-4">
+                <label class="flex items-center gap-2.5 w-32 sm:w-40 shrink-0">
+                  <input type="checkbox" checked class="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-400">
+                  <span class="text-sm font-500 text-ink-700">Martes</span>
+                </label>
+                <input type="time" value="09:00" class="flex-1 h-11 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition">
+                <span class="text-ink-400 text-sm">a</span>
+                <input type="time" value="18:00" class="flex-1 h-11 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition">
+              </div>
+              <div class="flex items-center gap-3 sm:gap-4">
+                <label class="flex items-center gap-2.5 w-32 sm:w-40 shrink-0">
+                  <input type="checkbox" checked class="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-400">
+                  <span class="text-sm font-500 text-ink-700">Miércoles</span>
+                </label>
+                <input type="time" value="09:00" class="flex-1 h-11 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition">
+                <span class="text-ink-400 text-sm">a</span>
+                <input type="time" value="18:00" class="flex-1 h-11 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition">
+              </div>
+              <div class="flex items-center gap-3 sm:gap-4">
+                <label class="flex items-center gap-2.5 w-32 sm:w-40 shrink-0">
+                  <input type="checkbox" checked class="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-400">
+                  <span class="text-sm font-500 text-ink-700">Jueves</span>
+                </label>
+                <input type="time" value="09:00" class="flex-1 h-11 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition">
+                <span class="text-ink-400 text-sm">a</span>
+                <input type="time" value="18:00" class="flex-1 h-11 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition">
+              </div>
+              <div class="flex items-center gap-3 sm:gap-4">
+                <label class="flex items-center gap-2.5 w-32 sm:w-40 shrink-0">
+                  <input type="checkbox" checked class="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-400">
+                  <span class="text-sm font-500 text-ink-700">Viernes</span>
+                </label>
+                <input type="time" value="09:00" class="flex-1 h-11 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition">
+                <span class="text-ink-400 text-sm">a</span>
+                <input type="time" value="18:00" class="flex-1 h-11 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition">
+              </div>
+              <div class="flex items-center gap-3 sm:gap-4">
+                <label class="flex items-center gap-2.5 w-32 sm:w-40 shrink-0">
+                  <input type="checkbox" class="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-400">
+                  <span class="text-sm font-500 text-ink-400">Sábado</span>
+                </label>
+                <input type="time" value="09:00" disabled class="flex-1 h-11 px-3 rounded-lg border border-slate-200 bg-slate-50 text-sm text-ink-400">
+                <span class="text-ink-300 text-sm">a</span>
+                <input type="time" value="18:00" disabled class="flex-1 h-11 px-3 rounded-lg border border-slate-200 bg-slate-50 text-sm text-ink-400">
+              </div>
+              <div class="flex items-center gap-3 sm:gap-4">
+                <label class="flex items-center gap-2.5 w-32 sm:w-40 shrink-0">
+                  <input type="checkbox" class="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-400">
+                  <span class="text-sm font-500 text-ink-400">Domingo</span>
+                </label>
+                <input type="time" value="09:00" disabled class="flex-1 h-11 px-3 rounded-lg border border-slate-200 bg-slate-50 text-sm text-ink-400">
+                <span class="text-ink-300 text-sm">a</span>
+                <input type="time" value="18:00" disabled class="flex-1 h-11 px-3 rounded-lg border border-slate-200 bg-slate-50 text-sm text-ink-400">
+              </div>
+            </div>
+          </section>
+
+          <!-- ============ PASO 3 · Skills ============ -->
+          <section data-step="3" class="step hidden">
+            <div class="flex items-center gap-3 mb-1">
+              <span class="w-9 h-9 rounded-xl bg-brand-100 text-brand-700 font-display font-700
+                           flex items-center justify-center text-sm">3</span>
+              <span class="text-xs font-600 uppercase tracking-wider text-brand-600">Skills de IA</span>
+            </div>
+            <h1 class="font-display font-700 text-2xl text-ink-900 mb-1.5">¿Qué sabrá hacer tu agente?</h1>
+            <p class="text-ink-500 mb-6">Activa las habilidades que quieras. Podrás editarlas en detalle más adelante.</p>
+
+            <div class="space-y-3">
+              <label class="flex items-start gap-3 p-4 rounded-xl border border-brand-200 bg-brand-50 cursor-pointer">
+                <input type="checkbox" checked class="mt-0.5 w-4 h-4 rounded border-brand-300 text-brand-600 focus:ring-brand-400">
+                <div>
+                  <p class="text-sm font-600 text-ink-900">Idioma y saludo inicial</p>
+                  <p class="text-sm text-ink-500 mt-0.5">Detecta el idioma del cliente y le da la bienvenida.</p>
+                </div>
+              </label>
+              <label class="flex items-start gap-3 p-4 rounded-xl border border-brand-200 bg-brand-50 cursor-pointer">
+                <input type="checkbox" checked class="mt-0.5 w-4 h-4 rounded border-brand-300 text-brand-600 focus:ring-brand-400">
+                <div>
+                  <p class="text-sm font-600 text-ink-900">Preguntas de precio</p>
+                  <p class="text-sm text-ink-500 mt-0.5">Informa precios y menciona descuentos si los hay.</p>
+                </div>
+              </label>
+              <label class="flex items-start gap-3 p-4 rounded-xl border border-slate-200 bg-white cursor-pointer hover:border-brand-300 transition">
+                <input type="checkbox" class="mt-0.5 w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-400">
+                <div>
+                  <p class="text-sm font-600 text-ink-900">Manejo de reclamos</p>
+                  <p class="text-sm text-ink-500 mt-0.5">Tono empático y escalado a un agente humano cuando hace falta.</p>
+                </div>
+              </label>
+              <label class="flex items-start gap-3 p-4 rounded-xl border border-slate-200 bg-white cursor-pointer hover:border-brand-300 transition">
+                <input type="checkbox" class="mt-0.5 w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-400">
+                <div>
+                  <p class="text-sm font-600 text-ink-900">Disponibilidad y stock</p>
+                  <p class="text-sm text-ink-500 mt-0.5">Informa cuando un producto no está disponible.</p>
+                </div>
+              </label>
+            </div>
+          </section>
+
+          <!-- ============ PASO 4 · Conectar canal ============ -->
+          <section data-step="4" class="step hidden">
+            <div class="flex items-center gap-3 mb-1">
+              <span class="w-9 h-9 rounded-xl bg-brand-100 text-brand-700 font-display font-700
+                           flex items-center justify-center text-sm">4</span>
+              <span class="text-xs font-600 uppercase tracking-wider text-brand-600">Conectar un canal</span>
+            </div>
+            <h1 class="font-display font-700 text-2xl text-ink-900 mb-1.5">Conecta tu Instagram</h1>
+            <p class="text-ink-500 mb-6">Tu agente recibirá y responderá los mensajes directos de esta cuenta.</p>
+
+            <div class="rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+              <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-pink-500 via-red-500 to-yellow-500
+                          flex items-center justify-center mb-4">
+                <svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2.16c3.2 0 3.58.01 4.85.07 3.25.15 4.77 1.69 4.92 4.92.06 1.27.07 1.65.07 4.85 0 3.2-.01 3.58-.07 4.85-.15 3.23-1.66 4.77-4.92 4.92-1.27.06-1.65.07-4.85.07-3.2 0-3.58-.01-4.85-.07-3.26-.15-4.77-1.7-4.92-4.92-.06-1.27-.07-1.65-.07-4.85s.01-3.58.07-4.85C2.38 3.92 3.9 2.38 7.15 2.23 8.42 2.17 8.8 2.16 12 2.16zM12 0C8.74 0 8.33.01 7.05.07 2.7.27.27 2.69.07 7.05.01 8.33 0 8.74 0 12s.01 3.67.07 4.95c.2 4.36 2.62 6.78 6.98 6.98C8.33 23.99 8.74 24 12 24s3.67-.01 4.95-.07c4.35-.2 6.78-2.62 6.98-6.98.06-1.28.07-1.69.07-4.95s-.01-3.67-.07-4.95c-.2-4.35-2.62-6.78-6.98-6.98C15.67.01 15.26 0 12 0zm0 5.84a6.16 6.16 0 100 12.32 6.16 6.16 0 000-12.32zM12 16a4 4 0 110-8 4 4 0 010 8zm6.4-10.85a1.44 1.44 0 100 2.88 1.44 1.44 0 000-2.88z"/>
+                </svg>
+              </div>
+              <p class="font-600 text-ink-900 mb-1">Instagram Direct</p>
+              <p class="text-sm text-ink-500 mb-5 max-w-sm mx-auto">
+                Inicia sesión con la cuenta de Instagram de tu negocio para autorizar la conexión.
+              </p>
+              <button class="inline-flex items-center gap-2 px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700
+                             text-white font-600 shadow-lg shadow-brand-600/30 transition">
+                Conectar Instagram
+              </button>
+            </div>
+            <p class="text-xs text-ink-400 mt-4 text-center">
+              WhatsApp y Facebook podrás conectarlos más adelante desde la configuración.
+            </p>
+          </section>
+
+          <!-- ============ PASO 5 · Disclaimer ============ -->
+          <section data-step="5" class="step hidden">
+            <div class="flex items-center gap-3 mb-1">
+              <span class="w-9 h-9 rounded-xl bg-brand-100 text-brand-700 font-display font-700
+                           flex items-center justify-center text-sm">5</span>
+              <span class="text-xs font-600 uppercase tracking-wider text-brand-600">Mensaje de bienvenida</span>
+            </div>
+            <h1 class="font-display font-700 text-2xl text-ink-900 mb-1.5">El primer mensaje al cliente</h1>
+            <p class="text-ink-500 mb-6">La IA enviará este texto al inicio de cada conversación nueva.</p>
+
+            <textarea rows="5" placeholder="Ej. ¡Hola! Soy el asistente virtual de Pastelería Dulce Hogar. Estoy aquí para ayudarte con información sobre nuestros productos y precios. ¿En qué puedo ayudarte hoy?"
+              class="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white resize-none
+                     placeholder:text-ink-400 focus:outline-none focus:border-brand-500
+                     focus:ring-4 focus:ring-brand-100 transition"></textarea>
+
+            <div class="flex items-start gap-3 mt-4 rounded-xl bg-brand-50 border border-brand-100 p-3.5">
+              <svg class="w-5 h-5 text-brand-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <p class="text-sm text-ink-700">
+                Es buena idea aclarar que se trata de un asistente virtual. Así el cliente sabe que habla con una IA.
+              </p>
+            </div>
+          </section>
+
+          <!-- ============ PASO 6 · Precios ============ -->
+          <section data-step="6" class="step hidden">
+            <div class="flex items-center gap-3 mb-1">
+              <span class="w-9 h-9 rounded-xl bg-brand-100 text-brand-700 font-display font-700
+                           flex items-center justify-center text-sm">6</span>
+              <span class="text-xs font-600 uppercase tracking-wider text-brand-600">Lista de precios</span>
+            </div>
+            <h1 class="font-display font-700 text-2xl text-ink-900 mb-1.5">Carga tus productos</h1>
+            <p class="text-ink-500 mb-6">Añade al menos un ítem. La IA usará estos precios para responder.</p>
+
+            <!-- Ítem cargado de ejemplo -->
+            <div class="flex items-center gap-3 p-3.5 rounded-xl border border-slate-200 bg-white mb-3">
+              <div class="w-10 h-10 rounded-lg bg-brand-100 flex items-center justify-center shrink-0">
+                <svg class="w-5 h-5 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5a2 2 0 011.41.59l7 7a2 2 0 010 2.82l-7 7a2 2 0 01-2.82 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"/></svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-600 text-ink-900">Torta de chocolate</p>
+                <p class="text-xs text-ink-500">Disponible</p>
+              </div>
+              <span class="text-sm font-600 text-ink-900">$25,00</span>
+            </div>
+
+            <!-- Añadir nuevo ítem -->
+            <div class="grid sm:grid-cols-[1fr_auto_auto] gap-3 items-end p-3.5 rounded-xl border border-dashed border-slate-300 bg-slate-50">
+              <div>
+                <label class="block text-xs font-500 text-ink-500 mb-1">Producto</label>
+                <input type="text" placeholder="Nombre del producto"
+                  class="w-full h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm
+                         focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition">
+              </div>
+              <div class="w-full sm:w-28">
+                <label class="block text-xs font-500 text-ink-500 mb-1">Precio</label>
+                <input type="text" placeholder="0,00"
+                  class="w-full h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm
+                         focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition">
+              </div>
+              <button class="h-10 px-4 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 transition">
+                Añadir
+              </button>
+            </div>
+
+            <p class="text-xs text-ink-400 mt-4 text-center">
+              ¿Tienes muchos productos? Más adelante podrás cargarlos en bloque con una plantilla de Excel.
+            </p>
+          </section>
+
+        </div>
+
+        <!-- ---- Pie de la tarjeta: navegación ---- -->
+        <div class="flex items-center justify-between gap-3 px-6 sm:px-10 py-5 border-t border-slate-100 bg-slate-50/60">
+          <button id="btnBack"
+            class="px-5 h-11 rounded-xl font-600 text-ink-500 hover:text-ink-700 hover:bg-white transition
+                   disabled:opacity-0 disabled:pointer-events-none">
+            ← Atrás
+          </button>
+
+          <!-- puntos indicadores -->
+          <div id="dots" class="hidden sm:flex items-center gap-2"></div>
+
+          <button id="btnNext"
+            class="px-6 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-600
+                   shadow-lg shadow-brand-600/30 transition">
+            Continuar →
+          </button>
+        </div>
+
+      </div>
+
+      <p class="text-center text-xs text-ink-400 mt-5">
+        Tu agente de IA se activará automáticamente al completar los 6 pasos.
+      </p>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  // ====== Lógica del wizard ======
+  const TOTAL = 6;
+  let current = 1;
+
+  const steps      = document.querySelectorAll('.step');
+  const stepNum    = document.getElementById('stepNum');
+  const stepPct    = document.getElementById('stepPct');
+  const progress   = document.getElementById('progressBar');
+  const btnBack    = document.getElementById('btnBack');
+  const btnNext    = document.getElementById('btnNext');
+  const dotsBox    = document.getElementById('dots');
+
+  // Crear los puntos indicadores
+  for (let i = 1; i <= TOTAL; i++) {
+    const d = document.createElement('span');
+    d.className = 'w-2 h-2 rounded-full transition-all duration-300';
+    d.dataset.dot = i;
+    dotsBox.appendChild(d);
+  }
+
+  function render() {
+    // mostrar solo el paso actual
+    steps.forEach(s => {
+      const n = Number(s.dataset.step);
+      if (n === current) {
+        s.classList.remove('hidden');
+        s.classList.add('step-anim');
+      } else {
+        s.classList.add('hidden');
+        s.classList.remove('step-anim');
+      }
+    });
+
+    // progreso: cuenta los pasos YA completados (los que quedaron atrás),
+    // no el paso en el que estás. En el paso 1 sin avanzar = 0%.
+    const pct = Math.round(((current - 1) / TOTAL) * 100);
+    stepNum.textContent = current;
+    stepPct.textContent = pct;
+    progress.style.width = pct + '%';
+
+    // botón atrás: invisible en el paso 1
+    btnBack.disabled = current === 1;
+
+    // botón siguiente: en el último paso cambia de texto
+    btnNext.textContent = current === TOTAL ? 'Activar mi agente ✓' : 'Continuar →';
+    if (current === TOTAL) {
+      btnNext.classList.add('bg-emerald-600','hover:bg-emerald-700','shadow-emerald-600/30');
+      btnNext.classList.remove('bg-brand-600','hover:bg-brand-700','shadow-brand-600/30');
+    } else {
+      btnNext.classList.remove('bg-emerald-600','hover:bg-emerald-700','shadow-emerald-600/30');
+      btnNext.classList.add('bg-brand-600','hover:bg-brand-700','shadow-brand-600/30');
+    }
+
+    // puntos
+    dotsBox.querySelectorAll('span').forEach(d => {
+      const n = Number(d.dataset.dot);
+      d.className = 'rounded-full transition-all duration-300 ' +
+        (n === current ? 'w-6 h-2 bg-brand-600'
+         : n <  current ? 'w-2 h-2 bg-brand-300'
+         : 'w-2 h-2 bg-slate-200');
+    });
+
+    // subir al inicio de la tarjeta al cambiar de paso
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  btnNext.addEventListener('click', () => {
+    if (current < TOTAL) { current++; render(); }
+    else {
+      // Último paso: completar la barra al 100% y avisar
+      progress.style.width = '100%';
+      stepPct.textContent = '100';
+      setTimeout(() => {
+        alert('¡Onboarding completo! Aquí el sistema activaría tu agente de IA.');
+      }, 350);
+    }
+  });
+  btnBack.addEventListener('click', () => {
+    if (current > 1) { current--; render(); }
+  });
+
+  render();
+</script>
+
+</body>
+</html>

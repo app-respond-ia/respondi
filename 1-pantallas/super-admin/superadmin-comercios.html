@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="color-scheme" content="light">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Respondi · Comercios</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script>
+  tailwind.config = {
+    theme: { extend: {
+      fontFamily: { display:['Sora','sans-serif'], body:['Inter','sans-serif'] },
+      fontWeight: { 400:'400', 500:'500', 600:'600', 700:'700' },
+      colors: {
+        brand: { 50:'#f5f3ff',100:'#ede9fe',200:'#ddd6fe',300:'#c4b5fd',400:'#a78bfa',
+                 500:'#8b5cf6',600:'#7c3aed',700:'#6d28d9',800:'#5b21b6',900:'#4c1d95' },
+        ink: { 900:'#1c1530',700:'#3b3155',500:'#6b6486',400:'#9b95ad' }
+      }
+    }}
+  }
+</script>
+<style>
+  :root { color-scheme: light; }
+  html, body { background-color: #ffffff !important; color: #1c1530 !important; }
+  body { font-family: 'Inter', sans-serif; }
+  h1,h2,h3,.font-display { font-family: 'Sora', sans-serif; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background:#ddd6fe; border-radius:8px; }
+</style>
+</head>
+<body class="bg-slate-50 text-ink-900 antialiased" style="background-color:#f8fafc;color:#1c1530;">
+
+<div class="min-h-screen lg:flex">
+
+  <aside id="sidebar"
+    class="fixed inset-y-0 left-0 z-40 w-72 bg-ink-900 text-white
+           transform -translate-x-full transition-transform duration-300 ease-out
+           lg:translate-x-0 lg:static lg:z-auto flex flex-col">
+
+    <div class="flex items-center gap-3 px-6 h-20 border-b border-white/10">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600
+                  flex items-center justify-center shadow-lg shadow-brand-600/30">
+        <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M8 10h8M8 14h5M21 12c0 4.418-4.03 8-9 8a9.7 9.7 0 01-4-.85L3 20l1.1-3.3A7.6 7.6 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+        </svg>
+      </div>
+      <div>
+        <p class="font-display font-700 text-lg leading-none">Respondi</p>
+        <p class="inline-flex items-center gap-1 text-[11px] text-brand-300 mt-1 tracking-wide">
+          <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm14 3c0 .6-.4 1-1 1H6c-.6 0-1-.4-1-1v-1h14v1z"/></svg>
+          Panel maestro · Atsura
+        </p>
+      </div>
+    </div>
+
+    <nav class="flex-1 px-3 py-5 space-y-1 overflow-y-auto">
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-400 hover:bg-white/5 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        Visión general
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-brand-600 text-white font-500 shadow-lg shadow-brand-900/40">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+        Comercios
+        <span class="ml-auto text-[11px] font-600 px-1.5 py-0.5 rounded-md bg-white text-brand-700">48</span>
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-400 hover:bg-white/5 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.99 1.99 0 013 12V7a4 4 0 014-4z"/></svg>
+        Planes
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-400 hover:bg-white/5 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-6a4 4 0 11-8 0 4 4 0 018 0zm6 3a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        Vendedores
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-400 hover:bg-white/5 hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        Errores del sistema
+        <span class="ml-auto text-[11px] font-600 px-1.5 py-0.5 rounded-md bg-red-500 text-white">2</span>
+      </a>
+    </nav>
+
+    <div class="px-3 py-4 border-t border-white/10">
+      <div class="flex items-center gap-3 px-3 py-2">
+        <div class="w-9 h-9 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center font-600 text-sm">AT</div>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-500 truncate">Atsura</p>
+          <p class="text-[11px] text-ink-400 truncate">Super administrador</p>
+        </div>
+        <svg class="w-5 h-5 text-ink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+      </div>
+    </div>
+  </aside>
+
+  <div id="overlay" class="fixed inset-0 bg-ink-900/50 z-30 hidden lg:hidden"></div>
+
+  <div class="flex-1 flex flex-col min-w-0">
+
+    <header class="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-slate-200">
+      <div class="flex items-center gap-3 px-4 sm:px-6 lg:px-8 h-20">
+        <button id="menuBtn" class="lg:hidden p-2 -ml-2 rounded-lg hover:bg-slate-100 transition" aria-label="Abrir menú">
+          <svg class="w-6 h-6 text-ink-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-brand-50 text-brand-700 text-xs font-600 border border-brand-100">
+          <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5z"/></svg>
+          Panel maestro
+        </span>
+        <div class="flex-1"></div>
+        <button class="relative p-2 rounded-lg hover:bg-slate-100 transition" aria-label="Notificaciones">
+          <svg class="w-6 h-6 text-ink-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+          <span class="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white"></span>
+        </button>
+        <div class="lg:hidden w-9 h-9 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-white flex items-center justify-center font-600 text-sm">AT</div>
+      </div>
+    </header>
+
+    <main class="flex-1 px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-5xl w-full mx-auto">
+
+      <div class="mb-5">
+        <h1 class="font-display font-700 text-2xl sm:text-3xl text-ink-900">Comercios</h1>
+        <p class="text-ink-500 mt-1">Todos los negocios que usan Respondi.</p>
+      </div>
+
+      <!-- Buscador + filtros -->
+      <div class="space-y-3 mb-5">
+        <div class="relative">
+          <svg class="w-5 h-5 text-ink-400 absolute left-3.5 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <input type="text" placeholder="Buscar comercio o vendedor..."
+            class="w-full h-11 pl-11 pr-4 rounded-xl border border-slate-300 bg-white text-sm placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition">
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <div class="inline-flex p-1 rounded-xl bg-white border border-slate-200 overflow-x-auto">
+            <button class="fstate-btn shrink-0 px-3 py-1.5 rounded-lg text-sm font-600 bg-brand-600 text-white transition">Todos</button>
+            <button class="fstate-btn shrink-0 px-3 py-1.5 rounded-lg text-sm font-500 text-ink-500 transition">Activos</button>
+            <button class="fstate-btn shrink-0 px-3 py-1.5 rounded-lg text-sm font-500 text-ink-500 transition">Trial</button>
+            <button class="fstate-btn shrink-0 px-3 py-1.5 rounded-lg text-sm font-500 text-ink-500 transition">Vencidos</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lista de comercios -->
+      <div class="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100">
+
+        <!-- comercio 1 · activo Pro -->
+        <button data-open class="comercio-item w-full text-left flex items-center gap-3 p-4 hover:bg-slate-50 transition">
+          <div class="w-11 h-11 rounded-xl bg-brand-100 flex items-center justify-center font-600 text-brand-700 shrink-0">DC</div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <p class="font-600 text-ink-900">Dulce Centro</p>
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-600 bg-emerald-100 text-emerald-700">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Activo
+              </span>
+            </div>
+            <p class="text-sm text-ink-500 mt-0.5 truncate">Plan Pro · vence el 15/06 · vendedor: Andrea L.</p>
+          </div>
+          <svg class="w-5 h-5 text-ink-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+        </button>
+
+        <!-- comercio 2 · trial -->
+        <button data-open class="comercio-item w-full text-left flex items-center gap-3 p-4 hover:bg-slate-50 transition">
+          <div class="w-11 h-11 rounded-xl bg-blue-100 flex items-center justify-center font-600 text-blue-700 shrink-0">CL</div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <p class="font-600 text-ink-900">Café Luna</p>
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-600 bg-blue-100 text-blue-700">
+                <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span> Trial
+              </span>
+            </div>
+            <p class="text-sm text-ink-500 mt-0.5 truncate">Día 11 de 14 · vendedor: Marco P.</p>
+          </div>
+          <svg class="w-5 h-5 text-ink-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+        </button>
+
+        <!-- comercio 3 · vencido -->
+        <button data-open class="comercio-item w-full text-left flex items-center gap-3 p-4 hover:bg-slate-50 transition">
+          <div class="w-11 h-11 rounded-xl bg-amber-100 flex items-center justify-center font-600 text-amber-700 shrink-0">PS</div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <p class="font-600 text-ink-900">Panadería Sol</p>
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-600 bg-amber-100 text-amber-700">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Vencido
+              </span>
+            </div>
+            <p class="text-sm text-ink-500 mt-0.5 truncate">Plan Starter · venció el 28/05 · vendedor: Andrea L.</p>
+          </div>
+          <svg class="w-5 h-5 text-ink-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+        </button>
+
+        <!-- comercio 4 · activo Business -->
+        <button data-open class="comercio-item w-full text-left flex items-center gap-3 p-4 hover:bg-slate-50 transition">
+          <div class="w-11 h-11 rounded-xl bg-purple-100 flex items-center justify-center font-600 text-purple-700 shrink-0">FB</div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <p class="font-600 text-ink-900">Floristería Bella</p>
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-600 bg-emerald-100 text-emerald-700">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Activo
+              </span>
+            </div>
+            <p class="text-sm text-ink-500 mt-0.5 truncate">Plan Business · vence el 02/07 · vendedor: Marco P.</p>
+          </div>
+          <svg class="w-5 h-5 text-ink-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+        </button>
+
+        <!-- comercio 5 · suspendido -->
+        <button data-open class="comercio-item w-full text-left flex items-center gap-3 p-4 hover:bg-slate-50 transition">
+          <div class="w-11 h-11 rounded-xl bg-slate-200 flex items-center justify-center font-600 text-slate-600 shrink-0">TM</div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <p class="font-600 text-ink-900">Tacos México</p>
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-600 bg-red-100 text-red-700">
+                <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span> Suspendido
+              </span>
+            </div>
+            <p class="text-sm text-ink-500 mt-0.5 truncate">Plan Pro · suspendido por impago · vendedor: Andrea L.</p>
+          </div>
+          <svg class="w-5 h-5 text-ink-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+        </button>
+
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- POPUP detalle/gestión de comercio -->
+<div id="modal" class="fixed inset-0 z-50 hidden">
+  <div id="modalBg" class="absolute inset-0 bg-ink-900/50 backdrop-blur-sm"></div>
+  <div class="relative min-h-full flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-white rounded-2xl shadow-2xl">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+        <h2 class="font-display font-700 text-lg text-ink-900">Dulce Centro</h2>
+        <button id="modalClose" class="p-1.5 rounded-lg text-ink-400 hover:text-ink-700 hover:bg-slate-100 transition" aria-label="Cerrar">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="px-6 py-5 space-y-4">
+
+        <!-- Estado actual -->
+        <div class="flex items-center gap-3 p-3 rounded-xl bg-emerald-50 border border-emerald-200">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+          <div class="flex-1">
+            <p class="text-sm font-600 text-ink-900">Plan Pro · Activo</p>
+            <p class="text-xs text-ink-500">Vence el 15/06/2026 · 765/2.000 créditos usados</p>
+          </div>
+        </div>
+
+        <!-- Datos -->
+        <dl class="space-y-2.5 text-sm">
+          <div class="flex justify-between gap-2"><dt class="text-ink-500">Admin</dt><dd class="text-ink-900 font-500 text-right">María Rodríguez</dd></div>
+          <div class="flex justify-between gap-2"><dt class="text-ink-500">Alta</dt><dd class="text-ink-900 font-500 text-right">15/04/2026</dd></div>
+          <div class="flex justify-between gap-2"><dt class="text-ink-500">Vendedor</dt><dd class="text-ink-900 font-500 text-right">Andrea L.</dd></div>
+          <div class="flex justify-between gap-2"><dt class="text-ink-500">Forma de pago</dt><dd class="text-ink-900 font-500 text-right">Transferencia</dd></div>
+          <div class="flex justify-between gap-2"><dt class="text-ink-500">Sucursales</dt><dd class="text-ink-900 font-500 text-right">2</dd></div>
+        </dl>
+
+        <!-- Acciones de gestión -->
+        <div class="pt-2 border-t border-slate-100 space-y-2">
+          <p class="text-xs font-600 text-ink-500 uppercase tracking-wide">Gestión del plan</p>
+          <button class="w-full flex items-center justify-center gap-2 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 transition">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Registrar pago y renovar
+          </button>
+          <div class="grid grid-cols-2 gap-2">
+            <button class="h-10 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition">Cambiar plan</button>
+            <button class="h-10 rounded-xl border border-red-200 bg-white hover:bg-red-50 text-sm font-600 text-red-600 transition">Suspender</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('overlay');
+  const menuBtn = document.getElementById('menuBtn');
+  menuBtn.addEventListener('click', () => { sidebar.classList.remove('-translate-x-full'); overlay.classList.remove('hidden'); });
+  overlay.addEventListener('click', () => { sidebar.classList.add('-translate-x-full'); overlay.classList.add('hidden'); });
+
+  document.querySelectorAll('.fstate-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.fstate-btn').forEach(b => {
+        b.classList.remove('bg-brand-600','text-white','font-600');
+        b.classList.add('text-ink-500','font-500');
+      });
+      btn.classList.add('bg-brand-600','text-white','font-600');
+      btn.classList.remove('text-ink-500','font-500');
+    });
+  });
+
+  const modal = document.getElementById('modal');
+  const modalClose = document.getElementById('modalClose');
+  const modalBg = document.getElementById('modalBg');
+  function closeModal() { modal.classList.add('hidden'); document.body.style.overflow = ''; }
+  document.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', () => {
+    modal.classList.remove('hidden'); document.body.style.overflow = 'hidden';
+  }));
+  modalClose.addEventListener('click', closeModal);
+  modalBg.addEventListener('click', closeModal);
+</script>
+
+</body>
+</html>

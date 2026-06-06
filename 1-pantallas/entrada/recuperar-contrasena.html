@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="color-scheme" content="light">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Respondi · Recuperar contraseña</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          display: ['Sora', 'sans-serif'],
+          body: ['Inter', 'sans-serif'],
+        },
+        fontWeight: {
+          400: '400', 500: '500', 600: '600', 700: '700',
+        },
+        colors: {
+          brand: {
+            50:'#f5f3ff',100:'#ede9fe',200:'#ddd6fe',300:'#c4b5fd',400:'#a78bfa',
+            500:'#8b5cf6',600:'#7c3aed',700:'#6d28d9',800:'#5b21b6',900:'#4c1d95',
+          },
+          ink: { 900:'#1c1530',700:'#3b3155',500:'#6b6486',400:'#9b95ad' }
+        }
+      }
+    }
+  }
+</script>
+<style>
+  :root { color-scheme: light; }
+  html, body { background-color: #ffffff !important; color: #1c1530 !important; }
+  body { font-family: 'Inter', sans-serif; }
+  h1,h2,h3,.font-display { font-family: 'Sora', sans-serif; }
+  @keyframes rise { from {opacity:0; transform:translateY(16px);} to {opacity:1; transform:translateY(0);} }
+  .rise { animation: rise .5s ease-out both; }
+</style>
+</head>
+<body class="bg-slate-50 text-ink-900 antialiased" style="background-color:#f8fafc;color:#1c1530;">
+
+<!-- =========================================================
+     RECUPERAR CONTRASEÑA
+     Dos momentos dentro de la misma pantalla:
+       · Vista 1: el usuario escribe su correo.
+       · Vista 2: confirmación de que se envió el enlace.
+     El botón cambia de una vista a otra (demo de frontend).
+     ========================================================= -->
+
+<div class="min-h-screen flex flex-col">
+
+  <!-- Logo arriba, centrado -->
+  <div class="flex items-center justify-center gap-2.5 px-6 pt-10">
+    <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center">
+      <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+        <path stroke-linecap="round" stroke-linejoin="round"
+          d="M8 10h8M8 14h5M21 12c0 4.418-4.03 8-9 8a9.7 9.7 0 01-4-.85L3 20l1.1-3.3A7.6 7.6 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+      </svg>
+    </div>
+    <span class="font-display font-700 text-lg">Respondi</span>
+  </div>
+
+  <div class="flex-1 flex items-center justify-center px-6 py-10">
+    <div class="w-full max-w-sm">
+
+      <!-- ============ VISTA 1 · Pedir el correo ============ -->
+      <div id="view1" class="rise">
+        <div class="bg-white rounded-3xl shadow-xl shadow-brand-900/5 ring-1 ring-slate-200/70 p-7 sm:p-9">
+
+          <!-- Icono -->
+          <div class="w-12 h-12 rounded-xl bg-brand-100 flex items-center justify-center mb-5">
+            <svg class="w-6 h-6 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+          </div>
+
+          <h1 class="font-display font-700 text-2xl text-ink-900 mb-1.5">¿Olvidaste tu contraseña?</h1>
+          <p class="text-ink-500 mb-6">
+            Escribe tu correo y te enviaremos un enlace para crear una contraseña nueva.
+          </p>
+
+          <form class="space-y-4" onsubmit="return false;">
+            <div>
+              <label class="block text-sm font-500 text-ink-700 mb-1.5">Correo electrónico</label>
+              <div class="relative">
+                <svg class="w-5 h-5 text-ink-400 absolute left-3.5 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                <input type="email" placeholder="tucorreo@comercio.com"
+                  class="w-full h-12 pl-11 pr-4 rounded-xl border border-slate-300 bg-white
+                         placeholder:text-ink-400 focus:outline-none focus:border-brand-500
+                         focus:ring-4 focus:ring-brand-100 transition">
+              </div>
+            </div>
+
+            <button type="submit" id="btnSend"
+              class="w-full h-12 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-600
+                     shadow-lg shadow-brand-600/30 transition">
+              Enviar enlace de recuperación
+            </button>
+          </form>
+        </div>
+
+        <a href="#" class="flex items-center justify-center gap-1.5 text-sm font-500 text-ink-500 hover:text-ink-700 mt-6 transition">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+          Volver al inicio de sesión
+        </a>
+      </div>
+
+      <!-- ============ VISTA 2 · Confirmación de envío ============ -->
+      <div id="view2" class="hidden">
+        <div class="bg-white rounded-3xl shadow-xl shadow-brand-900/5 ring-1 ring-slate-200/70 p-7 sm:p-9 text-center">
+
+          <!-- Icono de éxito -->
+          <div class="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-200
+                      flex items-center justify-center mx-auto mb-5">
+            <svg class="w-7 h-7 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+          </div>
+
+          <h1 class="font-display font-700 text-2xl text-ink-900 mb-1.5">Revisa tu correo</h1>
+          <p class="text-ink-500 mb-1">Hemos enviado un enlace de recuperación a</p>
+          <p class="font-600 text-ink-900 mb-6">tucorreo@comercio.com</p>
+
+          <div class="rounded-xl bg-brand-50 border border-brand-100 p-3.5 text-left mb-6">
+            <p class="text-sm text-ink-700">
+              El enlace caduca en 1 hora. Si no lo ves, revisa la carpeta de spam.
+            </p>
+          </div>
+
+          <button id="btnResend"
+            class="w-full h-12 rounded-xl border border-slate-300 bg-white font-600 text-ink-700
+                   hover:bg-slate-50 transition">
+            Volver a enviar
+          </button>
+        </div>
+
+        <a href="#" class="flex items-center justify-center gap-1.5 text-sm font-500 text-ink-500 hover:text-ink-700 mt-6 transition">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+          Volver al inicio de sesión
+        </a>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  // Demo de frontend: el botón pasa de la vista 1 (pedir correo)
+  // a la vista 2 (confirmación). El envío real será cosa de Supabase.
+  const view1 = document.getElementById('view1');
+  const view2 = document.getElementById('view2');
+  const btnSend = document.getElementById('btnSend');
+  const btnResend = document.getElementById('btnResend');
+
+  btnSend.addEventListener('click', () => {
+    view1.classList.add('hidden');
+    view2.classList.remove('hidden');
+    view2.classList.add('rise');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  btnResend.addEventListener('click', () => {
+    // pequeño aviso visual
+    btnResend.textContent = 'Enlace reenviado ✓';
+    setTimeout(() => { btnResend.textContent = 'Volver a enviar'; }, 2500);
+  });
+</script>
+
+</body>
+</html>

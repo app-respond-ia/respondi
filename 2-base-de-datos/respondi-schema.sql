@@ -608,5 +608,39 @@ create policy vendedores_super on vendedores for all using (is_super_admin()) wi
 create policy errors_super on error_logs for all using (is_super_admin()) with check (is_super_admin());
 
 -- ============================================================================
+-- 15. RPC PARA REGISTRO DE TRIAL ATÓMICO (SECURITY DEFINER)
+-- ============================================================================
+
+create or replace function create_trial_account(
+  p_user_id uuid,
+  p_email text,
+  p_nombre text,
+  p_comercio_nombre text
+) returns void language plpgsql security definer as $$
+declare
+  v_comercio_id uuid;
+  v_sucursal_id uuid;
+begin
+  -- 1. Crear comercio
+  insert into public.comercios (nombre, estado, trial_activo, fecha_inicio, fecha_vencimiento)
+  values (p_comercio_nombre, 'trial', true, current_date, current_date + interval '14 days')
+  returning id into v_comercio_id;
+
+  -- 2. Crear sucursal
+  insert into public.sucursales (tenant_id, nombre, activa)
+  values (v_comercio_id, 'Principal', true)
+  returning id into v_sucursal_id;
+
+  -- 3. Crear usuario (Admin del tenant)
+  insert into public.users (id, tenant_id, branch_id, email, nombre, rol, invitacion_aceptada)
+  values (p_user_id, v_comercio_id, v_sucursal_id, p_email, p_nombre, 'admin', true);
+
+  -- 4. Crear cuota inicial (100 créditos)
+  insert into public.message_quotas (tenant_id, tipo, cantidad, saldo, descripcion)
+  values (v_comercio_id, 'abono', 100, 100, 'Cuota inicial trial');
+end;
+$$;
+
+-- ============================================================================
 -- FIN DEL ESQUEMA
 -- ============================================================================

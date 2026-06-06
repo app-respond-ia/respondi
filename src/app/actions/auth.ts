@@ -21,7 +21,19 @@ export async function login(formData: FormData) {
   redirect('/') // El middleware lo redirigirá al panel correcto
 }
 
-export async function loginWithGoogle() {
+import { cookies } from 'next/headers'
+
+export async function loginWithGoogle(comercioNombre?: string) {
+  if (comercioNombre) {
+    const cookieStore = await cookies()
+    cookieStore.set('respondi_pending_trial', comercioNombre, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 60 * 60, // 1 hora
+      path: '/'
+    })
+  }
+
   const supabase = await createClient()
 
   const { data, error } = await supabase.auth.signInWithOAuth({
@@ -59,47 +71,19 @@ export async function signupTrial(formData: FormData) {
 
   const userId = authUser.user.id
 
-  // 2. Transacción manual simulada (ya que no hay RPC para esto configurado)
-  // Crear comercio
-  const { data: comercio, error: comercioError } = await supabaseAdmin
-    .from('comercios')
-    .insert({
-      nombre: comercioNombre,
-      estado: 'trial',
-      trial_activo: true,
-      // fecha_inicio y fecha_vencimiento (14 días) se podrían setear aquí
-    })
-    .select()
-    .single()
+  // 2. Transacción manual mediante RPC con Security Definer
+  const { error: rpcError } = await supabaseAdmin.rpc('create_trial_account', {
+    p_user_id: userId,
+    p_email: email,
+    p_nombre: nombre,
+    p_comercio_nombre: comercioNombre
+  })
 
-  if (comercioError) return { error: comercioError.message }
-
-  // Crear sucursal
-  const { data: sucursal, error: sucursalError } = await supabaseAdmin
-    .from('sucursales')
-    .insert({
-      tenant_id: comercio.id,
-      nombre: 'Principal',
-    })
-    .select()
-    .single()
-
-  if (sucursalError) return { error: sucursalError.message }
-
-  // Insertar en public.users
-  const { error: userError } = await supabaseAdmin
-    .from('users')
-    .insert({
-      id: userId,
-      tenant_id: comercio.id,
-      branch_id: sucursal.id,
-      email: email,
-      nombre: nombre,
-      rol: 'admin',
-      invitacion_aceptada: true, // Es el creador, ya aceptado
-    })
-
-  if (userError) return { error: userError.message }
+  if (rpcError) {
+    // Si falla el RPC, borramos el usuario de Auth para hacer rollback
+    await supabaseAdmin.auth.admin.deleteUser(userId)
+    return { error: rpcError.message }
+  }
 
   // Iniciar sesión automáticamente
   const supabase = await createClient()

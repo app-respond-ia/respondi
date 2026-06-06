@@ -8,6 +8,7 @@ export default function SignupForm() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [comercioNombre, setComercioNombre] = useState('')
 
   async function handleSubmit(formData: FormData) {
     const terms = formData.get('terms')
@@ -27,10 +28,15 @@ export default function SignupForm() {
     }
   }
 
-  async function handleGoogle() {
+  async function handleGoogle(e: React.FormEvent) {
+    e.preventDefault()
+    if (!comercioNombre) {
+      setError('Por favor, ingresa el nombre de tu comercio primero.')
+      return
+    }
     setIsLoading(true)
     setError(null)
-    const result = await loginWithGoogle()
+    const result = await loginWithGoogle(comercioNombre)
     if (result?.error) {
       setError(result.error)
       setIsLoading(false)
@@ -39,7 +45,7 @@ export default function SignupForm() {
 
   return (
     <>
-      <form action={handleGoogle}>
+      <form onSubmit={handleGoogle}>
         <button type="submit" className="w-full flex items-center justify-center gap-3 h-12 rounded-xl border border-slate-300 bg-white font-500 text-ink-700 hover:bg-slate-50 hover:border-slate-400 transition">
           <svg className="w-5 h-5" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.76h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -63,6 +69,7 @@ export default function SignupForm() {
           <div className="relative">
             <svg className="w-5 h-5 text-ink-400 absolute left-3.5 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
             <input name="comercio" type="text" placeholder="Ej. Mi Tienda" required
+              value={comercioNombre} onChange={(e) => setComercioNombre(e.target.value)}
               className="w-full h-12 pl-11 pr-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition" />
           </div>
         </div>

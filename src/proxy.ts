@@ -1,0 +1,72 @@
+import { NextResponse, type NextRequest } from 'next/server'
+import { updateSession } from '@/utils/supabase/middleware'
+
+export async function proxy(request: NextRequest) {
+  // Update session
+  const { supabaseResponse, user, supabase } = await updateSession(request)
+
+  const { pathname } = request.nextUrl
+
+  // Rutas públicas que no requieren autenticación
+  const publicRoutes = ['/login', '/registro-trial', '/recuperar-contrasena', '/aceptar-invitacion', '/auth/callback']
+  const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route)) || pathname === '/'
+
+  // Rutas protegidas por rol
+  const protectedRoutes = ['/app', '/superadmin', '/agente', '/operario']
+  const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
+
+  // Si no hay usuario y trata de acceder a una ruta protegida
+  if (!user && isProtectedRoute) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/login'
+    return NextResponse.redirect(url)
+  }
+
+  // Si hay usuario, verificamos su rol para enrutamiento
+  if (user && (isPublicRoute || isProtectedRoute)) {
+    // Obtenemos el rol desde la tabla public.users
+    const { data: userData } = await supabase
+      .from('users')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+
+    const role = userData?.rol
+
+    // Determinar la ruta base según el rol
+    let roleBasePath = ''
+    if (role === 'super_admin') roleBasePath = '/superadmin'
+    else if (role === 'admin') roleBasePath = '/app'
+    else if (role === 'agente') roleBasePath = '/agente'
+    else if (role === 'operario') roleBasePath = '/operario'
+
+    // Si está en una ruta pública (ej. login) y está autenticado, lo mandamos a su panel
+    if (isPublicRoute && roleBasePath) {
+      const url = request.nextUrl.clone()
+      url.pathname = roleBasePath
+      return NextResponse.redirect(url)
+    }
+
+    // Si está en una ruta protegida, validar que coincida con su rol
+    if (isProtectedRoute && roleBasePath && !pathname.startsWith(roleBasePath)) {
+      const url = request.nextUrl.clone()
+      url.pathname = roleBasePath
+      return NextResponse.redirect(url)
+    }
+  }
+
+  return supabaseResponse
+}
+
+export const config = {
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * Feel free to modify this pattern to include more paths.
+     */
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
+}

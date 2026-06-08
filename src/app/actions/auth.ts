@@ -12,13 +12,13 @@ export async function login(formData: FormData) {
     password: formData.get('password') as string,
   }
 
-  const { error } = await supabase.auth.signInWithPassword(data)
+  const { data: authData, error } = await supabase.auth.signInWithPassword(data)
 
   if (error) {
     return { error: error.message }
   }
 
-  return { success: true }
+  return { success: true, session: authData.session }
 }
 
 import { cookies } from 'next/headers'
@@ -87,9 +87,9 @@ export async function signupTrial(formData: FormData) {
 
   // Iniciar sesión automáticamente
   const supabase = await createClient()
-  await supabase.auth.signInWithPassword({ email, password })
+  const { data: authData } = await supabase.auth.signInWithPassword({ email, password })
 
-  return { success: true, redirectUrl: '/dashboard' }
+  return { success: true, redirectUrl: '/dashboard', session: authData.session }
 }
 
 export async function resetPasswordForEmail(formData: FormData) {

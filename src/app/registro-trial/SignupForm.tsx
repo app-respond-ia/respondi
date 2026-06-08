@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { signupTrial, loginWithGoogle } from '@/app/actions/auth'
+import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
 
 export default function SignupForm() {
@@ -26,6 +27,13 @@ export default function SignupForm() {
       setError(result.error)
       setIsLoading(false)
     } else {
+      if (result?.session) {
+        const supabase = createClient()
+        await supabase.auth.setSession({
+          access_token: result.session.access_token,
+          refresh_token: result.session.refresh_token,
+        })
+      }
       window.location.href = '/dashboard'
     }
   }

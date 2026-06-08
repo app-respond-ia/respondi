@@ -16,6 +16,8 @@ export default function LoginForm() {
     if (result?.error) {
       setError(result.error)
       setIsLoading(false)
+    } else {
+      window.location.href = '/'
     }
   }
 
@@ -26,6 +28,8 @@ export default function LoginForm() {
     if (result?.error) {
       setError(result.error)
       setIsLoading(false)
+    } else if (result?.url) {
+      window.location.href = result.url
     }
   }
 

@@ -44,7 +44,12 @@ export async function GET(request: Request) {
       // Preparamos la respuesta de redirección
       const response = NextResponse.redirect(`${origin}${next}`)
       
-      // Borramos la cookie de forma segura en la respuesta
+      // Importantísimo: propagar cookies para no perder sesión en Vercel Edge
+      cookieStore.getAll().forEach((cookie) => {
+        response.cookies.set(cookie.name, cookie.value, cookie)
+      })
+
+      // Borramos la cookie temporal de forma segura en la respuesta
       if (pendingComercio) {
         response.cookies.delete('respondi_pending_trial')
       }

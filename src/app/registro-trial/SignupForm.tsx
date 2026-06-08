@@ -25,6 +25,8 @@ export default function SignupForm() {
     if (result?.error) {
       setError(result.error)
       setIsLoading(false)
+    } else {
+      window.location.href = '/dashboard'
     }
   }
 
@@ -40,6 +42,8 @@ export default function SignupForm() {
     if (result?.error) {
       setError(result.error)
       setIsLoading(false)
+    } else if (result?.url) {
+      window.location.href = result.url
     }
   }
 

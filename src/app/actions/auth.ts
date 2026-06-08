@@ -18,7 +18,7 @@ export async function login(formData: FormData) {
     return { error: error.message }
   }
 
-  redirect('/') // El middleware lo redirigirá al panel correcto
+  return { success: true }
 }
 
 import { cookies } from 'next/headers'
@@ -48,7 +48,7 @@ export async function loginWithGoogle(comercioNombre?: string) {
   }
 
   if (data.url) {
-    redirect(data.url)
+    return { url: data.url }
   }
 }
 
@@ -89,7 +89,7 @@ export async function signupTrial(formData: FormData) {
   const supabase = await createClient()
   await supabase.auth.signInWithPassword({ email, password })
 
-  redirect('/dashboard')
+  return { success: true, redirectUrl: '/dashboard' }
 }
 
 export async function resetPasswordForEmail(formData: FormData) {
@@ -127,7 +127,7 @@ export async function updatePasswordAndAcceptInvite(formData: FormData) {
       .eq('id', user.id)
   }
 
-  redirect('/')
+  return { success: true }
 }
 
 export async function signOut() {

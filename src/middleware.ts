@@ -5,6 +5,8 @@ export async function middleware(request: NextRequest) {
   // Update session
   const { supabaseResponse, user, supabase } = await updateSession(request)
 
+  console.log('MW user:', user?.id ?? 'NULL')
+
   const { pathname } = request.nextUrl
 
   // Rutas públicas que no requieren autenticación
@@ -33,11 +35,13 @@ export async function middleware(request: NextRequest) {
   // Si hay usuario, verificamos su rol para enrutamiento
   if (user && (isPublicRoute || isProtectedRoute)) {
     // Obtenemos el rol desde la tabla public.users
-    const { data: userData } = await supabase
+    const { data: userData, error: userError } = await supabase
       .from('users')
       .select('rol')
       .eq('id', user.id)
       .single()
+
+    console.log('MW userData:', JSON.stringify(userData), 'error:', JSON.stringify(userError))
 
     const role = userData?.rol
 
@@ -47,6 +51,8 @@ export async function middleware(request: NextRequest) {
     else if (role === 'admin') roleBasePath = '/dashboard'
     else if (role === 'agente') roleBasePath = '/agente'
     else if (role === 'operario') roleBasePath = '/operario'
+
+    console.log('MW roleBasePath:', roleBasePath, 'pathname:', pathname)
 
     // Si el usuario está logueado pero no tiene registro en public.users
     // significa que inició sesión con Google sin haber pasado por el trial o invitación.

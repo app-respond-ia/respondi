@@ -29,6 +29,7 @@ export async function middleware(request: NextRequest) {
 
   // Si no hay usuario y trata de acceder a una ruta protegida
   if (!user && isProtectedRoute) {
+    console.log('MW redirect reason: protected-no-user')
     return redirectWithCookies('/login')
   }
 
@@ -57,20 +58,24 @@ export async function middleware(request: NextRequest) {
     // Si el usuario está logueado pero no tiene registro en public.users
     // significa que inició sesión con Google sin haber pasado por el trial o invitación.
     if (!roleBasePath && isPublicRoute && pathname !== '/registro-trial') {
+      console.log('MW redirect reason: public-no-role')
       return redirectWithCookies('/registro-trial')
     }
 
     // Si está en una ruta pública (ej. login) y está autenticado, lo mandamos a su panel
     if (isPublicRoute && roleBasePath) {
+      console.log('MW redirect reason: public-to-panel')
       return redirectWithCookies(roleBasePath)
     }
 
     // Si está en una ruta protegida, validar que coincida con su rol
     if (isProtectedRoute && roleBasePath && !pathname.startsWith(roleBasePath)) {
+      console.log('MW redirect reason: protected-wrong-role')
       return redirectWithCookies(roleBasePath)
     }
   }
 
+  console.log('MW redirect reason: pass-through')
   return supabaseResponse
 }
 

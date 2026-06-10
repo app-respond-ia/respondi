@@ -44,6 +44,7 @@ export async function getOnboardingState() {
 }
 
 export async function saveStep1(data: {
+  nombrePersona: string
   nombreComercio: string
   direccion: string
   timezone: string
@@ -107,6 +108,10 @@ export async function saveStep1(data: {
     }).eq('id', profile.id)
     if (profileErr) throw profileErr
   }
+
+  // Actualizar nombre de usuario y nombre del comercio
+  await supabase.from('users').update({ nombre: data.nombrePersona }).eq('id', user.id)
+  await supabase.from('comercios').update({ nombre: data.nombreComercio }).eq('id', tenantId)
 
   // Update comercio step
   await supabase.from('comercios').update({ onboarding_paso: 2 }).eq('id', tenantId)

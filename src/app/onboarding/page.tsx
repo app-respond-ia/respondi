@@ -22,7 +22,7 @@ export default function OnboardingPage() {
 
   // Form states
   const [s1, setS1] = useState({
-    nombreComercio: '', direccion: '', timezone: 'America/Caracas', servicios: '', politicas: ''
+    nombrePersona: '', nombreComercio: '', direccion: '', timezone: 'America/Caracas', servicios: '', politicas: ''
   })
   
   const [s2, setS2] = useState([
@@ -72,8 +72,9 @@ export default function OnboardingPage() {
   const handleNext = async () => {
     if (saving) return
 
-    if (step === 1 && !s1.nombreComercio.trim()) {
-      setErrorS1('El nombre comercial es obligatorio')
+    if (step === 1 && (!s1.nombrePersona.trim() || !s1.nombreComercio.trim())) {
+      if (!s1.nombrePersona.trim()) setErrorS1('Tu nombre es obligatorio')
+      else setErrorS1('El nombre comercial es obligatorio')
       return
     }
     if (step === 5 && s5Prods.length === 0) {
@@ -170,7 +171,11 @@ export default function OnboardingPage() {
 
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-ink-700 mb-1.5">Nombre comercial</label>
+                      <label className="block text-sm font-medium text-ink-700 mb-1.5">Tu nombre completo</label>
+                      <input type="text" value={s1.nombrePersona} onChange={e => { setS1({...s1, nombrePersona: e.target.value}); setErrorS1('') }} placeholder="Ej. Ana Martínez" className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-ink-700 mb-1.5">Nombre de tu comercio</label>
                       <input type="text" value={s1.nombreComercio} onChange={e => { setS1({...s1, nombreComercio: e.target.value}); setErrorS1('') }} placeholder="Ej. Pastelería Dulce Hogar" className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition" />
                       {errorS1 && <p className="text-red-500 text-xs mt-1.5">{errorS1}</p>}
                     </div>

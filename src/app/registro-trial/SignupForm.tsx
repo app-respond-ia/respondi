@@ -9,7 +9,6 @@ export default function SignupForm() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [comercioNombre, setComercioNombre] = useState('')
 
   async function handleSubmit(formData: FormData) {
     const terms = formData.get('terms')
@@ -40,13 +39,9 @@ export default function SignupForm() {
 
   async function handleGoogle(e: React.FormEvent) {
     e.preventDefault()
-    if (!comercioNombre) {
-      setError('Por favor, ingresa el nombre de tu comercio primero.')
-      return
-    }
     setIsLoading(true)
     setError(null)
-    const result = await loginWithGoogle(comercioNombre)
+    const result = await loginWithGoogle()
     if (result?.error) {
       setError(result.error)
       setIsLoading(false)
@@ -76,25 +71,6 @@ export default function SignupForm() {
       </div>
 
       <form action={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm font-500 text-ink-700 mb-1.5">Nombre de tu comercio</label>
-          <div className="relative">
-            <svg className="w-5 h-5 text-ink-400 absolute left-3.5 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-            <input name="comercio" type="text" placeholder="Ej. Mi Tienda" required
-              value={comercioNombre} onChange={(e) => setComercioNombre(e.target.value)}
-              className="w-full h-12 pl-11 pr-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition" />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-500 text-ink-700 mb-1.5">Tu nombre completo</label>
-          <div className="relative">
-            <svg className="w-5 h-5 text-ink-400 absolute left-3.5 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-            <input name="nombre" type="text" placeholder="Ej. Ana Martínez" required
-              className="w-full h-12 pl-11 pr-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition" />
-          </div>
-        </div>
-
         <div>
           <label className="block text-sm font-500 text-ink-700 mb-1.5">Correo electrónico</label>
           <div className="relative">

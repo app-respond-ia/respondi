@@ -12,7 +12,7 @@ export async function middleware(request: NextRequest) {
   const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route)) || pathname === '/'
 
   // Rutas protegidas por rol
-  const protectedRoutes = ['/dashboard', '/superadmin', '/agente', '/operario']
+  const protectedRoutes = ['/dashboard', '/superadmin', '/agente', '/operario', '/onboarding']
   const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
 
   // Función helper para redirigir copiando las cookies
@@ -35,7 +35,7 @@ export async function middleware(request: NextRequest) {
     // Obtenemos el rol desde la tabla public.users
     const { data: userData, error: userError } = await supabase
       .from('users')
-      .select('rol')
+      .select('rol, tenant_id')
       .eq('id', user.id)
       .single()
 
@@ -47,6 +47,27 @@ export async function middleware(request: NextRequest) {
     else if (role === 'admin') roleBasePath = '/dashboard'
     else if (role === 'agente') roleBasePath = '/agente'
     else if (role === 'operario') roleBasePath = '/operario'
+
+    // Onboarding obligatorio para admins
+    if (role === 'admin' && userData?.tenant_id) {
+      const { data: comercio } = await supabase
+        .from('comercios')
+        .select('onboarding_completado')
+        .eq('id', userData.tenant_id)
+        .single()
+
+      const onboardingCompleto = comercio?.onboarding_completado ?? false
+
+      // Si no completó el onboarding y no está ya en /onboarding → mandarlo al onboarding
+      if (!onboardingCompleto && !pathname.startsWith('/onboarding')) {
+        return redirectWithCookies('/onboarding')
+      }
+
+      // Si ya completó el onboarding y está en /onboarding → mandarlo al dashboard
+      if (onboardingCompleto && pathname.startsWith('/onboarding')) {
+        return redirectWithCookies('/dashboard')
+      }
+    }
 
     // Si el usuario está logueado pero no tiene registro en public.users
     // significa que inició sesión con Google sin haber pasado por el trial o invitación.

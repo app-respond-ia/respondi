@@ -81,7 +81,7 @@ export async function middleware(request: NextRequest) {
     }
 
     // Si está en una ruta protegida, validar que coincida con su rol
-    if (isProtectedRoute && roleBasePath && !pathname.startsWith(roleBasePath)) {
+    if (isProtectedRoute && roleBasePath && !pathname.startsWith(roleBasePath) && !pathname.startsWith('/onboarding')) {
       return redirectWithCookies(roleBasePath)
     }
   }

@@ -48,16 +48,22 @@ export async function getCasos(filtros?: { estado?: string, canal?: string, sear
   
   // Post-filtro para fallbacks (Supabase a veces no filtra bien joins externos condicionales)
   if (filtros?.canal && filtros.canal !== 'Todos') {
-    result = result.filter(c => c.contacts && c.contacts.canal === filtros.canal.toLowerCase())
+    result = result.filter(c => {
+      const contact = Array.isArray(c.contacts) ? c.contacts[0] : c.contacts
+      return contact && contact.canal === filtros.canal!.toLowerCase()
+    })
   }
   
   if (filtros?.search) {
     const s = filtros.search.toLowerCase()
-    result = result.filter(c => 
-      c.id.toLowerCase().includes(s) || 
-      (c.contacts?.nombre && c.contacts.nombre.toLowerCase().includes(s)) ||
-      (c.descripcion && c.descripcion.toLowerCase().includes(s))
-    )
+    result = result.filter(c => {
+      const contact = Array.isArray(c.contacts) ? c.contacts[0] : c.contacts
+      return (
+        c.id.toLowerCase().includes(s) ||
+        (contact?.nombre && contact.nombre.toLowerCase().includes(s)) ||
+        (c.descripcion && c.descripcion.toLowerCase().includes(s))
+      )
+    })
   }
 
   return { success: true, data: result }

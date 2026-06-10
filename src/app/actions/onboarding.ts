@@ -9,28 +9,37 @@ export async function getOnboardingState() {
 
   const { data: userData } = await supabase
     .from('users')
-    .select('tenant_id, branch_id, comercios(onboarding_paso, onboarding_completado)')
+    .select('tenant_id, branch_id')
     .eq('id', user.id)
     .single()
 
   if (!userData?.tenant_id) return { success: false, error: 'No tenant' }
 
-  // Check if branch exists and get its ID if we don't have it in user
+  // Consulta directa a comercios en vez de join
+  const { data: comercio } = await supabase
+    .from('comercios')
+    .select('onboarding_paso, onboarding_completado')
+    .eq('id', userData.tenant_id)
+    .single()
+
+  // Buscar branch si no está en el usuario todavía
   let branchId = userData.branch_id
   if (!branchId) {
-    const { data: branch } = await supabase.from('sucursales').select('id').eq('tenant_id', userData.tenant_id).limit(1).single()
+    const { data: branch } = await supabase
+      .from('sucursales')
+      .select('id')
+      .eq('tenant_id', userData.tenant_id)
+      .limit(1)
+      .single()
     if (branch) branchId = branch.id
   }
-
-  // Handle Supabase joining array vs object
-  const comercio = Array.isArray(userData.comercios) ? userData.comercios[0] : userData.comercios
 
   return {
     success: true,
     tenantId: userData.tenant_id,
     branchId: branchId,
-    paso: comercio?.onboarding_paso || 1,
-    completado: comercio?.onboarding_completado || false
+    paso: comercio?.onboarding_paso ?? 1,
+    completado: comercio?.onboarding_completado ?? false
   }
 }
 

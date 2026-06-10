@@ -47,6 +47,9 @@ export default function OnboardingPage() {
   const [s5Prods, setS5Prods] = useState<{nombre: string, precio: number}[]>([])
   const [prodNombre, setProdNombre] = useState('')
   const [prodPrecio, setProdPrecio] = useState('')
+  
+  const [errorS1, setErrorS1] = useState('')
+  const [errorS5, setErrorS5] = useState('')
 
   useEffect(() => {
     getOnboardingState().then(res => {
@@ -68,6 +71,16 @@ export default function OnboardingPage() {
 
   const handleNext = async () => {
     if (saving) return
+
+    if (step === 1 && !s1.nombreComercio.trim()) {
+      setErrorS1('El nombre comercial es obligatorio')
+      return
+    }
+    if (step === 5 && s5Prods.length === 0) {
+      setErrorS5('Añade al menos un producto para continuar')
+      return
+    }
+
     setSaving(true)
     try {
       if (step === 1) {
@@ -106,6 +119,7 @@ export default function OnboardingPage() {
       setS5Prods([...s5Prods, { nombre: prodNombre, precio: parseFloat(prodPrecio) }])
       setProdNombre('')
       setProdPrecio('')
+      setErrorS5('')
     }
   }
 
@@ -157,7 +171,8 @@ export default function OnboardingPage() {
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-ink-700 mb-1.5">Nombre comercial</label>
-                      <input type="text" value={s1.nombreComercio} onChange={e => setS1({...s1, nombreComercio: e.target.value})} placeholder="Ej. Pastelería Dulce Hogar" className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition" />
+                      <input type="text" value={s1.nombreComercio} onChange={e => { setS1({...s1, nombreComercio: e.target.value}); setErrorS1('') }} placeholder="Ej. Pastelería Dulce Hogar" className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition" />
+                      {errorS1 && <p className="text-red-500 text-xs mt-1.5">{errorS1}</p>}
                     </div>
                     <div className="grid sm:grid-cols-2 gap-4">
                       <div>
@@ -273,6 +288,8 @@ export default function OnboardingPage() {
                   <h1 className="font-display font-bold text-2xl text-ink-900 mb-1.5">Carga tus productos</h1>
                   <p className="text-ink-500 mb-6">Añade al menos un ítem. La IA usará estos precios para responder.</p>
                   
+                  {errorS5 && <p className="text-red-500 text-sm font-medium mb-4">{errorS5}</p>}
+
                   <div className="space-y-3 mb-6">
                     {s5Prods.map((p, i) => (
                       <div key={i} className="flex items-center gap-3 p-3.5 rounded-xl border border-slate-200 bg-white">

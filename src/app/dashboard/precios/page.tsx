@@ -252,7 +252,7 @@ export default function ListaPreciosPage() {
           <div className="relative min-h-full flex items-center justify-center p-4 pointer-events-none">
             <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl pointer-events-auto overflow-hidden flex flex-col max-h-[90vh]">
               
-              <form onSubmit={handleSubmit} className="flex flex-col h-full">
+              <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 h-full">
                 {/* Cabecera */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
                   <h2 className="font-display font-700 text-lg text-ink-900">{modalMode === 'editar' ? 'Editar ítem' : 'Añadir ítem'}</h2>
@@ -262,7 +262,7 @@ export default function ListaPreciosPage() {
                 </div>
         
                 {/* Formulario */}
-                <div className="px-6 py-5 space-y-4 overflow-y-auto">
+                <div className="flex-1 min-h-0 px-6 py-5 space-y-4 overflow-y-auto">
                   <div>
                     <label className="block text-sm font-500 text-ink-700 mb-1.5">Nombre del ítem</label>
                     <input type="text" required placeholder="Ej. Torta de chocolate"

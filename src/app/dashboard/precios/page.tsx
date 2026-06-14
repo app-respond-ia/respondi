@@ -78,9 +78,9 @@ export default function ListaPreciosPage() {
     
     const res = await eliminarPrecio(id)
     if (res.success) {
+      setItems(prev => prev.filter(it => it.id !== id))
       setMensaje({ tipo: 'exito', texto: 'Ítem eliminado correctamente ✓' })
       setTimeout(() => setMensaje(null), 3000)
-      cargar()
     } else {
       setMensaje({ tipo: 'error', texto: res.error || 'Error al eliminar el ítem' })
       setTimeout(() => setMensaje(null), 3000)
@@ -111,10 +111,14 @@ export default function ListaPreciosPage() {
     }
 
     if (res.success) {
+      if (modalMode === 'añadir') {
+        setItems(prev => [res.data, ...prev])
+      } else {
+        setItems(prev => prev.map(it => it.id === editingId ? res.data : it))
+      }
       setIsModalOpen(false)
       setMensaje({ tipo: 'exito', texto: modalMode === 'añadir' ? 'Ítem añadido correctamente ✓' : 'Ítem actualizado correctamente ✓' })
       setTimeout(() => setMensaje(null), 3000)
-      cargar()
     } else {
       setMensaje({ tipo: 'error', texto: res.error || 'Error al guardar el ítem' })
       setTimeout(() => setMensaje(null), 3000)
@@ -353,7 +357,7 @@ export default function ListaPreciosPage() {
                 </div>
         
                 {/* Pie con botones */}
-                <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100 shrink-0">
+                <div className="flex justify-end gap-3 px-6 pt-5 pb-6 border-t border-slate-100 shrink-0">
                   <button type="button" disabled={saving} onClick={() => setIsModalOpen(false)} className="px-5 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition disabled:opacity-50">
                     Cancelar
                   </button>

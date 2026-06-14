@@ -174,6 +174,7 @@ create table price_list (
   tenant_id   uuid not null references comercios(id) on delete cascade,
   branch_id   uuid not null references sucursales(id) on delete cascade,
   nombre      text not null,
+  tipo        text not null default 'producto' check (tipo in ('producto', 'servicio')),
   precio      numeric(12,2),
   precio_tipo text not null default 'exacto',   -- CAMBIO: exacto|desde|consultar
   moneda      text not null default 'USD',

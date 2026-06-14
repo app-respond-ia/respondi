@@ -35,11 +35,18 @@ export async function middleware(request: NextRequest) {
     // Obtenemos el rol desde la tabla public.users
     const { data: userData, error: userError } = await supabase
       .from('users')
-      .select('rol, tenant_id')
+      .select('rol, tenant_id, invitacion_aceptada')
       .eq('id', user.id)
       .single()
 
     const role = userData?.rol
+
+    if ((role === 'agente' || role === 'operario') && userData?.invitacion_aceptada === false) {
+      if (pathname.startsWith('/aceptar-invitacion') || pathname.startsWith('/auth/callback')) {
+        return supabaseResponse
+      }
+      return redirectWithCookies('/aceptar-invitacion')
+    }
 
     // Determinar la ruta base según el rol
     let roleBasePath = ''

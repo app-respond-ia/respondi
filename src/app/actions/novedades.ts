@@ -71,6 +71,16 @@ export async function actualizarNovedad(id: string, data: Partial<NovedadData & 
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
+  if ('fecha_vigencia_fin' in data) {
+    if (data.fecha_vigencia_fin === null) {
+      data.activo = true
+    } else {
+      const fin = new Date(data.fecha_vigencia_fin!).getTime()
+      const ahora = new Date().getTime()
+      data.activo = fin >= ahora
+    }
+  }
+
   const { data: updatedData, error } = await supabase
     .from('daily_updates')
     .update(data)

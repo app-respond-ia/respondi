@@ -10,49 +10,74 @@ import {
 
 const TIPO_CONFIG = {
   horario: {
-    color: 'blue',
     label: 'HORARIO',
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
-    )
+    ),
+    iconBg: 'bg-blue-100',
+    iconText: 'text-blue-600',
+    badge: 'bg-blue-100 text-blue-700',
+    selected: 'border-blue-500 bg-blue-50/40 ring-4 ring-blue-50',
+    selectedIconText: 'text-blue-600',
+    selectedLabelText: 'text-blue-700',
   },
   stock: {
-    color: 'amber',
     label: 'STOCK',
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
         <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
       </svg>
-    )
+    ),
+    iconBg: 'bg-amber-100',
+    iconText: 'text-amber-600',
+    badge: 'bg-amber-100 text-amber-700',
+    selected: 'border-amber-500 bg-amber-50/40 ring-4 ring-amber-50',
+    selectedIconText: 'text-amber-600',
+    selectedLabelText: 'text-amber-700',
   },
   promo: {
-    color: 'purple',
     label: 'PROMOCIÓN',
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
         <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.99 1.99 0 013 12V7a4 4 0 014-4z" />
       </svg>
-    )
+    ),
+    iconBg: 'bg-purple-100',
+    iconText: 'text-purple-600',
+    badge: 'bg-purple-100 text-purple-700',
+    selected: 'border-purple-500 bg-purple-50/40 ring-4 ring-purple-50',
+    selectedIconText: 'text-purple-600',
+    selectedLabelText: 'text-purple-700',
   },
   evento: {
-    color: 'pink',
     label: 'EVENTO',
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
         <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
       </svg>
-    )
+    ),
+    iconBg: 'bg-pink-100',
+    iconText: 'text-pink-600',
+    badge: 'bg-pink-100 text-pink-700',
+    selected: 'border-pink-500 bg-pink-50/40 ring-4 ring-pink-50',
+    selectedIconText: 'text-pink-600',
+    selectedLabelText: 'text-pink-700',
   },
   otro: {
-    color: 'slate',
     label: 'OTRO',
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
         <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
       </svg>
-    )
+    ),
+    iconBg: 'bg-slate-100',
+    iconText: 'text-slate-600',
+    badge: 'bg-slate-100 text-slate-700',
+    selected: 'border-slate-500 bg-slate-50/40 ring-4 ring-slate-50',
+    selectedIconText: 'text-slate-600',
+    selectedLabelText: 'text-slate-700',
   }
 } as const
 
@@ -249,14 +274,14 @@ export default function NovedadesPage() {
                 return (
                   <div key={item.id} className="p-4 sm:p-5 flex items-start gap-4 hover:bg-slate-50 transition-colors bg-white">
                     {/* Icono fijo */}
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 mt-0.5 bg-${conf.color}-100 text-${conf.color}-600`}>
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${conf.iconBg} ${conf.iconText}`}>
                       {conf.icon}
                     </div>
 
                     {/* Info principal */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3 mb-2 flex-wrap">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-700 bg-${conf.color}-100 text-${conf.color}-700`}>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-700 ${conf.badge}`}>
                           {conf.label}
                         </span>
                         
@@ -350,12 +375,12 @@ export default function NovedadesPage() {
                             key={key}
                             type="button"
                             onClick={() => setFormData({...formData, tipo: key})}
-                            className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${isSelected ? `border-${conf.color}-500 bg-${conf.color}-50/40 ring-4 ring-${conf.color}-50` : 'border-slate-200 bg-white hover:border-slate-300'}`}
+                            className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${isSelected ? conf.selected : 'border-slate-200 bg-white hover:border-slate-300'}`}
                           >
-                            <div className={`${isSelected ? `text-${conf.color}-600` : 'text-slate-400'}`}>
+                            <div className={`${isSelected ? conf.selectedIconText : 'text-slate-400'}`}>
                               {conf.icon}
                             </div>
-                            <span className={`text-[10px] font-700 ${isSelected ? `text-${conf.color}-700` : 'text-slate-500'}`}>
+                            <span className={`text-[10px] font-700 ${isSelected ? conf.selectedLabelText : 'text-slate-500'}`}>
                               {conf.label}
                             </span>
                           </button>

@@ -2,6 +2,17 @@
 
 import { useState, useEffect } from 'react'
 import { getPerfilComercio, savePerfilComercio } from '@/app/actions/perfil'
+import { getHorarios, saveHorarios } from '@/app/actions/horarios'
+
+const DIAS_SEMANA = [
+  { id: 1, label: 'Lunes' },
+  { id: 2, label: 'Martes' },
+  { id: 3, label: 'Miércoles' },
+  { id: 4, label: 'Jueves' },
+  { id: 5, label: 'Viernes' },
+  { id: 6, label: 'Sábado' },
+  { id: 0, label: 'Domingo' }
+]
 
 export default function PerfilComercioPage() {
   const [loading, setLoading] = useState(true)
@@ -18,22 +29,35 @@ export default function PerfilComercioPage() {
     tono: 'cercano',
     msg_fuera_horario: ''
   })
+  const [horarios, setHorarios] = useState<any[]>([])
 
   useEffect(() => {
     const cargar = async () => {
       setLoading(true)
-      const res = await getPerfilComercio()
-      if (res.success && res.data) {
+      const [resPerfil, resHorarios] = await Promise.all([
+        getPerfilComercio(),
+        getHorarios()
+      ])
+      
+      if (resPerfil.success && resPerfil.data) {
         setFormData({
-          nombreSucursal: res.data.sucursal?.nombre || '',
-          direccion: res.data.sucursal?.direccion || '',
-          timezone: res.data.sucursal?.timezone || 'America/Caracas',
-          servicios: res.data.perfil?.servicios || '',
-          politicas: res.data.perfil?.politicas || '',
-          idioma_base: res.data.perfil?.idioma_base || 'es',
-          tono: res.data.perfil?.tono || 'cercano',
-          msg_fuera_horario: res.data.perfil?.msg_fuera_horario || ''
+          nombreSucursal: resPerfil.data.sucursal?.nombre || '',
+          direccion: resPerfil.data.sucursal?.direccion || '',
+          timezone: resPerfil.data.sucursal?.timezone || 'America/Caracas',
+          servicios: resPerfil.data.perfil?.servicios || '',
+          politicas: resPerfil.data.perfil?.politicas || '',
+          idioma_base: resPerfil.data.perfil?.idioma_base || 'es',
+          tono: resPerfil.data.perfil?.tono || 'cercano',
+          msg_fuera_horario: resPerfil.data.perfil?.msg_fuera_horario || ''
         })
+      }
+      
+      if (resHorarios.success && resHorarios.data) {
+        const ordenados = DIAS_SEMANA.map(d => {
+          const bd = resHorarios.data.find((h: any) => h.dia_semana === d.id)
+          return bd ? { ...bd } : { dia_semana: d.id, apertura: '09:00', cierre: '18:00', cerrado: true }
+        })
+        setHorarios(ordenados)
       }
       setLoading(false)
     }
@@ -45,18 +69,43 @@ export default function PerfilComercioPage() {
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
+  const handleChangeHorario = (diaId: number, field: string, value: any) => {
+    setHorarios(prev => prev.map(h => {
+      if (h.dia_semana === diaId) {
+        return { ...h, [field]: value }
+      }
+      return h
+    }))
+  }
+
+  const normalizeTime = (timeValue: string | null | undefined) => {
+    if (!timeValue) return null
+    if (timeValue.length === 5) return `${timeValue}:00`
+    return timeValue
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
     setMensaje(null)
     
-    const res = await savePerfilComercio(formData)
+    const horariosFormatted = horarios.map(h => ({
+      dia_semana: h.dia_semana,
+      apertura: normalizeTime(h.apertura),
+      cierre: normalizeTime(h.cierre),
+      cerrado: h.cerrado
+    }))
+
+    const [resPerfil, resHorarios] = await Promise.all([
+      savePerfilComercio(formData),
+      saveHorarios(horariosFormatted)
+    ])
     
-    if (res.success) {
+    if (resPerfil.success && resHorarios.success) {
       setMensaje({ tipo: 'exito', texto: 'Cambios guardados correctamente ✓' })
       setTimeout(() => setMensaje(null), 3000)
     } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al guardar los cambios' })
+      setMensaje({ tipo: 'error', texto: resPerfil.error || resHorarios.error || 'Error al guardar los cambios' })
     }
     setSaving(false)
   }
@@ -143,6 +192,56 @@ export default function PerfilComercioPage() {
                 placeholder="Tiempos de entrega, políticas de devolución, métodos de pago aceptados..."
               ></textarea>
             </div>
+          </div>
+        </section>
+
+        {/* SECCIÓN: HORARIOS DE ATENCIÓN */}
+        <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="p-6 sm:p-8 border-b border-slate-100">
+            <h2 className="text-xl font-bold text-ink-900">Horarios de atención</h2>
+          </div>
+          
+          <div className="divide-y divide-slate-100">
+            {horarios.map(h => {
+              const diaObj = DIAS_SEMANA.find(d => d.id === h.dia_semana)
+              return (
+                <div key={h.dia_semana} className={`p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition ${h.cerrado ? 'bg-slate-50' : 'bg-white'}`}>
+                  <label className="flex items-center gap-4 cursor-pointer min-w-[140px]">
+                    <div className="relative flex items-center justify-center w-6 h-6">
+                      <input 
+                        type="checkbox" 
+                        checked={!h.cerrado}
+                        onChange={e => handleChangeHorario(h.dia_semana, 'cerrado', !e.target.checked)}
+                        className="peer sr-only" 
+                      />
+                      <div className="w-6 h-6 border-2 border-slate-300 rounded bg-white peer-checked:bg-brand-600 peer-checked:border-brand-600 transition"></div>
+                      <svg className="absolute w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition pointer-events-none" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <span className={`font-semibold ${h.cerrado ? 'text-slate-400' : 'text-ink-900'}`}>{diaObj?.label}</span>
+                  </label>
+
+                  <div className="flex items-center gap-3 ml-10 sm:ml-0">
+                    <input 
+                      type="time" 
+                      value={h.apertura ? h.apertura.substring(0, 5) : ''} 
+                      onChange={e => handleChangeHorario(h.dia_semana, 'apertura', e.target.value)}
+                      disabled={h.cerrado}
+                      className="w-32 h-11 px-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition outline-none disabled:bg-slate-100 disabled:text-slate-400 font-medium"
+                    />
+                    <span className="text-slate-400 font-medium">a</span>
+                    <input 
+                      type="time" 
+                      value={h.cierre ? h.cierre.substring(0, 5) : ''} 
+                      onChange={e => handleChangeHorario(h.dia_semana, 'cierre', e.target.value)}
+                      disabled={h.cerrado}
+                      className="w-32 h-11 px-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition outline-none disabled:bg-slate-100 disabled:text-slate-400 font-medium"
+                    />
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </section>
 

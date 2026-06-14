@@ -1,0 +1,161 @@
+'use server'
+
+import { createClient } from '@/utils/supabase/server'
+
+export interface SkillData {
+  nombre: string
+  descripcion: string
+  activo: boolean
+}
+
+// Función auxiliar para obtener credenciales del usuario activo
+async function getAuthData(supabase: any) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autorizado' }
+
+  const { data: userData } = await supabase
+    .from('users')
+    .select('tenant_id, branch_id')
+    .eq('id', user.id)
+    .single()
+
+  if (!userData?.tenant_id || !userData?.branch_id) {
+    return { error: 'Usuario no vinculado a una sucursal' }
+  }
+
+  return { tenant_id: userData.tenant_id, branch_id: userData.branch_id }
+}
+
+export async function getSkills() {
+  const supabase = await createClient()
+  const auth = await getAuthData(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+
+  const { data, error } = await supabase
+    .from('skills')
+    .select('*')
+    .eq('branch_id', auth.branch_id)
+    .order('orden', { ascending: true })
+
+  if (error) return { success: false, error: error.message }
+  return { success: true, data }
+}
+
+export async function crearSkill(data: SkillData) {
+  const supabase = await createClient()
+  const auth = await getAuthData(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+
+  // Calcular el máximo orden actual
+  const { data: currentSkills, error: fetchError } = await supabase
+    .from('skills')
+    .select('orden')
+    .eq('branch_id', auth.branch_id)
+    .order('orden', { ascending: false })
+    .limit(1)
+
+  if (fetchError) return { success: false, error: fetchError.message }
+
+  const nuevoOrden = currentSkills && currentSkills.length > 0 ? currentSkills[0].orden + 1 : 0
+
+  const { data: insertedData, error } = await supabase
+    .from('skills')
+    .insert([{
+      tenant_id: auth.tenant_id,
+      branch_id: auth.branch_id,
+      nombre: data.nombre,
+      descripcion: data.descripcion,
+      activo: data.activo,
+      orden: nuevoOrden
+    }])
+    .select()
+    .single()
+
+  if (error) return { success: false, error: error.message }
+  return { success: true, data: insertedData }
+}
+
+export async function actualizarSkill(id: string, data: Partial<{ nombre: string, descripcion: string, activo: boolean, orden: number }>) {
+  const supabase = await createClient()
+  const auth = await getAuthData(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+
+  const { data: updatedData, error } = await supabase
+    .from('skills')
+    .update(data)
+    .eq('id', id)
+    .eq('branch_id', auth.branch_id)
+    .select()
+    .single()
+
+  if (error) return { success: false, error: error.message }
+  return { success: true, data: updatedData }
+}
+
+export async function eliminarSkill(id: string) {
+  const supabase = await createClient()
+  const auth = await getAuthData(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+
+  const { error } = await supabase
+    .from('skills')
+    .delete()
+    .eq('id', id)
+    .eq('branch_id', auth.branch_id)
+
+  if (error) return { success: false, error: error.message }
+  return { success: true }
+}
+
+export async function reordenarSkill(id: string, direccion: 'arriba' | 'abajo') {
+  const supabase = await createClient()
+  const auth = await getAuthData(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+
+  // Obtener la skill actual para saber su orden
+  const { data: currentSkill, error: fetchError } = await supabase
+    .from('skills')
+    .select('id, orden')
+    .eq('id', id)
+    .eq('branch_id', auth.branch_id)
+    .single()
+
+  if (fetchError || !currentSkill) return { success: false, error: fetchError?.message || 'Skill no encontrada' }
+
+  // Buscar la vecina con la que intercambiar el orden
+  let query = supabase
+    .from('skills')
+    .select('id, orden')
+    .eq('branch_id', auth.branch_id)
+    .limit(1)
+
+  if (direccion === 'arriba') {
+    query = query.lt('orden', currentSkill.orden).order('orden', { ascending: false })
+  } else {
+    query = query.gt('orden', currentSkill.orden).order('orden', { ascending: true })
+  }
+
+  const { data: vecinos, error: vecinoError } = await query
+
+  if (vecinoError) return { success: false, error: vecinoError.message }
+  if (!vecinos || vecinos.length === 0) return { success: true } // Ya está en el extremo, éxito sin cambios
+
+  const vecino = vecinos[0]
+
+  // Intercambiar ordenes
+  const { error: updateCurrentError } = await supabase
+    .from('skills')
+    .update({ orden: vecino.orden })
+    .eq('id', currentSkill.id)
+
+  if (updateCurrentError) return { success: false, error: updateCurrentError.message }
+
+  const { error: updateVecinoError } = await supabase
+    .from('skills')
+    .update({ orden: currentSkill.orden })
+    .eq('id', vecino.id)
+
+  if (updateVecinoError) return { success: false, error: updateVecinoError.message }
+
+  return { success: true }
+}

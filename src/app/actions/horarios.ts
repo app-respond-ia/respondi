@@ -44,7 +44,7 @@ export async function getHorarios() {
   return { success: true, data: horarios }
 }
 
-export async function saveHorarios(horarios: { dia_semana: number, apertura: string, cierre: string, cerrado: boolean }[]) {
+export async function saveHorarios(horarios: { dia_semana: number, apertura: string | null, cierre: string | null, cerrado: boolean }[]) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: 'No autorizado' }

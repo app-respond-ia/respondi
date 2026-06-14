@@ -107,55 +107,21 @@ export async function eliminarSkill(id: string) {
   return { success: true }
 }
 
-export async function reordenarSkill(id: string, direccion: 'arriba' | 'abajo') {
+export async function reordenarSkills(ids: string[]) {
   const supabase = await createClient()
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
-  // Obtener la skill actual para saber su orden
-  const { data: currentSkill, error: fetchError } = await supabase
-    .from('skills')
-    .select('id, orden')
-    .eq('id', id)
-    .eq('branch_id', auth.branch_id)
-    .single()
-
-  if (fetchError || !currentSkill) return { success: false, error: fetchError?.message || 'Skill no encontrada' }
-
-  // Buscar la vecina con la que intercambiar el orden
-  let query = supabase
-    .from('skills')
-    .select('id, orden')
-    .eq('branch_id', auth.branch_id)
-    .limit(1)
-
-  if (direccion === 'arriba') {
-    query = query.lt('orden', currentSkill.orden).order('orden', { ascending: false })
-  } else {
-    query = query.gt('orden', currentSkill.orden).order('orden', { ascending: true })
+  for (let i = 0; i < ids.length; i++) {
+    const id = ids[i]
+    const { error } = await supabase
+      .from('skills')
+      .update({ orden: i })
+      .eq('id', id)
+      .eq('branch_id', auth.branch_id)
+    
+    if (error) return { success: false, error: error.message }
   }
-
-  const { data: vecinos, error: vecinoError } = await query
-
-  if (vecinoError) return { success: false, error: vecinoError.message }
-  if (!vecinos || vecinos.length === 0) return { success: true } // Ya está en el extremo, éxito sin cambios
-
-  const vecino = vecinos[0]
-
-  // Intercambiar ordenes
-  const { error: updateCurrentError } = await supabase
-    .from('skills')
-    .update({ orden: vecino.orden })
-    .eq('id', currentSkill.id)
-
-  if (updateCurrentError) return { success: false, error: updateCurrentError.message }
-
-  const { error: updateVecinoError } = await supabase
-    .from('skills')
-    .update({ orden: currentSkill.orden })
-    .eq('id', vecino.id)
-
-  if (updateVecinoError) return { success: false, error: updateVecinoError.message }
 
   return { success: true }
 }

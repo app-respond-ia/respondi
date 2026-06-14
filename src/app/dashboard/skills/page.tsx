@@ -1,7 +1,91 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getSkills, crearSkill, actualizarSkill, eliminarSkill, reordenarSkill, SkillData } from '@/app/actions/skills'
+import { getSkills, crearSkill, actualizarSkill, eliminarSkill, reordenarSkills, SkillData } from '@/app/actions/skills'
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+
+// Componente individual para fila ordenable
+function SortableItem({ item, onToggle, onEdit, onDelete }: { 
+  item: any, 
+  onToggle: (item: any) => void,
+  onEdit: (item: any) => void,
+  onDelete: (id: string) => void
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 10 : 1,
+    position: 'relative' as const,
+  }
+
+  return (
+    <div ref={setNodeRef} style={style} className={`p-4 sm:p-5 flex items-center gap-4 transition ${isDragging ? 'bg-white shadow-xl ring-1 ring-brand-500/20' : 'hover:bg-slate-50 bg-white'}`}>
+      {/* Drag handle */}
+      <button 
+        {...attributes} 
+        {...listeners} 
+        className="p-1 -ml-2 text-slate-300 hover:text-slate-500 cursor-grab active:cursor-grabbing touch-none"
+        aria-label="Reordenar"
+      >
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+        </svg>
+      </button>
+
+      {/* Toggle */}
+      <button 
+        onClick={() => onToggle(item)} 
+        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 ${item.activo ? 'bg-emerald-500' : 'bg-slate-200'}`}
+        role="switch" 
+        aria-checked={item.activo}
+      >
+        <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${item.activo ? 'translate-x-5' : 'translate-x-0'}`} />
+      </button>
+
+      {/* Info */}
+      <div className="flex-1 min-w-0">
+        <h3 className="text-sm font-600 text-ink-900 truncate">{item.nombre}</h3>
+        {item.descripcion && (
+          <p className="text-xs text-ink-500 mt-0.5 line-clamp-2">{item.descripcion}</p>
+        )}
+      </div>
+
+      {/* Controles */}
+      <div className="flex items-center gap-1 shrink-0">
+        <button onClick={() => onEdit(item)} className="p-1.5 rounded-lg text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition" aria-label="Editar">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+        </button>
+        <button onClick={() => onDelete(item.id)} className="p-1.5 rounded-lg text-ink-400 hover:text-red-500 hover:bg-red-50 transition" aria-label="Eliminar">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+        </button>
+      </div>
+    </div>
+  )
+}
 
 export default function SkillsPage() {
   const [loading, setLoading] = useState(true)
@@ -19,6 +103,16 @@ export default function SkillsPage() {
     descripcion: '',
     activo: true
   })
+
+  // Sensores DndKit
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 }
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 250, tolerance: 5 }
+    })
+  )
 
   const cargar = async () => {
     setLoading(true)
@@ -71,43 +165,33 @@ export default function SkillsPage() {
 
   const handleToggleActivo = async (item: any) => {
     const newActivo = !item.activo
-    // Optimistic UI update
     setItems(prev => prev.map(it => it.id === item.id ? { ...it, activo: newActivo } : it))
     
     const res = await actualizarSkill(item.id, { activo: newActivo })
     if (!res.success) {
-      // Revertir
       setItems(prev => prev.map(it => it.id === item.id ? { ...it, activo: item.activo } : it))
       setMensaje({ tipo: 'error', texto: res.error || 'Error al actualizar el estado de la skill' })
       setTimeout(() => setMensaje(null), 3000)
     }
   }
 
-  const handleReordenar = async (id: string, direccion: 'arriba' | 'abajo') => {
-    const idx1 = items.findIndex(it => it.id === id)
-    if (idx1 < 0) return
-    const idx2 = direccion === 'arriba' ? idx1 - 1 : idx1 + 1
-    if (idx2 < 0 || idx2 >= items.length) return // Fuera de límites
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
 
-    // Optimistic local swap
-    const oldItems = [...items]
-    const newItems = [...items]
-    const temp = newItems[idx1]
-    newItems[idx1] = newItems[idx2]
-    newItems[idx2] = temp
-    
-    // Intercambiar campo "orden" para mantener coherencia en render si lo usamos internamente
-    const tempOrden = newItems[idx1].orden
-    newItems[idx1].orden = newItems[idx2].orden
-    newItems[idx2].orden = tempOrden
-    
-    setItems(newItems)
+    const oldIndex = items.findIndex(it => it.id === active.id)
+    const newIndex = items.findIndex(it => it.id === over.id)
 
-    const res = await reordenarSkill(id, direccion)
+    const newItems = arrayMove(items, oldIndex, newIndex)
+    // Update local orden so that it stays consistent if used elsewhere
+    const orderedItems = newItems.map((item, index) => ({ ...item, orden: index }))
+    setItems(orderedItems)
+
+    const ids = orderedItems.map(it => it.id)
+    const res = await reordenarSkills(ids)
     if (!res.success) {
-      // Revertir
-      setItems(oldItems)
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al reordenar la skill' })
+      setItems(items) // Revert
+      setMensaje({ tipo: 'error', texto: res.error || 'Error al reordenar las skills' })
       setTimeout(() => setMensaje(null), 3000)
     }
   }
@@ -127,7 +211,6 @@ export default function SkillsPage() {
 
     if (res.success && res.data) {
       if (modalMode === 'añadir') {
-        // Añadir al final ya que el servidor asigna el orden máximo + 1
         setItems(prev => [...prev, res.data])
       } else {
         setItems(prev => prev.map(it => it.id === editingId ? { ...it, ...res.data } : it))
@@ -180,61 +263,26 @@ export default function SkillsPage() {
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col divide-y divide-slate-100">
-          {items.map((item, index) => (
-            <div key={item.id} className="p-4 sm:p-5 flex items-center gap-4 hover:bg-slate-50 transition">
-              {/* Toggle */}
-              <button 
-                onClick={() => handleToggleActivo(item)} 
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 ${item.activo ? 'bg-emerald-500' : 'bg-slate-200'}`}
-                role="switch" 
-                aria-checked={item.activo}
-              >
-                <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${item.activo ? 'translate-x-5' : 'translate-x-0'}`} />
-              </button>
-
-              {/* Info */}
-              <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-600 text-ink-900 truncate">{item.nombre}</h3>
-                {item.descripcion && (
-                  <p className="text-xs text-ink-500 mt-0.5 line-clamp-2">{item.descripcion}</p>
-                )}
-              </div>
-
-              {/* Controles: Reordenar y Acciones */}
-              <div className="flex items-center gap-3 shrink-0">
-                {/* Reordenar */}
-                <div className="flex flex-col items-center justify-center -space-y-1 mr-2">
-                  <button 
-                    disabled={index === 0} 
-                    onClick={() => handleReordenar(item.id, 'arriba')}
-                    className="p-1 text-slate-400 hover:text-brand-600 disabled:opacity-30 disabled:hover:text-slate-400 transition"
-                  >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" /></svg>
-                  </button>
-                  <button 
-                    disabled={index === items.length - 1} 
-                    onClick={() => handleReordenar(item.id, 'abajo')}
-                    className="p-1 text-slate-400 hover:text-brand-600 disabled:opacity-30 disabled:hover:text-slate-400 transition"
-                  >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
-                  </button>
-                </div>
-
-                {/* Separador */}
-                <div className="w-px h-8 bg-slate-200"></div>
-
-                {/* Acciones */}
-                <div className="flex items-center gap-1">
-                  <button onClick={() => openEditar(item)} className="p-1.5 rounded-lg text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition" aria-label="Editar">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                  </button>
-                  <button onClick={() => handleDelete(item.id)} className="p-1.5 rounded-lg text-ink-400 hover:text-red-500 hover:bg-red-50 transition" aria-label="Eliminar">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
+          <DndContext 
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext 
+              items={items.map(it => it.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              {items.map((item) => (
+                <SortableItem 
+                  key={item.id} 
+                  item={item} 
+                  onToggle={handleToggleActivo}
+                  onEdit={openEditar}
+                  onDelete={handleDelete}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
         </div>
       )}
 
@@ -249,7 +297,6 @@ export default function SkillsPage() {
             <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl pointer-events-auto overflow-hidden flex flex-col max-h-[90vh]">
               
               <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 h-full">
-                {/* Cabecera */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
                   <h2 className="font-display font-700 text-lg text-ink-900">{modalMode === 'editar' ? 'Editar skill' : 'Añadir skill'}</h2>
                   <button type="button" onClick={() => !saving && setIsModalOpen(false)} className="p-1.5 rounded-lg text-ink-400 hover:text-ink-700 hover:bg-slate-100 transition" aria-label="Cerrar">
@@ -257,7 +304,6 @@ export default function SkillsPage() {
                   </button>
                 </div>
         
-                {/* Formulario */}
                 <div className="flex-1 min-h-0 px-6 py-5 space-y-4 overflow-y-auto">
                   <div>
                     <label className="block text-sm font-500 text-ink-700 mb-1.5">Nombre de la skill</label>
@@ -276,7 +322,6 @@ export default function SkillsPage() {
                       className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white resize-none placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition"></textarea>
                   </div>
         
-                  {/* Activo / Inactivo */}
                   <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer">
                     <span className="text-sm font-500 text-ink-700">Activo</span>
                     <input type="checkbox" 
@@ -287,7 +332,6 @@ export default function SkillsPage() {
                   </label>
                 </div>
         
-                {/* Pie con botones */}
                 <div className="flex justify-end gap-3 px-6 pt-5 pb-6 border-t border-slate-100 shrink-0">
                   <button type="button" disabled={saving} onClick={() => setIsModalOpen(false)} className="px-5 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition disabled:opacity-50">
                     Cancelar

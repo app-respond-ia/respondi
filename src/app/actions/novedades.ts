@@ -47,6 +47,13 @@ export async function crearNovedad(data: NovedadData) {
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
+  let isActivo = true
+  if (data.fecha_vigencia_fin !== null) {
+    const fin = new Date(data.fecha_vigencia_fin).getTime()
+    const ahora = new Date().getTime()
+    isActivo = fin >= ahora
+  }
+
   const { data: insertedData, error } = await supabase
     .from('daily_updates')
     .insert([{
@@ -57,7 +64,7 @@ export async function crearNovedad(data: NovedadData) {
       descripcion: data.descripcion,
       fecha_vigencia_inicio: data.fecha_vigencia_inicio,
       fecha_vigencia_fin: data.fecha_vigencia_fin,
-      activo: true
+      activo: isActivo
     }])
     .select('*, users (nombre, email)')
     .single()

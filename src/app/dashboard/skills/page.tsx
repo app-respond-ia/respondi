@@ -10,6 +10,7 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
+  DragOverlay,
 } from '@dnd-kit/core'
 import {
   arrayMove,
@@ -19,36 +20,19 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
-// Componente individual para fila ordenable
-function SortableItem({ item, onToggle, onEdit, onDelete }: { 
-  item: any, 
+function SkillRow({ item, onToggle, onEdit, onDelete, dragHandleProps }: {
+  item: any,
   onToggle: (item: any) => void,
   onEdit: (item: any) => void,
-  onDelete: (id: string) => void
+  onDelete: (id: string) => void,
+  dragHandleProps: any
 }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: item.id })
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    zIndex: isDragging ? 10 : 1,
-    position: 'relative' as const,
-  }
-
   return (
-    <div ref={setNodeRef} style={style} className={`p-4 sm:p-5 flex items-center gap-4 transition ${isDragging ? 'bg-white shadow-xl ring-1 ring-brand-500/20' : 'hover:bg-slate-50 bg-white'}`}>
+    <div className="p-4 sm:p-5 flex items-center gap-4 bg-white">
       {/* Drag handle */}
       <button 
-        {...attributes} 
-        {...listeners} 
-        className="p-1 -ml-2 text-slate-300 hover:text-slate-500 cursor-grab active:cursor-grabbing touch-none"
+        {...dragHandleProps}
+        className={`p-1 -ml-2 text-slate-300 hover:text-slate-500 touch-none ${dragHandleProps?.className || 'cursor-grab active:cursor-grabbing'}`}
         aria-label="Reordenar"
       >
         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -87,9 +71,48 @@ function SortableItem({ item, onToggle, onEdit, onDelete }: {
   )
 }
 
+// Componente individual para fila ordenable
+function SortableItem({ item, onToggle, onEdit, onDelete }: { 
+  item: any, 
+  onToggle: (item: any) => void,
+  onEdit: (item: any) => void,
+  onDelete: (id: string) => void
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition: isDragging ? undefined : transition,
+    willChange: 'transform',
+    zIndex: isDragging ? 10 : 1,
+    position: 'relative' as const,
+    opacity: isDragging ? 0.3 : 1,
+  }
+
+  return (
+    <div ref={setNodeRef} style={style} className="hover:bg-slate-50 transition-colors">
+      <SkillRow 
+        item={item} 
+        onToggle={onToggle} 
+        onEdit={onEdit} 
+        onDelete={onDelete} 
+        dragHandleProps={{ ...attributes, ...listeners }} 
+      />
+    </div>
+  )
+}
+
 export default function SkillsPage() {
   const [loading, setLoading] = useState(true)
   const [items, setItems] = useState<any[]>([])
+  const [activeId, setActiveId] = useState<string | null>(null)
   
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -176,6 +199,7 @@ export default function SkillsPage() {
   }
 
   const handleDragEnd = async (event: DragEndEvent) => {
+    setActiveId(null)
     const { active, over } = event
     if (!over || active.id === over.id) return
 
@@ -262,11 +286,13 @@ export default function SkillsPage() {
           </button>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col divide-y divide-slate-100">
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col divide-y divide-slate-100 relative">
           <DndContext 
             sensors={sensors}
             collisionDetection={closestCenter}
+            onDragStart={(e) => setActiveId(e.active.id as string)}
             onDragEnd={handleDragEnd}
+            onDragCancel={() => setActiveId(null)}
           >
             <SortableContext 
               items={items.map(it => it.id)}
@@ -282,6 +308,20 @@ export default function SkillsPage() {
                 />
               ))}
             </SortableContext>
+
+            <DragOverlay>
+              {activeId ? (
+                <div className="shadow-2xl ring-1 ring-brand-500/20 bg-white opacity-100 scale-[1.02] cursor-grabbing rounded-xl overflow-hidden">
+                  <SkillRow 
+                    item={items.find(i => i.id === activeId)}
+                    onToggle={() => {}}
+                    onEdit={() => {}}
+                    onDelete={() => {}}
+                    dragHandleProps={{ className: "cursor-grabbing touch-none text-slate-500" }}
+                  />
+                </div>
+              ) : null}
+            </DragOverlay>
           </DndContext>
         </div>
       )}

@@ -642,6 +642,26 @@ begin
   values (v_comercio_id, 'abono', 100, 100, 'Cuota inicial trial');
 end;
 $$;
+-- ============================================================================
+-- 15. JOBS PROGRAMADOS (pg_cron)
+-- ============================================================================
+
+-- Archiva automáticamente las novedades del día (daily_updates) cuya
+-- fecha_vigencia_fin ya pasó, marcándolas como activo=false. Se ejecuta
+-- cada 15 minutos. CAMBIO: añadido junto con la sección "Novedades del día".
+create extension if not exists pg_cron;
+
+select cron.schedule(
+  'archivar-novedades-caducadas',
+  '*/15 * * * *',
+  $$
+  update daily_updates
+  set activo = false
+  where activo = true
+    and fecha_vigencia_fin is not null
+    and fecha_vigencia_fin < now();
+  $$
+);
 
 -- ============================================================================
 -- FIN DEL ESQUEMA

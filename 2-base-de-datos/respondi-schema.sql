@@ -166,6 +166,7 @@ create table skills (
   descripcion text,
   activo      boolean not null default true,
   orden       integer not null default 0,
+  configuracion jsonb,
   created_at  timestamptz not null default now()
 );
 

@@ -34,16 +34,19 @@ export async function getUsuarios() {
 
   const { data: comercio, error: comErr } = await supabase
     .from('comercios')
-    .select('plan_id, plans(usuarios_max)')
+    .select('plan_id, plans(nombre, usuarios_max)')
     .eq('id', auth.tenant_id)
     .single()
 
   if (comErr) return { success: false, error: comErr.message }
 
-  // Acceder a usuarios_max (si es array se toma el primero, si es objeto se toma la prop)
+  // Acceder a usuarios_max y plan_nombre (si es array se toma el primero, si es objeto se toma la prop)
   let usuarios_max = null
+  let plan_nombre = null
   if (comercio?.plans) {
-    usuarios_max = Array.isArray(comercio.plans) ? comercio.plans[0]?.usuarios_max : (comercio.plans as any).usuarios_max
+    const plan = Array.isArray(comercio.plans) ? comercio.plans[0] : comercio.plans as any
+    usuarios_max = plan?.usuarios_max ?? null
+    plan_nombre = plan?.nombre ?? null
   }
 
   const { data: usuarios, error: usrErr } = await supabase
@@ -54,7 +57,7 @@ export async function getUsuarios() {
 
   if (usrErr) return { success: false, error: usrErr.message }
 
-  return { success: true, data: { usuarios, usuarios_max, sucursales } }
+  return { success: true, data: { usuarios, usuarios_max, plan_nombre, current_user_id: auth.user_id, sucursales } }
 }
 
 export async function invitarUsuario(data: { email: string, nombre: string | null, rol: 'agente' | 'operario', branch_id: string }) {
@@ -170,6 +173,23 @@ export async function desactivarUsuario(id: string) {
   const { data: updated, error } = await supabase
     .from('users')
     .update({ activo: false })
+    .eq('id', id)
+    .eq('tenant_id', auth.tenant_id)
+    .select('*')
+    .single()
+
+  if (error) return { success: false, error: error.message }
+  return { success: true, data: updated }
+}
+
+export async function reactivarUsuario(id: string) {
+  const supabase = await createClient()
+  const auth = await getAuthData(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+
+  const { data: updated, error } = await supabase
+    .from('users')
+    .update({ activo: true })
     .eq('id', id)
     .eq('tenant_id', auth.tenant_id)
     .select('*')

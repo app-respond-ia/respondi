@@ -198,17 +198,17 @@ create table daily_updates (
   created_at             timestamptz not null default now()
 );
 
--- Reglas de casos. tipo_caso se queda como TEXTO LIBRE (fiel al anteproyecto).
+-- Reglas de casos. tipo_caso se queda como TEXTO LIBRE (fiel al anteproyecto). CAMBIO §8.
 create table case_rules (
-  id             uuid primary key default gen_random_uuid(),
-  tenant_id      uuid not null references comercios(id) on delete cascade,
-  branch_id      uuid not null references sucursales(id) on delete cascade,
-  nombre         text not null,
-  descripcion    text,
-  palabras_clave text,
-  tipo_caso      text,                 -- texto libre, no FK
-  activa         boolean not null default true,
-  created_at     timestamptz not null default now()
+  id                    uuid primary key default gen_random_uuid(),
+  tenant_id             uuid not null references comercios(id) on delete cascade,
+  branch_id             uuid not null references sucursales(id) on delete cascade,
+  nombre                text not null,
+  descripcion_intencion text,          -- CAMBIO §8: sustituye a palabras_clave
+  tipo_caso             text,                 -- texto libre, no FK
+  activa                boolean not null default true,
+  es_plantilla          boolean not null default false,  -- CAMBIO §8
+  created_at            timestamptz not null default now()
 );
 
 -- Etiquetas (= "categorías/tags" del anteproyecto, sección 4.5). CAMBIO §9.

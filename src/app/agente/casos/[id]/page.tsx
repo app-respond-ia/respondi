@@ -236,9 +236,9 @@ export default function AgenteCasoDetalle() {
         </div>
       </div>
 
-      <div className="lg:grid lg:grid-cols-3 lg:gap-6">
+      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-3 lg:gap-6">
         {/* COLUMNA CHAT */}
-        <div className="lg:col-span-2 space-y-4">
+        <div className="order-2 lg:order-1 lg:col-span-2 space-y-4">
           
           {/* Cabecera contacto */}
           <div className="bg-white rounded-2xl border border-slate-200 p-4 flex items-center gap-3">
@@ -346,7 +346,7 @@ export default function AgenteCasoDetalle() {
         </div>
 
         {/* COLUMNA GESTIÓN */}
-        <div className="mt-6 lg:mt-0 space-y-4">
+        <div className="order-1 lg:order-2 space-y-4">
           
           {/* Estatus */}
           <div className="bg-white rounded-2xl border border-slate-200 p-4">

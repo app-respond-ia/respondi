@@ -28,7 +28,7 @@ async function getAuthData(supabase: any) {
     return { error: 'Usuario no vinculado a un comercio' }
   }
 
-  const branchId = await resolveBranchId(supabase, userData.tenant_id, userData.branch_id, userData.rol)
+  const branchId = await resolveBranchId(supabase, user.id)
   if (!branchId) return { error: 'Usuario no vinculado a una sucursal' }
 
   return { tenant_id: userData.tenant_id, branch_id: branchId }

@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import OperarioLayout from '@/components/layout/OperarioLayout'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -22,20 +23,31 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect('/login')
   }
 
-  // 3. Obtener nombre de la sucursal del operario
-  let nombreSucursal = ''
-  if (userData.branch_id) {
-    const { data: sucursalData } = await supabase
-      .from('sucursales')
-      .select('nombre')
-      .eq('id', userData.branch_id)
-      .single()
-    if (sucursalData) {
-      nombreSucursal = sucursalData.nombre
-    }
+  // 3. Obtener sucursales desde user_branches
+  const { data: ubData } = await supabase
+    .from('user_branches')
+    .select('branch_id, sucursales(id, nombre)')
+    .eq('user_id', user.id)
+    .order('branch_id', { ascending: true })
+
+  const branches = ((ubData || [])
+    .map((ub: any) => {
+      const s = Array.isArray(ub.sucursales) ? ub.sucursales[0] : ub.sucursales
+      return s ? { id: s.id, nombre: s.nombre } : null
+    })
+    .filter(Boolean) as { id: string, nombre: string }[])
+
+  // 4. Determinar sucursal activa (por cookie o la primera por defecto)
+  const cookieStore = await cookies()
+  const activeBranchCookie = cookieStore.get('respondi_active_branch')?.value
+  
+  let activeBranchId = ''
+  if (branches.length > 0) {
+    const isValidCookie = branches.some(b => b.id === activeBranchCookie)
+    activeBranchId = isValidCookie && activeBranchCookie ? activeBranchCookie : branches[0].id
   }
 
-  // 4. Preparar objeto de usuario para la UI
+  // 5. Preparar objeto de usuario para la UI
   const initials = userData.nombre
     ? userData.nombre.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
     : user.email?.substring(0, 2).toUpperCase() || 'U'
@@ -45,11 +57,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     email: user.email || '',
     initials,
     roleName: 'Operario',
-    nombreSucursal
   }
 
   return (
-    <OperarioLayout user={userForUI}>
+    <OperarioLayout user={userForUI} branches={branches} activeBranchId={activeBranchId}>
       {children}
     </OperarioLayout>
   )

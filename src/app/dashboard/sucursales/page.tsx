@@ -6,6 +6,8 @@ import { getSucursales, crearSucursal, desactivarSucursal, reactivarSucursal } f
 export default function SucursalesPage() {
   const [loading, setLoading] = useState(true)
   const [sucursales, setSucursales] = useState<any[]>([])
+  const [sucursalesMax, setSucursalesMax] = useState<number | null>(null)
+  const [sucursalesActivasCount, setSucursalesActivasCount] = useState<number>(0)
   const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
 
   // Modal Crear
@@ -21,6 +23,8 @@ export default function SucursalesPage() {
     const res = await getSucursales()
     if (res.success && res.data) {
       setSucursales(res.data.sucursales)
+      setSucursalesMax(res.data.sucursales_max)
+      setSucursalesActivasCount(res.data.sucursales_activas_count || 0)
     } else {
       setMensaje({ tipo: 'error', texto: res.error || 'Error al cargar sucursales' })
     }
@@ -79,6 +83,8 @@ export default function SucursalesPage() {
     return <div className="p-10 text-center text-slate-500 font-medium">Cargando sucursales...</div>
   }
 
+  const limitReached = sucursalesMax !== null && sucursalesActivasCount >= sucursalesMax
+
   return (
     <div className="p-6 sm:p-10 max-w-4xl w-full mx-auto pb-20">
       {/* Mensaje global */}
@@ -97,12 +103,20 @@ export default function SucursalesPage() {
           <p className="text-ink-500 mt-1">Las sucursales de tu comercio. Nunca se eliminan, solo se desactivan.</p>
         </div>
         
-        <button 
-          onClick={handleOpenModal}
-          className="inline-flex items-center gap-2 px-4 h-11 rounded-xl bg-brand-600 text-white text-sm font-600 transition hover:bg-brand-700">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
-          Añadir sucursal
-        </button>
+        <div className="group relative">
+          <button 
+            onClick={!limitReached ? handleOpenModal : undefined}
+            disabled={limitReached}
+            className={`inline-flex items-center gap-2 px-4 h-11 rounded-xl bg-brand-600 text-white text-sm font-600 transition ${limitReached ? 'opacity-50 cursor-not-allowed' : 'hover:bg-brand-700'}`}>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
+            Añadir sucursal
+          </button>
+          {limitReached && (
+            <div className="absolute top-full right-0 mt-2 px-2 py-1 bg-ink-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition whitespace-nowrap pointer-events-none z-10">
+              Has alcanzado el límite de sucursales de tu plan
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Lista de sucursales */}

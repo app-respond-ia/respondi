@@ -1,24 +1,56 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { signOut } from '@/app/actions/auth'
+import { setActiveBranch } from '@/app/actions/branch'
 
 interface OperarioUser {
   nombre: string
   email: string
   initials: string
   roleName: string
-  nombreSucursal: string
+}
+
+type Branch = {
+  id: string
+  nombre: string
 }
 
 export default function OperarioLayout({
   children,
-  user
+  user,
+  branches,
+  activeBranchId
 }: {
   children: React.ReactNode
   user: OperarioUser
+  branches: Branch[]
+  activeBranchId: string
 }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [isOpen, setIsOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  const activeBranch = branches.find((b) => b.id === activeBranchId) || branches[0]
+  const nombreSucursal = activeBranch?.nombre || ''
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  async function handleSelect(branchId: string) {
+    setIsOpen(false)
+    if (branchId !== activeBranchId) {
+      await setActiveBranch(branchId)
+      window.location.reload()
+    }
+  }
 
   return (
     <div className="min-h-screen lg:flex bg-slate-50 text-ink-900 font-body">
@@ -59,7 +91,7 @@ export default function OperarioLayout({
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-500 truncate">{user.nombre}</p>
-              <p className="text-[11px] text-ink-400 truncate">{user.roleName} · {user.nombreSucursal}</p>
+              <p className="text-[11px] text-ink-400 truncate">{user.roleName} · {nombreSucursal}</p>
             </div>
             <form action={signOut} className="shrink-0">
               <button 
@@ -97,12 +129,44 @@ export default function OperarioLayout({
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
               </svg>
             </button>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 relative" ref={dropdownRef}>
               <span className="hidden sm:inline text-xs text-ink-500 font-500">Sucursal</span>
-              <div className="flex items-center gap-2 pl-3 pr-4 py-2 rounded-xl border border-slate-200 bg-white cursor-default">
-                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                <span className="font-500 text-sm">{user.nombreSucursal}</span>
-              </div>
+              
+              {branches.length <= 1 ? (
+                <div className="flex items-center gap-2 pl-3 pr-4 py-2 rounded-xl border border-slate-200 bg-white cursor-default">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  <span className="font-500 text-sm">{nombreSucursal}</span>
+                </div>
+              ) : (
+                <button 
+                  onClick={() => setIsOpen(!isOpen)}
+                  className="flex items-center gap-2 pl-3 pr-2 py-2 rounded-xl border border-slate-200 bg-white hover:border-brand-300 hover:bg-brand-50 transition group"
+                >
+                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  <span className="font-500 text-sm">{nombreSucursal || 'Sin sucursal'}</span>
+                  <svg className={`w-4 h-4 text-ink-400 group-hover:text-brand-600 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/>
+                  </svg>
+                </button>
+              )}
+
+              {isOpen && branches.length > 1 && (
+                <div className="absolute top-full left-0 sm:left-12 mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-100 py-1 z-30">
+                  {branches.map(branch => (
+                    <button
+                      key={branch.id}
+                      onClick={() => handleSelect(branch.id)}
+                      className={`w-full text-left px-4 py-2 text-sm transition-colors ${
+                        branch.id === activeBranchId 
+                          ? 'bg-brand-50 text-brand-700 font-500' 
+                          : 'text-ink-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      {branch.nombre}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="flex-1"></div>
             <button className="relative p-2 rounded-lg hover:bg-slate-100 transition" aria-label="Notificaciones">

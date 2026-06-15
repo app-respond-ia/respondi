@@ -51,16 +51,18 @@ export async function getUsuarios() {
 
   const { data: usuarios, error: usrErr } = await supabase
     .from('users')
-    .select('*')
+    .select('*, user_branches(branch_id)')
     .eq('tenant_id', auth.tenant_id)
     .order('fecha_creacion', { ascending: true })
 
   if (usrErr) return { success: false, error: usrErr.message }
 
-  return { success: true, data: { usuarios, usuarios_max, plan_nombre, current_user_id: auth.user_id, sucursales } }
+  const usuarios_activos_count = (usuarios || []).filter((u: any) => u.activo).length
+
+  return { success: true, data: { usuarios, usuarios_max, plan_nombre, current_user_id: auth.user_id, sucursales, usuarios_activos_count } }
 }
 
-export async function invitarUsuario(data: { email: string, nombre: string | null, rol: 'agente' | 'operario', branch_id: string }) {
+export async function invitarUsuario(data: { email: string, nombre: string | null, rol: 'agente' | 'operario', branch_ids: string[] }) {
   if (data.rol !== 'agente' && data.rol !== 'operario') {
     return { success: false, error: 'Rol inválido. Solo se permite agente u operario.' }
   }
@@ -72,7 +74,7 @@ export async function invitarUsuario(data: { email: string, nombre: string | nul
   // Comprobar límite de usuarios
   const { data: config } = await getUsuarios()
   if (config?.usuarios && config.usuarios_max !== null && config.usuarios_max !== undefined) {
-    if (config.usuarios.length >= config.usuarios_max) {
+    if (config.usuarios_activos_count >= config.usuarios_max) {
       return { success: false, error: 'Has alcanzado el límite de usuarios de tu plan' }
     }
   }
@@ -90,7 +92,7 @@ export async function invitarUsuario(data: { email: string, nombre: string | nul
     .insert([{
       id: inviteData.user.id,
       tenant_id: auth.tenant_id,
-      branch_id: data.branch_id,
+      branch_id: data.branch_ids[0],
       email: data.email,
       nombre: data.nombre || null,
       rol: data.rol,
@@ -103,6 +105,14 @@ export async function invitarUsuario(data: { email: string, nombre: string | nul
     return { success: false, error: insertError.message }
   }
 
+  await supabaseAdmin.from('user_branches').insert(
+    data.branch_ids.map(bid => ({
+      user_id: inviteData.user.id,
+      branch_id: bid,
+      tenant_id: auth.tenant_id
+    }))
+  )
+
   const { data: newUser } = await supabaseAdmin
     .from('users')
     .select('*')
@@ -112,7 +122,7 @@ export async function invitarUsuario(data: { email: string, nombre: string | nul
   return { success: true, data: newUser }
 }
 
-export async function actualizarUsuario(id: string, data: Partial<{ nombre: string, rol: 'agente'|'operario', branch_id: string }>) {
+export async function actualizarUsuario(id: string, data: Partial<{ nombre: string, rol: 'agente'|'operario', branch_ids: string[] }>) {
   if (data.rol && data.rol !== 'agente' && data.rol !== 'operario') {
     return { success: false, error: 'No tienes permisos para asignar este rol' }
   }
@@ -126,7 +136,7 @@ export async function actualizarUsuario(id: string, data: Partial<{ nombre: stri
     .update({
       ...(data.nombre !== undefined && { nombre: data.nombre }),
       ...(data.rol && { rol: data.rol }),
-      ...(data.branch_id && { branch_id: data.branch_id })
+      ...(data.branch_ids && data.branch_ids.length > 0 && { branch_id: data.branch_ids[0] })
     })
     .eq('id', id)
     .eq('tenant_id', auth.tenant_id)
@@ -134,6 +144,19 @@ export async function actualizarUsuario(id: string, data: Partial<{ nombre: stri
     .single()
 
   if (error) return { success: false, error: error.message }
+
+  if (data.branch_ids) {
+    await supabase.from('user_branches')
+      .delete().eq('user_id', id).eq('tenant_id', auth.tenant_id)
+    if (data.branch_ids.length > 0) {
+      await supabase.from('user_branches').insert(
+        data.branch_ids.map(bid => ({
+          user_id: id, branch_id: bid, tenant_id: auth.tenant_id
+        }))
+      )
+    }
+  }
+
   return { success: true, data: updated }
 }
 

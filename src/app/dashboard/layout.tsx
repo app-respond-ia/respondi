@@ -23,14 +23,19 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect('/login')
   }
 
-  // 3. Obtener sucursales del comercio
-  const { data: branchesData } = await supabase
-    .from('sucursales')
-    .select('id, nombre')
-    .eq('tenant_id', userData.tenant_id)
-    .order('created_at', { ascending: true })
+  // 3. Obtener sucursales desde user_branches
+  const { data: ubData } = await supabase
+    .from('user_branches')
+    .select('branch_id, sucursales(id, nombre)')
+    .eq('user_id', user.id)
+    .order('branch_id', { ascending: true })
 
-  const branches = branchesData || []
+  const branches = ((ubData || [])
+    .map((ub: any) => {
+      const s = Array.isArray(ub.sucursales) ? ub.sucursales[0] : ub.sucursales
+      return s ? { id: s.id, nombre: s.nombre } : null
+    })
+    .filter(Boolean) as { id: string, nombre: string }[])
 
   // 4. Determinar sucursal activa (por cookie o la primera por defecto)
   const cookieStore = await cookies()

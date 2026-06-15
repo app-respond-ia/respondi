@@ -19,7 +19,7 @@ export async function getHorarios() {
     return { success: false, error: 'Usuario no vinculado a un comercio' }
   }
 
-  const branchId = await resolveBranchId(supabase, userData.tenant_id, userData.branch_id, userData.rol)
+  const branchId = await resolveBranchId(supabase, user.id)
   if (!branchId) return { success: false, error: 'Usuario no vinculado a una sucursal' }
 
   // Obtener horarios de esa sucursal
@@ -63,7 +63,7 @@ export async function saveHorarios(horarios: { dia_semana: number, apertura: str
     return { success: false, error: 'Usuario no vinculado a un comercio' }
   }
 
-  const branchId = await resolveBranchId(supabase, userData.tenant_id, userData.branch_id, userData.rol)
+  const branchId = await resolveBranchId(supabase, user.id)
   if (!branchId) return { success: false, error: 'Usuario no vinculado a una sucursal' }
 
   // 1. Borrar horarios actuales

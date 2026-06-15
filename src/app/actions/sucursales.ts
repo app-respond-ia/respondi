@@ -31,7 +31,17 @@ export async function getSucursales() {
     .order('created_at', { ascending: true })
 
   if (error) return { success: false, error: error.message }
-  return { success: true, data: { sucursales } }
+
+  const { data: comercio } = await supabase
+    .from('comercios')
+    .select('plan_id, plans(sucursales_max)')
+    .eq('id', auth.tenant_id)
+    .single()
+  const plan = Array.isArray(comercio?.plans) ? comercio.plans[0] : comercio?.plans
+  const sucursales_max = plan?.sucursales_max ?? null
+  const sucursales_activas_count = (sucursales || []).filter((s: any) => s.activa).length
+
+  return { success: true, data: { sucursales, sucursales_max, sucursales_activas_count } }
 }
 
 export async function crearSucursal(nombre: string, direccion?: string, copiarDesdeId?: string) {
@@ -42,6 +52,14 @@ export async function crearSucursal(nombre: string, direccion?: string, copiarDe
   const supabase = await createClient()
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
+
+  const sucRes = await getSucursales()
+  if (sucRes.success && sucRes.data) {
+    const { sucursales_max, sucursales_activas_count } = sucRes.data
+    if (sucursales_max !== null && sucursales_activas_count >= sucursales_max) {
+      return { success: false, error: 'Has alcanzado el límite de sucursales de tu plan' }
+    }
+  }
 
   const { data: nuevaSucursal, error } = await supabase
     .from('sucursales')
@@ -127,6 +145,21 @@ export async function crearSucursal(nombre: string, direccion?: string, copiarDe
     }
   }
 
+  const { data: admins } = await supabase
+    .from('users')
+    .select('id')
+    .eq('tenant_id', auth.tenant_id)
+    .eq('rol', 'admin')
+  if (admins && admins.length > 0) {
+    await supabase.from('user_branches').insert(
+      admins.map((a: any) => ({
+        user_id: a.id,
+        branch_id: nuevaSucursal.id,
+        tenant_id: auth.tenant_id
+      }))
+    )
+  }
+
   return { success: true, data: nuevaSucursal }
 }
 
@@ -164,6 +197,14 @@ export async function reactivarSucursal(id: string) {
   const supabase = await createClient()
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
+
+  const sucRes = await getSucursales()
+  if (sucRes.success && sucRes.data) {
+    const { sucursales_max, sucursales_activas_count } = sucRes.data
+    if (sucursales_max !== null && sucursales_activas_count >= sucursales_max) {
+      return { success: false, error: 'Has alcanzado el límite de sucursales de tu plan' }
+    }
+  }
 
   const { data, error } = await supabase
     .from('sucursales')

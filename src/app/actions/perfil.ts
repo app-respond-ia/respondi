@@ -19,7 +19,7 @@ export async function getPerfilComercio() {
     return { success: false, error: 'Usuario no vinculado a un comercio' }
   }
 
-  const branchId = await resolveBranchId(supabase, userData.tenant_id, userData.branch_id, userData.rol)
+  const branchId = await resolveBranchId(supabase, user.id)
   if (!branchId) return { success: false, error: 'Usuario no vinculado a una sucursal' }
 
   // 1. Obtener datos de la sucursal
@@ -70,7 +70,7 @@ export async function savePerfilComercio(data: {
     return { success: false, error: 'Usuario no vinculado a un comercio' }
   }
 
-  const branchId = await resolveBranchId(supabase, userData.tenant_id, userData.branch_id, userData.rol)
+  const branchId = await resolveBranchId(supabase, user.id)
   if (!branchId) return { success: false, error: 'Usuario no vinculado a una sucursal' }
 
   // 1. Actualizar sucursales

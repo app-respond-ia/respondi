@@ -14,6 +14,7 @@ export default function UsuariosPage() {
   const [loading, setLoading] = useState(true)
   const [usuarios, setUsuarios] = useState<any[]>([])
   const [usuariosMax, setUsuariosMax] = useState<number | null>(null)
+  const [usuariosActivosCount, setUsuariosActivosCount] = useState<number>(0)
   const [planNombre, setPlanNombre] = useState<string | null>(null)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [sucursales, setSucursales] = useState<any[]>([])
@@ -23,8 +24,8 @@ export default function UsuariosPage() {
   // Invitar Modal
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
   const [inviteLoading, setInviteLoading] = useState(false)
-  const [inviteData, setInviteData] = useState<{ email: string, nombre: string, rol: 'agente' | 'operario', branch_id: string }>({
-    email: '', nombre: '', rol: 'agente', branch_id: ''
+  const [inviteData, setInviteData] = useState<{ email: string, nombre: string, rol: 'agente' | 'operario', branch_ids: string[] }>({
+    email: '', nombre: '', rol: 'agente', branch_ids: []
   })
   const [inviteError, setInviteError] = useState<string | null>(null)
 
@@ -32,8 +33,8 @@ export default function UsuariosPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [editLoading, setEditLoading] = useState(false)
   const [selectedUser, setSelectedUser] = useState<any>(null)
-  const [editData, setEditData] = useState<{ nombre: string, rol: 'agente' | 'operario', branch_id: string }>({
-    nombre: '', rol: 'agente', branch_id: ''
+  const [editData, setEditData] = useState<{ nombre: string, rol: 'agente' | 'operario', branch_ids: string[] }>({
+    nombre: '', rol: 'agente', branch_ids: []
   })
 
   const cargar = async () => {
@@ -42,6 +43,7 @@ export default function UsuariosPage() {
     if (res.success && res.data) {
       setUsuarios(res.data.usuarios)
       setUsuariosMax(res.data.usuarios_max)
+      setUsuariosActivosCount(res.data.usuarios_activos_count || 0)
       setPlanNombre(res.data.plan_nombre)
       setCurrentUserId(res.data.current_user_id)
       setSucursales(res.data.sucursales)
@@ -56,13 +58,17 @@ export default function UsuariosPage() {
   }, [])
 
   const handleOpenInvite = () => {
-    setInviteData({ email: '', nombre: '', rol: 'agente', branch_id: sucursales[0]?.id || '' })
+    setInviteData({ email: '', nombre: '', rol: 'agente', branch_ids: [] })
     setInviteError(null)
     setIsInviteModalOpen(true)
   }
 
   const handleInvitar = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (inviteData.branch_ids.length === 0) {
+      setInviteError('Debes seleccionar al menos una sucursal')
+      return
+    }
     setInviteLoading(true)
     setInviteError(null)
 
@@ -70,7 +76,7 @@ export default function UsuariosPage() {
       email: inviteData.email,
       nombre: inviteData.nombre || null,
       rol: inviteData.rol,
-      branch_id: inviteData.branch_id
+      branch_ids: inviteData.branch_ids
     })
 
     if (res.success) {
@@ -89,7 +95,7 @@ export default function UsuariosPage() {
     setEditData({
       nombre: user.nombre || '',
       rol: user.rol === 'admin' || user.rol === 'super_admin' ? 'agente' : user.rol, // Para la UI si fuera modificable, pero no lo dejaremos si es admin
-      branch_id: user.branch_id || (sucursales[0]?.id || '')
+      branch_ids: Array.isArray(user.user_branches) ? user.user_branches.map((ub: any) => ub.branch_id) : []
     })
     setIsEditModalOpen(true)
   }
@@ -97,12 +103,16 @@ export default function UsuariosPage() {
   const handleEditar = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedUser) return
+    if (editData.branch_ids.length === 0) {
+      setMensaje({ tipo: 'error', texto: 'Debes seleccionar al menos una sucursal' })
+      return
+    }
     setEditLoading(true)
 
     const res = await actualizarUsuario(selectedUser.id, {
       nombre: editData.nombre,
       rol: editData.rol,
-      branch_id: editData.branch_id
+      branch_ids: editData.branch_ids
     })
 
     if (res.success) {
@@ -187,7 +197,7 @@ export default function UsuariosPage() {
     return 'Agente'
   }
 
-  const limitReached = usuariosMax !== null && usuarios.length >= usuariosMax
+  const limitReached = usuariosMax !== null && usuariosActivosCount >= usuariosMax
 
   if (loading) {
     return <div className="p-10 text-center text-slate-500 font-medium">Cargando usuarios...</div>
@@ -234,12 +244,12 @@ export default function UsuariosPage() {
             <div className="flex items-center justify-between gap-3 mb-2">
               <div>
                 <p className="text-sm font-600 text-ink-900">Usuarios del plan {planNombre || 'Pro'}</p>
-                <p className="text-xs text-ink-500 mt-0.5">Estás usando {usuarios.length} de {usuariosMax} disponibles</p>
+                <p className="text-xs text-ink-500 mt-0.5">Estás usando {usuariosActivosCount} de {usuariosMax} disponibles</p>
               </div>
-              <span className="font-display font-700 text-2xl text-ink-900">{usuarios.length}<span className="text-ink-400 font-500 text-lg">/{usuariosMax}</span></span>
+              <span className="font-display font-700 text-2xl text-ink-900">{usuariosActivosCount}<span className="text-ink-400 font-500 text-lg">/{usuariosMax}</span></span>
             </div>
             <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-brand-400 to-brand-600 rounded-full" style={{ width: `${Math.min((usuarios.length / usuariosMax) * 100, 100)}%` }}></div>
+              <div className="h-full bg-gradient-to-r from-brand-400 to-brand-600 rounded-full" style={{ width: `${Math.min((usuariosActivosCount / usuariosMax) * 100, 100)}%` }}></div>
             </div>
           </>
         ) : (
@@ -248,7 +258,7 @@ export default function UsuariosPage() {
               <p className="text-sm font-600 text-ink-900">Usuarios del plan {planNombre || 'Actual'}</p>
               <p className="text-xs text-ink-500 mt-0.5">Sin límite de usuarios</p>
             </div>
-            <span className="font-display font-700 text-2xl text-ink-900">{usuarios.length}</span>
+            <span className="font-display font-700 text-2xl text-ink-900">{usuariosActivosCount}</span>
           </div>
         )}
       </div>
@@ -259,7 +269,11 @@ export default function UsuariosPage() {
           const isCurrent = user.id === currentUserId
           const isPending = !user.invitacion_aceptada
           const isDisabled = !user.activo
-          const branchName = user.branch_id ? sucursales.find(s => s.id === user.branch_id)?.nombre : 'Todas las sucursales'
+          const userBranchNames = Array.isArray(user.user_branches) && user.user_branches.length > 0
+            ? user.user_branches
+                .map((ub: any) => sucursales.find((s: any) => s.id === ub.branch_id)?.nombre)
+                .filter(Boolean).join(', ')
+            : 'Sin sucursal asignada'
           const canEdit = !isCurrent && user.rol !== 'admin' && user.rol !== 'super_admin'
 
           return (
@@ -303,7 +317,7 @@ export default function UsuariosPage() {
                     {getRoleLabel(user.rol)}
                   </span>
                 )}
-                <span className="text-xs text-ink-400">{branchName || 'Sucursal no asignada'}</span>
+                <span className="text-xs text-ink-400">{userBranchNames}</span>
               </div>
 
               <button 
@@ -396,14 +410,25 @@ export default function UsuariosPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-500 text-ink-700 mb-1.5">Sucursal asignada</label>
-                    <select required value={inviteData.branch_id} onChange={e => setInviteData({...inviteData, branch_id: e.target.value})}
-                      className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm">
-                      <option value="" disabled>Selecciona una sucursal</option>
+                    <label className="block text-sm font-500 text-ink-700 mb-1.5">Sucursales asignadas</label>
+                    <div className="space-y-2 max-h-40 overflow-y-auto p-3 border border-slate-200 rounded-xl bg-slate-50">
                       {sucursales.map(s => (
-                        <option key={s.id} value={s.id}>{s.nombre}</option>
+                        <label key={s.id} className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" 
+                            checked={inviteData.branch_ids.includes(s.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setInviteData({...inviteData, branch_ids: [...inviteData.branch_ids, s.id]})
+                              } else {
+                                setInviteData({...inviteData, branch_ids: inviteData.branch_ids.filter(id => id !== s.id)})
+                              }
+                            }}
+                            className="w-4 h-4 text-brand-600 border-slate-300 rounded focus:ring-brand-500"
+                          />
+                          <span className="text-sm text-ink-700">{s.nombre}</span>
+                        </label>
                       ))}
-                    </select>
+                    </div>
                   </div>
                 </div>
         
@@ -506,13 +531,25 @@ export default function UsuariosPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-500 text-ink-700 mb-1.5">Sucursal asignada</label>
-                  <select required value={editData.branch_id} onChange={e => setEditData({...editData, branch_id: e.target.value})}
-                    className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm">
+                  <label className="block text-sm font-500 text-ink-700 mb-1.5">Sucursales asignadas</label>
+                  <div className="space-y-2 max-h-40 overflow-y-auto p-3 border border-slate-200 rounded-xl bg-slate-50">
                     {sucursales.map(s => (
-                      <option key={s.id} value={s.id}>{s.nombre}</option>
+                      <label key={s.id} className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" 
+                          checked={editData.branch_ids.includes(s.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setEditData({...editData, branch_ids: [...editData.branch_ids, s.id]})
+                            } else {
+                              setEditData({...editData, branch_ids: editData.branch_ids.filter(id => id !== s.id)})
+                            }
+                          }}
+                          className="w-4 h-4 text-brand-600 border-slate-300 rounded focus:ring-brand-500"
+                        />
+                        <span className="text-sm text-ink-700">{s.nombre}</span>
+                      </label>
                     ))}
-                  </select>
+                  </div>
                 </div>
 
                 {/* Acciones secundarias */}

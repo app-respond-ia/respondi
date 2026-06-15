@@ -2,34 +2,29 @@ import { cookies } from 'next/headers'
 
 export async function resolveBranchId(
   supabase: any,
-  tenantId: string,
-  userBranchId: string | null,
-  rol: string
+  userId: string
 ): Promise<string | null> {
-  if (rol === 'admin') {
-    const cookieStore = await cookies()
-    const cookieBranch = cookieStore.get('respondi_active_branch')?.value
+  const cookieStore = await cookies()
+  const cookieBranch = cookieStore.get('respondi_active_branch')?.value
 
-    if (cookieBranch) {
-      const { data } = await supabase
-        .from('sucursales')
-        .select('id')
-        .eq('id', cookieBranch)
-        .eq('tenant_id', tenantId)
-        .single()
-      if (data) return data.id
-    }
-
-    // Fallback: primera sucursal del tenant por antigüedad
+  if (cookieBranch) {
     const { data } = await supabase
-      .from('sucursales')
-      .select('id')
-      .eq('tenant_id', tenantId)
-      .order('created_at', { ascending: true })
-      .limit(1)
+      .from('user_branches')
+      .select('branch_id')
+      .eq('user_id', userId)
+      .eq('branch_id', cookieBranch)
       .single()
-    return data?.id ?? null
+    if (data) return data.branch_id
   }
 
-  return userBranchId
+  // Fallback: primera sucursal de user_branches para este usuario
+  const { data } = await supabase
+    .from('user_branches')
+    .select('branch_id')
+    .eq('user_id', userId)
+    .order('branch_id', { ascending: true })
+    .limit(1)
+    .single()
+    
+  return data?.branch_id ?? null
 }

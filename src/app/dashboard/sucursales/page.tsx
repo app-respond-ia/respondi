@@ -11,8 +11,8 @@ export default function SucursalesPage() {
   // Modal Crear
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [modalLoading, setModalLoading] = useState(false)
-  const [modalData, setModalData] = useState<{ nombre: string, direccion: string }>({
-    nombre: '', direccion: ''
+  const [modalData, setModalData] = useState<{ nombre: string, direccion: string, copiarDesdeId: string }>({
+    nombre: '', direccion: '', copiarDesdeId: ''
   })
   const [modalError, setModalError] = useState<string | null>(null)
 
@@ -32,7 +32,7 @@ export default function SucursalesPage() {
   }, [])
 
   const handleOpenModal = () => {
-    setModalData({ nombre: '', direccion: '' })
+    setModalData({ nombre: '', direccion: '', copiarDesdeId: '' })
     setModalError(null)
     setIsModalOpen(true)
   }
@@ -42,7 +42,7 @@ export default function SucursalesPage() {
     setModalLoading(true)
     setModalError(null)
 
-    const res = await crearSucursal(modalData.nombre, modalData.direccion)
+    const res = await crearSucursal(modalData.nombre, modalData.direccion, modalData.copiarDesdeId || undefined)
 
     if (res.success && res.data) {
       setIsModalOpen(false)
@@ -184,6 +184,20 @@ export default function SucursalesPage() {
                     <input type="text" placeholder="Calle principal 123"
                       value={modalData.direccion} onChange={e => setModalData({...modalData, direccion: e.target.value})}
                       className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm" />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-500 text-ink-700 mb-1.5">Copiar configuración desde <span className="text-ink-400 font-400">· opcional</span></label>
+                    <select
+                      value={modalData.copiarDesdeId}
+                      onChange={e => setModalData({...modalData, copiarDesdeId: e.target.value})}
+                      className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm"
+                    >
+                      <option value="">No copiar (empezar vacía)</option>
+                      {sucursales.map(s => (
+                        <option key={s.id} value={s.id}>{s.nombre}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
         

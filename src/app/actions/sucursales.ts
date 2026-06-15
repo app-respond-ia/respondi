@@ -34,7 +34,7 @@ export async function getSucursales() {
   return { success: true, data: { sucursales } }
 }
 
-export async function crearSucursal(nombre: string, direccion?: string) {
+export async function crearSucursal(nombre: string, direccion?: string, copiarDesdeId?: string) {
   if (!nombre || nombre.trim().length === 0) {
     return { success: false, error: 'El nombre es obligatorio' }
   }
@@ -43,7 +43,7 @@ export async function crearSucursal(nombre: string, direccion?: string) {
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
-  const { data, error } = await supabase
+  const { data: nuevaSucursal, error } = await supabase
     .from('sucursales')
     .insert({
       tenant_id: auth.tenant_id,
@@ -55,7 +55,79 @@ export async function crearSucursal(nombre: string, direccion?: string) {
     .single()
 
   if (error) return { success: false, error: error.message }
-  return { success: true, data }
+
+  // Si hay copiarDesdeId, procedemos a copiar (best-effort)
+  if (copiarDesdeId) {
+    // 1. business_profiles
+    const { data: bp } = await supabase
+      .from('business_profiles')
+      .select('descripcion, politicas, servicios, idioma_base, tono, disclaimer_texto, msg_fuera_horario, msg_cuota_agotada, msg_pausa_automatica')
+      .eq('branch_id', copiarDesdeId)
+      .single()
+    if (bp) {
+      await supabase.from('business_profiles').insert({
+        branch_id: nuevaSucursal.id,
+        ...bp
+      })
+    }
+
+    // 2. business_hours
+    const { data: bh } = await supabase
+      .from('business_hours')
+      .select('dia_semana, apertura, cierre, cerrado')
+      .eq('branch_id', copiarDesdeId)
+      .limit(7)
+    if (bh && bh.length > 0) {
+      const inserts = bh.map((h: any) => ({ branch_id: nuevaSucursal.id, ...h }))
+      await supabase.from('business_hours').insert(inserts)
+    }
+
+    // 3. case_rules
+    const { data: cr } = await supabase
+      .from('case_rules')
+      .select('nombre, descripcion_intencion, tipo_caso, activa, es_plantilla')
+      .eq('branch_id', copiarDesdeId)
+      .eq('tenant_id', auth.tenant_id)
+    if (cr && cr.length > 0) {
+      const inserts = cr.map((r: any) => ({ tenant_id: auth.tenant_id, branch_id: nuevaSucursal.id, ...r }))
+      await supabase.from('case_rules').insert(inserts)
+    }
+
+    // 4. price_list
+    const { data: pl } = await supabase
+      .from('price_list')
+      .select('nombre, precio, precio_tipo, moneda, descripcion, disponible')
+      .eq('branch_id', copiarDesdeId)
+      .eq('tenant_id', auth.tenant_id)
+    if (pl && pl.length > 0) {
+      const inserts = pl.map((p: any) => ({ tenant_id: auth.tenant_id, branch_id: nuevaSucursal.id, ...p }))
+      await supabase.from('price_list').insert(inserts)
+    }
+
+    // 5. message_categories
+    const { data: mc } = await supabase
+      .from('message_categories')
+      .select('nombre, descripcion_intencion, color, activa, es_plantilla, orden')
+      .eq('branch_id', copiarDesdeId)
+      .eq('tenant_id', auth.tenant_id)
+    if (mc && mc.length > 0) {
+      const inserts = mc.map((c: any) => ({ tenant_id: auth.tenant_id, branch_id: nuevaSucursal.id, ...c }))
+      await supabase.from('message_categories').insert(inserts)
+    }
+
+    // 6. skills
+    const { data: sk } = await supabase
+      .from('skills')
+      .select('nombre, descripcion, activo, orden')
+      .eq('branch_id', copiarDesdeId)
+      .eq('tenant_id', auth.tenant_id)
+    if (sk && sk.length > 0) {
+      const inserts = sk.map((s: any) => ({ tenant_id: auth.tenant_id, branch_id: nuevaSucursal.id, ...s }))
+      await supabase.from('skills').insert(inserts)
+    }
+  }
+
+  return { success: true, data: nuevaSucursal }
 }
 
 export async function desactivarSucursal(id: string) {

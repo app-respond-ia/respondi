@@ -79,6 +79,10 @@ export default function Sidebar({ user, onCloseMobile }: SidebarProps) {
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
           Perfil del comercio
         </Link>
+        <Link href="/dashboard/sucursales" onClick={onCloseMobile} className={navItemClass('/dashboard/sucursales')}>
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"/></svg>
+          Sucursales
+        </Link>
         <Link href="/dashboard/skills" onClick={onCloseMobile} className={navItemClass('/dashboard/skills')}>
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
           Skills de IA

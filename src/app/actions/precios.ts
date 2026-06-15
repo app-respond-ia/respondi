@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
+import { resolveBranchId } from '@/lib/active-branch'
 
 export interface PrecioData {
   nombre: string
@@ -19,15 +20,18 @@ async function getAuthData(supabase: any) {
 
   const { data: userData } = await supabase
     .from('users')
-    .select('tenant_id, branch_id')
+    .select('tenant_id, branch_id, rol')
     .eq('id', user.id)
     .single()
 
-  if (!userData?.tenant_id || !userData?.branch_id) {
-    return { error: 'Usuario no vinculado a una sucursal' }
+  if (!userData?.tenant_id) {
+    return { error: 'Usuario no vinculado a un comercio' }
   }
 
-  return { tenant_id: userData.tenant_id, branch_id: userData.branch_id }
+  const branchId = await resolveBranchId(supabase, userData.tenant_id, userData.branch_id, userData.rol)
+  if (!branchId) return { error: 'Usuario no vinculado a una sucursal' }
+
+  return { tenant_id: userData.tenant_id, branch_id: branchId }
 }
 
 export async function getPrecios() {

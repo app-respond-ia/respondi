@@ -35,6 +35,7 @@ export default function Header({ branches, activeBranchId, onOpenMobile, userIni
     setIsOpen(false)
     if (branchId !== activeBranchId) {
       await setActiveBranch(branchId)
+      window.location.reload()
     }
   }
 

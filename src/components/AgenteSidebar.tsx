@@ -122,7 +122,7 @@ export default function AgenteSidebar({ children, nombre, sucursal }: AgenteSide
           </div>
         </header>
 
-        <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-4xl w-full mx-auto">
+        <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 lg:py-8 w-full">
           {children}
         </main>
       </div>

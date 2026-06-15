@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
+import { resolveBranchId } from '@/lib/active-branch'
 
 export async function getHorarios() {
   const supabase = await createClient()
@@ -10,19 +11,22 @@ export async function getHorarios() {
   // Obtener branch_id del usuario
   const { data: userData } = await supabase
     .from('users')
-    .select('branch_id')
+    .select('tenant_id, branch_id, rol')
     .eq('id', user.id)
     .single()
 
-  if (!userData?.branch_id) {
-    return { success: false, error: 'Usuario no vinculado a una sucursal' }
+  if (!userData?.tenant_id) {
+    return { success: false, error: 'Usuario no vinculado a un comercio' }
   }
+
+  const branchId = await resolveBranchId(supabase, userData.tenant_id, userData.branch_id, userData.rol)
+  if (!branchId) return { success: false, error: 'Usuario no vinculado a una sucursal' }
 
   // Obtener horarios de esa sucursal
   const { data: horarios, error } = await supabase
     .from('business_hours')
     .select('*')
-    .eq('branch_id', userData.branch_id)
+    .eq('branch_id', branchId)
     .order('dia_semana', { ascending: true })
 
   if (error) return { success: false, error: error.message }
@@ -51,25 +55,28 @@ export async function saveHorarios(horarios: { dia_semana: number, apertura: str
 
   const { data: userData } = await supabase
     .from('users')
-    .select('branch_id')
+    .select('tenant_id, branch_id, rol')
     .eq('id', user.id)
     .single()
 
-  if (!userData?.branch_id) {
-    return { success: false, error: 'Usuario no vinculado a una sucursal' }
+  if (!userData?.tenant_id) {
+    return { success: false, error: 'Usuario no vinculado a un comercio' }
   }
+
+  const branchId = await resolveBranchId(supabase, userData.tenant_id, userData.branch_id, userData.rol)
+  if (!branchId) return { success: false, error: 'Usuario no vinculado a una sucursal' }
 
   // 1. Borrar horarios actuales
   const { error: errorDelete } = await supabase
     .from('business_hours')
     .delete()
-    .eq('branch_id', userData.branch_id)
+    .eq('branch_id', branchId)
 
   if (errorDelete) return { success: false, error: errorDelete.message }
 
   // 2. Preparar e insertar nuevos horarios
   const records = horarios.map(h => ({
-    branch_id: userData.branch_id,
+    branch_id: branchId,
     dia_semana: h.dia_semana,
     apertura: h.apertura,
     cierre: h.cierre,

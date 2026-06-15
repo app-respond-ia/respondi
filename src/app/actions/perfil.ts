@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
+import { resolveBranchId } from '@/lib/active-branch'
 
 export async function getPerfilComercio() {
   const supabase = await createClient()
@@ -10,19 +11,22 @@ export async function getPerfilComercio() {
   // Obtener tenant_id y branch_id del usuario
   const { data: userData } = await supabase
     .from('users')
-    .select('tenant_id, branch_id')
+    .select('tenant_id, branch_id, rol')
     .eq('id', user.id)
     .single()
     
-  if (!userData?.tenant_id || !userData?.branch_id) {
-    return { success: false, error: 'Usuario no vinculado a una sucursal' }
+  if (!userData?.tenant_id) {
+    return { success: false, error: 'Usuario no vinculado a un comercio' }
   }
+
+  const branchId = await resolveBranchId(supabase, userData.tenant_id, userData.branch_id, userData.rol)
+  if (!branchId) return { success: false, error: 'Usuario no vinculado a una sucursal' }
 
   // 1. Obtener datos de la sucursal
   const { data: sucursal } = await supabase
     .from('sucursales')
     .select('id, nombre, direccion, timezone')
-    .eq('id', userData.branch_id)
+    .eq('id', branchId)
     .eq('tenant_id', userData.tenant_id)
     .single()
 
@@ -30,7 +34,7 @@ export async function getPerfilComercio() {
   const { data: businessProfile } = await supabase
     .from('business_profiles')
     .select('id, servicios, politicas, idioma_base, tono, msg_fuera_horario')
-    .eq('branch_id', userData.branch_id)
+    .eq('branch_id', branchId)
     .single()
 
   return {
@@ -58,13 +62,16 @@ export async function savePerfilComercio(data: {
 
   const { data: userData } = await supabase
     .from('users')
-    .select('tenant_id, branch_id')
+    .select('tenant_id, branch_id, rol')
     .eq('id', user.id)
     .single()
 
-  if (!userData?.tenant_id || !userData?.branch_id) {
-    return { success: false, error: 'Usuario no vinculado a una sucursal' }
+  if (!userData?.tenant_id) {
+    return { success: false, error: 'Usuario no vinculado a un comercio' }
   }
+
+  const branchId = await resolveBranchId(supabase, userData.tenant_id, userData.branch_id, userData.rol)
+  if (!branchId) return { success: false, error: 'Usuario no vinculado a una sucursal' }
 
   // 1. Actualizar sucursales
   const { error: errorSucursal } = await supabase
@@ -74,7 +81,7 @@ export async function savePerfilComercio(data: {
       direccion: data.direccion,
       timezone: data.timezone
     })
-    .eq('id', userData.branch_id)
+    .eq('id', branchId)
     .eq('tenant_id', userData.tenant_id)
 
   if (errorSucursal) return { success: false, error: errorSucursal.message }
@@ -83,7 +90,7 @@ export async function savePerfilComercio(data: {
   const { data: checkProfile } = await supabase
     .from('business_profiles')
     .select('id')
-    .eq('branch_id', userData.branch_id)
+    .eq('branch_id', branchId)
     .single()
 
   if (checkProfile) {
@@ -97,7 +104,7 @@ export async function savePerfilComercio(data: {
         tono: data.tono,
         msg_fuera_horario: data.msg_fuera_horario
       })
-      .eq('branch_id', userData.branch_id)
+      .eq('branch_id', branchId)
       
     if (errorProfile) return { success: false, error: errorProfile.message }
   } else {
@@ -105,7 +112,7 @@ export async function savePerfilComercio(data: {
     const { error: errorInsert } = await supabase
       .from('business_profiles')
       .insert({
-        branch_id: userData.branch_id,
+        branch_id: branchId,
         servicios: data.servicios,
         politicas: data.politicas,
         idioma_base: data.idioma_base,

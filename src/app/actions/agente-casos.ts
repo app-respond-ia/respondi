@@ -27,7 +27,6 @@ export async function getMisCasos(filtro: 'todos' | 'pendiente' | 'atendiendo' =
     return { success: false, error: auth.error }
   }
 
-  // Fetch all 'pendiente' and 'atendiendo' cases for this agent
   let query = supabase
     .from('cases')
     .select(`
@@ -51,12 +50,6 @@ export async function getMisCasos(filtro: 'todos' | 'pendiente' | 'atendiendo' =
     .in('estatus', ['pendiente', 'atendiendo'])
     .order('fecha_apertura', { ascending: true })
 
-  // Wait, the schema says cases has conversation_id. 
-  // To get conversation_tags from cases:
-  // cases -> conversations -> conversation_tags -> message_categories.
-  // The correct syntax for Supabase JS to join through an explicit foreign key or relation is:
-  // `conversations ( conversation_tags ( message_categories ( nombre, color ) ) )`
-  
   const { data, error } = await query
 
   if (error) {
@@ -78,10 +71,10 @@ export async function getMisCasos(filtro: 'todos' | 'pendiente' | 'atendiendo' =
 
     // Extraer el primer tag si existe
     let tag = null
-    if (c.conversations && c.conversations.conversation_tags) {
-      const tagsArray = Array.isArray(c.conversations.conversation_tags) 
-        ? c.conversations.conversation_tags 
-        : [c.conversations.conversation_tags]
+    if (c.conversation_tags && c.conversation_tags.conversation_tags) {
+      const tagsArray = Array.isArray(c.conversation_tags.conversation_tags) 
+        ? c.conversation_tags.conversation_tags 
+        : [c.conversation_tags.conversation_tags]
       
       const firstTag = tagsArray[0]
       if (firstTag?.message_categories) {

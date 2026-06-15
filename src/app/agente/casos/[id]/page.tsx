@@ -236,31 +236,31 @@ export default function AgenteCasoDetalle() {
         </div>
       </div>
 
+      {/* Cabecera contacto */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 flex items-center gap-3 mb-6">
+        <div className="relative shrink-0">
+          <div className="w-12 h-12 rounded-full bg-brand-100 flex items-center justify-center font-600 text-brand-700">{initials}</div>
+          <span className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full ${canalConf.iconBg} flex items-center justify-center text-white ring-2 ring-white shadow-sm`}>
+            {canalConf.icon}
+          </span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-600 text-ink-900">{nombre}</p>
+          <p className="text-sm text-ink-500">
+            {caso.contacts?.identificador_canal ? `${caso.contacts.identificador_canal} · ` : ''}
+            {canalCapitalized}
+          </p>
+        </div>
+        <button disabled className="inline-flex items-center gap-1.5 px-3 h-9 rounded-lg bg-slate-100 text-slate-400 text-sm font-600 cursor-not-allowed">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>
+          <span className="hidden sm:inline">Próximamente</span>
+          <span className="sm:hidden">Chats</span>
+        </button>
+      </div>
+
       <div className="flex flex-col gap-4 lg:grid lg:grid-cols-3 lg:gap-6">
         {/* COLUMNA CHAT */}
         <div className="order-2 lg:order-1 lg:col-span-2 space-y-4">
-          
-          {/* Cabecera contacto */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 flex items-center gap-3">
-            <div className="relative shrink-0">
-              <div className="w-12 h-12 rounded-full bg-brand-100 flex items-center justify-center font-600 text-brand-700">{initials}</div>
-              <span className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full ${canalConf.iconBg} flex items-center justify-center text-white ring-2 ring-white shadow-sm`}>
-                {canalConf.icon}
-              </span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-600 text-ink-900">{nombre}</p>
-              <p className="text-sm text-ink-500">
-                {caso.contacts?.identificador_canal ? `${caso.contacts.identificador_canal} · ` : ''}
-                {canalCapitalized}
-              </p>
-            </div>
-            <button disabled className="inline-flex items-center gap-1.5 px-3 h-9 rounded-lg bg-slate-100 text-slate-400 text-sm font-600 cursor-not-allowed">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>
-              <span className="hidden sm:inline">Próximamente</span>
-              <span className="sm:hidden">Chats</span>
-            </button>
-          </div>
 
           {/* Hilo */}
           <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 space-y-4 max-h-[60vh] overflow-y-auto">

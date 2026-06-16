@@ -182,7 +182,8 @@ export default function AuditLogPage() {
           <option value="perfil">Perfil</option>
           <option value="novedades">Novedades</option>
           <option value="blacklist">Blacklist</option>
-          <option value="conversations">Conversaciones</option>
+          <option value="conversations">Conversaciones / Chats</option>
+          <option value="sucursales">Sucursales</option>
         </select>
       </div>
 

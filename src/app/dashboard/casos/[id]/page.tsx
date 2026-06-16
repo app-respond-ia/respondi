@@ -31,7 +31,6 @@ export default function CasoDetallePage() {
     if (res.success) {
       setCaso(res.data)
     } else {
-      alert(res.error)
       router.push('/dashboard/casos')
     }
     setLoading(false)

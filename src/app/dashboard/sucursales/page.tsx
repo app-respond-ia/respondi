@@ -119,6 +119,32 @@ export default function SucursalesPage() {
         </div>
       </div>
 
+      {/* Contador de plan */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 mb-6">
+        {sucursalesMax !== null ? (
+          <>
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <div>
+                <p className="text-sm font-600 text-ink-900">Sucursales del plan</p>
+                <p className="text-xs text-ink-500 mt-0.5">Estás usando {sucursalesActivasCount} de {sucursalesMax} disponibles</p>
+              </div>
+              <span className="font-display font-700 text-2xl text-ink-900">{sucursalesActivasCount}<span className="text-ink-400 font-500 text-lg">/{sucursalesMax}</span></span>
+            </div>
+            <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-brand-400 to-brand-600 rounded-full" style={{ width: `${Math.min((sucursalesActivasCount / sucursalesMax) * 100, 100)}%` }}></div>
+            </div>
+          </>
+        ) : (
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-600 text-ink-900">Sucursales del plan</p>
+              <p className="text-xs text-ink-500 mt-0.5">Sin límite de sucursales</p>
+            </div>
+            <span className="font-display font-700 text-2xl text-ink-900">{sucursalesActivasCount}</span>
+          </div>
+        )}
+      </div>
+
       {/* Lista de sucursales */}
       <div className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100">
         {sucursales.map(sucursal => (

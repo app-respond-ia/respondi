@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     
     if (!error && sessionData.user) {
       if (type === 'recovery') {
-        return NextResponse.redirect(`${origin}/aceptar-invitacion`)
+        return NextResponse.redirect(`${origin}/restablecer-contrasena`)
       }
 
       const user = sessionData.user

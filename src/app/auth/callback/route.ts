@@ -5,12 +5,17 @@ import { supabaseAdmin } from '@/utils/supabase/admin'
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
+  const type = searchParams.get('type')
 
   if (code) {
     const supabase = await createClient()
     const { data: sessionData, error } = await supabase.auth.exchangeCodeForSession(code)
     
     if (!error && sessionData.user) {
+      if (type === 'recovery') {
+        return NextResponse.redirect(`${origin}/aceptar-invitacion`)
+      }
+
       const user = sessionData.user
       
       // Comprobamos si el usuario ya existe en public.users

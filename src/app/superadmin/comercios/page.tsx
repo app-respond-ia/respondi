@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { getComercios } from '@/app/actions/superadmin'
-import { format } from 'date-fns'
+
 
 export default function ComerciosPage() {
   const [comercios, setComercios] = useState<any[]>([])
@@ -117,7 +117,7 @@ export default function ComerciosPage() {
                     </span>
                   </div>
                   <p className="text-sm text-ink-500 mt-0.5 truncate">
-                    Plan {c.plans?.nombre || 'Ninguno'} · vence el {c.fecha_vencimiento ? format(new Date(c.fecha_vencimiento), 'dd/MM/yyyy') : 'N/A'} · vendedor: {c.vendedores?.nombre || 'Sin vendedor'}
+                    Plan {c.plans?.nombre || 'Ninguno'} · vence el {c.fecha_vencimiento ? new Date(c.fecha_vencimiento).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'N/A'} · vendedor: {c.vendedores?.nombre || 'Sin vendedor'}
                   </p>
                 </div>
                 <svg className="w-5 h-5 text-ink-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
@@ -146,13 +146,13 @@ export default function ComerciosPage() {
                   <span className={`w-2.5 h-2.5 rounded-full ${getStatusColor(modalComercio.estado).split(' marker:')[1]}`}></span>
                   <div className="flex-1">
                     <p className="text-sm font-600 text-ink-900">Plan {modalComercio.plans?.nombre} · {modalComercio.estado}</p>
-                    <p className="text-xs text-ink-500">Vence el {modalComercio.fecha_vencimiento ? format(new Date(modalComercio.fecha_vencimiento), 'dd/MM/yyyy') : 'N/A'}</p>
+                    <p className="text-xs text-ink-500">Vence el {modalComercio.fecha_vencimiento ? new Date(modalComercio.fecha_vencimiento).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'N/A'}</p>
                   </div>
                 </div>
 
                 {/* Datos */}
                 <dl className="space-y-2.5 text-sm">
-                  <div className="flex justify-between gap-2"><dt className="text-ink-500">Alta</dt><dd className="text-ink-900 font-500 text-right">{format(new Date(modalComercio.created_at), 'dd/MM/yyyy')}</dd></div>
+                  <div className="flex justify-between gap-2"><dt className="text-ink-500">Alta</dt><dd className="text-ink-900 font-500 text-right">{new Date(modalComercio.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}</dd></div>
                   <div className="flex justify-between gap-2"><dt className="text-ink-500">Vendedor</dt><dd className="text-ink-900 font-500 text-right">{modalComercio.vendedores?.nombre || 'Sin vendedor'}</dd></div>
                 </dl>
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { getErrores, resolverError } from '@/app/actions/superadmin'
-import { format } from 'date-fns'
+
 
 export default function ErroresPage() {
   const [errores, setErrores] = useState<any[]>([])
@@ -116,7 +116,7 @@ export default function ErroresPage() {
                             {isResolved ? 'Resuelto' : 'Requiere atención'}
                           </span>
                           <span className="text-xs font-500 text-ink-500 bg-slate-100 px-2 py-0.5 rounded">{e.origen}</span>
-                          <span className="text-xs text-ink-400">{format(new Date(e.timestamp), 'dd/MM/yyyy HH:mm')}</span>
+                          <span className="text-xs text-ink-400">{new Date(e.timestamp).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                         </div>
                         <p className={`font-600 truncate ${isResolved ? 'text-ink-700' : 'text-ink-900'}`}>{e.descripcion}</p>
                         {e.comercios?.nombre && (
@@ -158,7 +158,7 @@ export default function ErroresPage() {
                     {modalData.resuelto ? 'Resuelto' : 'Sin resolver'}
                   </span>
                   <span className="text-sm font-500 text-ink-500 bg-slate-100 px-2 py-1 rounded">{modalData.origen}</span>
-                  <span className="text-sm text-ink-400">{format(new Date(modalData.timestamp), 'dd/MM/yyyy HH:mm:ss')}</span>
+                  <span className="text-sm text-ink-400">{new Date(modalData.timestamp).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
                 </div>
                 
                 <div>

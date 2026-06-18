@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { getCasoDetalle, actualizarEstadoCaso, agregarNotaCaso, enviarMensaje } from '@/app/actions/agente-caso-detalle'
+import { reabrirCaso } from '@/app/actions/casos'
 
 const CANAL_CONFIG = {
   instagram: {
@@ -76,6 +77,7 @@ export default function AgenteCasoDetalle() {
   const [enviandoMensaje, setEnviandoMensaje] = useState(false)
   const [guardandoNota, setGuardandoNota] = useState(false)
   const [actualizandoEstado, setActualizandoEstado] = useState(false)
+  const [reabriendoCaso, setReabriendoCaso] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const isFirstRender = useRef(true)
@@ -150,6 +152,23 @@ export default function AgenteCasoDetalle() {
       showToast(res.error || 'Error al actualizar estado')
     }
     setActualizandoEstado(false)
+  }
+
+  const handleReabrirCaso = async () => {
+    setReabriendoCaso(true)
+    const res = await reabrirCaso(caseId)
+    if (res.success) {
+      const reload = await getCasoDetalle(caseId)
+      if (reload.success && reload.data) {
+        setCaso(reload.data.caso)
+        setMensajes(reload.data.mensajes)
+        setNotas(reload.data.notas)
+        showToast('Caso reabierto exitosamente', 'success')
+      }
+    } else {
+      showToast(res.error || 'Error al reabrir caso')
+    }
+    setReabriendoCaso(false)
   }
 
   if (loading) {
@@ -386,6 +405,17 @@ export default function AgenteCasoDetalle() {
                 <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Resuelto
               </button>
             </div>
+            
+            {caso.estatus === 'resuelto' && (
+              <button
+                onClick={handleReabrirCaso}
+                disabled={reabriendoCaso}
+                className="mt-4 w-full flex items-center justify-center gap-2 px-3 h-10 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                {reabriendoCaso ? 'Reabriendo...' : 'Reabrir caso'}
+              </button>
+            )}
           </div>
 
           {/* Notas de avance */}

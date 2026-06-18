@@ -19,7 +19,7 @@ async function getAuthData(supabase: any) {
   return { tenant_id: userData.tenant_id, branch_id: userData.branch_id, user_id: user.id }
 }
 
-export async function getMisCasos(filtro: 'todos' | 'pendiente' | 'atendiendo' = 'todos') {
+export async function getMisCasos(filtro: 'todos' | 'pendiente' | 'atendiendo' | 'resuelto' = 'todos') {
   const supabase = await createClient()
   const auth = await getAuthData(supabase)
   
@@ -47,7 +47,7 @@ export async function getMisCasos(filtro: 'todos' | 'pendiente' | 'atendiendo' =
     `)
     .eq('tenant_id', auth.tenant_id)
     .eq('agente_id', auth.user_id)
-    .in('estatus', ['pendiente', 'atendiendo'])
+    .in('estatus', ['pendiente', 'atendiendo', 'resuelto'])
     .order('fecha_apertura', { ascending: true })
 
   const { data, error } = await query
@@ -62,12 +62,14 @@ export async function getMisCasos(filtro: 'todos' | 'pendiente' | 'atendiendo' =
   const counts = {
     todos: allCases.length,
     pendiente: 0,
-    atendiendo: 0
+    atendiendo: 0,
+    resuelto: 0
   }
 
   const processedCases = allCases.map(c => {
     if (c.estatus === 'pendiente') counts.pendiente++
     if (c.estatus === 'atendiendo') counts.atendiendo++
+    if (c.estatus === 'resuelto') counts.resuelto++
 
     // Extraer el primer tag si existe
     let tag = null

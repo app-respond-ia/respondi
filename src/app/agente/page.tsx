@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { getMisCasos } from '@/app/actions/agente-casos'
 
-type FiltroEstado = 'todos' | 'pendiente' | 'atendiendo'
+type FiltroEstado = 'todos' | 'pendiente' | 'atendiendo' | 'resuelto'
 
 const CANAL_CONFIG = {
   instagram: {
@@ -59,7 +59,7 @@ export default function AgentePage() {
   const [filtro, setFiltro] = useState<FiltroEstado>('todos')
   const [loading, setLoading] = useState(true)
   const [casos, setCasos] = useState<any[]>([])
-  const [counts, setCounts] = useState({ todos: 0, pendiente: 0, atendiendo: 0 })
+  const [counts, setCounts] = useState({ todos: 0, pendiente: 0, atendiendo: 0, resuelto: 0 })
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -131,6 +131,15 @@ export default function AgentePage() {
       )
     }
 
+    if (caso.estatus === 'resuelto') {
+      return (
+        <div className="flex flex-col items-end gap-1.5 shrink-0">
+          <span className="text-xs font-600 px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200">Resuelto</span>
+          <span className="text-xs text-ink-400">{timeStr}</span>
+        </div>
+      )
+    }
+
     return null
   }
 
@@ -162,6 +171,12 @@ export default function AgentePage() {
             className={`px-3 py-1.5 rounded-lg text-sm transition ${filtro === 'atendiendo' ? 'font-600 bg-brand-600 text-white' : 'font-500 text-ink-500 hover:bg-slate-50'}`}
           >
             Atendiendo
+          </button>
+          <button 
+            onClick={() => setFiltro('resuelto')}
+            className={`px-3 py-1.5 rounded-lg text-sm transition ${filtro === 'resuelto' ? 'font-600 bg-brand-600 text-white' : 'font-500 text-ink-500 hover:bg-slate-50'}`}
+          >
+            Resueltos
           </button>
         </div>
       </div>

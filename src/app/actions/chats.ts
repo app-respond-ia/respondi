@@ -36,6 +36,11 @@ export async function getConversaciones() {
         nombre,
         identificador_canal,
         canal
+      ),
+      cases (
+        id,
+        estatus,
+        agente_id
       )
     `)
     .eq('branch_id', auth.branch_id)

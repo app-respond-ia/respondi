@@ -48,7 +48,7 @@ export default function AgenteSidebar({ children, nombre, sucursal }: AgenteSide
             href="/agente" 
             onClick={() => setIsMobileMenuOpen(false)}
             className={`flex items-center gap-3 px-3 py-2.5 rounded-xl font-500 transition ${
-              pathname === '/agente' 
+              pathname === '/agente' || pathname.startsWith('/agente/casos')
                 ? 'bg-brand-600 text-white shadow-lg shadow-brand-900/40' 
                 : 'text-ink-400 hover:bg-white/5 hover:text-white'
             }`}
@@ -57,17 +57,31 @@ export default function AgenteSidebar({ children, nombre, sucursal }: AgenteSide
             Mis casos
           </Link>
           
-          <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-300 cursor-not-allowed">
-            <svg className="w-5 h-5 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>
+          <Link 
+            href="/agente/chats" 
+            onClick={() => setIsMobileMenuOpen(false)}
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl font-500 transition ${
+              pathname.startsWith('/agente/chats') 
+                ? 'bg-brand-600 text-white shadow-lg shadow-brand-900/40' 
+                : 'text-ink-400 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>
             Chats
-            <span className="ml-auto text-[10px] font-600 px-1.5 py-0.5 rounded bg-white/10 text-white/70">Próximamente</span>
-          </div>
+          </Link>
           
-          <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-ink-300 cursor-not-allowed">
-            <svg className="w-5 h-5 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+          <Link 
+            href="/agente/novedades" 
+            onClick={() => setIsMobileMenuOpen(false)}
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl font-500 transition ${
+              pathname.startsWith('/agente/novedades') 
+                ? 'bg-brand-600 text-white shadow-lg shadow-brand-900/40' 
+                : 'text-ink-400 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
             Novedades del día
-            <span className="ml-auto text-[10px] font-600 px-1.5 py-0.5 rounded bg-white/10 text-white/70">Próximamente</span>
-          </div>
+          </Link>
         </nav>
 
         <div className="px-3 py-4 border-t border-white/10 shrink-0">

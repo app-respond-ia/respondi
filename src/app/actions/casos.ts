@@ -179,3 +179,52 @@ export async function enviarMensajeAgente(conversationId: string, contenido: str
 
   return { success: !error, error: error?.message }
 }
+
+export async function reabrirCaso(casoId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'No autorizado' }
+
+  const { error } = await supabase
+    .from('cases')
+    .update({ estatus: 'pendiente', agente_id: null, fecha_cierre: null })
+    .eq('id', casoId)
+
+  return { success: !error, error: error?.message }
+}
+
+export async function crearCasoDesdeConversacion(conversationId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'No autorizado' }
+
+  const { data: userData } = await supabase.from('users').select('tenant_id, branch_id').eq('id', user.id).single()
+  const { data: conv } = await supabase.from('conversations').select('contact_id').eq('id', conversationId).single()
+
+  if (!conv || !userData) return { success: false, error: 'Datos no encontrados' }
+
+  const { data: nuevoCaso, error } = await supabase
+    .from('cases')
+    .insert({
+      tenant_id: userData.tenant_id,
+      branch_id: userData.branch_id,
+      contact_id: conv.contact_id,
+      conversation_id: conversationId,
+      tipo: 'consulta',
+      descripcion: 'Caso creado manualmente por agente',
+      estatus: 'atendiendo',
+      agente_id: user.id,
+      fecha_apertura: new Date().toISOString()
+    })
+    .select()
+    .single()
+
+  if (!error) {
+    await supabase
+      .from('conversations')
+      .update({ ia_pausada: true, atendida_por: user.id })
+      .eq('id', conversationId)
+  }
+
+  return { success: !error, data: nuevoCaso, error: error?.message }
+}

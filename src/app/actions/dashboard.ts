@@ -14,7 +14,7 @@ async function getAuthData(supabase: any) {
     .single()
 
   if (!userData?.tenant_id) {
-    return { error: 'Usuario no vinculado a un comercio', user_id: user.id }
+    return { error: 'Usuario no vinculado a una organización', user_id: user.id }
   }
 
   const branchId = await resolveBranchId(supabase, user.id)
@@ -53,8 +53,8 @@ export async function getDashboardData(period: 'hoy' | 'semana' | 'mes') {
   const fetchDateIso = fetchDate.toISOString()
 
   const queries = [
-    // 1. comercios
-    supabase.from('comercios').select('trial_activo, fecha_vencimiento').eq('id', auth.tenant_id).single(),
+    // 1. organizaciones
+    supabase.from('organizaciones').select('trial_activo, fecha_vencimiento').eq('id', auth.tenant_id).single(),
     
     // 2. message_quotas
     supabase.from('message_quotas').select('saldo').eq('tenant_id', auth.tenant_id).order('timestamp', { ascending: false }).limit(1).single(),
@@ -81,11 +81,11 @@ export async function getDashboardData(period: 'hoy' | 'semana' | 'mes') {
     })()
   ]
 
-  const [comerciosRes, quotasRes, casesRes, convRes, aiLogsRes] = await Promise.all(queries)
+  const [organizacionRes, quotasRes, casesRes, convRes, aiLogsRes] = await Promise.all(queries)
 
-  if (comerciosRes.error) return { success: false, error: comerciosRes.error.message }
+  if (organizacionRes.error) return { success: false, error: organizacionRes.error.message }
 
-  const comercios: any = comerciosRes.data
+  const organizacion: any = organizacionRes.data
   const saldo = (quotasRes.data as any)?.saldo || 0
   const cases: any[] = (casesRes.data as any) || []
   const convs: any[] = (convRes.data as any) || []
@@ -213,8 +213,8 @@ export async function getDashboardData(period: 'hoy' | 'semana' | 'mes') {
   const tiempo_cierre_casos_min = casos_cierre_count > 0 ? casos_cierre_min_sum / casos_cierre_count : null
 
   let dias_restantes = null
-  if (comercios.trial_activo && comercios.fecha_vencimiento) {
-    const v = new Date(comercios.fecha_vencimiento)
+  if (organizacion.trial_activo && organizacion.fecha_vencimiento) {
+    const v = new Date(organizacion.fecha_vencimiento)
     dias_restantes = Math.ceil((v.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
     if (dias_restantes < 0) dias_restantes = 0
   }
@@ -223,7 +223,7 @@ export async function getDashboardData(period: 'hoy' | 'semana' | 'mes') {
     success: true,
     data: {
       trial: {
-        activo: comercios.trial_activo,
+        activo: organizacion.trial_activo,
         dias_restantes
       },
       creditos_disponibles: saldo,

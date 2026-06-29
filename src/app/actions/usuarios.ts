@@ -33,7 +33,7 @@ export async function getUsuarios() {
   if (sucErr) return { success: false, error: sucErr.message }
 
   const { data: comercio, error: comErr } = await supabase
-    .from('comercios')
+    .from('organizaciones')
     .select('plan_id, plans(nombre, usuarios_max)')
     .eq('id', auth.tenant_id)
     .single()
@@ -108,8 +108,7 @@ export async function invitarUsuario(data: { email: string, nombre: string | nul
   await supabaseAdmin.from('user_branches').insert(
     data.branch_ids.map(bid => ({
       user_id: inviteData.user.id,
-      branch_id: bid,
-      tenant_id: auth.tenant_id
+      branch_id: bid
     }))
   )
 
@@ -147,11 +146,11 @@ export async function actualizarUsuario(id: string, data: Partial<{ nombre: stri
 
   if (data.branch_ids) {
     await supabase.from('user_branches')
-      .delete().eq('user_id', id).eq('tenant_id', auth.tenant_id)
+      .delete().eq('user_id', id)
     if (data.branch_ids.length > 0) {
       await supabase.from('user_branches').insert(
         data.branch_ids.map(bid => ({
-          user_id: id, branch_id: bid, tenant_id: auth.tenant_id
+          user_id: id, branch_id: bid
         }))
       )
     }
@@ -174,7 +173,7 @@ export async function reenviarInvitacion(email: string) {
     .single()
 
   if (!userRow) {
-    return { success: false, error: 'No se encontró una invitación pendiente para ese email en tu comercio' }
+    return { success: false, error: 'No se encontró una invitación pendiente para ese email en tu organización' }
   }
 
   const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {

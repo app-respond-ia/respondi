@@ -15,11 +15,12 @@ export async function getOnboardingState() {
 
   if (!userData?.tenant_id) return { success: false, error: 'No tenant' }
 
-  // Consulta directa a comercios en vez de join
-  const { data: comercio } = await supabase
-    .from('comercios')
+  const { data: sucursal } = await supabase
+    .from('sucursales')
     .select('onboarding_paso, onboarding_completado')
-    .eq('id', userData.tenant_id)
+    .eq('tenant_id', userData.tenant_id)
+    .order('created_at', { ascending: true })
+    .limit(1)
     .single()
 
   // Buscar branch si no está en el usuario todavía
@@ -38,8 +39,8 @@ export async function getOnboardingState() {
     success: true,
     tenantId: userData.tenant_id,
     branchId: branchId,
-    paso: comercio?.onboarding_paso ?? 1,
-    completado: comercio?.onboarding_completado ?? false
+    paso: sucursal?.onboarding_paso ?? 1,
+    completado: sucursal?.onboarding_completado ?? false
   }
 }
 
@@ -109,12 +110,11 @@ export async function saveStep1(data: {
     if (profileErr) throw profileErr
   }
 
-  // Actualizar nombre de usuario y nombre del comercio
+  // Actualizar nombre de usuario
   await supabase.from('users').update({ nombre: data.nombrePersona }).eq('id', user.id)
-  await supabase.from('comercios').update({ nombre: data.nombreComercio }).eq('id', tenantId)
 
-  // Update comercio step
-  await supabase.from('comercios').update({ onboarding_paso: 2 }).eq('id', tenantId)
+  // Update sucursal step
+  await supabase.from('sucursales').update({ onboarding_paso: 2 }).eq('id', branch.id)
 
   return { success: true, branchId: branch.id }
 }
@@ -144,7 +144,7 @@ export async function saveStep2(data: {
   const { error } = await supabase.from('business_hours').insert(rows)
   if (error) throw error
 
-  await supabase.from('comercios').update({ onboarding_paso: 3 }).eq('id', tenantId)
+  await supabase.from('sucursales').update({ onboarding_paso: 3 }).eq('id', data.branchId)
   return { success: true }
 }
 
@@ -172,7 +172,7 @@ export async function saveStep3(data: {
     if (error) throw error
   }
 
-  await supabase.from('comercios').update({ onboarding_paso: 4 }).eq('id', data.tenantId)
+  await supabase.from('sucursales').update({ onboarding_paso: 4 }).eq('id', data.branchId)
   return { success: true }
 }
 
@@ -194,7 +194,7 @@ export async function saveStep4(data: { tenantId: string, branchId: string, msg:
     if (error) throw error
   }
 
-  await supabase.from('comercios').update({ onboarding_paso: 5 }).eq('id', data.tenantId)
+  await supabase.from('sucursales').update({ onboarding_paso: 5 }).eq('id', data.branchId)
   return { success: true }
 }
 
@@ -221,10 +221,10 @@ export async function saveStep5(data: {
     if (error) throw error
   }
 
-  await supabase.from('comercios').update({ 
+  await supabase.from('sucursales').update({ 
     onboarding_paso: 5,
     onboarding_completado: true 
-  }).eq('id', data.tenantId)
+  }).eq('id', data.branchId)
 
   return { success: true }
 }

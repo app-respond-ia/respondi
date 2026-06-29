@@ -76,7 +76,7 @@ export async function signupTrial(formData: FormData) {
     p_user_id: userId,
     p_email: email,
     p_nombre: nombre,
-    p_comercio_nombre: comercioNombre
+    p_org_nombre: comercioNombre
   })
 
   if (rpcError) {
@@ -109,18 +109,12 @@ export async function updatePasswordAndAcceptInvite(formData: FormData) {
   const password = formData.get('password') as string
   const nombre = formData.get('nombre') as string
 
-  // Actualizar contraseña en Auth
-  const { error: updateError } = await supabase.auth.updateUser({
-    password,
-  })
-
+  const { error: updateError } = await supabase.auth.updateUser({ password })
   if (updateError) return { error: updateError.message }
 
-  // Obtener usuario actual
   const { data: { user } } = await supabase.auth.getUser()
   
   if (user) {
-    // Actualizar nombre y estado de invitación en public.users
     await supabaseAdmin
       .from('users')
       .update({ nombre, invitacion_aceptada: true })

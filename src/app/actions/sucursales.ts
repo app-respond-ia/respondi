@@ -13,7 +13,7 @@ async function getAuthData(supabase: any) {
     .single()
 
   if (!userData?.tenant_id) {
-    return { error: 'Usuario no vinculado a un comercio', user_id: user.id }
+    return { error: 'Usuario no vinculado a una organización', user_id: user.id }
   }
 
   return { tenant_id: userData.tenant_id, branch_id: userData.branch_id, user_id: user.id }
@@ -33,7 +33,7 @@ export async function getSucursales() {
   if (error) return { success: false, error: error.message }
 
   const { data: comercio } = await supabase
-    .from('comercios')
+    .from('organizaciones')
     .select('plan_id, plans(sucursales_max)')
     .eq('id', auth.tenant_id)
     .single()
@@ -154,8 +154,7 @@ export async function crearSucursal(nombre: string, direccion?: string, copiarDe
     await supabase.from('user_branches').insert(
       admins.map((a: any) => ({
         user_id: a.id,
-        branch_id: nuevaSucursal.id,
-        tenant_id: auth.tenant_id
+        branch_id: nuevaSucursal.id
       }))
     )
   }

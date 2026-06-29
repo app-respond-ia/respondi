@@ -57,13 +57,15 @@ export async function middleware(request: NextRequest) {
 
     // Onboarding obligatorio para admins
     if (role === 'admin' && userData?.tenant_id) {
-      const { data: comercio } = await supabase
-        .from('comercios')
+      const { data: sucursal } = await supabase
+        .from('sucursales')
         .select('onboarding_completado')
-        .eq('id', userData.tenant_id)
+        .eq('tenant_id', userData.tenant_id)
+        .order('created_at', { ascending: true })
+        .limit(1)
         .single()
 
-      const onboardingCompleto = comercio?.onboarding_completado ?? false
+      const onboardingCompleto = sucursal?.onboarding_completado ?? false
 
       // Si no completó el onboarding y no está ya en /onboarding → mandarlo al onboarding
       if (!onboardingCompleto && !pathname.startsWith('/onboarding')) {

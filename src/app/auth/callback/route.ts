@@ -33,7 +33,7 @@ export async function GET(request: Request) {
           p_user_id: user.id,
           p_email: user.email!,
           p_nombre: nombre,
-          p_comercio_nombre: 'Comercio de ' + nombre
+          p_org_nombre: 'Organización de ' + nombre
         })
       }
 

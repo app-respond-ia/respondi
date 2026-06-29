@@ -1,6 +1,6 @@
 -- ============================================================================
 -- RESPONDI · Esquema de base de datos para Supabase (PostgreSQL)
--- Versión consolidada: anteproyecto v2.0 + CAMBIOS-anteproyecto.md
+-- Versión consolidada: anteproyecto v2.0 + migraciones "organizaciones"
 -- ============================================================================
 --
 -- Cómo usar este archivo:
@@ -11,7 +11,7 @@
 --
 -- Principios (del anteproyecto):
 --   - Todos los IDs son UUID.
---   - Multi-tenant: casi todas las tablas llevan tenant_id (= comercios.id).
+--   - Multi-tenant: casi todas las tablas llevan tenant_id (= organizaciones.id).
 --   - RLS activo en todas las tablas. El super-admin tiene bypass.
 --   - La tabla de usuarios se enlaza con auth.users de Supabase.
 -- ============================================================================
@@ -23,18 +23,18 @@ create extension if not exists "pgcrypto";
 -- 1. TIPOS ENUM
 -- ============================================================================
 
-create type estado_comercio   as enum ('trial', 'activo', 'vencido', 'suspendido');
+create type estado_organizacion as enum ('trial', 'activo', 'vencido', 'suspendido');
 create type rol_usuario        as enum ('super_admin', 'admin', 'operario', 'agente');
 create type modo_pausa         as enum ('apagada', 'automatica', 'ninguna');
 create type tipo_canal         as enum ('instagram', 'whatsapp', 'facebook');
-create type metodo_canal       as enum ('whaticket', 'meta_oficial');  -- CAMBIO §11
-create type estado_canal       as enum ('activo', 'pendiente', 'desconectado', 'error');  -- CAMBIO §11
-create type tipo_novedad       as enum ('horario', 'stock', 'promo', 'evento', 'otro');   -- CAMBIO: +'otro'
+create type metodo_canal       as enum ('whaticket', 'meta_oficial');
+create type estado_canal       as enum ('activo', 'pendiente', 'desconectado', 'error');
+create type tipo_novedad       as enum ('horario', 'stock', 'promo', 'evento', 'otro');
 create type estado_conv        as enum ('activa', 'cerrada');
 create type remitente_msg      as enum ('cliente', 'ia', 'agente');
 create type tipo_caso          as enum ('normal', 'fallo_llm', 'fallo_entrega', 'blacklist_sugerida');
 create type estatus_caso       as enum ('pendiente', 'atendiendo', 'resuelto', 'cerrado');
-create type blacklist_modo     as enum ('ignorar', 'respuesta_automatica', 'derivar');    -- CAMBIO §10
+create type blacklist_modo     as enum ('ignorar', 'respuesta_automatica', 'derivar');
 create type tipo_comision      as enum ('recurrente', 'puntual');
 create type tipo_movimiento    as enum ('abono', 'debito');
 create type estado_pago        as enum ('pendiente', 'confirmado', 'fallido');
@@ -46,16 +46,15 @@ create type resultado_ia       as enum ('respondio','abrio_caso','fuera_horario'
 -- 2. TABLAS GLOBALES (sin tenant_id · solo super-admin)
 -- ============================================================================
 
--- Planes (gestionados por super-admin). Valores configurables, no hardcodeados.
 create table plans (
   id                        uuid primary key default gen_random_uuid(),
   nombre                    text not null,
   precio_usd                numeric(10,2) not null default 0,
-  creditos_diarios_trial    integer,            -- solo plan trial
-  creditos_mensuales        integer,            -- planes pagos
+  creditos_diarios_trial    integer,
+  creditos_mensuales        integer,
   canales_max               integer not null default 1,
   sucursales_max            integer not null default 1,
-  usuarios_max              integer,            -- null = ilimitados
+  usuarios_max              integer,
   modelo_ia                 text not null default 'gpt-4o-mini',
   dias_retencion_mensajes   integer not null default 30,
   precio_credito_adicional  numeric(10,4) not null default 0,
@@ -64,7 +63,6 @@ create table plans (
   created_at                timestamptz not null default now()
 );
 
--- Vendedores (sin tenant_id · solo super-admin)
 create table vendedores (
   id                  uuid primary key default gen_random_uuid(),
   nombre              text not null,
@@ -77,15 +75,15 @@ create table vendedores (
 );
 
 -- ============================================================================
--- 3. COMERCIOS Y ESTRUCTURA
+-- 3. ORGANIZACIONES Y ESTRUCTURA
 -- ============================================================================
 
--- Comercio = tenant. tenant_id de las demás tablas apunta aquí.
-create table comercios (
+-- Organización = tenant. tenant_id de las demás tablas apunta aquí.
+create table organizaciones (
   id                 uuid primary key default gen_random_uuid(),
   nombre             text not null,
   plan_id            uuid references plans(id),
-  estado             estado_comercio not null default 'trial',
+  estado             estado_organizacion not null default 'trial',
   fecha_inicio       date not null default current_date,
   fecha_vencimiento  date,
   trial_activo       boolean not null default true,
@@ -94,23 +92,24 @@ create table comercios (
   created_at         timestamptz not null default now()
 );
 
--- Sucursales (branch). Cada comercio tiene N sucursales.
+-- Sucursales (branch). Cada organización tiene N sucursales.
 create table sucursales (
   id                       uuid primary key default gen_random_uuid(),
-  tenant_id                uuid not null references comercios(id) on delete cascade,
+  tenant_id                uuid not null references organizaciones(id) on delete cascade,
   nombre                   text not null,
   direccion                text,
   activa                   boolean not null default true,
   modo_pausa               modo_pausa not null default 'ninguna',
   timezone                 text not null default 'America/Caracas',
   tiempo_agrupacion_seg    integer not null default 30,
-  -- CAMBIO §10: configuración de blacklist por sucursal
   blacklist_modo           blacklist_modo not null default 'ignorar',
   blacklist_respuesta_auto text,
+  -- Nuevas columnas de onboarding trasladadas
+  onboarding_paso          integer not null default 1,
+  onboarding_completado    boolean not null default false,
   created_at               timestamptz not null default now()
 );
 
--- Perfil del comercio por sucursal (Tab 2 y Tab 3)
 create table business_profiles (
   id                    uuid primary key default gen_random_uuid(),
   branch_id             uuid not null references sucursales(id) on delete cascade,
@@ -126,7 +125,6 @@ create table business_profiles (
   created_at            timestamptz not null default now()
 );
 
--- Horarios de atención (7 filas por sucursal)
 create table business_hours (
   id         uuid primary key default gen_random_uuid(),
   branch_id  uuid not null references sucursales(id) on delete cascade,
@@ -137,21 +135,26 @@ create table business_hours (
 );
 
 -- ============================================================================
--- 4. USUARIOS (enlazados con auth.users de Supabase)
+-- 4. USUARIOS Y ASIGNACIONES
 -- ============================================================================
 
--- Cada fila se enlaza 1:1 con un usuario de Supabase Auth por el id.
--- Al crear un usuario en Authentication, se inserta aquí su perfil + rol.
 create table users (
   id             uuid primary key references auth.users(id) on delete cascade,
-  tenant_id      uuid references comercios(id) on delete cascade,  -- null para super_admin
-  branch_id      uuid references sucursales(id),                    -- null para admin (ve todas)
+  tenant_id      uuid references organizaciones(id) on delete cascade,  -- null para super_admin
+  branch_id      uuid references sucursales(id),                        -- null para admin
   email          text not null,
   nombre         text,
   rol            rol_usuario not null,
   activo         boolean not null default true,
-  invitacion_aceptada boolean not null default false,   -- pendiente vs activo
+  invitacion_aceptada boolean not null default false,
   fecha_creacion timestamptz not null default now()
+);
+
+-- Relación N:M entre usuarios y sucursales (ej. operarios/agentes asignados a múltiples branches)
+create table user_branches (
+  user_id   uuid not null references users(id) on delete cascade,
+  branch_id uuid not null references sucursales(id) on delete cascade,
+  primary key (user_id, branch_id)
 );
 
 -- ============================================================================
@@ -160,7 +163,7 @@ create table users (
 
 create table skills (
   id          uuid primary key default gen_random_uuid(),
-  tenant_id   uuid not null references comercios(id) on delete cascade,
+  tenant_id   uuid not null references organizaciones(id) on delete cascade,
   branch_id   uuid not null references sucursales(id) on delete cascade,
   nombre      text not null,
   descripcion text,
@@ -172,22 +175,21 @@ create table skills (
 
 create table price_list (
   id          uuid primary key default gen_random_uuid(),
-  tenant_id   uuid not null references comercios(id) on delete cascade,
+  tenant_id   uuid not null references organizaciones(id) on delete cascade,
   branch_id   uuid not null references sucursales(id) on delete cascade,
   nombre      text not null,
   tipo        text not null default 'producto' check (tipo in ('producto', 'servicio')),
   precio      numeric(12,2),
-  precio_tipo text not null default 'exacto',   -- CAMBIO: exacto|desde|consultar
+  precio_tipo text not null default 'exacto',
   moneda      text not null default 'USD',
   descripcion text,
   disponible  boolean not null default true,
   created_at  timestamptz not null default now()
 );
 
--- Novedades del día. CAMBIO §13: el agente también puede crear (no solo operario).
 create table daily_updates (
   id                     uuid primary key default gen_random_uuid(),
-  tenant_id              uuid not null references comercios(id) on delete cascade,
+  tenant_id              uuid not null references organizaciones(id) on delete cascade,
   branch_id              uuid not null references sucursales(id) on delete cascade,
   user_id                uuid references users(id),
   tipo                   tipo_novedad not null,
@@ -198,46 +200,43 @@ create table daily_updates (
   created_at             timestamptz not null default now()
 );
 
--- Reglas de casos. tipo_caso se queda como TEXTO LIBRE (fiel al anteproyecto). CAMBIO §8.
 create table case_rules (
   id                    uuid primary key default gen_random_uuid(),
-  tenant_id             uuid not null references comercios(id) on delete cascade,
+  tenant_id             uuid not null references organizaciones(id) on delete cascade,
   branch_id             uuid not null references sucursales(id) on delete cascade,
   nombre                text not null,
-  descripcion_intencion text,          -- CAMBIO §8: sustituye a palabras_clave
-  tipo_caso             text,                 -- texto libre, no FK
+  descripcion_intencion text,
+  tipo_caso             text,
   activa                boolean not null default true,
-  es_plantilla          boolean not null default false,  -- CAMBIO §8
+  es_plantilla          boolean not null default false,
   created_at            timestamptz not null default now()
 );
 
--- Etiquetas (= "categorías/tags" del anteproyecto, sección 4.5). CAMBIO §9.
--- Nombre técnico conservado: message_categories.
 create table message_categories (
   id                   uuid primary key default gen_random_uuid(),
-  tenant_id            uuid not null references comercios(id) on delete cascade,
+  tenant_id            uuid not null references organizaciones(id) on delete cascade,
   branch_id            uuid not null references sucursales(id) on delete cascade,
   nombre               text not null,
-  descripcion_intencion text,          -- CAMBIO §9: la IA la usa para saber cuándo aplicar
-  color                text default 'slate',  -- CAMBIO §9
+  descripcion_intencion text,
+  color                text default 'slate',
   activa               boolean not null default true,
-  es_plantilla         boolean not null default false,  -- CAMBIO §9
+  es_plantilla         boolean not null default false,
   orden                integer not null default 0,
   created_at           timestamptz not null default now()
 );
 
 -- ============================================================================
--- 6. CANALES · CAMBIO §11 (modelo nuevo: Whaticket / Meta oficial)
+-- 6. CANALES
 -- ============================================================================
 
 create table channels (
   id                  uuid primary key default gen_random_uuid(),
-  tenant_id           uuid not null references comercios(id) on delete cascade,
+  tenant_id           uuid not null references organizaciones(id) on delete cascade,
   branch_id           uuid references sucursales(id) on delete cascade,
   tipo                tipo_canal not null,
   metodo              metodo_canal not null default 'whaticket',
   estado              estado_canal not null default 'pendiente',
-  identificador_externo text,           -- handle, número, page id
+  identificador_externo text,
   fecha_conexion      timestamptz,
   ultima_actividad    timestamptz,
   created_at          timestamptz not null default now()
@@ -249,7 +248,7 @@ create table channels (
 
 create table contacts (
   id                   uuid primary key default gen_random_uuid(),
-  tenant_id            uuid not null references comercios(id) on delete cascade,
+  tenant_id            uuid not null references organizaciones(id) on delete cascade,
   canal                tipo_canal not null,
   identificador_canal  text not null,
   nombre               text,
@@ -262,12 +261,11 @@ create table contacts (
 
 create table conversations (
   id                   uuid primary key default gen_random_uuid(),
-  tenant_id            uuid not null references comercios(id) on delete cascade,
+  tenant_id            uuid not null references organizaciones(id) on delete cascade,
   branch_id            uuid references sucursales(id),
   contact_id           uuid not null references contacts(id) on delete cascade,
   canal                tipo_canal not null,
   estado               estado_conv not null default 'activa',
-  -- CAMBIO §12 (Chats): pausar IA y saber quién atiende
   ia_pausada           boolean not null default false,
   atendida_por         uuid references users(id),
   fecha_inicio         timestamptz not null default now(),
@@ -278,7 +276,7 @@ create table conversations (
 
 create table messages (
   id              uuid primary key default gen_random_uuid(),
-  tenant_id       uuid not null references comercios(id) on delete cascade,
+  tenant_id       uuid not null references organizaciones(id) on delete cascade,
   conversation_id uuid not null references conversations(id) on delete cascade,
   remitente       remitente_msg not null,
   contenido       text,
@@ -291,11 +289,10 @@ create table messages (
   es_ultimo_agrupado boolean default false
 );
 
--- Etiquetas aplicadas a conversaciones (N:M). CAMBIO §9.
 create table conversation_tags (
   conversation_id uuid not null references conversations(id) on delete cascade,
   category_id     uuid not null references message_categories(id) on delete cascade,
-  aplicada_por    text default 'ia',       -- ia | agente
+  aplicada_por    text default 'ia',
   created_at      timestamptz not null default now(),
   primary key (conversation_id, category_id)
 );
@@ -306,7 +303,7 @@ create table conversation_tags (
 
 create table cases (
   id              uuid primary key default gen_random_uuid(),
-  tenant_id       uuid not null references comercios(id) on delete cascade,
+  tenant_id       uuid not null references organizaciones(id) on delete cascade,
   branch_id       uuid references sucursales(id),
   contact_id      uuid references contacts(id),
   conversation_id uuid references conversations(id),
@@ -321,10 +318,9 @@ create table cases (
   sla_horas       integer
 );
 
--- Notas de avance. Inmutables (sin update/delete por política).
 create table case_notes (
   id         uuid primary key default gen_random_uuid(),
-  tenant_id  uuid not null references comercios(id) on delete cascade,
+  tenant_id  uuid not null references organizaciones(id) on delete cascade,
   case_id    uuid not null references cases(id) on delete cascade,
   user_id    uuid references users(id),
   nota       text not null,
@@ -335,10 +331,9 @@ create table case_notes (
 -- 9. CRÉDITOS Y FACTURACIÓN
 -- ============================================================================
 
--- Movimientos tipo ledger. El saldo actual = último registro del tenant.
 create table message_quotas (
   id                  uuid primary key default gen_random_uuid(),
-  tenant_id           uuid not null references comercios(id) on delete cascade,
+  tenant_id           uuid not null references organizaciones(id) on delete cascade,
   tipo                tipo_movimiento not null,
   cantidad            integer not null,
   saldo               integer not null,
@@ -349,7 +344,7 @@ create table message_quotas (
 
 create table billing (
   id          uuid primary key default gen_random_uuid(),
-  tenant_id   uuid not null references comercios(id) on delete cascade,
+  tenant_id   uuid not null references organizaciones(id) on delete cascade,
   plan_id     uuid references plans(id),
   importe_usd numeric(10,2) not null,
   forma_pago  forma_pago_enum,
@@ -365,7 +360,7 @@ create table billing (
 
 create table ai_logs (
   id                 uuid primary key default gen_random_uuid(),
-  tenant_id          uuid references comercios(id) on delete cascade,
+  tenant_id          uuid references organizaciones(id) on delete cascade,
   branch_id          uuid references sucursales(id),
   message_id         uuid references messages(id),
   modelo_ia          text,
@@ -377,10 +372,9 @@ create table ai_logs (
   timestamp          timestamptz not null default now()
 );
 
--- error_logs: SIN política de tenant para que el super-admin vea todos.
 create table error_logs (
   id          uuid primary key default gen_random_uuid(),
-  tenant_id   uuid references comercios(id) on delete set null,
+  tenant_id   uuid references organizaciones(id) on delete set null,
   origen      origen_error not null,
   descripcion text,
   stacktrace  text,
@@ -390,7 +384,7 @@ create table error_logs (
 
 create table audit_log (
   id              uuid primary key default gen_random_uuid(),
-  tenant_id       uuid references comercios(id) on delete cascade,
+  tenant_id       uuid references organizaciones(id) on delete cascade,
   user_id         uuid references users(id),
   accion          text not null,
   tabla_afectada  text,
@@ -402,7 +396,7 @@ create table audit_log (
 
 create table notifications (
   id         uuid primary key default gen_random_uuid(),
-  tenant_id  uuid references comercios(id) on delete cascade,
+  tenant_id  uuid references organizaciones(id) on delete cascade,
   user_id    uuid references users(id),
   tipo       text,
   titulo     text,
@@ -417,6 +411,8 @@ create table notifications (
 
 create index idx_sucursales_tenant      on sucursales(tenant_id);
 create index idx_users_tenant           on users(tenant_id);
+create index idx_user_branches_uid      on user_branches(user_id);
+create index idx_user_branches_bid      on user_branches(branch_id);
 create index idx_skills_branch          on skills(branch_id);
 create index idx_price_branch           on price_list(branch_id);
 create index idx_updates_branch_activo  on daily_updates(branch_id, activo);
@@ -437,19 +433,16 @@ create index idx_errors_resuelto_ts     on error_logs(resuelto, timestamp desc);
 -- 12. FUNCIONES AUXILIARES PARA RLS
 -- ============================================================================
 
--- Devuelve el tenant_id del usuario autenticado.
 create or replace function auth_tenant_id()
 returns uuid language sql stable security definer as $$
   select tenant_id from public.users where id = auth.uid()
 $$;
 
--- Devuelve el rol del usuario autenticado.
 create or replace function auth_rol()
 returns rol_usuario language sql stable security definer as $$
   select rol from public.users where id = auth.uid()
 $$;
 
--- ¿Es super-admin? (bypass del filtro de tenant)
 create or replace function is_super_admin()
 returns boolean language sql stable security definer as $$
   select coalesce((select rol = 'super_admin' from public.users where id = auth.uid()), false)
@@ -459,11 +452,12 @@ $$;
 -- 13. ACTIVAR RLS EN TODAS LAS TABLAS
 -- ============================================================================
 
-alter table comercios          enable row level security;
+alter table organizaciones       enable row level security;
 alter table sucursales         enable row level security;
 alter table business_profiles  enable row level security;
 alter table business_hours     enable row level security;
 alter table users              enable row level security;
+alter table user_branches      enable row level security;
 alter table skills             enable row level security;
 alter table price_list         enable row level security;
 alter table daily_updates      enable row level security;
@@ -488,26 +482,19 @@ alter table error_logs         enable row level security;
 -- ============================================================================
 -- 14. POLÍTICAS RLS
 -- ============================================================================
--- Patrón general para tablas con tenant_id:
---   - El super-admin ve y modifica todo (bypass).
---   - El resto solo accede a filas de su propio tenant_id.
--- ============================================================================
 
--- comercios: el usuario ve su propio comercio; super-admin ve todos.
-create policy comercios_select on comercios for select
+-- organizaciones
+create policy organizaciones_select on organizaciones for select
   using (is_super_admin() or id = auth_tenant_id());
-create policy comercios_super_all on comercios for all
+create policy organizaciones_super_all on organizaciones for all
   using (is_super_admin()) with check (is_super_admin());
-
--- Macro conceptual aplicada tabla por tabla (tenant_id = auth_tenant_id()).
--- SELECT/INSERT/UPDATE/DELETE para miembros del tenant + bypass super-admin.
 
 -- sucursales
 create policy sucursales_tenant on sucursales for all
   using (is_super_admin() or tenant_id = auth_tenant_id())
   with check (is_super_admin() or tenant_id = auth_tenant_id());
 
--- business_profiles (vía join a sucursal del tenant)
+-- business_profiles
 create policy bprofiles_tenant on business_profiles for all
   using (is_super_admin() or branch_id in (select id from sucursales where tenant_id = auth_tenant_id()))
   with check (is_super_admin() or branch_id in (select id from sucursales where tenant_id = auth_tenant_id()));
@@ -516,14 +503,19 @@ create policy bhours_tenant on business_hours for all
   using (is_super_admin() or branch_id in (select id from sucursales where tenant_id = auth_tenant_id()))
   with check (is_super_admin() or branch_id in (select id from sucursales where tenant_id = auth_tenant_id()));
 
--- users: cada quien ve los usuarios de su tenant; super-admin ve todos.
+-- users
 create policy users_tenant on users for select
   using (is_super_admin() or tenant_id = auth_tenant_id() or id = auth.uid());
 create policy users_admin_manage on users for all
   using (is_super_admin() or (tenant_id = auth_tenant_id() and auth_rol() = 'admin'))
   with check (is_super_admin() or (tenant_id = auth_tenant_id() and auth_rol() = 'admin'));
 
--- Tablas de configuración por tenant (mismo patrón)
+-- user_branches
+create policy user_branches_access on user_branches for all
+  using (is_super_admin() or user_id = auth.uid() or branch_id in (select id from sucursales where tenant_id = auth_tenant_id()))
+  with check (is_super_admin() or user_id = auth.uid() or branch_id in (select id from sucursales where tenant_id = auth_tenant_id()));
+
+-- settings
 create policy skills_tenant on skills for all
   using (is_super_admin() or tenant_id = auth_tenant_id())
   with check (is_super_admin() or tenant_id = auth_tenant_id());
@@ -532,14 +524,11 @@ create policy price_tenant on price_list for all
   using (is_super_admin() or tenant_id = auth_tenant_id())
   with check (is_super_admin() or tenant_id = auth_tenant_id());
 
--- daily_updates: ver todos del tenant; crear admin/operario/agente (CAMBIO §13).
 create policy updates_select on daily_updates for select
   using (is_super_admin() or tenant_id = auth_tenant_id());
 create policy updates_write on daily_updates for all
-  using (is_super_admin() or (tenant_id = auth_tenant_id()
-         and auth_rol() in ('admin','operario','agente')))
-  with check (is_super_admin() or (tenant_id = auth_tenant_id()
-         and auth_rol() in ('admin','operario','agente')));
+  using (is_super_admin() or (tenant_id = auth_tenant_id() and auth_rol() in ('admin','operario','agente')))
+  with check (is_super_admin() or (tenant_id = auth_tenant_id() and auth_rol() in ('admin','operario','agente')));
 
 create policy rules_tenant on case_rules for all
   using (is_super_admin() or tenant_id = auth_tenant_id())
@@ -569,16 +558,12 @@ create policy convtags_tenant on conversation_tags for all
   using (is_super_admin() or conversation_id in (select id from conversations where tenant_id = auth_tenant_id()))
   with check (is_super_admin() or conversation_id in (select id from conversations where tenant_id = auth_tenant_id()));
 
--- cases: el agente solo ve los suyos; admin ve todos los del tenant.
 create policy cases_select on cases for select
-  using (is_super_admin() or (tenant_id = auth_tenant_id()
-         and (auth_rol() in ('admin') or agente_id = auth.uid())));
+  using (is_super_admin() or (tenant_id = auth_tenant_id() and (auth_rol() in ('admin') or agente_id = auth.uid())));
 create policy cases_write on cases for all
-  using (is_super_admin() or (tenant_id = auth_tenant_id()
-         and (auth_rol() = 'admin' or agente_id = auth.uid())))
+  using (is_super_admin() or (tenant_id = auth_tenant_id() and (auth_rol() = 'admin' or agente_id = auth.uid())))
   with check (is_super_admin() or tenant_id = auth_tenant_id());
 
--- case_notes: insertar y leer; NO update/delete (inmutables).
 create policy notes_select on case_notes for select
   using (is_super_admin() or tenant_id = auth_tenant_id());
 create policy notes_insert on case_notes for insert
@@ -600,13 +585,9 @@ create policy notif_own on notifications for all
   using (is_super_admin() or user_id = auth.uid())
   with check (is_super_admin() or user_id = auth.uid());
 
--- plans y vendedores: lectura abierta a usuarios autenticados; gestión solo super-admin.
 create policy plans_read on plans for select using (auth.uid() is not null);
 create policy plans_super on plans for all using (is_super_admin()) with check (is_super_admin());
-
 create policy vendedores_super on vendedores for all using (is_super_admin()) with check (is_super_admin());
-
--- error_logs: SOLO super-admin (sin filtro de tenant, ve todos).
 create policy errors_super on error_logs for all using (is_super_admin()) with check (is_super_admin());
 
 -- ============================================================================
@@ -617,38 +598,40 @@ create or replace function create_trial_account(
   p_user_id uuid,
   p_email text,
   p_nombre text,
-  p_comercio_nombre text
+  p_org_nombre text
 ) returns void language plpgsql security definer as $$
 declare
-  v_comercio_id uuid;
+  v_org_id uuid;
   v_sucursal_id uuid;
 begin
-  -- 1. Crear comercio
-  insert into public.comercios (nombre, estado, trial_activo, fecha_inicio, fecha_vencimiento)
-  values (p_comercio_nombre, 'trial', true, current_date, current_date + interval '14 days')
-  returning id into v_comercio_id;
+  -- 1. Crear organización
+  insert into public.organizaciones (nombre, estado, trial_activo, fecha_inicio, fecha_vencimiento)
+  values (p_org_nombre, 'trial', true, current_date, current_date + interval '14 days')
+  returning id into v_org_id;
 
-  -- 2. Crear sucursal
-  insert into public.sucursales (tenant_id, nombre, activa)
-  values (v_comercio_id, 'Principal', true)
+  -- 2. Crear sucursal con datos base del onboarding
+  insert into public.sucursales (tenant_id, nombre, activa, onboarding_paso, onboarding_completado)
+  values (v_org_id, 'Principal', true, 1, false)
   returning id into v_sucursal_id;
 
   -- 3. Crear usuario (Admin del tenant)
   insert into public.users (id, tenant_id, branch_id, email, nombre, rol, invitacion_aceptada)
-  values (p_user_id, v_comercio_id, v_sucursal_id, p_email, p_nombre, 'admin', true);
+  values (p_user_id, v_org_id, v_sucursal_id, p_email, p_nombre, 'admin', true);
 
-  -- 4. Crear cuota inicial (100 créditos)
+  -- 4. Asignar sucursal al usuario en user_branches
+  insert into public.user_branches (user_id, branch_id)
+  values (p_user_id, v_sucursal_id);
+
+  -- 5. Crear cuota inicial (100 créditos)
   insert into public.message_quotas (tenant_id, tipo, cantidad, saldo, descripcion)
-  values (v_comercio_id, 'abono', 100, 100, 'Cuota inicial trial');
+  values (v_org_id, 'abono', 100, 100, 'Cuota inicial trial');
 end;
 $$;
+
 -- ============================================================================
--- 15. JOBS PROGRAMADOS (pg_cron)
+-- 16. JOBS PROGRAMADOS (pg_cron)
 -- ============================================================================
 
--- Archiva automáticamente las novedades del día (daily_updates) cuya
--- fecha_vigencia_fin ya pasó, marcándolas como activo=false. Se ejecuta
--- cada 15 minutos. CAMBIO: añadido junto con la sección "Novedades del día".
 create extension if not exists pg_cron;
 
 select cron.schedule(

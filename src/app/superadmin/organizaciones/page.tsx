@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { getComercios } from '@/app/actions/superadmin'
 
 
-export default function ComerciosPage() {
+export default function OrganizacionesPage() {
   const [comercios, setComercios] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [filtro, setFiltro] = useState('Todos')
@@ -63,7 +63,7 @@ export default function ComerciosPage() {
   return (
     <>
       <div className="mb-5">
-        <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Comercios</h1>
+        <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Organizaciones</h1>
         <p className="text-ink-500 mt-1">Todos los negocios que usan Respondi.</p>
       </div>
 
@@ -73,7 +73,7 @@ export default function ComerciosPage() {
           <svg className="w-5 h-5 text-ink-400 absolute left-3.5 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
           <input 
             type="text" 
-            placeholder="Buscar comercio o vendedor..."
+            placeholder="Buscar organización o vendedor..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full h-11 pl-11 pr-4 rounded-xl border border-slate-300 bg-white text-sm placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition"
@@ -94,12 +94,12 @@ export default function ComerciosPage() {
         </div>
       </div>
 
-      {/* Lista de comercios */}
+      {/* Lista de organizaciones */}
       <div className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100">
         {loading ? (
-          <div className="p-8 text-center text-ink-500">Cargando comercios...</div>
+          <div className="p-8 text-center text-ink-500">Cargando organizaciones...</div>
         ) : comerciosFiltrados.length === 0 ? (
-          <div className="p-8 text-center text-ink-500">No se encontraron comercios.</div>
+          <div className="p-8 text-center text-ink-500">No se encontraron organizaciones.</div>
         ) : (
           comerciosFiltrados.map(c => {
             const statusStyle = getStatusColor(c.estado)
@@ -127,7 +127,7 @@ export default function ComerciosPage() {
         )}
       </div>
 
-      {/* MODAL DETALLE COMERCIO */}
+      {/* MODAL DETALLE ORGANIZACIÓN */}
       {modalComercio && (
         <div className="fixed inset-0 z-50">
           <div className="absolute inset-0 bg-ink-900/50 backdrop-blur-sm" onClick={closeModal}></div>

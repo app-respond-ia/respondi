@@ -14,7 +14,7 @@ const DIAS_SEMANA = [
   { id: 0, label: 'Domingo' }
 ]
 
-export default function PerfilComercioPage() {
+export default function PerfilSucursalPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
@@ -122,7 +122,7 @@ export default function PerfilComercioPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">
-        {/* SECCIÓN: DATOS DEL COMERCIO */}
+        {/* SECCIÓN: DATOS DE LA SUCURSAL */}
         <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8">
           <h2 className="text-xl font-bold text-ink-900 mb-6 border-b border-slate-100 pb-3">Datos de la sucursal</h2>
           

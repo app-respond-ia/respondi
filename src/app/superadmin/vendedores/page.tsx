@@ -61,7 +61,7 @@ export default function VendedoresPage() {
       <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
         <div>
           <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Vendedores</h1>
-          <p className="text-ink-500 mt-1">Quién trae comercios y cuánto comisiona.</p>
+          <p className="text-ink-500 mt-1">Quién trae organizaciones y cuánto comisiona.</p>
         </div>
         <button onClick={() => openModal()} className="inline-flex items-center gap-2 px-4 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 transition">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
@@ -160,7 +160,7 @@ export default function VendedoresPage() {
                 </div>
                 <div className="flex items-start gap-2 p-3 rounded-xl bg-slate-50 border border-slate-200">
                   <svg className="w-4 h-4 text-ink-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                  <p className="text-xs text-ink-600"><strong>Recurrente:</strong> comisiona en cada renovación. <strong>Puntual:</strong> solo en el primer pago del comercio.</p>
+                  <p className="text-xs text-ink-600"><strong>Recurrente:</strong> comisiona en cada renovación. <strong>Puntual:</strong> solo en el primer pago de la organización.</p>
                 </div>
               </div>
               <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100">

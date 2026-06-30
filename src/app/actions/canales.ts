@@ -36,12 +36,12 @@ export async function getCanales() {
 
   if (error) return { success: false, error: error.message }
 
-  const { data: comercio } = await supabase
+  const { data: organizacion } = await supabase
     .from('organizaciones')
     .select('plan_id, plans(canales_max)')
     .eq('id', auth.tenant_id)
     .single()
-  const plan = Array.isArray(comercio?.plans) ? comercio.plans[0] : comercio?.plans
+  const plan = Array.isArray(organizacion?.plans) ? organizacion.plans[0] : organizacion?.plans
   const canales_max = plan?.canales_max ?? null
   const canales_activos_count = (canales || []).filter((c: any) => c.estado === 'activo').length
 

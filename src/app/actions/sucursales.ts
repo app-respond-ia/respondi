@@ -32,12 +32,12 @@ export async function getSucursales() {
 
   if (error) return { success: false, error: error.message }
 
-  const { data: comercio } = await supabase
+  const { data: organizacion } = await supabase
     .from('organizaciones')
     .select('plan_id, plans(sucursales_max)')
     .eq('id', auth.tenant_id)
     .single()
-  const plan = Array.isArray(comercio?.plans) ? comercio.plans[0] : comercio?.plans
+  const plan = Array.isArray(organizacion?.plans) ? organizacion.plans[0] : organizacion?.plans
   const sucursales_max = plan?.sucursales_max ?? null
   const sucursales_activas_count = (sucursales || []).filter((s: any) => s.activa).length
 

@@ -46,7 +46,7 @@ export async function getOnboardingState() {
 
 export async function saveStep1(data: {
   nombrePersona: string
-  nombreComercio: string
+  nombreNegocio: string
   direccion: string
   timezone: string
   servicios: string
@@ -68,7 +68,7 @@ export async function saveStep1(data: {
       .from('sucursales')
       .insert({
         tenant_id: tenantId,
-        nombre: data.nombreComercio,
+        nombre: data.nombreNegocio,
         direccion: data.direccion,
         timezone: data.timezone,
         activa: true
@@ -82,7 +82,7 @@ export async function saveStep1(data: {
     const { error: branchErr } = await supabase
       .from('sucursales')
       .update({
-        nombre: data.nombreComercio,
+        nombre: data.nombreNegocio,
         direccion: data.direccion,
         timezone: data.timezone
       })

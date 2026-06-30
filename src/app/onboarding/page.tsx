@@ -22,7 +22,7 @@ export default function OnboardingPage() {
 
   // Form states
   const [s1, setS1] = useState({
-    nombrePersona: '', nombreComercio: '', direccion: '', timezone: 'America/Caracas', servicios: '', politicas: ''
+    nombrePersona: '', nombreNegocio: '', direccion: '', timezone: 'America/Caracas', servicios: '', politicas: ''
   })
   
   const [s2, setS2] = useState([
@@ -72,7 +72,7 @@ export default function OnboardingPage() {
   const handleNext = async () => {
     if (saving) return
 
-    if (step === 1 && (!s1.nombrePersona.trim() || !s1.nombreComercio.trim())) {
+    if (step === 1 && (!s1.nombrePersona.trim() || !s1.nombreNegocio.trim())) {
       if (!s1.nombrePersona.trim()) setErrorS1('Tu nombre es obligatorio')
       else setErrorS1('El nombre comercial es obligatorio')
       return
@@ -176,7 +176,7 @@ export default function OnboardingPage() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-ink-700 mb-1.5">Nombre de tu negocio</label>
-                      <input type="text" value={s1.nombreComercio} onChange={e => { setS1({...s1, nombreComercio: e.target.value}); setErrorS1('') }} placeholder="Ej. Pastelería Dulce Hogar" className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition" />
+                      <input type="text" value={s1.nombreNegocio} onChange={e => { setS1({...s1, nombreNegocio: e.target.value}); setErrorS1('') }} placeholder="Ej. Pastelería Dulce Hogar" className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition" />
                       {errorS1 && <p className="text-red-500 text-xs mt-1.5">{errorS1}</p>}
                     </div>
                     <div className="grid sm:grid-cols-2 gap-4">

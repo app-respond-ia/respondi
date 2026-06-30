@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getPerfilComercio, savePerfilComercio } from '@/app/actions/perfil'
+import { getPerfilSucursal, savePerfilSucursal } from '@/app/actions/perfil'
 import { getHorarios, saveHorarios } from '@/app/actions/horarios'
 
 const DIAS_SEMANA = [
@@ -35,7 +35,7 @@ export default function PerfilSucursalPage() {
     const cargar = async () => {
       setLoading(true)
       const [resPerfil, resHorarios] = await Promise.all([
-        getPerfilComercio(),
+        getPerfilSucursal(),
         getHorarios()
       ])
       
@@ -97,7 +97,7 @@ export default function PerfilSucursalPage() {
     }))
 
     const [resPerfil, resHorarios] = await Promise.all([
-      savePerfilComercio(formData),
+      savePerfilSucursal(formData),
       saveHorarios(horariosFormatted)
     ])
     

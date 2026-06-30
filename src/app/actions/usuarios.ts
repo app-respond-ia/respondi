@@ -32,7 +32,7 @@ export async function getUsuarios() {
   
   if (sucErr) return { success: false, error: sucErr.message }
 
-  const { data: comercio, error: comErr } = await supabase
+  const { data: organizacion, error: comErr } = await supabase
     .from('organizaciones')
     .select('plan_id, plans(nombre, usuarios_max)')
     .eq('id', auth.tenant_id)
@@ -43,8 +43,8 @@ export async function getUsuarios() {
   // Acceder a usuarios_max y plan_nombre (si es array se toma el primero, si es objeto se toma la prop)
   let usuarios_max = null
   let plan_nombre = null
-  if (comercio?.plans) {
-    const plan = Array.isArray(comercio.plans) ? comercio.plans[0] : comercio.plans as any
+  if (organizacion?.plans) {
+    const plan = Array.isArray(organizacion.plans) ? organizacion.plans[0] : organizacion.plans as any
     usuarios_max = plan?.usuarios_max ?? null
     plan_nombre = plan?.nombre ?? null
   }

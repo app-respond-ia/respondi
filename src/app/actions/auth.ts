@@ -23,10 +23,10 @@ export async function login(formData: FormData) {
 
 import { cookies } from 'next/headers'
 
-export async function loginWithGoogle(comercioNombre?: string) {
-  if (comercioNombre) {
+export async function loginWithGoogle(nombreOrganizacion?: string) {
+  if (nombreOrganizacion) {
     const cookieStore = await cookies()
-    cookieStore.set('respondi_pending_trial', comercioNombre, {
+    cookieStore.set('respondi_pending_trial', nombreOrganizacion, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       maxAge: 60 * 60, // 1 hora
@@ -56,7 +56,7 @@ export async function signupTrial(formData: FormData) {
   const email = formData.get('email') as string
   const password = formData.get('password') as string
   const nombre = (formData.get('nombre') as string) || 'Usuario'
-  const comercioNombre = (formData.get('comercio') as string) || 'Mi comercio'
+  const nombreOrganizacion = (formData.get('comercio') as string) || 'Mi organización'
 
   // 1. Crear el usuario en Auth (usamos admin porque queremos controlar el insert posterior)
   const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
@@ -76,7 +76,7 @@ export async function signupTrial(formData: FormData) {
     p_user_id: userId,
     p_email: email,
     p_nombre: nombre,
-    p_org_nombre: comercioNombre
+    p_org_nombre: nombreOrganizacion
   })
 
   if (rpcError) {

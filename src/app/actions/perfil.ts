@@ -3,7 +3,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { resolveBranchId } from '@/lib/active-branch'
 
-export async function getPerfilComercio() {
+export async function getPerfilSucursal() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: 'No autorizado' }
@@ -46,7 +46,7 @@ export async function getPerfilComercio() {
   }
 }
 
-export async function savePerfilComercio(data: { 
+export async function savePerfilSucursal(data: { 
   nombreSucursal: string, 
   direccion: string, 
   timezone: string, 

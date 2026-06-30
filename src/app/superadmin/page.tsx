@@ -10,17 +10,17 @@ export default async function SuperadminDashboardPage() {
     return <div className="p-6 text-red-500">Error cargando dashboard: {error}</div>
   }
 
-  const { comerciosPorEstado, trialsPorVencer, totalMensajesMes, erroresSinResolver } = data
+  const { organizacionesPorEstado, trialsPorVencer, totalMensajesMes, erroresSinResolver } = data
 
   // Estimación simple de ingresos (en una app real sacaríamos de una query más compleja o pagos reales)
   // Para el stub, asumimos un valor promedio por comercio activo.
-  const ingresosEstimados = comerciosPorEstado.activos * 59 
+  const ingresosEstimados = organizacionesPorEstado.activos * 59 
 
-  const totalComercios = comerciosPorEstado.total
-  const pctActivos = totalComercios > 0 ? (comerciosPorEstado.activos / totalComercios) * 100 : 0
-  const pctTrial = totalComercios > 0 ? (comerciosPorEstado.trial / totalComercios) * 100 : 0
-  const pctVencidos = totalComercios > 0 ? (comerciosPorEstado.vencidos / totalComercios) * 100 : 0
-  const pctSuspendidos = totalComercios > 0 ? (comerciosPorEstado.suspendidos / totalComercios) * 100 : 0
+  const totalOrganizaciones = organizacionesPorEstado.total
+  const pctActivos = totalOrganizaciones > 0 ? (organizacionesPorEstado.activos / totalOrganizaciones) * 100 : 0
+  const pctTrial = totalOrganizaciones > 0 ? (organizacionesPorEstado.trial / totalOrganizaciones) * 100 : 0
+  const pctVencidos = totalOrganizaciones > 0 ? (organizacionesPorEstado.vencidos / totalOrganizaciones) * 100 : 0
+  const pctSuspendidos = totalOrganizaciones > 0 ? (organizacionesPorEstado.suspendidos / totalOrganizaciones) * 100 : 0
 
   return (
     <>
@@ -38,9 +38,9 @@ export default async function SuperadminDashboardPage() {
         <div className="bg-white rounded-2xl border border-slate-200 p-4">
           <p className="text-xs text-ink-500 mb-1">Organizaciones activas</p>
           <p className="font-display font-700 text-2xl text-ink-900">
-            {comerciosPorEstado.activos}<span className="text-lg text-ink-400">/{totalComercios}</span>
+            {organizacionesPorEstado.activos}<span className="text-lg text-ink-400">/{totalOrganizaciones}</span>
           </p>
-          <p className="text-xs text-ink-400 mt-1">{comerciosPorEstado.trial} en trial</p>
+          <p className="text-xs text-ink-400 mt-1">{organizacionesPorEstado.trial} en trial</p>
         </div>
         <div className="bg-white rounded-2xl border border-slate-200 p-4">
           <p className="text-xs text-ink-500 mb-1">Mensajes IA (mes)</p>
@@ -76,19 +76,19 @@ export default async function SuperadminDashboardPage() {
         <h2 className="font-display font-600 text-base text-ink-900 mb-4">Estado de las organizaciones</h2>
         <div className="space-y-3 mt-6">
           <div>
-            <div className="flex justify-between text-sm mb-1"><span className="text-ink-600">Activos</span><span className="font-600 text-ink-900">{comerciosPorEstado.activos}</span></div>
+            <div className="flex justify-between text-sm mb-1"><span className="text-ink-600">Activos</span><span className="font-600 text-ink-900">{organizacionesPorEstado.activos}</span></div>
             <div className="h-2 rounded-full bg-slate-100 overflow-hidden"><div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pctActivos}%` }}></div></div>
           </div>
           <div>
-            <div className="flex justify-between text-sm mb-1"><span className="text-ink-600">En trial</span><span className="font-600 text-ink-900">{comerciosPorEstado.trial}</span></div>
+            <div className="flex justify-between text-sm mb-1"><span className="text-ink-600">En trial</span><span className="font-600 text-ink-900">{organizacionesPorEstado.trial}</span></div>
             <div className="h-2 rounded-full bg-slate-100 overflow-hidden"><div className="h-full bg-blue-500 rounded-full" style={{ width: `${pctTrial}%` }}></div></div>
           </div>
           <div>
-            <div className="flex justify-between text-sm mb-1"><span className="text-ink-600">Vencidos</span><span className="font-600 text-ink-900">{comerciosPorEstado.vencidos}</span></div>
+            <div className="flex justify-between text-sm mb-1"><span className="text-ink-600">Vencidos</span><span className="font-600 text-ink-900">{organizacionesPorEstado.vencidos}</span></div>
             <div className="h-2 rounded-full bg-slate-100 overflow-hidden"><div className="h-full bg-amber-500 rounded-full" style={{ width: `${pctVencidos}%` }}></div></div>
           </div>
           <div>
-            <div className="flex justify-between text-sm mb-1"><span className="text-ink-600">Suspendidos</span><span className="font-600 text-ink-900">{comerciosPorEstado.suspendidos}</span></div>
+            <div className="flex justify-between text-sm mb-1"><span className="text-ink-600">Suspendidos</span><span className="font-600 text-ink-900">{organizacionesPorEstado.suspendidos}</span></div>
             <div className="h-2 rounded-full bg-slate-100 overflow-hidden"><div className="h-full bg-red-500 rounded-full" style={{ width: `${pctSuspendidos}%` }}></div></div>
           </div>
         </div>

@@ -1,42 +1,42 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getComercios } from '@/app/actions/superadmin'
+import { getOrganizaciones } from '@/app/actions/superadmin'
 
 
 export default function OrganizacionesPage() {
-  const [comercios, setComercios] = useState<any[]>([])
+  const [organizaciones, setOrganizaciones] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [filtro, setFiltro] = useState('Todos')
   const [search, setSearch] = useState('')
 
-  const [modalComercio, setModalComercio] = useState<any>(null)
+  const [modalOrganizacion, setModalOrganizacion] = useState<any>(null)
 
   useEffect(() => {
-    loadComercios()
+    loadOrganizaciones()
   }, [filtro])
 
-  async function loadComercios() {
+  async function loadOrganizaciones() {
     setLoading(true)
-    const { success, comercios: data } = await getComercios(filtro)
+    const { success, organizaciones: data } = await getOrganizaciones(filtro)
     if (success && data) {
-      setComercios(data)
+      setOrganizaciones(data)
     }
     setLoading(false)
   }
 
-  const comerciosFiltrados = comercios.filter(c => 
-    c.nombre.toLowerCase().includes(search.toLowerCase()) || 
-    (c.vendedores?.nombre || '').toLowerCase().includes(search.toLowerCase())
+  const organizacionesFiltradas = organizaciones.filter(o => 
+    o.nombre.toLowerCase().includes(search.toLowerCase()) || 
+    (o.vendedores?.nombre || '').toLowerCase().includes(search.toLowerCase())
   )
 
-  const openModal = (comercio: any) => {
-    setModalComercio(comercio)
+  const openModal = (organizacion: any) => {
+    setModalOrganizacion(organizacion)
     document.body.style.overflow = 'hidden'
   }
 
   const closeModal = () => {
-    setModalComercio(null)
+    setModalOrganizacion(null)
     document.body.style.overflow = ''
   }
 
@@ -98,26 +98,26 @@ export default function OrganizacionesPage() {
       <div className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100">
         {loading ? (
           <div className="p-8 text-center text-ink-500">Cargando organizaciones...</div>
-        ) : comerciosFiltrados.length === 0 ? (
+        ) : organizacionesFiltradas.length === 0 ? (
           <div className="p-8 text-center text-ink-500">No se encontraron organizaciones.</div>
         ) : (
-          comerciosFiltrados.map(c => {
-            const statusStyle = getStatusColor(c.estado)
-            const avatarStyle = getAvatarColor(c.estado)
-            const iniciales = c.nombre.substring(0, 2).toUpperCase()
+          organizacionesFiltradas.map(o => {
+            const statusStyle = getStatusColor(o.estado)
+            const avatarStyle = getAvatarColor(o.estado)
+            const iniciales = o.nombre.substring(0, 2).toUpperCase()
             
             return (
-              <button key={c.id} onClick={() => openModal(c)} className="w-full text-left flex items-center gap-3 p-4 hover:bg-slate-50 transition">
+              <button key={o.id} onClick={() => openModal(o)} className="w-full text-left flex items-center gap-3 p-4 hover:bg-slate-50 transition">
                 <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-600 shrink-0 ${avatarStyle}`}>{iniciales}</div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-600 text-ink-900">{c.nombre}</p>
+                    <p className="font-600 text-ink-900">{o.nombre}</p>
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-600 ${statusStyle.split(' marker:')[0]}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${statusStyle.split(' marker:')[1]}`}></span> {c.estado}
+                      <span className={`w-1.5 h-1.5 rounded-full ${statusStyle.split(' marker:')[1]}`}></span> {o.estado}
                     </span>
                   </div>
                   <p className="text-sm text-ink-500 mt-0.5 truncate">
-                    Plan {c.plans?.nombre || 'Ninguno'} · vence el {c.fecha_vencimiento ? new Date(c.fecha_vencimiento).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'N/A'} · vendedor: {c.vendedores?.nombre || 'Sin vendedor'}
+                    Plan {o.plans?.nombre || 'Ninguno'} · vence el {o.fecha_vencimiento ? new Date(o.fecha_vencimiento).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'N/A'} · vendedor: {o.vendedores?.nombre || 'Sin vendedor'}
                   </p>
                 </div>
                 <svg className="w-5 h-5 text-ink-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
@@ -128,13 +128,13 @@ export default function OrganizacionesPage() {
       </div>
 
       {/* MODAL DETALLE ORGANIZACIÓN */}
-      {modalComercio && (
+      {modalOrganizacion && (
         <div className="fixed inset-0 z-50">
           <div className="absolute inset-0 bg-ink-900/50 backdrop-blur-sm" onClick={closeModal}></div>
           <div className="relative min-h-full flex items-center justify-center p-4">
             <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl">
               <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-                <h2 className="font-display font-700 text-lg text-ink-900">{modalComercio.nombre}</h2>
+                <h2 className="font-display font-700 text-lg text-ink-900">{modalOrganizacion.nombre}</h2>
                 <button onClick={closeModal} className="p-1.5 rounded-lg text-ink-400 hover:text-ink-700 hover:bg-slate-100 transition" aria-label="Cerrar">
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
@@ -142,18 +142,18 @@ export default function OrganizacionesPage() {
               <div className="px-6 py-5 space-y-4">
                 
                 {/* Estado actual */}
-                <div className={`flex items-center gap-3 p-3 rounded-xl border ${modalComercio.estado === 'activo' ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
-                  <span className={`w-2.5 h-2.5 rounded-full ${getStatusColor(modalComercio.estado).split(' marker:')[1]}`}></span>
+                <div className={`flex items-center gap-3 p-3 rounded-xl border ${modalOrganizacion.estado === 'activo' ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
+                  <span className={`w-2.5 h-2.5 rounded-full ${getStatusColor(modalOrganizacion.estado).split(' marker:')[1]}`}></span>
                   <div className="flex-1">
-                    <p className="text-sm font-600 text-ink-900">Plan {modalComercio.plans?.nombre} · {modalComercio.estado}</p>
-                    <p className="text-xs text-ink-500">Vence el {modalComercio.fecha_vencimiento ? new Date(modalComercio.fecha_vencimiento).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'N/A'}</p>
+                    <p className="text-sm font-600 text-ink-900">Plan {modalOrganizacion.plans?.nombre} · {modalOrganizacion.estado}</p>
+                    <p className="text-xs text-ink-500">Vence el {modalOrganizacion.fecha_vencimiento ? new Date(modalOrganizacion.fecha_vencimiento).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'N/A'}</p>
                   </div>
                 </div>
 
                 {/* Datos */}
                 <dl className="space-y-2.5 text-sm">
-                  <div className="flex justify-between gap-2"><dt className="text-ink-500">Alta</dt><dd className="text-ink-900 font-500 text-right">{new Date(modalComercio.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}</dd></div>
-                  <div className="flex justify-between gap-2"><dt className="text-ink-500">Vendedor</dt><dd className="text-ink-900 font-500 text-right">{modalComercio.vendedores?.nombre || 'Sin vendedor'}</dd></div>
+                  <div className="flex justify-between gap-2"><dt className="text-ink-500">Alta</dt><dd className="text-ink-900 font-500 text-right">{new Date(modalOrganizacion.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}</dd></div>
+                  <div className="flex justify-between gap-2"><dt className="text-ink-500">Vendedor</dt><dd className="text-ink-900 font-500 text-right">{modalOrganizacion.vendedores?.nombre || 'Sin vendedor'}</dd></div>
                 </dl>
 
                 {/* Acciones de gestión */}

@@ -28,29 +28,29 @@ export async function getDashboardData() {
     const supabase = await requireSuperAdmin()
 
     // Comercios por estado
-    const { data: comercios } = await supabase
+    const { data: organizaciones } = await supabase
       .from('organizaciones')
       .select('estado, fecha_vencimiento')
 
-    let comerciosActivos = 0
-    let comerciosTrial = 0
-    let comerciosVencidos = 0
-    let comerciosSuspendidos = 0
+    let organizacionesActivas = 0
+    let organizacionesTrial = 0
+    let organizacionesVencidas = 0
+    let organizacionesSuspendidas = 0
     let trialsPorVencer = 0
 
     const now = new Date()
     const in3Days = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000)
 
-    comercios?.forEach(c => {
-      if (c.estado === 'activo') comerciosActivos++
-      if (c.estado === 'trial') {
-        comerciosTrial++
-        if (c.fecha_vencimiento && new Date(c.fecha_vencimiento) <= in3Days) {
+    organizaciones?.forEach(o => {
+      if (o.estado === 'activo') organizacionesActivas++
+      if (o.estado === 'trial') {
+        organizacionesTrial++
+        if (o.fecha_vencimiento && new Date(o.fecha_vencimiento) <= in3Days) {
           trialsPorVencer++
         }
       }
-      if (c.estado === 'vencido') comerciosVencidos++
-      if (c.estado === 'suspendido') comerciosSuspendidos++
+      if (o.estado === 'vencido') organizacionesVencidas++
+      if (o.estado === 'suspendido') organizacionesSuspendidas++
     })
 
     // Mensajes IA del mes
@@ -72,12 +72,12 @@ export async function getDashboardData() {
     return {
       success: true,
       data: {
-        comerciosPorEstado: {
-          activos: comerciosActivos,
-          trial: comerciosTrial,
-          vencidos: comerciosVencidos,
-          suspendidos: comerciosSuspendidos,
-          total: comercios?.length || 0
+        organizacionesPorEstado: {
+          activos: organizacionesActivas,
+          trial: organizacionesTrial,
+          vencidos: organizacionesVencidas,
+          suspendidos: organizacionesSuspendidas,
+          total: organizaciones?.length || 0
         },
         trialsPorVencer,
         totalMensajesMes,
@@ -89,8 +89,8 @@ export async function getDashboardData() {
   }
 }
 
-// B) getComercios
-export async function getComercios(filtro?: string) {
+// B) getOrganizaciones
+export async function getOrganizaciones(filtro?: string) {
   const supabase = await requireSuperAdmin()
 
   let query = supabase
@@ -108,7 +108,7 @@ export async function getComercios(filtro?: string) {
 
   const { data, error } = await query
   if (error) return { success: false, error: error.message }
-  return { success: true, comercios: data }
+  return { success: true, organizaciones: data }
 }
 
 // C) getVendedores

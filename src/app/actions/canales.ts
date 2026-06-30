@@ -14,7 +14,7 @@ async function getAuthData(supabase: any) {
     .single()
 
   if (!userData?.tenant_id) {
-    return { error: 'Usuario no vinculado a un comercio', user_id: user.id }
+    return { error: 'Usuario no vinculado a una organización', user_id: user.id }
   }
 
   const branchId = await resolveBranchId(supabase, user.id)
@@ -37,7 +37,7 @@ export async function getCanales() {
   if (error) return { success: false, error: error.message }
 
   const { data: comercio } = await supabase
-    .from('comercios')
+    .from('organizaciones')
     .select('plan_id, plans(canales_max)')
     .eq('id', auth.tenant_id)
     .single()

@@ -13,7 +13,7 @@ async function getAuthData(supabase: any) {
     .single()
 
   if (!userData?.tenant_id) {
-    return { error: 'Usuario no vinculado a un comercio', user_id: user.id }
+    return { error: 'Usuario no vinculado a una organización', user_id: user.id }
   }
 
   return { tenant_id: userData.tenant_id, user_id: user.id }

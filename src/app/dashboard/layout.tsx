@@ -15,7 +15,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // 2. Obtener datos del usuario en public.users
   const { data: userData } = await supabase
     .from('users')
-    .select('*, comercios(nombre)')
+    .select('*, organizaciones(nombre)')
     .eq('id', user.id)
     .single()
 

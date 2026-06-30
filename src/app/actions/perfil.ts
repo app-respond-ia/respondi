@@ -16,7 +16,7 @@ export async function getPerfilComercio() {
     .single()
     
   if (!userData?.tenant_id) {
-    return { success: false, error: 'Usuario no vinculado a un comercio' }
+    return { success: false, error: 'Usuario no vinculado a una organización' }
   }
 
   const branchId = await resolveBranchId(supabase, user.id)
@@ -67,7 +67,7 @@ export async function savePerfilComercio(data: {
     .single()
 
   if (!userData?.tenant_id) {
-    return { success: false, error: 'Usuario no vinculado a un comercio' }
+    return { success: false, error: 'Usuario no vinculado a una organización' }
   }
 
   const branchId = await resolveBranchId(supabase, user.id)

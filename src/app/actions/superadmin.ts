@@ -29,7 +29,7 @@ export async function getDashboardData() {
 
     // Comercios por estado
     const { data: comercios } = await supabase
-      .from('comercios')
+      .from('organizaciones')
       .select('estado, fecha_vencimiento')
 
     let comerciosActivos = 0
@@ -94,7 +94,7 @@ export async function getComercios(filtro?: string) {
   const supabase = await requireSuperAdmin()
 
   let query = supabase
-    .from('comercios')
+    .from('organizaciones')
     .select(`
       id, nombre, estado, plan_id, fecha_vencimiento, id_vendedor, created_at,
       plans (nombre),
@@ -162,7 +162,7 @@ export async function getErrores(filtro?: 'sin_resolver' | 'resuelto') {
     .from('error_logs')
     .select(`
       *,
-      comercios (nombre)
+      organizaciones (nombre)
     `)
     .order('timestamp', { ascending: false })
     .limit(100)

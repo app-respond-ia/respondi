@@ -16,7 +16,7 @@ export async function getHorarios() {
     .single()
 
   if (!userData?.tenant_id) {
-    return { success: false, error: 'Usuario no vinculado a un comercio' }
+    return { success: false, error: 'Usuario no vinculado a una organización' }
   }
 
   const branchId = await resolveBranchId(supabase, user.id)
@@ -60,7 +60,7 @@ export async function saveHorarios(horarios: { dia_semana: number, apertura: str
     .single()
 
   if (!userData?.tenant_id) {
-    return { success: false, error: 'Usuario no vinculado a un comercio' }
+    return { success: false, error: 'Usuario no vinculado a una organización' }
   }
 
   const branchId = await resolveBranchId(supabase, user.id)

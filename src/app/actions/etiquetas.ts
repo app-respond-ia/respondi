@@ -22,7 +22,7 @@ async function getAuthData(supabase: any) {
     .single()
 
   if (!userData?.tenant_id) {
-    return { error: 'Usuario no vinculado a un comercio' }
+    return { error: 'Usuario no vinculado a una organización' }
   }
 
   const branchId = await resolveBranchId(supabase, user.id)

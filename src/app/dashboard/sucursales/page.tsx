@@ -100,7 +100,7 @@ export default function SucursalesPage() {
       <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
         <div>
           <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Sucursales</h1>
-          <p className="text-ink-500 mt-1">Las sucursales de tu comercio. Nunca se eliminan, solo se desactivan.</p>
+          <p className="text-ink-500 mt-1">Las sucursales de tu organización. Nunca se eliminan, solo se desactivan.</p>
         </div>
         
         <div className="group relative">

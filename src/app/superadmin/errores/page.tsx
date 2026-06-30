@@ -119,8 +119,8 @@ export default function ErroresPage() {
                           <span className="text-xs text-ink-400">{new Date(e.timestamp).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                         </div>
                         <p className={`font-600 truncate ${isResolved ? 'text-ink-700' : 'text-ink-900'}`}>{e.descripcion}</p>
-                        {e.comercios?.nombre && (
-                          <p className="text-sm text-ink-500 mt-1">Comercio: <span className="font-500">{e.comercios.nombre}</span></p>
+                        {e.organizaciones?.nombre && (
+                          <p className="text-sm text-ink-500 mt-1">Organización: <span className="font-500">{e.organizaciones.nombre}</span></p>
                         )}
                       </div>
                       <button className="shrink-0 p-1.5 text-ink-400 hover:text-ink-700 hover:bg-slate-100 rounded-lg transition" title="Ver detalle">
@@ -166,10 +166,10 @@ export default function ErroresPage() {
                   <p className="text-ink-900 font-500 bg-red-50 text-red-900 p-3 rounded-xl border border-red-100">{modalData.descripcion}</p>
                 </div>
 
-                {modalData.comercios?.nombre && (
+                {modalData.organizaciones?.nombre && (
                   <div>
-                    <h3 className="text-sm font-600 text-ink-500 uppercase tracking-wide mb-1">Comercio afectado</h3>
-                    <p className="text-ink-900 font-500">{modalData.comercios.nombre}</p>
+                    <h3 className="text-sm font-600 text-ink-500 uppercase tracking-wide mb-1">Organización afectada</h3>
+                    <p className="text-ink-900 font-500">{modalData.organizaciones.nombre}</p>
                   </div>
                 )}
 

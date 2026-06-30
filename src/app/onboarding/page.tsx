@@ -164,7 +164,7 @@ export default function OnboardingPage() {
                 <div className="animate-in fade-in duration-300">
                   <div className="flex items-center gap-3 mb-1">
                     <span className="w-9 h-9 rounded-xl bg-brand-100 text-brand-700 font-display font-bold flex items-center justify-center text-sm">1</span>
-                    <span className="text-xs font-semibold uppercase tracking-wider text-brand-600">Datos del comercio</span>
+                    <span className="text-xs font-semibold uppercase tracking-wider text-brand-600">Datos de tu negocio</span>
                   </div>
                   <h1 className="font-display font-bold text-2xl text-ink-900 mb-1.5">Cuéntanos de tu negocio</h1>
                   <p className="text-ink-500 mb-6">Completa los datos comerciales de tu sucursal.</p>
@@ -175,7 +175,7 @@ export default function OnboardingPage() {
                       <input type="text" value={s1.nombrePersona} onChange={e => { setS1({...s1, nombrePersona: e.target.value}); setErrorS1('') }} placeholder="Ej. Ana Martínez" className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition" />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-ink-700 mb-1.5">Nombre de tu comercio</label>
+                      <label className="block text-sm font-medium text-ink-700 mb-1.5">Nombre de tu negocio</label>
                       <input type="text" value={s1.nombreComercio} onChange={e => { setS1({...s1, nombreComercio: e.target.value}); setErrorS1('') }} placeholder="Ej. Pastelería Dulce Hogar" className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition" />
                       {errorS1 && <p className="text-red-500 text-xs mt-1.5">{errorS1}</p>}
                     </div>

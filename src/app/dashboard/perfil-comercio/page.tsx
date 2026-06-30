@@ -111,20 +111,20 @@ export default function PerfilComercioPage() {
   }
 
   if (loading) {
-    return <div className="p-10 text-center text-slate-500 font-medium">Cargando perfil del comercio...</div>
+    return <div className="p-10 text-center text-slate-500 font-medium">Cargando perfil de la sucursal...</div>
   }
 
   return (
     <div className="p-6 sm:p-10 max-w-4xl mx-auto pb-20">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-ink-900 font-display">Perfil del comercio</h1>
+        <h1 className="text-3xl font-bold text-ink-900 font-display">Perfil de la sucursal</h1>
         <p className="text-ink-500 mt-1">Configura los datos de tu negocio y la personalidad de tu asistente IA.</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">
         {/* SECCIÓN: DATOS DEL COMERCIO */}
         <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8">
-          <h2 className="text-xl font-bold text-ink-900 mb-6 border-b border-slate-100 pb-3">Datos del comercio</h2>
+          <h2 className="text-xl font-bold text-ink-900 mb-6 border-b border-slate-100 pb-3">Datos de la sucursal</h2>
           
           <div className="space-y-5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

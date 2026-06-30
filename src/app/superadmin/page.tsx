@@ -26,7 +26,7 @@ export default async function SuperadminDashboardPage() {
     <>
       <div className="mb-6">
         <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Visión general</h1>
-        <p className="text-ink-500 mt-1">El estado de Respondi en todos los comercios.</p>
+        <p className="text-ink-500 mt-1">El estado de Respondi en todas las organizaciones.</p>
       </div>
 
       {/* KPIs de negocio */}
@@ -36,7 +36,7 @@ export default async function SuperadminDashboardPage() {
           <p className="font-display font-700 text-2xl text-ink-900">{ingresosEstimados} $</p>
         </div>
         <div className="bg-white rounded-2xl border border-slate-200 p-4">
-          <p className="text-xs text-ink-500 mb-1">Comercios activos</p>
+          <p className="text-xs text-ink-500 mb-1">Organizaciones activas</p>
           <p className="font-display font-700 text-2xl text-ink-900">
             {comerciosPorEstado.activos}<span className="text-lg text-ink-400">/{totalComercios}</span>
           </p>
@@ -73,7 +73,7 @@ export default async function SuperadminDashboardPage() {
 
       {/* Estado de los comercios (Barras CSS simples) */}
       <div className="bg-white rounded-2xl border border-slate-200 p-5 mb-6 max-w-xl">
-        <h2 className="font-display font-600 text-base text-ink-900 mb-4">Estado de los comercios</h2>
+        <h2 className="font-display font-600 text-base text-ink-900 mb-4">Estado de las organizaciones</h2>
         <div className="space-y-3 mt-6">
           <div>
             <div className="flex justify-between text-sm mb-1"><span className="text-ink-600">Activos</span><span className="font-600 text-ink-900">{comerciosPorEstado.activos}</span></div>

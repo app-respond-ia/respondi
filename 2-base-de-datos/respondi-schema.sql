@@ -24,7 +24,14 @@ create extension if not exists "pgcrypto";
 -- ============================================================================
 
 create type estado_organizacion as enum ('trial', 'activo', 'vencido', 'suspendido');
-create type rol_usuario        as enum ('super_admin', 'admin', 'operario', 'agente');
+create type rol_usuario        as enum ('super_admin', 'admin', 'usuario');
+create type seccion_permiso as enum (
+  'casos', 'conversaciones', 'chats', 'novedades', 'blacklist',
+  'skills', 'precios', 'reglas', 'etiquetas', 'canales',
+  'usuarios', 'sucursales', 'perfil', 'audit_log'
+);
+create type nivel_permiso as enum ('ninguno', 'lectura', 'escritura');
+create type alcance_permiso as enum ('todos', 'propios');
 create type modo_pausa         as enum ('apagada', 'automatica', 'ninguna');
 create type tipo_canal         as enum ('instagram', 'whatsapp', 'facebook');
 create type metodo_canal       as enum ('whaticket', 'meta_oficial');
@@ -155,6 +162,19 @@ create table user_branches (
   user_id   uuid not null references users(id) on delete cascade,
   branch_id uuid not null references sucursales(id) on delete cascade,
   primary key (user_id, branch_id)
+);
+
+-- Permisos granulares por usuario, sucursal y sección
+create table user_permissions (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references users(id) on delete cascade,
+  branch_id  uuid not null references sucursales(id) on delete cascade,
+  seccion    seccion_permiso not null,
+  nivel      nivel_permiso not null default 'ninguno',
+  alcance    alcance_permiso,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, branch_id, seccion)
 );
 
 -- ============================================================================
@@ -428,6 +448,8 @@ create index idx_cases_agente           on cases(agente_id);
 create index idx_quotas_tenant_ts       on message_quotas(tenant_id, timestamp desc);
 create index idx_audit_tenant_ts        on audit_log(tenant_id, timestamp desc);
 create index idx_errors_resuelto_ts     on error_logs(resuelto, timestamp desc);
+create index idx_user_permissions_user_branch  on user_permissions(user_id, branch_id);
+create index idx_user_permissions_branch_seccion on user_permissions(branch_id, seccion);
 
 -- ============================================================================
 -- 12. FUNCIONES AUXILIARES PARA RLS
@@ -441,6 +463,36 @@ $$;
 create or replace function auth_rol()
 returns rol_usuario language sql stable security definer as $$
   select rol from public.users where id = auth.uid()
+$$;
+
+create or replace function auth_is_admin()
+returns boolean language sql stable security definer as $$
+  select coalesce(
+    (select rol in ('super_admin', 'admin') from public.users where id = auth.uid()),
+    false
+  )
+$$;
+
+create or replace function auth_has_permission(
+  p_branch_id uuid,
+  p_seccion   seccion_permiso,
+  p_nivel     nivel_permiso
+) returns boolean language plpgsql stable security definer as $$
+declare
+  v_rol rol_usuario;
+  v_nivel nivel_permiso;
+begin
+  select rol into v_rol from public.users where id = auth.uid();
+  if v_rol in ('super_admin', 'admin') then return true; end if;
+  select nivel into v_nivel from public.user_permissions
+  where user_id = auth.uid() and branch_id = p_branch_id and seccion = p_seccion;
+  if v_nivel is null then return false; end if;
+  if p_nivel = 'ninguno' then return true;
+  elsif p_nivel = 'lectura' then return v_nivel in ('lectura', 'escritura');
+  elsif p_nivel = 'escritura' then return v_nivel = 'escritura';
+  end if;
+  return false;
+end;
 $$;
 
 create or replace function is_super_admin()
@@ -458,6 +510,7 @@ alter table business_profiles  enable row level security;
 alter table business_hours     enable row level security;
 alter table users              enable row level security;
 alter table user_branches      enable row level security;
+alter table user_permissions   enable row level security;
 alter table skills             enable row level security;
 alter table price_list         enable row level security;
 alter table daily_updates      enable row level security;
@@ -515,6 +568,13 @@ create policy user_branches_access on user_branches for all
   using (is_super_admin() or user_id = auth.uid() or branch_id in (select id from sucursales where tenant_id = auth_tenant_id()))
   with check (is_super_admin() or user_id = auth.uid() or branch_id in (select id from sucursales where tenant_id = auth_tenant_id()));
 
+-- user_permissions
+create policy user_permissions_select on user_permissions for select
+  using (is_super_admin() or user_id = auth.uid() or branch_id in (select id from sucursales where tenant_id = auth_tenant_id()));
+create policy user_permissions_admin on user_permissions for all
+  using (is_super_admin() or (branch_id in (select id from sucursales where tenant_id = auth_tenant_id()) and auth_is_admin()))
+  with check (is_super_admin() or (branch_id in (select id from sucursales where tenant_id = auth_tenant_id()) and auth_is_admin()));
+
 -- settings
 create policy skills_tenant on skills for all
   using (is_super_admin() or tenant_id = auth_tenant_id())
@@ -527,8 +587,8 @@ create policy price_tenant on price_list for all
 create policy updates_select on daily_updates for select
   using (is_super_admin() or tenant_id = auth_tenant_id());
 create policy updates_write on daily_updates for all
-  using (is_super_admin() or (tenant_id = auth_tenant_id() and auth_rol() in ('admin','operario','agente')))
-  with check (is_super_admin() or (tenant_id = auth_tenant_id() and auth_rol() in ('admin','operario','agente')));
+  using (is_super_admin() or (tenant_id = auth_tenant_id() and (auth_rol() = 'admin' or auth_has_permission(branch_id, 'novedades', 'escritura'))))
+  with check (is_super_admin() or (tenant_id = auth_tenant_id() and (auth_rol() = 'admin' or auth_has_permission(branch_id, 'novedades', 'escritura'))));
 
 create policy rules_tenant on case_rules for all
   using (is_super_admin() or tenant_id = auth_tenant_id())
@@ -559,9 +619,9 @@ create policy convtags_tenant on conversation_tags for all
   with check (is_super_admin() or conversation_id in (select id from conversations where tenant_id = auth_tenant_id()));
 
 create policy cases_select on cases for select
-  using (is_super_admin() or (tenant_id = auth_tenant_id() and (auth_rol() in ('admin') or agente_id = auth.uid())));
+  using (is_super_admin() or (tenant_id = auth_tenant_id() and (auth_rol() = 'admin' or auth_has_permission(branch_id, 'casos', 'lectura'))));
 create policy cases_write on cases for all
-  using (is_super_admin() or (tenant_id = auth_tenant_id() and (auth_rol() = 'admin' or agente_id = auth.uid())))
+  using (is_super_admin() or (tenant_id = auth_tenant_id() and (auth_rol() = 'admin' or auth_has_permission(branch_id, 'casos', 'escritura'))))
   with check (is_super_admin() or tenant_id = auth_tenant_id());
 
 create policy notes_select on case_notes for select
@@ -579,7 +639,7 @@ create policy ailogs_tenant on ai_logs for select
   using (is_super_admin() or tenant_id = auth_tenant_id());
 
 create policy audit_tenant on audit_log for select
-  using (is_super_admin() or (tenant_id = auth_tenant_id() and auth_rol() = 'admin'));
+  using (is_super_admin() or (tenant_id = auth_tenant_id() and (auth_rol() = 'admin' or auth_has_permission((select branch_id from public.users where id = auth.uid()), 'audit_log', 'lectura'))));
 
 create policy notif_own on notifications for all
   using (is_super_admin() or user_id = auth.uid())

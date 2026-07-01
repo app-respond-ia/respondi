@@ -62,10 +62,7 @@ export async function getUsuarios() {
   return { success: true, data: { usuarios, usuarios_max, plan_nombre, current_user_id: auth.user_id, sucursales, usuarios_activos_count } }
 }
 
-export async function invitarUsuario(data: { email: string, nombre: string | null, rol: 'agente' | 'operario', branch_ids: string[] }) {
-  if (data.rol !== 'agente' && data.rol !== 'operario') {
-    return { success: false, error: 'Rol inválido. Solo se permite agente u operario.' }
-  }
+export async function invitarUsuario(data: { email: string, nombre: string | null, branch_ids: string[], permisos: { branch_id: string, secciones: { seccion: string, nivel: string, alcance?: string }[] }[] }) {
 
   const supabase = await createClient()
   const auth = await getAuthData(supabase)
@@ -95,7 +92,7 @@ export async function invitarUsuario(data: { email: string, nombre: string | nul
       branch_id: data.branch_ids[0],
       email: data.email,
       nombre: data.nombre || null,
-      rol: data.rol,
+      rol: 'usuario',
       activo: true,
       invitacion_aceptada: false
     }])
@@ -112,6 +109,29 @@ export async function invitarUsuario(data: { email: string, nombre: string | nul
     }))
   )
 
+  if (data.permisos && data.permisos.length > 0) {
+    for (const p of data.permisos) {
+      const rows = p.secciones.map(sec => ({
+        user_id: inviteData.user.id,
+        branch_id: p.branch_id,
+        seccion: sec.seccion,
+        nivel: sec.nivel,
+        alcance: sec.alcance || null,
+        updated_at: new Date().toISOString()
+      }))
+      await supabaseAdmin.from('user_permissions').upsert(rows, { onConflict: 'user_id,branch_id,seccion' })
+    }
+    await supabaseAdmin.from('audit_log').insert({
+      tenant_id: auth.tenant_id,
+      user_id: auth.user_id,
+      accion: 'crear_permisos',
+      tabla_afectada: 'user_permissions',
+      registro_id: inviteData.user.id,
+      valor_anterior: null,
+      valor_nuevo: { permisos: data.permisos }
+    })
+  }
+
   const { data: newUser } = await supabaseAdmin
     .from('users')
     .select('*')
@@ -121,10 +141,7 @@ export async function invitarUsuario(data: { email: string, nombre: string | nul
   return { success: true, data: newUser }
 }
 
-export async function actualizarUsuario(id: string, data: Partial<{ nombre: string, rol: 'agente'|'operario', branch_ids: string[] }>) {
-  if (data.rol && data.rol !== 'agente' && data.rol !== 'operario') {
-    return { success: false, error: 'No tienes permisos para asignar este rol' }
-  }
+export async function actualizarUsuario(id: string, data: Partial<{ nombre: string, branch_ids: string[], permisos: { branch_id: string, secciones: { seccion: string, nivel: string, alcance?: string }[] }[] }>) {
 
   const supabase = await createClient()
   const auth = await getAuthData(supabase)
@@ -134,7 +151,6 @@ export async function actualizarUsuario(id: string, data: Partial<{ nombre: stri
     .from('users')
     .update({
       ...(data.nombre !== undefined && { nombre: data.nombre }),
-      ...(data.rol && { rol: data.rol }),
       ...(data.branch_ids && data.branch_ids.length > 0 && { branch_id: data.branch_ids[0] })
     })
     .eq('id', id)
@@ -154,6 +170,29 @@ export async function actualizarUsuario(id: string, data: Partial<{ nombre: stri
         }))
       )
     }
+  }
+
+  if (data.permisos && data.permisos.length > 0) {
+    for (const p of data.permisos) {
+      const rows = p.secciones.map(sec => ({
+        user_id: id,
+        branch_id: p.branch_id,
+        seccion: sec.seccion,
+        nivel: sec.nivel,
+        alcance: sec.alcance || null,
+        updated_at: new Date().toISOString()
+      }))
+      await supabase.from('user_permissions').upsert(rows, { onConflict: 'user_id,branch_id,seccion' })
+    }
+    await supabase.from('audit_log').insert({
+      tenant_id: auth.tenant_id,
+      user_id: auth.user_id,
+      accion: 'actualizar_permisos',
+      tabla_afectada: 'user_permissions',
+      registro_id: id,
+      valor_anterior: null,
+      valor_nuevo: { permisos: data.permisos }
+    })
   }
 
   return { success: true, data: updated }

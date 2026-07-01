@@ -24,8 +24,8 @@ export default function UsuariosPage() {
   // Invitar Modal
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
   const [inviteLoading, setInviteLoading] = useState(false)
-  const [inviteData, setInviteData] = useState<{ email: string, nombre: string, rol: 'agente' | 'operario', branch_ids: string[] }>({
-    email: '', nombre: '', rol: 'agente', branch_ids: []
+  const [inviteData, setInviteData] = useState<{ email: string, nombre: string, branch_ids: string[] }>({
+    email: '', nombre: '', branch_ids: []
   })
   const [inviteError, setInviteError] = useState<string | null>(null)
 
@@ -33,8 +33,8 @@ export default function UsuariosPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [editLoading, setEditLoading] = useState(false)
   const [selectedUser, setSelectedUser] = useState<any>(null)
-  const [editData, setEditData] = useState<{ nombre: string, rol: 'agente' | 'operario', branch_ids: string[] }>({
-    nombre: '', rol: 'agente', branch_ids: []
+  const [editData, setEditData] = useState<{ nombre: string, branch_ids: string[] }>({
+    nombre: '', branch_ids: []
   })
 
   const cargar = async () => {
@@ -58,7 +58,7 @@ export default function UsuariosPage() {
   }, [])
 
   const handleOpenInvite = () => {
-    setInviteData({ email: '', nombre: '', rol: 'agente', branch_ids: [] })
+    setInviteData({ email: '', nombre: '', branch_ids: [] })
     setInviteError(null)
     setIsInviteModalOpen(true)
   }
@@ -75,8 +75,8 @@ export default function UsuariosPage() {
     const res = await invitarUsuario({
       email: inviteData.email,
       nombre: inviteData.nombre || null,
-      rol: inviteData.rol,
-      branch_ids: inviteData.branch_ids
+      branch_ids: inviteData.branch_ids,
+      permisos: []
     })
 
     if (res.success) {
@@ -94,7 +94,6 @@ export default function UsuariosPage() {
     setSelectedUser(user)
     setEditData({
       nombre: user.nombre || '',
-      rol: user.rol === 'admin' || user.rol === 'super_admin' ? 'agente' : user.rol, // Para la UI si fuera modificable, pero no lo dejaremos si es admin
       branch_ids: Array.isArray(user.user_branches) ? user.user_branches.map((ub: any) => ub.branch_id) : []
     })
     setIsEditModalOpen(true)
@@ -111,7 +110,6 @@ export default function UsuariosPage() {
 
     const res = await actualizarUsuario(selectedUser.id, {
       nombre: editData.nombre,
-      rol: editData.rol,
       branch_ids: editData.branch_ids
     })
 
@@ -382,8 +380,8 @@ export default function UsuariosPage() {
                   <div>
                     <label className="block text-sm font-500 text-ink-700 mb-2.5">Rol</label>
                     <div className="grid grid-cols-2 gap-2">
-                      <label className={`relative rounded-xl border-2 p-3 cursor-pointer transition ${inviteData.rol === 'agente' ? 'border-brand-500 bg-brand-50/50 ring-4 ring-brand-100' : 'border-slate-200 bg-white hover:border-brand-300'}`}>
-                        <input type="radio" name="rol" value="agente" className="sr-only" checked={inviteData.rol === 'agente'} onChange={() => setInviteData({...inviteData, rol: 'agente'})} />
+                      <label className={`relative rounded-xl border-2 p-3 cursor-pointer transition ${(inviteData as any).rol === 'agente' ? 'border-brand-500 bg-brand-50/50 ring-4 ring-brand-100' : 'border-slate-200 bg-white hover:border-brand-300'}`}>
+                        <input type="radio" name="rol" value="agente" className="sr-only" checked={(inviteData as any).rol === 'agente'} onChange={() => setInviteData({...inviteData, rol: 'agente'} as any)} />
                         <div className="flex items-center gap-2">
                           <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
                             <svg className="w-4 h-4 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.7 9.7 0 01-4-.85L3 20l1.1-3.3A7.6 7.6 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
@@ -394,8 +392,8 @@ export default function UsuariosPage() {
                           </div>
                         </div>
                       </label>
-                      <label className={`relative rounded-xl border-2 p-3 cursor-pointer transition ${inviteData.rol === 'operario' ? 'border-brand-500 bg-brand-50/50 ring-4 ring-brand-100' : 'border-slate-200 bg-white hover:border-brand-300'}`}>
-                        <input type="radio" name="rol" value="operario" className="sr-only" checked={inviteData.rol === 'operario'} onChange={() => setInviteData({...inviteData, rol: 'operario'})} />
+                      <label className={`relative rounded-xl border-2 p-3 cursor-pointer transition ${(inviteData as any).rol === 'operario' ? 'border-brand-500 bg-brand-50/50 ring-4 ring-brand-100' : 'border-slate-200 bg-white hover:border-brand-300'}`}>
+                        <input type="radio" name="rol" value="operario" className="sr-only" checked={(inviteData as any).rol === 'operario'} onChange={() => setInviteData({...inviteData, rol: 'operario'} as any)} />
                         <div className="flex items-center gap-2">
                           <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center shrink-0">
                             <svg className="w-4 h-4 text-orange-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
@@ -503,8 +501,8 @@ export default function UsuariosPage() {
                 <div>
                   <label className="block text-sm font-500 text-ink-700 mb-2.5">Rol</label>
                   <div className="grid grid-cols-2 gap-2">
-                    <label className={`relative rounded-xl border-2 p-3 cursor-pointer transition ${editData.rol === 'agente' ? 'border-brand-500 bg-brand-50/50 ring-4 ring-brand-100' : 'border-slate-200 bg-white hover:border-brand-300'}`}>
-                      <input type="radio" name="erol" value="agente" className="sr-only" checked={editData.rol === 'agente'} onChange={() => setEditData({...editData, rol: 'agente'})} />
+                    <label className={`relative rounded-xl border-2 p-3 cursor-pointer transition ${(editData as any).rol === 'agente' ? 'border-brand-500 bg-brand-50/50 ring-4 ring-brand-100' : 'border-slate-200 bg-white hover:border-brand-300'}`}>
+                      <input type="radio" name="erol" value="agente" className="sr-only" checked={(editData as any).rol === 'agente'} onChange={() => setEditData({...editData, rol: 'agente'} as any)} />
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
                           <svg className="w-4 h-4 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.7 9.7 0 01-4-.85L3 20l1.1-3.3A7.6 7.6 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
@@ -515,8 +513,8 @@ export default function UsuariosPage() {
                         </div>
                       </div>
                     </label>
-                    <label className={`relative rounded-xl border-2 p-3 cursor-pointer transition ${editData.rol === 'operario' ? 'border-brand-500 bg-brand-50/50 ring-4 ring-brand-100' : 'border-slate-200 bg-white hover:border-brand-300'}`}>
-                      <input type="radio" name="erol" value="operario" className="sr-only" checked={editData.rol === 'operario'} onChange={() => setEditData({...editData, rol: 'operario'})} />
+                    <label className={`relative rounded-xl border-2 p-3 cursor-pointer transition ${(editData as any).rol === 'operario' ? 'border-brand-500 bg-brand-50/50 ring-4 ring-brand-100' : 'border-slate-200 bg-white hover:border-brand-300'}`}>
+                      <input type="radio" name="erol" value="operario" className="sr-only" checked={(editData as any).rol === 'operario'} onChange={() => setEditData({...editData, rol: 'operario'} as any)} />
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center shrink-0">
                           <svg className="w-4 h-4 text-orange-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>

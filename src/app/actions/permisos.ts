@@ -3,22 +3,8 @@
 import { createClient } from '@/utils/supabase/server'
 import { resolveBranchId } from '@/lib/active-branch'
 
-export type SeccionPermiso = 
-  | 'casos' | 'conversaciones' | 'chats' | 'novedades' | 'blacklist'
-  | 'skills' | 'precios' | 'reglas' | 'etiquetas' | 'canales'
-  | 'usuarios' | 'sucursales' | 'perfil' | 'audit_log'
-
-export type NivelPermiso = 'ninguno' | 'lectura' | 'escritura'
-export type AlcancePermiso = 'todos' | 'propios'
-
-export interface PermisoSeccion {
-  seccion: SeccionPermiso
-  nivel: NivelPermiso
-  alcance?: AlcancePermiso
-}
-
-// Secciones que soportan el campo alcance
-export const SECCIONES_CON_ALCANCE: SeccionPermiso[] = ['casos', 'conversaciones', 'chats']
+import type { SeccionPermiso, NivelPermiso, PermisoSeccion } from '@/lib/permisos-types'
+import { SECCIONES_CON_ALCANCE } from '@/lib/permisos-types'
 
 // Obtener los permisos de un usuario en una sucursal específica
 export async function getPermisosUsuario(userId: string, branchId: string) {

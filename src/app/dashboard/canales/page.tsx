@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { getCanales, conectarCanal, desconectarCanal } from '@/app/actions/canales'
+import { getMisPermisos } from '@/app/actions/permisos'
 
 type TipoCanal = 'instagram' | 'whatsapp' | 'facebook'
 type MetodoCanal = 'whaticket' | 'meta_oficial'
@@ -19,6 +20,7 @@ interface Canal {
 export default function CanalesPage() {
   const [loading, setLoading] = useState(true)
   const [canales, setCanales] = useState<Canal[]>([])
+  const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
   const [canalesMax, setCanalesMax] = useState<number | null>(null)
   const [canalesActivosCount, setCanalesActivosCount] = useState<number>(0)
   const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
@@ -40,6 +42,17 @@ export default function CanalesPage() {
     } else {
       setMensaje({ tipo: 'error', texto: res.error || 'Error al cargar canales' })
     }
+
+    const permisosRes = await getMisPermisos()
+    if (permisosRes.success) {
+      if ((permisosRes as any).esAdmin) {
+        setNivelPermiso('escritura')
+      } else {
+        const p = (permisosRes.data || []).find((p: any) => p.seccion === 'canales')
+        setNivelPermiso(p?.nivel || 'ninguno')
+      }
+    }
+
     setLoading(false)
   }
 
@@ -50,7 +63,7 @@ export default function CanalesPage() {
   const limitReached = canalesMax !== null && canalesActivosCount >= canalesMax
 
   const handleOpenModal = (tipo: TipoCanal) => {
-    if (limitReached) return
+    if (limitReached || nivelPermiso !== 'escritura') return
     setModalTipo(tipo)
     setModalMetodo('oficial')
     setAceptaRiesgo(false)
@@ -89,8 +102,16 @@ export default function CanalesPage() {
     }
   }
 
-  if (loading) {
+  if (loading || nivelPermiso === null) {
     return <div className="p-10 text-center text-slate-500 font-medium">Cargando canales...</div>
+  }
+
+  if (nivelPermiso === 'ninguno') {
+    return (
+      <div className="p-10 text-center">
+        <p className="text-ink-500 font-500">No tienes acceso a esta sección.</p>
+      </div>
+    )
   }
 
   const getCanal = (tipo: TipoCanal) => canales.find(c => c.tipo === tipo)
@@ -153,7 +174,7 @@ export default function CanalesPage() {
           {/* Acciones */}
           {isActivo && (
             <div className="flex items-center justify-end gap-2 px-5 py-3.5 bg-slate-50 border-t border-slate-200">
-              <button onClick={() => handleDesconectar(canal.id)} className="text-sm font-600 text-red-600 hover:text-red-700 hover:underline underline-offset-2 transition">Desconectar</button>
+              <button onClick={() => handleDesconectar(canal.id)} disabled={nivelPermiso !== 'escritura'} className="text-sm font-600 text-red-600 hover:text-red-700 hover:underline underline-offset-2 transition disabled:opacity-50 disabled:cursor-not-allowed">Desconectar</button>
             </div>
           )}
         </article>
@@ -177,7 +198,7 @@ export default function CanalesPage() {
               <p className="text-sm text-ink-500">{descSinConectar}</p>
             </div>
             <div className="group relative hidden sm:inline-block">
-              <button onClick={() => handleOpenModal(tipo)} disabled={limitReached} className={`shrink-0 flex items-center gap-1.5 px-5 h-11 rounded-xl bg-brand-600 text-white text-sm font-600 transition ${limitReached ? 'opacity-50 cursor-not-allowed' : 'hover:bg-brand-700'}`}>
+              <button onClick={() => handleOpenModal(tipo)} disabled={limitReached || nivelPermiso !== 'escritura'} className={`shrink-0 flex items-center gap-1.5 px-5 h-11 rounded-xl bg-brand-600 text-white text-sm font-600 transition ${limitReached || nivelPermiso !== 'escritura' ? 'opacity-50 cursor-not-allowed' : 'hover:bg-brand-700'}`}>
                 Conectar
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
               </button>
@@ -189,7 +210,7 @@ export default function CanalesPage() {
             </div>
           </div>
           <div className="group relative sm:hidden mt-5">
-            <button onClick={() => handleOpenModal(tipo)} disabled={limitReached} className={`w-full h-12 rounded-xl bg-brand-600 text-white text-sm font-600 transition flex items-center justify-center gap-1.5 ${limitReached ? 'opacity-50 cursor-not-allowed' : 'hover:bg-brand-700'}`}>
+            <button onClick={() => handleOpenModal(tipo)} disabled={limitReached || nivelPermiso !== 'escritura'} className={`w-full h-12 rounded-xl bg-brand-600 text-white text-sm font-600 transition flex items-center justify-center gap-1.5 ${limitReached || nivelPermiso !== 'escritura' ? 'opacity-50 cursor-not-allowed' : 'hover:bg-brand-700'}`}>
               Conectar {titulo}
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
             </button>

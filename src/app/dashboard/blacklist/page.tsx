@@ -10,6 +10,7 @@ import {
   BlacklistConfigData,
   BloquearContactoData
 } from '@/app/actions/blacklist'
+import { getMisPermisos } from '@/app/actions/permisos'
 
 const CANAL_CONFIG = {
   instagram: {
@@ -56,6 +57,7 @@ export default function BlacklistPage() {
   const [loading, setLoading] = useState(true)
   const [contactos, setContactos] = useState<any[]>([])
   const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
+  const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
   
   // Config state
   const [modo, setModo] = useState<BlacklistModo>('ignorar')
@@ -79,9 +81,10 @@ export default function BlacklistPage() {
 
   const cargar = async () => {
     setLoading(true)
-    const [configRes, contactosRes] = await Promise.all([
+    const [configRes, contactosRes, permisosRes] = await Promise.all([
       getBlacklistConfig(),
-      getContactosBloqueados()
+      getContactosBloqueados(),
+      getMisPermisos()
     ])
 
     if (configRes.success && configRes.data) {
@@ -92,6 +95,16 @@ export default function BlacklistPage() {
     if (contactosRes.success && contactosRes.data) {
       setContactos(contactosRes.data)
     }
+
+    if (permisosRes.success) {
+      if ((permisosRes as any).esAdmin) {
+        setNivelPermiso('escritura')
+      } else {
+        const p = (permisosRes.data || []).find((p: any) => p.seccion === 'blacklist')
+        setNivelPermiso(p?.nivel || 'ninguno')
+      }
+    }
+
     setLoading(false)
   }
 
@@ -162,8 +175,16 @@ export default function BlacklistPage() {
     setTimeout(() => setMensaje(null), 3000)
   }
 
-  if (loading) {
+  if (loading || nivelPermiso === null) {
     return <div className="p-10 text-center text-slate-500 font-medium">Cargando blacklist...</div>
+  }
+
+  if (nivelPermiso === 'ninguno') {
+    return (
+      <div className="p-10 text-center">
+        <p className="text-ink-500 font-500">No tienes acceso a esta sección.</p>
+      </div>
+    )
   }
 
   return (
@@ -184,7 +205,7 @@ export default function BlacklistPage() {
           <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Blacklist</h1>
           <p className="text-ink-500 mt-1 max-w-xl">Contactos bloqueados. La IA detecta abusos y los sugiere, tú decides.</p>
         </div>
-        <button onClick={openAñadir} className="inline-flex items-center gap-2 px-4 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition">
+        <button onClick={openAñadir} disabled={nivelPermiso !== 'escritura'} className="inline-flex items-center gap-2 px-4 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition disabled:opacity-50 disabled:cursor-not-allowed">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
           Bloquear contacto
         </button>
@@ -199,8 +220,8 @@ export default function BlacklistPage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {/* Modo 1: ignorar */}
-          <label className={`relative rounded-2xl border-2 p-4 cursor-pointer transition ${modo === 'ignorar' ? 'border-brand-500 bg-brand-50/50 ring-4 ring-brand-100' : 'border-slate-200 bg-white hover:border-brand-300'}`}>
-            <input type="radio" name="modo" value="ignorar" checked={modo === 'ignorar'} onChange={() => setModo('ignorar')} className="sr-only" />
+          <label className={`relative rounded-2xl border-2 p-4 cursor-pointer transition ${nivelPermiso !== 'escritura' ? 'pointer-events-none opacity-50' : ''} ${modo === 'ignorar' ? 'border-brand-500 bg-brand-50/50 ring-4 ring-brand-100' : 'border-slate-200 bg-white hover:border-brand-300'}`}>
+            <input type="radio" name="modo" value="ignorar" checked={modo === 'ignorar'} onChange={() => setModo('ignorar')} disabled={nivelPermiso !== 'escritura'} className="sr-only" />
             {modo === 'ignorar' && (
               <span className="absolute top-3 right-3 w-5 h-5 rounded-full bg-brand-600 flex items-center justify-center">
                 <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
@@ -214,8 +235,8 @@ export default function BlacklistPage() {
           </label>
 
           {/* Modo 2: respuesta_automatica */}
-          <label className={`relative rounded-2xl border-2 p-4 cursor-pointer transition ${modo === 'respuesta_automatica' ? 'border-brand-500 bg-brand-50/50 ring-4 ring-brand-100' : 'border-slate-200 bg-white hover:border-brand-300'}`}>
-            <input type="radio" name="modo" value="respuesta_automatica" checked={modo === 'respuesta_automatica'} onChange={() => setModo('respuesta_automatica')} className="sr-only" />
+          <label className={`relative rounded-2xl border-2 p-4 cursor-pointer transition ${nivelPermiso !== 'escritura' ? 'pointer-events-none opacity-50' : ''} ${modo === 'respuesta_automatica' ? 'border-brand-500 bg-brand-50/50 ring-4 ring-brand-100' : 'border-slate-200 bg-white hover:border-brand-300'}`}>
+            <input type="radio" name="modo" value="respuesta_automatica" checked={modo === 'respuesta_automatica'} onChange={() => setModo('respuesta_automatica')} disabled={nivelPermiso !== 'escritura'} className="sr-only" />
             {modo === 'respuesta_automatica' && (
               <span className="absolute top-3 right-3 w-5 h-5 rounded-full bg-brand-600 flex items-center justify-center">
                 <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
@@ -229,8 +250,8 @@ export default function BlacklistPage() {
           </label>
 
           {/* Modo 3: derivar */}
-          <label className={`relative rounded-2xl border-2 p-4 cursor-pointer transition ${modo === 'derivar' ? 'border-brand-500 bg-brand-50/50 ring-4 ring-brand-100' : 'border-slate-200 bg-white hover:border-brand-300'}`}>
-            <input type="radio" name="modo" value="derivar" checked={modo === 'derivar'} onChange={() => setModo('derivar')} className="sr-only" />
+          <label className={`relative rounded-2xl border-2 p-4 cursor-pointer transition ${nivelPermiso !== 'escritura' ? 'pointer-events-none opacity-50' : ''} ${modo === 'derivar' ? 'border-brand-500 bg-brand-50/50 ring-4 ring-brand-100' : 'border-slate-200 bg-white hover:border-brand-300'}`}>
+            <input type="radio" name="modo" value="derivar" checked={modo === 'derivar'} onChange={() => setModo('derivar')} disabled={nivelPermiso !== 'escritura'} className="sr-only" />
             {modo === 'derivar' && (
               <span className="absolute top-3 right-3 w-5 h-5 rounded-full bg-brand-600 flex items-center justify-center">
                 <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
@@ -250,13 +271,14 @@ export default function BlacklistPage() {
             <textarea rows={2} 
               value={respuestaAuto}
               onChange={e => setRespuestaAuto(e.target.value)}
+              disabled={nivelPermiso !== 'escritura'}
               placeholder="Lo sentimos, no podemos atender tu mensaje en este momento. Para cualquier consulta urgente, contáctanos por otro canal."
-              className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white resize-none placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition"></textarea>
+              className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white resize-none placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition disabled:opacity-50 disabled:bg-slate-50"></textarea>
           </div>
         )}
 
         <div className="mt-4 flex items-center gap-4">
-          <button onClick={handleSaveConfig} disabled={savingConfig} className="px-5 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition disabled:opacity-50">
+          <button onClick={handleSaveConfig} disabled={savingConfig || nivelPermiso !== 'escritura'} className="px-5 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
             {savingConfig ? 'Guardando...' : 'Guardar configuración'}
           </button>
         </div>
@@ -306,7 +328,7 @@ export default function BlacklistPage() {
 
                   {/* Controles */}
                   <div className="flex items-center shrink-0 ml-2">
-                    <button onClick={() => handleDesbloquear(contacto.id)} className="px-3 h-9 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-600 text-ink-700 transition">
+                    <button onClick={() => handleDesbloquear(contacto.id)} disabled={nivelPermiso !== 'escritura'} className="px-3 h-9 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-600 text-ink-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
                       Desbloquear
                     </button>
                   </div>

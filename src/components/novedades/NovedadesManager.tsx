@@ -7,6 +7,7 @@ import {
   actualizarNovedad,
   NovedadData
 } from '@/app/actions/novedades'
+import { getMisPermisos } from '@/app/actions/permisos'
 
 const TIPO_CONFIG = {
   horario: {
@@ -109,6 +110,7 @@ export default function NovedadesManager() {
   const [loading, setLoading] = useState(true)
   const [items, setItems] = useState<any[]>([])
   const [filtro, setFiltro] = useState<'vigentes' | 'expiradas' | 'todas'>('vigentes')
+  const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
   
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -135,6 +137,17 @@ export default function NovedadesManager() {
     if (res.success && res.data) {
       setItems(res.data)
     }
+
+    const permisosRes = await getMisPermisos()
+    if (permisosRes.success) {
+      if ((permisosRes as any).esAdmin) {
+        setNivelPermiso('escritura')
+      } else {
+        const p = (permisosRes.data || []).find((p: any) => p.seccion === 'novedades')
+        setNivelPermiso(p?.nivel || 'ninguno')
+      }
+    }
+
     setLoading(false)
   }
 
@@ -203,8 +216,16 @@ export default function NovedadesManager() {
     setSaving(false)
   }
 
-  if (loading) {
+  if (loading || nivelPermiso === null) {
     return <div className="p-10 text-center text-slate-500 font-medium">Cargando novedades...</div>
+  }
+
+  if (nivelPermiso === 'ninguno') {
+    return (
+      <div className="p-10 text-center">
+        <p className="text-ink-500 font-500">No tienes acceso a esta sección.</p>
+      </div>
+    )
   }
 
   const filteredItems = items.filter(item => {
@@ -232,7 +253,7 @@ export default function NovedadesManager() {
           <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Novedades del día</h1>
           <p className="text-ink-500 mt-1 max-w-xl">Cambios puntuales que tu IA debe saber para responder mejor.</p>
         </div>
-        <button onClick={openAñadir} className="inline-flex items-center gap-2 px-4 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition">
+        <button onClick={openAñadir} disabled={nivelPermiso !== 'escritura'} className="inline-flex items-center gap-2 px-4 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition disabled:opacity-50 disabled:cursor-not-allowed">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
           Nueva novedad
         </button>
@@ -304,7 +325,7 @@ export default function NovedadesManager() {
 
                     {/* Controles */}
                     <div className="flex items-center shrink-0 ml-2">
-                      <button onClick={() => openEditar(item)} className="p-2 rounded-lg text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition" aria-label="Editar">
+                      <button onClick={() => openEditar(item)} disabled={nivelPermiso !== 'escritura'} className="p-2 rounded-lg text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition disabled:opacity-50 disabled:cursor-not-allowed" aria-label="Editar">
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                       </button>
                     </div>
@@ -327,7 +348,8 @@ export default function NovedadesManager() {
           <div className="flex items-center justify-center">
             <button 
               onClick={openAñadir} 
-              className="inline-flex items-center gap-2 px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition"
+              disabled={nivelPermiso !== 'escritura'}
+              className="inline-flex items-center gap-2 px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Nueva novedad
             </button>

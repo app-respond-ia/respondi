@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import AdminLayout from '@/components/layout/AdminLayout'
+import { getMisPermisos } from '@/app/actions/permisos'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -22,6 +23,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!userData) {
     redirect('/login')
   }
+
+  // 2b. Cargar permisos del usuario
+  const permisosRes = await getMisPermisos()
+  const esAdmin = permisosRes.success && (permisosRes as any).esAdmin === true
+  const permisos = permisosRes.success ? (permisosRes.data || []) : []
 
   // 3. Obtener sucursales desde user_branches
   const { data: ubData } = await supabase
@@ -51,8 +57,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const roleLabels: Record<string, string> = {
     super_admin: 'Super Administrador',
     admin: 'Administrador',
-    agente: 'Agente',
-    operario: 'Operario',
+    usuario: 'Usuario',
   }
 
   const initials = userData.nombre
@@ -67,7 +72,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <AdminLayout user={userForUI} branches={branches} activeBranchId={activeBranchId}>
+    <AdminLayout user={userForUI} branches={branches} activeBranchId={activeBranchId} permisos={permisos} esAdmin={esAdmin}>
       {children}
     </AdminLayout>
   )

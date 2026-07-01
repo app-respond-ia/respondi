@@ -12,7 +12,7 @@ export async function middleware(request: NextRequest) {
   const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route)) || pathname === '/'
 
   // Rutas protegidas por rol
-  const protectedRoutes = ['/dashboard', '/superadmin', '/agente', '/operario', '/onboarding']
+  const protectedRoutes = ['/dashboard', '/superadmin', '/onboarding']
   const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
 
   // Función helper para redirigir copiando las cookies
@@ -41,7 +41,7 @@ export async function middleware(request: NextRequest) {
 
     const role = userData?.rol
 
-    if ((role === 'agente' || role === 'operario') && userData?.invitacion_aceptada === false) {
+    if (role === 'usuario' && userData?.invitacion_aceptada === false) {
       if (pathname.startsWith('/aceptar-invitacion') || pathname.startsWith('/auth/callback')) {
         return supabaseResponse
       }
@@ -51,9 +51,7 @@ export async function middleware(request: NextRequest) {
     // Determinar la ruta base según el rol
     let roleBasePath = ''
     if (role === 'super_admin') roleBasePath = '/superadmin'
-    else if (role === 'admin') roleBasePath = '/dashboard'
-    else if (role === 'agente') roleBasePath = '/agente'
-    else if (role === 'operario') roleBasePath = '/operario'
+    else if (role === 'admin' || role === 'usuario') roleBasePath = '/dashboard'
 
     // Onboarding obligatorio para admins
     if (role === 'admin' && userData?.tenant_id) {

@@ -17,16 +17,18 @@ type AdminLayoutProps = {
     nombre: string
   }[]
   activeBranchId: string
+  permisos: { seccion: string, nivel: string, alcance?: string }[]
+  esAdmin: boolean
 }
 
-export default function AdminLayout({ children, user, branches, activeBranchId }: AdminLayoutProps) {
+export default function AdminLayout({ children, user, branches, activeBranchId, permisos, esAdmin }: AdminLayoutProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   return (
     <div className="min-h-screen lg:flex bg-slate-50 text-ink-900">
       {/* Sidebar Wrapper */}
       <div className={`fixed inset-y-0 left-0 z-40 transform transition-transform duration-300 ease-out lg:translate-x-0 lg:static lg:z-auto ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <Sidebar user={user} onCloseMobile={() => setIsMobileMenuOpen(false)} />
+        <Sidebar user={user} onCloseMobile={() => setIsMobileMenuOpen(false)} permisos={permisos} esAdmin={esAdmin} />
       </div>
 
       {/* Overlay Mobile */}

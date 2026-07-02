@@ -3,10 +3,12 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { getConversaciones } from '@/app/actions/conversaciones'
+import { getMisPermisos } from '@/app/actions/permisos'
 
 export default function ConversacionesPage() {
   const [conversaciones, setConversaciones] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
   
   const [search, setSearch] = useState('')
   const [estadoFilter, setEstadoFilter] = useState('Todas')
@@ -19,13 +21,26 @@ export default function ConversacionesPage() {
   useEffect(() => {
     const cargar = async () => {
       setLoading(true)
-      const res = await getConversaciones({
-        estado: estadoFilter,
-        canal: canalFilter,
-        search: search,
-        iaPausada: iaPausada
-      })
+      const [res, permisosRes] = await Promise.all([
+        getConversaciones({
+          estado: estadoFilter,
+          canal: canalFilter,
+          search: search,
+          iaPausada: iaPausada
+        }),
+        getMisPermisos()
+      ])
+
       if (res.success) setConversaciones(res.data || [])
+
+      if (permisosRes.success) {
+        if ((permisosRes as any).esAdmin) {
+          setNivelPermiso('escritura')
+        } else {
+          const p = (permisosRes.data || []).find((p: any) => p.seccion === 'conversaciones')
+          setNivelPermiso(p?.nivel || 'ninguno')
+        }
+      }
       setLoading(false)
     }
     cargar()
@@ -61,6 +76,18 @@ export default function ConversacionesPage() {
       return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }
     return d.toLocaleDateString([], { day: 'numeric', month: 'short' })
+  }
+
+  if (loading || nivelPermiso === null) {
+    return <div className="p-10 text-center text-slate-500 font-medium">Cargando conversaciones...</div>
+  }
+
+  if (nivelPermiso === 'ninguno') {
+    return (
+      <div className="p-10 text-center">
+        <p className="text-ink-500 font-500">No tienes acceso a esta sección.</p>
+      </div>
+    )
   }
 
   return (
@@ -113,9 +140,7 @@ export default function ConversacionesPage() {
         </div>
       </div>
 
-      {loading ? (
-        <div className="py-20 text-center text-slate-500 font-medium">Cargando conversaciones...</div>
-      ) : conversaciones.length === 0 ? (
+      {conversaciones.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 p-16 text-center shadow-sm">
           <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-5">
             <svg className="w-10 h-10 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>

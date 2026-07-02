@@ -2,12 +2,14 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { getConversaciones, getMensajes, toggleIAPausa, cerrarConversacion } from '@/app/actions/chats'
+import { getMisPermisos } from '@/app/actions/permisos'
 
 export default function ChatsPage() {
   const [conversaciones, setConversaciones] = useState<any[]>([])
   const [mensajes, setMensajes] = useState<any[]>([])
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null)
   const [filtroActivo, setFiltroActivo] = useState<'todas' | 'activas' | 'cerradas'>('todas')
+  const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
   
   const [loadingChats, setLoadingChats] = useState(true)
   const [loadingMsgs, setLoadingMsgs] = useState(false)
@@ -17,11 +19,24 @@ export default function ChatsPage() {
 
   const cargarConversaciones = async () => {
     setLoadingChats(true)
-    const res = await getConversaciones()
+    const [res, permisosRes] = await Promise.all([
+      getConversaciones(),
+      getMisPermisos()
+    ])
+
     if (res.success && res.data) {
       setConversaciones(res.data.conversaciones || [])
     } else {
       setMensajeGlobal({ tipo: 'error', texto: res.error || 'Error al cargar chats' })
+    }
+
+    if (permisosRes.success) {
+      if ((permisosRes as any).esAdmin) {
+        setNivelPermiso('escritura')
+      } else {
+        const p = (permisosRes.data || []).find((p: any) => p.seccion === 'chats')
+        setNivelPermiso(p?.nivel || 'ninguno')
+      }
     }
     setLoadingChats(false)
   }
@@ -91,6 +106,18 @@ export default function ChatsPage() {
 
   const selectedConv = conversaciones.find(c => c.id === selectedConvId)
 
+  if (loadingChats || nivelPermiso === null) {
+    return <div className="p-10 text-center text-slate-500 font-medium">Cargando chats...</div>
+  }
+
+  if (nivelPermiso === 'ninguno') {
+    return (
+      <div className="p-10 text-center">
+        <p className="text-ink-500 font-500">No tienes acceso a esta sección.</p>
+      </div>
+    )
+  }
+
   return (
     <div className="h-screen flex lg:flex-row overflow-hidden bg-white">
       {/* PANEL IZQUIERDO */}
@@ -111,9 +138,7 @@ export default function ChatsPage() {
         </div>
 
         <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
-          {loadingChats ? (
-            <div className="p-4 text-center text-sm text-ink-500">Cargando chats...</div>
-          ) : filteredConversaciones.length === 0 ? (
+          {filteredConversaciones.length === 0 ? (
             <div className="p-4 text-center text-sm text-ink-500">No hay conversaciones en esta vista.</div>
           ) : (
             filteredConversaciones.map(conv => {
@@ -196,12 +221,12 @@ export default function ChatsPage() {
                           {selectedConv.ia_pausada ? 'IA en pausa' : 'IA activa'}
                         </p>
                       </div>
-                      <button onClick={() => handleTogglePausa(selectedConv)} className={`relative w-11 h-6 rounded-full transition ${selectedConv.ia_pausada ? 'bg-amber-500' : 'bg-brand-600'}`}>
+                      <button onClick={() => handleTogglePausa(selectedConv)} disabled={nivelPermiso !== 'escritura'} className={`relative w-11 h-6 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed ${selectedConv.ia_pausada ? 'bg-amber-500' : 'bg-brand-600'}`}>
                         <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${selectedConv.ia_pausada ? 'translate-x-0' : 'translate-x-5'}`}></span>
                       </button>
                     </div>
                     {/* Botón cerrar */}
-                    <button onClick={() => handleCerrar(selectedConv)} className="hidden sm:inline-flex px-3 py-1.5 bg-slate-100 text-ink-700 hover:bg-slate-200 rounded-lg text-xs font-600 transition">
+                    <button onClick={() => handleCerrar(selectedConv)} disabled={nivelPermiso !== 'escritura'} className="hidden sm:inline-flex px-3 py-1.5 bg-slate-100 text-ink-700 hover:bg-slate-200 rounded-lg text-xs font-600 transition disabled:opacity-50 disabled:cursor-not-allowed">
                       Cerrar
                     </button>
                   </>
@@ -274,10 +299,10 @@ export default function ChatsPage() {
               <div className="p-3 sm:p-4 bg-white border-t border-slate-200 shrink-0">
                 <div className="flex items-end gap-2">
                   <div className="flex-1 relative">
-                    <textarea rows={1} placeholder="Escribe un mensaje..."
-                      className="w-full px-4 py-2.5 rounded-2xl border border-slate-300 bg-white resize-none text-sm placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition max-h-32"></textarea>
+                    <textarea rows={1} placeholder="Escribe un mensaje..." disabled={nivelPermiso !== 'escritura'}
+                      className="w-full px-4 py-2.5 rounded-2xl border border-slate-300 bg-white resize-none text-sm placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition max-h-32 disabled:opacity-50 disabled:bg-slate-50"></textarea>
                   </div>
-                  <button className="p-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white transition shrink-0" aria-label="Enviar">
+                  <button disabled={nivelPermiso !== 'escritura'} className="p-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white transition shrink-0 disabled:opacity-50 disabled:cursor-not-allowed" aria-label="Enviar">
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
                   </button>
                 </div>

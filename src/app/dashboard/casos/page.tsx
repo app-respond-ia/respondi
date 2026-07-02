@@ -3,10 +3,12 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { getCasos } from '@/app/actions/casos'
+import { getMisPermisos } from '@/app/actions/permisos'
 
 export default function CasosPage() {
   const [casos, setCasos] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
   
   const [search, setSearch] = useState('')
   const [estadoFilter, setEstadoFilter] = useState('Todos')
@@ -18,12 +20,25 @@ export default function CasosPage() {
   useEffect(() => {
     const cargar = async () => {
       setLoading(true)
-      const res = await getCasos({
-        estado: estadoFilter,
-        canal: canalFilter,
-        search: search
-      })
+      const [res, permisosRes] = await Promise.all([
+        getCasos({
+          estado: estadoFilter,
+          canal: canalFilter,
+          search: search
+        }),
+        getMisPermisos()
+      ])
+
       if (res.success) setCasos(res.data || [])
+
+      if (permisosRes.success) {
+        if ((permisosRes as any).esAdmin) {
+          setNivelPermiso('escritura')
+        } else {
+          const p = (permisosRes.data || []).find((p: any) => p.seccion === 'casos')
+          setNivelPermiso(p?.nivel || 'ninguno')
+        }
+      }
       setLoading(false)
     }
     cargar()
@@ -66,6 +81,18 @@ export default function CasosPage() {
     return `${Math.floor(hr / 24)} d`
   }
 
+  if (loading || nivelPermiso === null) {
+    return <div className="p-10 text-center text-slate-500 font-medium">Cargando casos...</div>
+  }
+
+  if (nivelPermiso === 'ninguno') {
+    return (
+      <div className="p-10 text-center">
+        <p className="text-ink-500 font-500">No tienes acceso a esta sección.</p>
+      </div>
+    )
+  }
+
   return (
     <div className="p-6 sm:p-10 max-w-7xl mx-auto">
       <div className="mb-8">
@@ -105,9 +132,7 @@ export default function CasosPage() {
         </div>
       </div>
 
-      {loading ? (
-        <div className="py-20 text-center text-slate-500">Cargando casos...</div>
-      ) : casos.length === 0 ? (
+      {casos.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 p-16 text-center shadow-sm">
           <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-5">
             <svg className="w-10 h-10 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>

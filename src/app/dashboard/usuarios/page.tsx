@@ -9,7 +9,125 @@ import {
   desactivarUsuario,
   reactivarUsuario
 } from '@/app/actions/usuarios'
-import { getMisPermisos } from '@/app/actions/permisos'
+import { getMisPermisos, getPermisosUsuario } from '@/app/actions/permisos'
+
+type PermisoUI = {
+  seccion: string
+  nivel: 'ninguno' | 'lectura' | 'escritura'
+  alcance?: 'todos' | 'propios'
+}
+
+const SECCIONES_CON_ALCANCE = ['casos', 'conversaciones', 'chats']
+
+const GRUPOS = [
+  {
+    label: 'Operación',
+    secciones: [
+      { id: 'casos', label: 'Casos' },
+      { id: 'conversaciones', label: 'Conversaciones' },
+      { id: 'chats', label: 'Chats' },
+      { id: 'novedades', label: 'Novedades del día' },
+      { id: 'blacklist', label: 'Blacklist' },
+    ]
+  },
+  {
+    label: 'Configuración',
+    secciones: [
+      { id: 'skills', label: 'Skills de IA' },
+      { id: 'precios', label: 'Lista de precios' },
+      { id: 'reglas', label: 'Reglas de casos' },
+      { id: 'etiquetas', label: 'Etiquetas' },
+      { id: 'canales', label: 'Canales' },
+      { id: 'usuarios', label: 'Usuarios' },
+      { id: 'sucursales', label: 'Sucursales' },
+      { id: 'perfil', label: 'Perfil de sucursal' },
+      { id: 'audit_log', label: 'Audit log' },
+    ]
+  }
+]
+
+const SECCIONES_DEFAULT: PermisoUI[] = GRUPOS.flatMap(g => 
+  g.secciones.map(s => ({ seccion: s.id, nivel: 'ninguno', alcance: 'todos' }))
+)
+
+const buildPermisosPayload = (permisos: PermisoUI[], branchIds: string[]) => {
+  return branchIds.map(bid => ({
+    branch_id: bid,
+    secciones: permisos
+      .filter(p => p.nivel !== 'ninguno')
+      .map(p => ({
+        seccion: p.seccion,
+        nivel: p.nivel,
+        ...(SECCIONES_CON_ALCANCE.includes(p.seccion) && { alcance: p.alcance || 'todos' })
+      }))
+  }))
+}
+
+const renderPermisosEditor = (permisos: PermisoUI[], setPermisos: (p: PermisoUI[]) => void) => {
+  const updateNivel = (seccion: string, nivel: 'ninguno' | 'lectura' | 'escritura') => {
+    setPermisos(permisos.map(p => p.seccion === seccion ? { ...p, nivel } : p))
+  }
+  const updateAlcance = (seccion: string, alcance: 'todos' | 'propios') => {
+    setPermisos(permisos.map(p => p.seccion === seccion ? { ...p, alcance } : p))
+  }
+
+  return (
+    <div className="space-y-6">
+      {GRUPOS.map(grupo => (
+        <div key={grupo.label} className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
+          <div className="px-4 py-3 bg-slate-100 border-b border-slate-200">
+            <h3 className="font-600 text-sm text-slate-700">{grupo.label}</h3>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {grupo.secciones.map(sec => {
+              const perm = permisos.find(p => p.seccion === sec.id) || { seccion: sec.id, nivel: 'ninguno', alcance: 'todos' }
+              const showsAlcance = SECCIONES_CON_ALCANCE.includes(sec.id) && perm.nivel !== 'ninguno'
+              
+              return (
+                <div key={sec.id} className="p-4 bg-white flex flex-col gap-3">
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-sm font-500 text-ink-900">{sec.label}</span>
+                    <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
+                      {(['ninguno', 'lectura', 'escritura'] as const).map(n => (
+                        <button
+                          key={n}
+                          type="button"
+                          onClick={() => updateNivel(sec.id, n)}
+                          className={`px-3 py-1.5 text-xs font-600 rounded-md transition capitalize ${
+                            perm.nivel === n 
+                              ? 'bg-brand-600 text-white shadow-sm' 
+                              : 'text-ink-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          {n}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {showsAlcance && (
+                    <div className="flex justify-end">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-ink-500 font-500">Alcance:</span>
+                        <select 
+                          value={perm.alcance || 'todos'} 
+                          onChange={(e) => updateAlcance(sec.id, e.target.value as 'todos' | 'propios')}
+                          className="text-xs font-500 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50 focus:ring-brand-500 focus:border-brand-500 outline-none text-ink-700"
+                        >
+                          <option value="todos">Todos los registros</option>
+                          <option value="propios">Solo propios</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 export default function UsuariosPage() {
   const [loading, setLoading] = useState(true)
@@ -29,6 +147,7 @@ export default function UsuariosPage() {
   const [inviteData, setInviteData] = useState<{ email: string, nombre: string, branch_ids: string[] }>({
     email: '', nombre: '', branch_ids: []
   })
+  const [invitePermisos, setInvitePermisos] = useState<PermisoUI[]>(SECCIONES_DEFAULT)
   const [inviteError, setInviteError] = useState<string | null>(null)
 
   // Editar Modal
@@ -38,6 +157,7 @@ export default function UsuariosPage() {
   const [editData, setEditData] = useState<{ nombre: string, branch_ids: string[] }>({
     nombre: '', branch_ids: []
   })
+  const [editPermisos, setEditPermisos] = useState<PermisoUI[]>([])
 
   const cargar = async () => {
     setLoading(true)
@@ -74,6 +194,7 @@ export default function UsuariosPage() {
 
   const handleOpenInvite = () => {
     setInviteData({ email: '', nombre: '', branch_ids: [] })
+    setInvitePermisos(SECCIONES_DEFAULT)
     setInviteError(null)
     setIsInviteModalOpen(true)
   }
@@ -91,7 +212,7 @@ export default function UsuariosPage() {
       email: inviteData.email,
       nombre: inviteData.nombre || null,
       branch_ids: inviteData.branch_ids,
-      permisos: []
+      permisos: buildPermisosPayload(invitePermisos, inviteData.branch_ids)
     })
 
     if (res.success) {
@@ -105,12 +226,32 @@ export default function UsuariosPage() {
     setInviteLoading(false)
   }
 
-  const handleOpenEdit = (user: any) => {
+  const handleOpenEdit = async (user: any) => {
     setSelectedUser(user)
     setEditData({
       nombre: user.nombre || '',
       branch_ids: Array.isArray(user.user_branches) ? user.user_branches.map((ub: any) => ub.branch_id) : []
     })
+    
+    // Cargar permisos existentes del usuario (usando la primera branch como referencia)
+    const firstBranchId = Array.isArray(user.user_branches) && user.user_branches.length > 0
+      ? user.user_branches[0].branch_id : null
+      
+    if (firstBranchId) {
+      const permRes = await getPermisosUsuario(user.id, firstBranchId)
+      if (permRes.success && permRes.data) {
+        const loaded = SECCIONES_DEFAULT.map(s => {
+          const existing = (permRes.data as any[]).find((p: any) => p.seccion === s.seccion)
+          return existing ? { ...s, nivel: existing.nivel, alcance: existing.alcance || 'todos' } : s
+        })
+        setEditPermisos(loaded)
+      } else {
+        setEditPermisos([...SECCIONES_DEFAULT])
+      }
+    } else {
+      setEditPermisos([...SECCIONES_DEFAULT])
+    }
+    
     setIsEditModalOpen(true)
   }
 
@@ -125,7 +266,8 @@ export default function UsuariosPage() {
 
     const res = await actualizarUsuario(selectedUser.id, {
       nombre: editData.nombre,
-      branch_ids: editData.branch_ids
+      branch_ids: editData.branch_ids,
+      permisos: buildPermisosPayload(editPermisos, editData.branch_ids)
     })
 
     if (res.success) {
@@ -182,32 +324,25 @@ export default function UsuariosPage() {
 
   const getAvatarClass = (user: any) => {
     if (!user.invitacion_aceptada) return 'bg-slate-100 text-slate-500 ring-2 ring-amber-200 ring-offset-2'
-    if (user.rol === 'admin' || user.rol === 'super_admin') return 'bg-gradient-to-br from-brand-400 to-brand-600 text-white'
-    if (user.rol === 'operario') return 'bg-orange-100 text-orange-700'
+    if (user.es_admin) return 'bg-gradient-to-br from-brand-400 to-brand-600 text-white'
     return 'bg-emerald-100 text-emerald-700'
   }
 
-  const getRoleBadgeClass = (rol: string) => {
-    if (rol === 'admin' || rol === 'super_admin') return 'bg-purple-100 text-purple-700'
-    if (rol === 'operario') return 'bg-orange-100 text-orange-700'
+  const getRoleBadgeClass = (esAdmin: boolean) => {
+    if (esAdmin) return 'bg-purple-100 text-purple-700'
     return 'bg-emerald-100 text-emerald-700'
   }
 
-  const getRoleIcon = (rol: string) => {
-    if (rol === 'admin' || rol === 'super_admin') {
+  const getRoleIcon = (esAdmin: boolean) => {
+    if (esAdmin) {
       return <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-    }
-    if (rol === 'operario') {
-      return <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
     }
     return <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.7 9.7 0 01-4-.85L3 20l1.1-3.3A7.6 7.6 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
   }
 
-  const getRoleLabel = (rol: string) => {
-    if (rol === 'admin') return 'Administradora'
-    if (rol === 'super_admin') return 'Super Admin'
-    if (rol === 'operario') return 'Operario'
-    return 'Agente'
+  const getRoleLabel = (esAdmin: boolean) => {
+    if (esAdmin) return 'Administrador'
+    return 'Usuario'
   }
 
   const limitReached = usuariosMax !== null && usuariosActivosCount >= usuariosMax
@@ -296,6 +431,9 @@ export default function UsuariosPage() {
                 .map((ub: any) => sucursales.find((s: any) => s.id === ub.branch_id)?.nombre)
                 .filter(Boolean).join(', ')
             : 'Sin sucursal asignada'
+          // Adaptamos la lógica de canEdit para la nueva estructura sin `rol`, 
+          // asumiendo que `es_admin` (o similar) define si se puede editar, 
+          // o simplemente permitimos editar a todos excepto al currentUserId.
           const canEdit = !isCurrent && user.rol !== 'admin' && user.rol !== 'super_admin'
 
           return (
@@ -334,9 +472,9 @@ export default function UsuariosPage() {
                     Desactivado
                   </span>
                 ) : (
-                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-600 ${getRoleBadgeClass(user.rol)}`}>
-                    {getRoleIcon(user.rol)}
-                    {getRoleLabel(user.rol)}
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-600 ${getRoleBadgeClass(user.rol === 'admin' || user.rol === 'super_admin')}`}>
+                    {getRoleIcon(user.rol === 'admin' || user.rol === 'super_admin')}
+                    {getRoleLabel(user.rol === 'admin' || user.rol === 'super_admin')}
                   </span>
                 )}
                 <span className="text-xs text-ink-400">{userBranchNames}</span>
@@ -369,7 +507,7 @@ export default function UsuariosPage() {
           <div className="absolute inset-0 bg-ink-900/50 backdrop-blur-sm" onClick={() => !inviteLoading && setIsInviteModalOpen(false)}></div>
         
           <div className="relative min-h-full flex items-center justify-center p-4 pointer-events-none">
-            <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl pointer-events-auto flex flex-col max-h-[90vh]">
+            <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl pointer-events-auto flex flex-col max-h-[90vh]">
               
               <form onSubmit={handleInvitar} className="flex flex-col h-full overflow-hidden">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
@@ -379,55 +517,27 @@ export default function UsuariosPage() {
                   </button>
                 </div>
         
-                <div className="px-6 py-5 space-y-4 overflow-y-auto">
+                <div className="px-6 py-5 space-y-6 overflow-y-auto">
                   {inviteError && (
                     <div className="p-3 bg-red-50 border border-red-200 text-red-800 rounded-xl text-sm font-500">
                       {inviteError}
                     </div>
                   )}
 
-                  <div>
-                    <label className="block text-sm font-500 text-ink-700 mb-1.5">Correo electrónico</label>
-                    <input type="email" placeholder="empleado@ejemplo.com" required
-                      value={inviteData.email} onChange={e => setInviteData({...inviteData, email: e.target.value})}
-                      className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm" />
-                    <p className="text-xs text-ink-400 mt-1.5">Le enviaremos un correo con el enlace para activar su cuenta.</p>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-500 text-ink-700 mb-1.5">Nombre <span className="text-ink-400 font-400">· opcional</span></label>
-                    <input type="text" placeholder="Cómo se llama"
-                      value={inviteData.nombre} onChange={e => setInviteData({...inviteData, nombre: e.target.value})}
-                      className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm" />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-500 text-ink-700 mb-2.5">Rol</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <label className={`relative rounded-xl border-2 p-3 cursor-pointer transition ${(inviteData as any).rol === 'agente' ? 'border-brand-500 bg-brand-50/50 ring-4 ring-brand-100' : 'border-slate-200 bg-white hover:border-brand-300'}`}>
-                        <input type="radio" name="rol" value="agente" className="sr-only" checked={(inviteData as any).rol === 'agente'} onChange={() => setInviteData({...inviteData, rol: 'agente'} as any)} />
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
-                            <svg className="w-4 h-4 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.7 9.7 0 01-4-.85L3 20l1.1-3.3A7.6 7.6 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
-                          </div>
-                          <div className="min-w-0">
-                            <p className="font-600 text-sm text-ink-900">Agente</p>
-                            <p className="text-xs text-ink-500 leading-tight">Atiende casos</p>
-                          </div>
-                        </div>
-                      </label>
-                      <label className={`relative rounded-xl border-2 p-3 cursor-pointer transition ${(inviteData as any).rol === 'operario' ? 'border-brand-500 bg-brand-50/50 ring-4 ring-brand-100' : 'border-slate-200 bg-white hover:border-brand-300'}`}>
-                        <input type="radio" name="rol" value="operario" className="sr-only" checked={(inviteData as any).rol === 'operario'} onChange={() => setInviteData({...inviteData, rol: 'operario'} as any)} />
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center shrink-0">
-                            <svg className="w-4 h-4 text-orange-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
-                          </div>
-                          <div className="min-w-0">
-                            <p className="font-600 text-sm text-ink-900">Operario</p>
-                            <p className="text-xs text-ink-500 leading-tight">Carga novedades</p>
-                          </div>
-                        </div>
-                      </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-500 text-ink-700 mb-1.5">Correo electrónico</label>
+                      <input type="email" placeholder="empleado@ejemplo.com" required
+                        value={inviteData.email} onChange={e => setInviteData({...inviteData, email: e.target.value})}
+                        className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm" />
+                      <p className="text-xs text-ink-400 mt-1.5">Le enviaremos un correo con el enlace para activar su cuenta.</p>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-500 text-ink-700 mb-1.5">Nombre <span className="text-ink-400 font-400">· opcional</span></label>
+                      <input type="text" placeholder="Cómo se llama"
+                        value={inviteData.nombre} onChange={e => setInviteData({...inviteData, nombre: e.target.value})}
+                        className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm" />
                     </div>
                   </div>
 
@@ -451,6 +561,11 @@ export default function UsuariosPage() {
                         </label>
                       ))}
                     </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-500 text-ink-700 mb-3">Permisos por sección</label>
+                    {renderPermisosEditor(invitePermisos, setInvitePermisos)}
                   </div>
                 </div>
         
@@ -476,7 +591,7 @@ export default function UsuariosPage() {
           <div className="absolute inset-0 bg-ink-900/50 backdrop-blur-sm" onClick={() => !editLoading && setIsEditModalOpen(false)}></div>
         
           <div className="relative min-h-full flex items-center justify-center p-4 pointer-events-none">
-            <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl pointer-events-auto flex flex-col max-h-[90vh]">
+            <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl pointer-events-auto flex flex-col max-h-[90vh]">
               
               <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
                 <h2 className="font-display font-700 text-lg text-ink-900">Editar usuario</h2>
@@ -485,7 +600,7 @@ export default function UsuariosPage() {
                 </button>
               </div>
       
-              <div className="px-6 py-5 space-y-4 overflow-y-auto">
+              <div className="px-6 py-5 space-y-6 overflow-y-auto">
                 {/* Cabecera de usuario */}
                 <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
                   <div className={`w-12 h-12 rounded-full flex items-center justify-center font-600 shrink-0 ${getAvatarClass(selectedUser)}`}>
@@ -523,36 +638,6 @@ export default function UsuariosPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-500 text-ink-700 mb-2.5">Rol</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <label className={`relative rounded-xl border-2 p-3 cursor-pointer transition ${(editData as any).rol === 'agente' ? 'border-brand-500 bg-brand-50/50 ring-4 ring-brand-100' : 'border-slate-200 bg-white hover:border-brand-300'}`}>
-                      <input type="radio" name="erol" value="agente" className="sr-only" checked={(editData as any).rol === 'agente'} onChange={() => setEditData({...editData, rol: 'agente'} as any)} />
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
-                          <svg className="w-4 h-4 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.7 9.7 0 01-4-.85L3 20l1.1-3.3A7.6 7.6 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-600 text-sm text-ink-900">Agente</p>
-                          <p className="text-xs text-ink-500 leading-tight">Atiende casos</p>
-                        </div>
-                      </div>
-                    </label>
-                    <label className={`relative rounded-xl border-2 p-3 cursor-pointer transition ${(editData as any).rol === 'operario' ? 'border-brand-500 bg-brand-50/50 ring-4 ring-brand-100' : 'border-slate-200 bg-white hover:border-brand-300'}`}>
-                      <input type="radio" name="erol" value="operario" className="sr-only" checked={(editData as any).rol === 'operario'} onChange={() => setEditData({...editData, rol: 'operario'} as any)} />
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center shrink-0">
-                          <svg className="w-4 h-4 text-orange-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-600 text-sm text-ink-900">Operario</p>
-                          <p className="text-xs text-ink-500 leading-tight">Carga novedades</p>
-                        </div>
-                      </div>
-                    </label>
-                  </div>
-                </div>
-
-                <div>
                   <label className="block text-sm font-500 text-ink-700 mb-1.5">Sucursales asignadas</label>
                   <div className="space-y-2 max-h-40 overflow-y-auto p-3 border border-slate-200 rounded-xl bg-slate-50">
                     {sucursales.map(s => (
@@ -572,6 +657,11 @@ export default function UsuariosPage() {
                       </label>
                     ))}
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-500 text-ink-700 mb-3">Permisos por sección</label>
+                  {renderPermisosEditor(editPermisos, setEditPermisos)}
                 </div>
 
                 {/* Acciones secundarias */}

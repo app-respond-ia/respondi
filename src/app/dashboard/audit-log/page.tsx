@@ -2,12 +2,14 @@
 
 import { useState, useEffect } from 'react'
 import { getAuditLog } from '@/app/actions/audit-log'
+import { getMisPermisos } from '@/app/actions/permisos'
 
 export default function AuditLogPage() {
   const [entradas, setEntradas] = useState<any[]>([])
   const [usuariosDisp, setUsuariosDisp] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [errorMsg, setErrorMsg] = useState('')
+  const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
 
   const [busqueda, setBusqueda] = useState('')
   const [filtroUser, setFiltroUser] = useState('todos')
@@ -19,7 +21,20 @@ export default function AuditLogPage() {
 
   const cargarDatos = async () => {
     setLoading(true)
-    const res = await getAuditLog()
+    const [res, permisosRes] = await Promise.all([
+      getAuditLog(),
+      getMisPermisos()
+    ])
+    
+    if (permisosRes.success) {
+      if ((permisosRes as any).esAdmin) {
+        setNivelPermiso('escritura')
+      } else {
+        const p = (permisosRes.data || []).find((p: any) => p.seccion === 'audit_log')
+        setNivelPermiso(p?.nivel || 'ninguno')
+      }
+    }
+
     if (res.success && res.data) {
       setEntradas(res.data.entradas || [])
       setUsuariosDisp(res.data.usuarios_disponibles || [])
@@ -129,6 +144,19 @@ export default function AuditLogPage() {
     agrupadas[group].push(e)
   })
 
+  if (loading || nivelPermiso === null) {
+    return <div className="p-10 text-center text-slate-500 font-medium">Cargando registro...</div>
+  }
+
+  if (nivelPermiso === 'ninguno') {
+    return (
+      <div className="p-10 text-center">
+        <h2 className="text-xl font-bold text-ink-900 mb-2">Acceso denegado</h2>
+        <p className="text-ink-500">No tienes permisos para ver el registro de auditoría.</p>
+      </div>
+    )
+  }
+
   return (
     <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-4xl w-full mx-auto">
       
@@ -187,9 +215,7 @@ export default function AuditLogPage() {
         </select>
       </div>
 
-      {loading ? (
-        <div className="text-center py-10 text-ink-500">Cargando registro...</div>
-      ) : errorMsg ? (
+      {errorMsg ? (
         <div className="p-4 rounded-xl bg-red-50 text-red-600 text-sm font-500">{errorMsg}</div>
       ) : Object.keys(agrupadas).length === 0 ? (
         <div className="text-center py-12">

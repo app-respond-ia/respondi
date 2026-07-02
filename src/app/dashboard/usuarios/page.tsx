@@ -9,6 +9,7 @@ import {
   desactivarUsuario,
   reactivarUsuario
 } from '@/app/actions/usuarios'
+import { getMisPermisos } from '@/app/actions/permisos'
 
 export default function UsuariosPage() {
   const [loading, setLoading] = useState(true)
@@ -20,6 +21,7 @@ export default function UsuariosPage() {
   const [sucursales, setSucursales] = useState<any[]>([])
 
   const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
+  const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
 
   // Invitar Modal
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
@@ -39,7 +41,20 @@ export default function UsuariosPage() {
 
   const cargar = async () => {
     setLoading(true)
-    const res = await getUsuarios()
+    const [res, permisosRes] = await Promise.all([
+      getUsuarios(),
+      getMisPermisos()
+    ])
+
+    if (permisosRes.success) {
+      if ((permisosRes as any).esAdmin) {
+        setNivelPermiso('escritura')
+      } else {
+        const p = (permisosRes.data || []).find((p: any) => p.seccion === 'usuarios')
+        setNivelPermiso(p?.nivel || 'ninguno')
+      }
+    }
+
     if (res.success && res.data) {
       setUsuarios(res.data.usuarios)
       setUsuariosMax(res.data.usuarios_max)
@@ -197,8 +212,17 @@ export default function UsuariosPage() {
 
   const limitReached = usuariosMax !== null && usuariosActivosCount >= usuariosMax
 
-  if (loading) {
+  if (loading || nivelPermiso === null) {
     return <div className="p-10 text-center text-slate-500 font-medium">Cargando usuarios...</div>
+  }
+
+  if (nivelPermiso === 'ninguno') {
+    return (
+      <div className="p-10 text-center">
+        <h2 className="text-xl font-bold text-ink-900 mb-2">Acceso denegado</h2>
+        <p className="text-ink-500">No tienes permisos para ver los usuarios.</p>
+      </div>
+    )
   }
 
   return (
@@ -221,8 +245,8 @@ export default function UsuariosPage() {
         
         <div className="group relative">
           <button 
-            onClick={!limitReached ? handleOpenInvite : undefined} 
-            disabled={limitReached}
+            onClick={!limitReached && nivelPermiso === 'escritura' ? handleOpenInvite : undefined} 
+            disabled={limitReached || nivelPermiso !== 'escritura'}
             className={`inline-flex items-center gap-2 px-4 h-11 rounded-xl bg-brand-600 text-white text-sm font-600 transition ${limitReached ? 'opacity-50 cursor-not-allowed' : 'hover:bg-brand-700'}`}>
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7zM20 8v6M23 11h-6"/></svg>
             Invitar usuario
@@ -319,8 +343,8 @@ export default function UsuariosPage() {
               </div>
 
               <button 
-                onClick={() => canEdit ? handleOpenEdit(user) : undefined}
-                disabled={!canEdit}
+                onClick={() => canEdit && nivelPermiso === 'escritura' ? handleOpenEdit(user) : undefined}
+                disabled={!canEdit || nivelPermiso !== 'escritura'}
                 className={`p-1.5 rounded-lg transition ${canEdit ? 'text-ink-400 hover:text-ink-700 hover:bg-slate-100' : 'text-ink-300 cursor-not-allowed'}`}
                 aria-label={canEdit ? "Más opciones" : "No puedes editar este usuario"}
               >
@@ -553,18 +577,18 @@ export default function UsuariosPage() {
                 {/* Acciones secundarias */}
                 <div className="pt-2 border-t border-slate-100 space-y-2">
                   {!selectedUser.invitacion_aceptada && (
-                    <button type="button" onClick={handleReenviar} className="w-full inline-flex items-center justify-center gap-2 h-11 rounded-xl border border-brand-300 bg-brand-50 hover:bg-brand-100 text-sm font-600 text-brand-700 transition">
+                    <button type="button" onClick={handleReenviar} disabled={nivelPermiso !== 'escritura'} className="w-full inline-flex items-center justify-center gap-2 h-11 rounded-xl border border-brand-300 bg-brand-50 hover:bg-brand-100 text-sm font-600 text-brand-700 transition disabled:opacity-50">
                       <svg className="w-4 h-4 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                       Reenviar invitación
                     </button>
                   )}
                   {selectedUser.activo ? (
-                    <button type="button" onClick={handleToggleActivo} className="w-full inline-flex items-center justify-center gap-2 h-11 rounded-xl border border-red-200 bg-white hover:bg-red-50 text-sm font-600 text-red-600 transition">
+                    <button type="button" onClick={handleToggleActivo} disabled={nivelPermiso !== 'escritura'} className="w-full inline-flex items-center justify-center gap-2 h-11 rounded-xl border border-red-200 bg-white hover:bg-red-50 text-sm font-600 text-red-600 transition disabled:opacity-50">
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
                       Desactivar usuario
                     </button>
                   ) : (
-                    <button type="button" onClick={handleToggleActivo} className="w-full inline-flex items-center justify-center gap-2 h-11 rounded-xl border border-emerald-200 bg-white hover:bg-emerald-50 text-sm font-600 text-emerald-600 transition">
+                    <button type="button" onClick={handleToggleActivo} disabled={nivelPermiso !== 'escritura'} className="w-full inline-flex items-center justify-center gap-2 h-11 rounded-xl border border-emerald-200 bg-white hover:bg-emerald-50 text-sm font-600 text-emerald-600 transition disabled:opacity-50">
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
                       Reactivar usuario
                     </button>
@@ -576,7 +600,7 @@ export default function UsuariosPage() {
                 <button type="button" disabled={editLoading} onClick={() => setIsEditModalOpen(false)} className="px-5 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition disabled:opacity-50">
                   Cancelar
                 </button>
-                <button type="button" onClick={handleEditar} disabled={editLoading} className="px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition disabled:opacity-50">
+                <button type="button" onClick={handleEditar} disabled={editLoading || nivelPermiso !== 'escritura'} className="px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition disabled:opacity-50">
                   Guardar cambios
                 </button>
               </div>

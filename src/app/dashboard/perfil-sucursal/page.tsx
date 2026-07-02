@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { getPerfilSucursal, savePerfilSucursal } from '@/app/actions/perfil'
 import { getHorarios, saveHorarios } from '@/app/actions/horarios'
+import { getMisPermisos } from '@/app/actions/permisos'
 
 const DIAS_SEMANA = [
   { id: 1, label: 'Lunes' },
@@ -18,6 +19,7 @@ export default function PerfilSucursalPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
+  const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
 
   const [formData, setFormData] = useState({
     nombreSucursal: '',
@@ -34,10 +36,20 @@ export default function PerfilSucursalPage() {
   useEffect(() => {
     const cargar = async () => {
       setLoading(true)
-      const [resPerfil, resHorarios] = await Promise.all([
+      const [resPerfil, resHorarios, permisosRes] = await Promise.all([
         getPerfilSucursal(),
-        getHorarios()
+        getHorarios(),
+        getMisPermisos()
       ])
+      
+      if (permisosRes.success) {
+        if ((permisosRes as any).esAdmin) {
+          setNivelPermiso('escritura')
+        } else {
+          const p = (permisosRes.data || []).find((p: any) => p.seccion === 'perfil')
+          setNivelPermiso(p?.nivel || 'ninguno')
+        }
+      }
       
       if (resPerfil.success && resPerfil.data) {
         setFormData({
@@ -110,8 +122,17 @@ export default function PerfilSucursalPage() {
     setSaving(false)
   }
 
-  if (loading) {
+  if (loading || nivelPermiso === null) {
     return <div className="p-10 text-center text-slate-500 font-medium">Cargando perfil de la sucursal...</div>
+  }
+
+  if (nivelPermiso === 'ninguno') {
+    return (
+      <div className="p-10 text-center">
+        <h2 className="text-xl font-bold text-ink-900 mb-2">Acceso denegado</h2>
+        <p className="text-ink-500">No tienes permisos para ver el perfil de la sucursal.</p>
+      </div>
+    )
   }
 
   return (
@@ -135,6 +156,7 @@ export default function PerfilSucursalPage() {
                   name="nombreSucursal"
                   value={formData.nombreSucursal}
                   onChange={handleChange}
+                  disabled={nivelPermiso !== 'escritura'}
                   className="w-full h-11 px-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition outline-none"
                   placeholder="Ej: Tienda Respondi"
                 />
@@ -146,6 +168,7 @@ export default function PerfilSucursalPage() {
                   name="timezone"
                   value={formData.timezone}
                   onChange={handleChange}
+                  disabled={nivelPermiso !== 'escritura'}
                   className="w-full h-11 px-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition outline-none bg-white"
                 >
                   <option value="America/Caracas">Caracas (UTC-4)</option>
@@ -164,6 +187,7 @@ export default function PerfilSucursalPage() {
                 name="direccion"
                 value={formData.direccion}
                 onChange={handleChange}
+                disabled={nivelPermiso !== 'escritura'}
                 className="w-full h-11 px-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition outline-none"
                 placeholder="Ej: Av. Principal, Local 4, Centro Comercial..."
               />
@@ -175,6 +199,7 @@ export default function PerfilSucursalPage() {
                 name="servicios"
                 value={formData.servicios}
                 onChange={handleChange}
+                disabled={nivelPermiso !== 'escritura'}
                 rows={4}
                 className="w-full p-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition outline-none resize-y"
                 placeholder="Describe qué vendes o qué servicios ofreces para que la IA sepa de qué trata el negocio..."
@@ -187,6 +212,7 @@ export default function PerfilSucursalPage() {
                 name="politicas"
                 value={formData.politicas}
                 onChange={handleChange}
+                disabled={nivelPermiso !== 'escritura'}
                 rows={4}
                 className="w-full p-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition outline-none resize-y"
                 placeholder="Tiempos de entrega, políticas de devolución, métodos de pago aceptados..."
@@ -212,6 +238,7 @@ export default function PerfilSucursalPage() {
                         type="checkbox" 
                         checked={!h.cerrado}
                         onChange={e => handleChangeHorario(h.dia_semana, 'cerrado', !e.target.checked)}
+                        disabled={nivelPermiso !== 'escritura'}
                         className="peer sr-only" 
                       />
                       <div className="w-6 h-6 border-2 border-slate-300 rounded bg-white peer-checked:bg-brand-600 peer-checked:border-brand-600 transition"></div>
@@ -227,7 +254,7 @@ export default function PerfilSucursalPage() {
                       type="time" 
                       value={h.apertura ? h.apertura.substring(0, 5) : ''} 
                       onChange={e => handleChangeHorario(h.dia_semana, 'apertura', e.target.value)}
-                      disabled={h.cerrado}
+                      disabled={h.cerrado || nivelPermiso !== 'escritura'}
                       className="w-32 h-11 px-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition outline-none disabled:bg-slate-100 disabled:text-slate-400 font-medium"
                     />
                     <span className="text-slate-400 font-medium">a</span>
@@ -235,7 +262,7 @@ export default function PerfilSucursalPage() {
                       type="time" 
                       value={h.cierre ? h.cierre.substring(0, 5) : ''} 
                       onChange={e => handleChangeHorario(h.dia_semana, 'cierre', e.target.value)}
-                      disabled={h.cerrado}
+                      disabled={h.cerrado || nivelPermiso !== 'escritura'}
                       className="w-32 h-11 px-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition outline-none disabled:bg-slate-100 disabled:text-slate-400 font-medium"
                     />
                   </div>
@@ -263,6 +290,7 @@ export default function PerfilSucursalPage() {
                           value={t} 
                           checked={formData.tono === t}
                           onChange={handleChange}
+                          disabled={nivelPermiso !== 'escritura'}
                           className="peer sr-only" 
                         />
                         <div className="w-5 h-5 border-2 border-slate-300 rounded-full peer-checked:border-brand-600 transition group-hover:border-brand-400"></div>
@@ -280,6 +308,7 @@ export default function PerfilSucursalPage() {
                   name="idioma_base"
                   value={formData.idioma_base}
                   onChange={handleChange}
+                  disabled={nivelPermiso !== 'escritura'}
                   className="w-full h-11 px-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition outline-none bg-white"
                 >
                   <option value="es">Español</option>
@@ -296,6 +325,7 @@ export default function PerfilSucursalPage() {
                 name="msg_fuera_horario"
                 value={formData.msg_fuera_horario}
                 onChange={handleChange}
+                disabled={nivelPermiso !== 'escritura'}
                 rows={3}
                 className="w-full p-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition outline-none resize-y"
                 placeholder="¡Hola! En este momento estamos cerrados. Déjanos tu mensaje y te responderemos a primera hora."
@@ -314,7 +344,7 @@ export default function PerfilSucursalPage() {
           
           <button 
             type="submit" 
-            disabled={saving}
+            disabled={saving || nivelPermiso !== 'escritura'}
             className="px-6 h-12 bg-brand-600 hover:bg-brand-700 disabled:bg-brand-400 text-white font-semibold rounded-xl shadow-sm shadow-brand-600/20 transition flex items-center gap-2"
           >
             {saving ? (

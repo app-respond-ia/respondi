@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { getSucursales, crearSucursal, desactivarSucursal, reactivarSucursal } from '@/app/actions/sucursales'
+import { getMisPermisos } from '@/app/actions/permisos'
 
 export default function SucursalesPage() {
   const [loading, setLoading] = useState(true)
@@ -9,6 +10,7 @@ export default function SucursalesPage() {
   const [sucursalesMax, setSucursalesMax] = useState<number | null>(null)
   const [sucursalesActivasCount, setSucursalesActivasCount] = useState<number>(0)
   const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
+  const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
 
   // Modal Crear
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -20,7 +22,20 @@ export default function SucursalesPage() {
 
   const cargar = async () => {
     setLoading(true)
-    const res = await getSucursales()
+    const [res, permisosRes] = await Promise.all([
+      getSucursales(),
+      getMisPermisos()
+    ])
+
+    if (permisosRes.success) {
+      if ((permisosRes as any).esAdmin) {
+        setNivelPermiso('escritura')
+      } else {
+        const p = (permisosRes.data || []).find((p: any) => p.seccion === 'sucursales')
+        setNivelPermiso(p?.nivel || 'ninguno')
+      }
+    }
+
     if (res.success && res.data) {
       setSucursales(res.data.sucursales)
       setSucursalesMax(res.data.sucursales_max)
@@ -79,8 +94,17 @@ export default function SucursalesPage() {
     }
   }
 
-  if (loading) {
+  if (loading || nivelPermiso === null) {
     return <div className="p-10 text-center text-slate-500 font-medium">Cargando sucursales...</div>
+  }
+
+  if (nivelPermiso === 'ninguno') {
+    return (
+      <div className="p-10 text-center">
+        <h2 className="text-xl font-bold text-ink-900 mb-2">Acceso denegado</h2>
+        <p className="text-ink-500">No tienes permisos para ver las sucursales.</p>
+      </div>
+    )
   }
 
   const limitReached = sucursalesMax !== null && sucursalesActivasCount >= sucursalesMax
@@ -105,8 +129,8 @@ export default function SucursalesPage() {
         
         <div className="group relative">
           <button 
-            onClick={!limitReached ? handleOpenModal : undefined}
-            disabled={limitReached}
+            onClick={!limitReached && nivelPermiso === 'escritura' ? handleOpenModal : undefined}
+            disabled={limitReached || nivelPermiso !== 'escritura'}
             className={`inline-flex items-center gap-2 px-4 h-11 rounded-xl bg-brand-600 text-white text-sm font-600 transition ${limitReached ? 'opacity-50 cursor-not-allowed' : 'hover:bg-brand-700'}`}>
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
             Añadir sucursal
@@ -172,6 +196,7 @@ export default function SucursalesPage() {
 
             <button 
               onClick={() => handleToggleActivo(sucursal)}
+              disabled={nivelPermiso !== 'escritura'}
               className={`px-3 py-1.5 rounded-lg text-sm font-600 border transition ${
                 sucursal.activa 
                   ? 'border-red-200 bg-white text-red-600 hover:bg-red-50' 

@@ -12,7 +12,7 @@ export async function middleware(request: NextRequest) {
   const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route)) || pathname === '/'
 
   // Rutas protegidas por rol
-  const protectedRoutes = ['/dashboard', '/superadmin', '/onboarding']
+  const protectedRoutes = ['/dashboard', '/superadmin', '/onboarding', '/vendedor']
   const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route))
 
   // Función helper para redirigir copiando las cookies
@@ -52,6 +52,7 @@ export async function middleware(request: NextRequest) {
     let roleBasePath = ''
     if (role === 'super_admin') roleBasePath = '/superadmin'
     else if (role === 'admin' || role === 'usuario') roleBasePath = '/dashboard'
+    else if (role === 'vendedor') roleBasePath = '/vendedor'
 
     // Onboarding obligatorio para admins
     if (role === 'admin' && userData?.tenant_id) {

@@ -81,12 +81,34 @@ export default function PerfilSucursalPage() {
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
-  const handleChangeHorario = (diaId: number, field: string, value: any) => {
+  const handleToggleCerrado = (diaId: number, cerrado: boolean) => {
+    setHorarios(prev => prev.map(h =>
+      h.dia_semana === diaId ? { ...h, cerrado } : h
+    ))
+  }
+
+  const handleChangeFranja = (diaId: number, idx: number, field: 'apertura' | 'cierre', value: string) => {
     setHorarios(prev => prev.map(h => {
-      if (h.dia_semana === diaId) {
-        return { ...h, [field]: value }
-      }
-      return h
+      if (h.dia_semana !== diaId) return h
+      const franjas = [...h.franjas]
+      franjas[idx] = { ...franjas[idx], [field]: value }
+      return { ...h, franjas }
+    }))
+  }
+
+  const handleAddFranja = (diaId: number) => {
+    setHorarios(prev => prev.map(h => {
+      if (h.dia_semana !== diaId) return h
+      const franjas = [...h.franjas, { apertura: '09:00', cierre: '18:00', orden: h.franjas.length }]
+      return { ...h, franjas }
+    }))
+  }
+
+  const handleRemoveFranja = (diaId: number, idx: number) => {
+    setHorarios(prev => prev.map(h => {
+      if (h.dia_semana !== diaId) return h
+      const franjas = h.franjas.filter((_: any, i: number) => i !== idx)
+      return { ...h, franjas: franjas.length > 0 ? franjas : [{ apertura: '09:00', cierre: '18:00', orden: 0 }] }
     }))
   }
 
@@ -101,16 +123,9 @@ export default function PerfilSucursalPage() {
     setSaving(true)
     setMensaje(null)
     
-    const horariosFormatted = horarios.map(h => ({
-      dia_semana: h.dia_semana,
-      apertura: normalizeTime(h.apertura),
-      cierre: normalizeTime(h.cierre),
-      cerrado: h.cerrado
-    }))
-
     const [resPerfil, resHorarios] = await Promise.all([
       savePerfilSucursal(formData),
-      saveHorarios(horariosFormatted)
+      saveHorarios(horarios)
     ])
     
     if (resPerfil.success && resHorarios.success) {
@@ -225,47 +240,79 @@ export default function PerfilSucursalPage() {
         <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-6 sm:p-8 border-b border-slate-100">
             <h2 className="text-xl font-bold text-ink-900">Horarios de atención</h2>
+            <p className="text-sm text-ink-500 mt-1">Puedes añadir varias franjas por día para horarios partidos.</p>
           </div>
           
           <div className="divide-y divide-slate-100">
             {horarios.map(h => {
               const diaObj = DIAS_SEMANA.find(d => d.id === h.dia_semana)
               return (
-                <div key={h.dia_semana} className={`p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition ${h.cerrado ? 'bg-slate-50' : 'bg-white'}`}>
-                  <label className="flex items-center gap-4 cursor-pointer min-w-[140px]">
-                    <div className="relative flex items-center justify-center w-6 h-6">
-                      <input 
-                        type="checkbox" 
-                        checked={!h.cerrado}
-                        onChange={e => handleChangeHorario(h.dia_semana, 'cerrado', !e.target.checked)}
-                        disabled={nivelPermiso !== 'escritura'}
-                        className="peer sr-only" 
-                      />
-                      <div className="w-6 h-6 border-2 border-slate-300 rounded bg-white peer-checked:bg-brand-600 peer-checked:border-brand-600 transition"></div>
-                      <svg className="absolute w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition pointer-events-none" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <span className={`font-semibold ${h.cerrado ? 'text-slate-400' : 'text-ink-900'}`}>{diaObj?.label}</span>
-                  </label>
-
-                  <div className="flex items-center gap-3 ml-10 sm:ml-0">
-                    <input 
-                      type="time" 
-                      value={h.apertura ? h.apertura.substring(0, 5) : ''} 
-                      onChange={e => handleChangeHorario(h.dia_semana, 'apertura', e.target.value)}
-                      disabled={h.cerrado || nivelPermiso !== 'escritura'}
-                      className="w-32 h-11 px-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition outline-none disabled:bg-slate-100 disabled:text-slate-400 font-medium"
-                    />
-                    <span className="text-slate-400 font-medium">a</span>
-                    <input 
-                      type="time" 
-                      value={h.cierre ? h.cierre.substring(0, 5) : ''} 
-                      onChange={e => handleChangeHorario(h.dia_semana, 'cierre', e.target.value)}
-                      disabled={h.cerrado || nivelPermiso !== 'escritura'}
-                      className="w-32 h-11 px-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition outline-none disabled:bg-slate-100 disabled:text-slate-400 font-medium"
-                    />
+                <div key={h.dia_semana} className={`p-4 sm:p-5 transition ${h.cerrado ? 'bg-slate-50' : 'bg-white'}`}>
+                  {/* Fila de cabecera del día */}
+                  <div className="flex items-center gap-4 mb-3">
+                    <label className="flex items-center gap-3 cursor-pointer min-w-[130px]">
+                      <div className="relative flex items-center justify-center w-6 h-6">
+                        <input
+                          type="checkbox"
+                          checked={!h.cerrado}
+                          onChange={e => handleToggleCerrado(h.dia_semana, !e.target.checked)}
+                          disabled={nivelPermiso !== 'escritura'}
+                          className="peer sr-only"
+                        />
+                        <div className="w-6 h-6 border-2 border-slate-300 rounded bg-white peer-checked:bg-brand-600 peer-checked:border-brand-600 transition"></div>
+                        <svg className="absolute w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition pointer-events-none" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
+                        </svg>
+                      </div>
+                      <span className={`font-semibold text-sm ${h.cerrado ? 'text-slate-400' : 'text-ink-900'}`}>{diaObj?.label}</span>
+                    </label>
+                    {h.cerrado && <span className="text-xs text-slate-400 font-500">Cerrado</span>}
                   </div>
+        
+                  {/* Franjas horarias */}
+                  {!h.cerrado && (
+                    <div className="ml-9 space-y-2">
+                      {h.franjas.map((franja: any, idx: number) => (
+                        <div key={idx} className="flex items-center gap-2 flex-wrap">
+                          <input
+                            type="time"
+                            value={franja.apertura ? franja.apertura.substring(0, 5) : ''}
+                            onChange={e => handleChangeFranja(h.dia_semana, idx, 'apertura', e.target.value)}
+                            disabled={nivelPermiso !== 'escritura'}
+                            className="w-32 h-10 px-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition outline-none disabled:bg-slate-100 disabled:text-slate-400 text-sm font-medium"
+                          />
+                          <span className="text-slate-400 text-sm">a</span>
+                          <input
+                            type="time"
+                            value={franja.cierre ? franja.cierre.substring(0, 5) : ''}
+                            onChange={e => handleChangeFranja(h.dia_semana, idx, 'cierre', e.target.value)}
+                            disabled={nivelPermiso !== 'escritura'}
+                            className="w-32 h-10 px-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition outline-none disabled:bg-slate-100 disabled:text-slate-400 text-sm font-medium"
+                          />
+                          {nivelPermiso === 'escritura' && h.franjas.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveFranja(h.dia_semana, idx)}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition"
+                              aria-label="Eliminar franja"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      {nivelPermiso === 'escritura' && (
+                        <button
+                          type="button"
+                          onClick={() => handleAddFranja(h.dia_semana)}
+                          className="flex items-center gap-1.5 text-xs font-600 text-brand-600 hover:text-brand-700 transition mt-1"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
+                          Añadir franja
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               )
             })}

@@ -29,7 +29,9 @@ export default function PerfilSucursalPage() {
     politicas: '',
     idioma_base: 'es',
     tono: 'cercano',
-    msg_fuera_horario: ''
+    msg_fuera_horario: '',
+    ia_activa_fuera_horario: false,
+    caso_fuera_horario: false
   })
   const [horarios, setHorarios] = useState<any[]>([])
 
@@ -60,7 +62,9 @@ export default function PerfilSucursalPage() {
           politicas: resPerfil.data.perfil?.politicas || '',
           idioma_base: resPerfil.data.perfil?.idioma_base || 'es',
           tono: resPerfil.data.perfil?.tono || 'cercano',
-          msg_fuera_horario: resPerfil.data.perfil?.msg_fuera_horario || ''
+          msg_fuera_horario: resPerfil.data.perfil?.msg_fuera_horario || '',
+          ia_activa_fuera_horario: resPerfil.data.perfil?.ia_activa_fuera_horario ?? false,
+          caso_fuera_horario: resPerfil.data.perfil?.caso_fuera_horario ?? false
         })
       }
       
@@ -377,6 +381,47 @@ export default function PerfilSucursalPage() {
                 className="w-full p-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition outline-none resize-y"
                 placeholder="¡Hola! En este momento estamos cerrados. Déjanos tu mensaje y te responderemos a primera hora."
               ></textarea>
+            </div>
+
+            {/* Comportamiento fuera de horario */}
+            <div className="space-y-3">
+              <label className="block text-sm font-semibold text-slate-700">Comportamiento fuera de horario</label>
+              
+              <label className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition">
+                <div>
+                  <p className="text-sm font-500 text-ink-900">La IA sigue respondiendo fuera de horario</p>
+                  <p className="text-xs text-ink-500 mt-0.5">Si está desactivado, solo se enviará el mensaje de fuera de horario.</p>
+                </div>
+                <div className="relative ml-4 shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={formData.ia_activa_fuera_horario}
+                    onChange={e => setFormData({...formData, ia_activa_fuera_horario: e.target.checked})}
+                    disabled={nivelPermiso !== 'escritura'}
+                    className="peer sr-only"
+                  />
+                  <div className={`w-11 h-6 rounded-full transition-colors ${formData.ia_activa_fuera_horario ? 'bg-brand-600' : 'bg-slate-300'} peer-disabled:opacity-50`}></div>
+                  <div className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${formData.ia_activa_fuera_horario ? 'translate-x-5' : 'translate-x-0'}`}></div>
+                </div>
+              </label>
+
+              <label className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition">
+                <div>
+                  <p className="text-sm font-500 text-ink-900">Abrir caso automáticamente fuera de horario</p>
+                  <p className="text-xs text-ink-500 mt-0.5">Se crea un caso para que un agente lo atienda cuando vuelva a haber horario.</p>
+                </div>
+                <div className="relative ml-4 shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={formData.caso_fuera_horario}
+                    onChange={e => setFormData({...formData, caso_fuera_horario: e.target.checked})}
+                    disabled={nivelPermiso !== 'escritura'}
+                    className="peer sr-only"
+                  />
+                  <div className={`w-11 h-6 rounded-full transition-colors ${formData.caso_fuera_horario ? 'bg-brand-600' : 'bg-slate-300'} peer-disabled:opacity-50`}></div>
+                  <div className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${formData.caso_fuera_horario ? 'translate-x-5' : 'translate-x-0'}`}></div>
+                </div>
+              </label>
             </div>
           </div>
         </section>

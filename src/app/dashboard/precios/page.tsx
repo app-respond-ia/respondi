@@ -22,10 +22,8 @@ export default function ListaPreciosPage() {
     tipo: 'producto',
     precio: null,
     precio_tipo: 'exacto',
-    moneda: 'USD',
-    descripcion: '',
-    disponible: true
-  })
+    descripcion: ''
+  } as any)
 
   const cargar = async () => {
     setLoading(true)
@@ -64,10 +62,8 @@ export default function ListaPreciosPage() {
       tipo: 'producto',
       precio: null,
       precio_tipo: 'exacto',
-      moneda: 'USD',
-      descripcion: '',
-      disponible: true
-    })
+      descripcion: ''
+    } as any)
     setIsModalOpen(true)
   }
 
@@ -79,10 +75,8 @@ export default function ListaPreciosPage() {
       tipo: item.tipo,
       precio: item.precio,
       precio_tipo: item.precio_tipo,
-      moneda: item.moneda,
       descripcion: item.descripcion || '',
-      disponible: item.disponible
-    })
+    } as any)
     setIsModalOpen(true)
   }
 
@@ -141,12 +135,9 @@ export default function ListaPreciosPage() {
 
   const formatearPrecio = (item: any) => {
     if (item.precio_tipo === 'consultar') return 'A consultar'
-    
     const numeroStr = item.precio != null ? Number(item.precio).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0,00'
-    const monedaStr = item.moneda
-
-    if (item.precio_tipo === 'desde') return `Desde ${numeroStr} ${monedaStr}`
-    return `${numeroStr} ${monedaStr}`
+    if (item.precio_tipo === 'desde') return `Desde ${numeroStr}`
+    return numeroStr
   }
 
   if (loading || nivelPermiso === null) {
@@ -213,7 +204,6 @@ export default function ListaPreciosPage() {
                     <th className="font-600 px-5 py-3">Ítem</th>
                     <th className="font-600 px-5 py-3">Tipo</th>
                     <th className="font-600 px-5 py-3">Precio</th>
-                    <th className="font-600 px-5 py-3">Disponibilidad</th>
                     <th className="font-600 px-5 py-3 text-right">Acciones</th>
                   </tr>
                 </thead>
@@ -231,13 +221,6 @@ export default function ListaPreciosPage() {
                       </td>
                       <td className="px-5 py-3.5 font-600 text-ink-900">
                         {formatearPrecio(item)}
-                      </td>
-                      <td className="px-5 py-3.5">
-                        {item.disponible ? (
-                          <span className="inline-flex items-center gap-1.5 text-xs font-500 text-emerald-700"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Disponible</span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 text-xs font-500 text-ink-400"><span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>No disponible</span>
-                        )}
                       </td>
                       <td className="px-5 py-3.5">
                         <div className="flex items-center justify-end gap-1">
@@ -332,30 +315,15 @@ export default function ListaPreciosPage() {
                     </p>
                   </div>
         
-                  {/* Precio + moneda */}
-                  <div className="grid grid-cols-[1fr_auto] gap-3">
-                    <div>
-                      <label className="block text-sm font-500 text-ink-700 mb-1.5">Precio</label>
-                      <input type="number" step="0.01" min="0" placeholder="0.00"
-                        required={formData.precio_tipo !== 'consultar'}
-                        disabled={formData.precio_tipo === 'consultar'}
-                        value={formData.precio_tipo === 'consultar' ? '' : (formData.precio || '')}
-                        onChange={e => setFormData({...formData, precio: parseFloat(e.target.value) || null})}
-                        className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition disabled:bg-slate-50 disabled:text-ink-400 disabled:border-slate-200" 
-                      />
-                    </div>
-                    <div className="w-28">
-                      <label className="block text-sm font-500 text-ink-700 mb-1.5">Moneda</label>
-                      <select 
-                        disabled={formData.precio_tipo === 'consultar'}
-                        value={formData.precio_tipo === 'consultar' ? 'USD' : formData.moneda}
-                        onChange={e => setFormData({...formData, moneda: e.target.value})}
-                        className="w-full h-12 px-3 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition disabled:bg-slate-50 disabled:text-ink-400 disabled:border-slate-200">
-                        <option value="USD">USD</option>
-                        <option value="EUR">EUR</option>
-                        <option value="VES">VES</option>
-                      </select>
-                    </div>
+                  <div>
+                    <label className="block text-sm font-500 text-ink-700 mb-1.5">Precio</label>
+                    <input type="number" step="0.01" min="0" placeholder="0.00"
+                      required={formData.precio_tipo !== 'consultar'}
+                      disabled={formData.precio_tipo === 'consultar'}
+                      value={formData.precio_tipo === 'consultar' ? '' : (formData.precio || '')}
+                      onChange={e => setFormData({...formData, precio: parseFloat(e.target.value) || null})}
+                      className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition disabled:bg-slate-50 disabled:text-ink-400 disabled:border-slate-200" 
+                    />
                   </div>
         
                   <div>
@@ -366,15 +334,7 @@ export default function ListaPreciosPage() {
                       className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white resize-none placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition"></textarea>
                   </div>
         
-                  {/* Disponibilidad */}
-                  <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer">
-                    <span className="text-sm font-500 text-ink-700">Disponible</span>
-                    <input type="checkbox" 
-                      checked={formData.disponible} 
-                      onChange={e => setFormData({...formData, disponible: e.target.checked})}
-                      className="w-5 h-5 rounded text-brand-600 focus:ring-brand-400" 
-                    />
-                  </label>
+
                 </div>
         
                 {/* Pie con botones */}

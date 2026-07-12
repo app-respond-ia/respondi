@@ -5,6 +5,8 @@ import { getDashboardData } from '@/app/actions/dashboard'
 
 export default function DashboardPage() {
   const [period, setPeriod] = useState<'hoy' | 'semana' | 'mes'>('semana')
+  const [filtroCanalDB, setFiltroCanalDB] = useState<string>('')
+  const [filtroSucursalDB, setFiltroSucursalDB] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
@@ -89,19 +91,26 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Encabezado + selector de periodo */}
       <div className="flex items-end justify-between gap-4 flex-wrap mb-6">
         <div>
           <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Dashboard</h1>
           <p className="text-ink-500 mt-1">Así trabaja tu agente de IA.</p>
         </div>
-        
-        <div className="inline-flex p-1 rounded-xl bg-white border border-slate-200">
-          {(['hoy', 'semana', 'mes'] as const).map(p => (
-            <button key={p} onClick={() => setPeriod(p)} className={`px-4 py-1.5 rounded-lg text-sm transition capitalize ${period === p ? 'font-600 bg-brand-600 text-white' : 'font-500 text-ink-500'}`}>
-              {p}
-            </button>
-          ))}
+        <div className="flex flex-wrap gap-2 items-center">
+          <select value={filtroCanalDB} onChange={e => setFiltroCanalDB(e.target.value)}
+            className="h-10 px-3 rounded-xl border border-slate-200 bg-white text-sm text-ink-700 focus:outline-none focus:border-brand-500 transition">
+            <option value="">Todos los canales</option>
+            <option value="instagram">Instagram</option>
+            <option value="whatsapp">WhatsApp</option>
+            <option value="facebook">Facebook</option>
+          </select>
+          <div className="inline-flex p-1 rounded-xl bg-white border border-slate-200">
+            {(['hoy', 'semana', 'mes'] as const).map(p => (
+              <button key={p} onClick={() => setPeriod(p)} className={`px-4 py-1.5 rounded-lg text-sm transition capitalize ${period === p ? 'font-600 bg-brand-600 text-white' : 'font-500 text-ink-500'}`}>
+                {p}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -259,11 +268,18 @@ export default function DashboardPage() {
       </div>
 
       {/* Consumo de cuota */}
-      <div className="rounded-2xl bg-white border border-slate-200 p-5">
+      <div className="rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 text-white p-5">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
-            <h2 className="font-display font-600 text-ink-900">Créditos disponibles: {creditos_disponibles}</h2>
-            <p className="text-sm text-ink-500 mt-1">Se consumen cuando tu agente de IA responde mensajes.</p>
+            <p className="text-sm text-slate-400 mb-1">Créditos disponibles</p>
+            <p className="font-display font-700 text-3xl">{creditos_disponibles.toLocaleString()}</p>
+            <p className="text-sm text-slate-400 mt-1">Cada mensaje respondido por la IA consume 1 crédito.</p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-slate-500 mb-1">¿Necesitas más?</p>
+            <button className="px-4 h-9 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 transition">
+              Ampliar plan
+            </button>
           </div>
         </div>
       </div>

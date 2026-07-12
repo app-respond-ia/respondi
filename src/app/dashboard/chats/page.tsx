@@ -9,6 +9,7 @@ export default function ChatsPage() {
   const [mensajes, setMensajes] = useState<any[]>([])
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null)
   const [filtroActivo, setFiltroActivo] = useState<'todas' | 'activas' | 'cerradas'>('todas')
+  const [busqueda, setBusqueda] = useState('')
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
   
   const [loadingChats, setLoadingChats] = useState(true)
@@ -99,9 +100,23 @@ export default function ChatsPage() {
   }
 
   const filteredConversaciones = conversaciones.filter(c => {
-    if (filtroActivo === 'activas') return c.estado === 'activa'
-    if (filtroActivo === 'cerradas') return c.estado === 'cerrada'
-    return true
+    const matchFiltro = 
+      filtroActivo === 'todas' ? true :
+      filtroActivo === 'activas' ? c.estado === 'activa' :
+      c.estado === 'cerrada'
+    
+    if (!busqueda) return matchFiltro
+    
+    const q = busqueda.toLowerCase()
+    const nombre = (c.contacts?.nombre || '').toLowerCase()
+    const identificador = (c.contacts?.identificador_canal || '').toLowerCase()
+    const resumen = (c.resumen || '').toLowerCase()
+    
+    return matchFiltro && (
+      nombre.includes(q) ||
+      identificador.includes(q) ||
+      resumen.includes(q)
+    )
   })
 
   const selectedConv = conversaciones.find(c => c.id === selectedConvId)
@@ -130,6 +145,17 @@ export default function ChatsPage() {
         </div>
 
         <div className="p-3 space-y-2 border-b border-slate-200 shrink-0">
+          {/* Buscador */}
+          <div className="relative">
+            <svg className="w-4 h-4 text-ink-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <input
+              type="text"
+              placeholder="Buscar cliente, número..."
+              value={busqueda}
+              onChange={e => setBusqueda(e.target.value)}
+              className="w-full h-9 pl-9 pr-3 rounded-lg border border-slate-200 bg-slate-50 text-sm placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:bg-white transition"
+            />
+          </div>
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
             <button onClick={() => setFiltroActivo('todas')} className={`shrink-0 px-2.5 py-1 rounded-lg text-xs font-600 transition ${filtroActivo === 'todas' ? 'bg-brand-600 text-white' : 'bg-slate-100 text-ink-600'}`}>Todas</button>
             <button onClick={() => setFiltroActivo('activas')} className={`shrink-0 px-2.5 py-1 rounded-lg text-xs font-600 transition ${filtroActivo === 'activas' ? 'bg-brand-600 text-white' : 'bg-slate-100 text-ink-600'}`}>Activas</button>

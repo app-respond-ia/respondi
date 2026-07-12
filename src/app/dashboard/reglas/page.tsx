@@ -171,12 +171,12 @@ export default function ReglasPage() {
       {/* Encabezado + acciones */}
       <div className="flex items-start justify-between gap-4 flex-wrap mb-8">
         <div>
-          <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Reglas de casos</h1>
-          <p className="text-ink-500 mt-1 max-w-xl">Cuando una conversación cumpla una regla, la IA abrirá un caso para que un agente lo atienda.</p>
+          <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Escalado de casos</h1>
+          <p className="text-ink-500 mt-1 max-w-xl">Define cuándo la IA debe escalar una conversación a un agente humano abriendo un caso.</p>
         </div>
         <button onClick={openAñadir} disabled={nivelPermiso !== 'escritura'} className="inline-flex items-center gap-2 px-4 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition disabled:opacity-50 disabled:cursor-not-allowed">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
-          Nueva regla
+          Nueva regla de escalado
         </button>
       </div>
 
@@ -248,22 +248,22 @@ export default function ReglasPage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
           </div>
-          <p className="font-semibold text-ink-900 text-lg mb-2">Aún no tienes reglas configuradas.</p>
-          <p className="text-ink-500 text-sm mb-6 max-w-sm mx-auto">Comienza cargando nuestras reglas sugeridas para derivaciones y reclamos comunes, o crea una nueva regla personalizada.</p>
+          <p className="font-semibold text-ink-900 text-lg mb-2">Aún no tienes escalados configurados.</p>
+          <p className="text-ink-500 text-sm mb-6 max-w-sm mx-auto">Comienza cargando los escalados sugeridos para derivaciones y reclamos comunes, o crea uno nuevo.</p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <button 
               onClick={handleCargarPlantillas} 
               disabled={saving || nivelPermiso !== 'escritura'}
               className="inline-flex items-center gap-2 px-5 h-11 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {saving ? 'Cargando...' : 'Cargar reglas sugeridas'}
+              {saving ? 'Cargando...' : 'Cargar escalados sugeridos'}
             </button>
             <button 
               onClick={openAñadir} 
               disabled={nivelPermiso !== 'escritura'}
               className="inline-flex items-center gap-2 px-5 h-11 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-ink-700 text-sm font-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Nueva regla
+              Nueva regla de escalado
             </button>
           </div>
         </div>
@@ -281,7 +281,7 @@ export default function ReglasPage() {
               
               <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 h-full">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
-                  <h2 className="font-display font-700 text-lg text-ink-900">{modalMode === 'editar' ? 'Editar regla' : 'Nueva regla'}</h2>
+                  <h2 className="font-display font-700 text-lg text-ink-900">{modalMode === 'editar' ? 'Editar regla de escalado' : 'Nueva regla de escalado'}</h2>
                   <button type="button" onClick={() => !saving && setIsModalOpen(false)} className="p-1.5 rounded-lg text-ink-400 hover:text-ink-700 hover:bg-slate-100 transition" aria-label="Cerrar">
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                   </button>
@@ -309,19 +309,19 @@ export default function ReglasPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-500 text-ink-700 mb-1.5">Tipo de caso que se creará</label>
+                    <label className="block text-sm font-500 text-ink-700 mb-1.5">Tipo de escalado</label>
                     <input type="text" required placeholder="Ej. atencion_urgente"
                       value={formData.tipo_caso}
                       onChange={e => setFormData({...formData, tipo_caso: e.target.value})}
                       className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition" 
                     />
                     <p className="text-xs text-ink-400 mt-1.5">
-                      Esta etiqueta aparecerá en la bandeja de casos.
+                      Esta etiqueta identificará el motivo del escalado en la bandeja de casos.
                     </p>
                   </div>
         
                   <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer">
-                    <span className="text-sm font-500 text-ink-700">Regla activa</span>
+                    <span className="text-sm font-500 text-ink-700">Escalado activo</span>
                     <input type="checkbox" 
                       checked={formData.activa} 
                       onChange={e => setFormData({...formData, activa: e.target.checked})}

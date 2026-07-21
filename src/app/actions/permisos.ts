@@ -56,16 +56,19 @@ export async function getMisPermisos() {
 
   if (!userData) return { success: false, error: 'No autorizado' }
 
-  // Admin tiene acceso total — devolvemos todos los permisos en nivel escritura
+  // Obtenemos el branchId para todos los roles
+  const branchId = await resolveBranchId(supabase, user.id)
+
   if (userData.rol === 'admin' || userData.rol === 'super_admin') {
     return { 
       success: true, 
       esAdmin: true,
-      data: [] // El frontend sabrá que es admin y dará acceso total
+      tenantId: userData.tenant_id,
+      branchId: branchId,
+      data: [] 
     }
   }
 
-  const branchId = await resolveBranchId(supabase, user.id)
   if (!branchId) return { success: false, error: 'No hay sucursal activa' }
 
   const { data: permisos, error } = await supabase
@@ -76,7 +79,13 @@ export async function getMisPermisos() {
 
   if (error) return { success: false, error: error.message }
 
-  return { success: true, esAdmin: false, data: permisos || [] }
+  return { 
+    success: true, 
+    esAdmin: false, 
+    tenantId: userData.tenant_id,
+    branchId: branchId,
+    data: permisos || [] 
+  }
 }
 
 // Guardar/actualizar permisos de un usuario en una sucursal

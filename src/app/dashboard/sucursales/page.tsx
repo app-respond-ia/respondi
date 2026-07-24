@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { getSucursales, crearSucursal, desactivarSucursal, reactivarSucursal } from '@/app/actions/sucursales'
 import { getMisPermisos } from '@/app/actions/permisos'
 
@@ -128,13 +129,17 @@ export default function SucursalesPage() {
         </div>
         
         <div className="group relative">
-          <button 
-            onClick={!limitReached && nivelPermiso === 'escritura' ? handleOpenModal : undefined}
-            disabled={limitReached || nivelPermiso !== 'escritura'}
-            className={`inline-flex items-center gap-2 px-4 h-11 rounded-xl bg-brand-600 text-white text-sm font-600 transition ${limitReached ? 'opacity-50 cursor-not-allowed' : 'hover:bg-brand-700'}`}>
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
-            Añadir sucursal
-          </button>
+          {limitReached || nivelPermiso !== 'escritura' ? (
+            <button disabled className="inline-flex items-center gap-2 px-4 h-11 rounded-xl bg-brand-600 text-white text-sm font-600 transition opacity-50 cursor-not-allowed">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
+              Añadir sucursal
+            </button>
+          ) : (
+            <Link href="/dashboard/sucursales/nueva" className="inline-flex items-center gap-2 px-4 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 transition shadow-lg shadow-brand-600/30">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
+              Añadir sucursal
+            </Link>
+          )}
           {limitReached && (
             <div className="absolute top-full right-0 mt-2 px-2 py-1 bg-ink-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition whitespace-nowrap pointer-events-none z-10">
               Has alcanzado el límite de sucursales de tu plan

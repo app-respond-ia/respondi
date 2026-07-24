@@ -216,3 +216,163 @@ export async function reactivarSucursal(id: string) {
   if (error) return { success: false, error: error.message }
   return { success: true, data }
 }
+
+export async function getDatosSucursalParaCopiar(branchIdOrigen: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'No autorizado' }
+
+  const { data: userData } = await supabase
+    .from('users')
+    .select('tenant_id')
+    .eq('id', user.id)
+    .single()
+
+  if (!userData?.tenant_id) return { success: false, error: 'Sin organización' }
+
+  // Verificar que la sucursal origen pertenece al mismo tenant
+  const { data: sucursal } = await supabase
+    .from('sucursales')
+    .select('id, nombre, direccion, timezone')
+    .eq('id', branchIdOrigen)
+    .eq('tenant_id', userData.tenant_id)
+    .single()
+
+  if (!sucursal) return { success: false, error: 'Sucursal no encontrada' }
+
+  // Perfil
+  const { data: perfil } = await supabase
+    .from('business_profiles')
+    .select('servicios, politicas, idioma_base, tono, msg_fuera_horario, ia_activa_fuera_horario, caso_fuera_horario')
+    .eq('branch_id', branchIdOrigen)
+    .single()
+
+  // Horarios
+  const { data: horarios } = await supabase
+    .from('business_hours')
+    .select('dia_semana, apertura, cierre, cerrado, orden')
+    .eq('branch_id', branchIdOrigen)
+    .order('dia_semana', { ascending: true })
+    .order('orden', { ascending: true })
+
+  // Skills
+  const { data: skills } = await supabase
+    .from('skills')
+    .select('nombre, activo')
+    .eq('branch_id', branchIdOrigen)
+
+  // Precios
+  const { data: precios } = await supabase
+    .from('price_list')
+    .select('nombre, tipo, precio, precio_tipo, descripcion')
+    .eq('branch_id', branchIdOrigen)
+    .eq('activo', true)
+
+  return {
+    success: true,
+    data: {
+      sucursal,
+      perfil: perfil || null,
+      horarios: horarios || [],
+      skills: skills || [],
+      precios: precios || []
+    }
+  }
+}
+
+export async function crearSucursalConDatos(data: {
+  nombre: string
+  direccion?: string
+  timezone: string
+  servicios?: string
+  politicas?: string
+  idioma_base?: string
+  tono?: string
+  msg_fuera_horario?: string
+  ia_activa_fuera_horario?: boolean
+  caso_fuera_horario?: boolean
+  horarios?: { dia_semana: number, apertura: string | null, cierre: string | null, cerrado: boolean, orden: number }[]
+  skills?: { nombre: string, activo: boolean }[]
+  precios?: { nombre: string, tipo: string, precio: number | null, precio_tipo: string, descripcion?: string }[]
+}) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'No autorizado' }
+
+  const { data: userData } = await supabase
+    .from('users')
+    .select('tenant_id, rol')
+    .eq('id', user.id)
+    .single()
+
+  if (!userData?.tenant_id) return { success: false, error: 'Sin organización' }
+  if (userData.rol !== 'admin') return { success: false, error: 'Solo el administrador puede crear sucursales' }
+
+  // Crear sucursal
+  const { data: newBranch, error: branchErr } = await supabase
+    .from('sucursales')
+    .insert({
+      tenant_id: userData.tenant_id,
+      nombre: data.nombre,
+      direccion: data.direccion || null,
+      timezone: data.timezone,
+      activa: true,
+      onboarding_completado: true
+    })
+    .select()
+    .single()
+
+  if (branchErr || !newBranch) return { success: false, error: branchErr?.message || 'Error al crear sucursal' }
+
+  // Business profile
+  if (data.servicios || data.politicas || data.msg_fuera_horario) {
+    await supabase.from('business_profiles').insert({
+      branch_id: newBranch.id,
+      servicios: data.servicios || null,
+      politicas: data.politicas || null,
+      idioma_base: data.idioma_base || 'es',
+      tono: data.tono || 'cercano',
+      msg_fuera_horario: data.msg_fuera_horario || null,
+      ia_activa_fuera_horario: data.ia_activa_fuera_horario ?? false,
+      caso_fuera_horario: data.caso_fuera_horario ?? false
+    })
+  }
+
+  // Horarios
+  if (data.horarios && data.horarios.length > 0) {
+    await supabase.from('business_hours').insert(
+      data.horarios.map(h => ({ ...h, branch_id: newBranch.id }))
+    )
+  }
+
+  // Skills
+  if (data.skills && data.skills.length > 0) {
+    await supabase.from('skills').insert(
+      data.skills.map((s, idx) => ({
+        branch_id: newBranch.id,
+        tenant_id: userData.tenant_id,
+        nombre: s.nombre,
+        activo: s.activo,
+        orden: idx
+      }))
+    )
+  }
+
+  // Precios
+  if (data.precios && data.precios.length > 0) {
+    await supabase.from('price_list').insert(
+      data.precios.map(p => ({
+        branch_id: newBranch.id,
+        tenant_id: userData.tenant_id,
+        nombre: p.nombre,
+        tipo: p.tipo || 'producto',
+        precio: p.precio,
+        precio_tipo: p.precio_tipo || 'exacto',
+        descripcion: p.descripcion || null,
+        activo: true
+      }))
+    )
+  }
+
+  return { success: true, sucursal: newBranch }
+}

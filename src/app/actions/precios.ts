@@ -106,3 +106,35 @@ export async function eliminarPrecio(id: string) {
   if (error) return { success: false, error: error.message }
   return { success: true }
 }
+
+export async function importarPreciosMasivo(items: {
+  nombre: string
+  tipo: string
+  precio: number | null
+  precio_tipo: string
+  descripcion: string | null
+}[]) {
+  const supabase = await createClient()
+  const auth = await getAuthData(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+
+  if (!items || items.length === 0) return { success: false, error: 'No hay ítems para importar' }
+
+  const rows = items.map(item => ({
+    tenant_id: auth.tenant_id,
+    branch_id: auth.branch_id,
+    nombre: item.nombre,
+    tipo: item.tipo || 'producto',
+    precio: item.precio,
+    precio_tipo: item.precio_tipo || 'exacto',
+    descripcion: item.descripcion || null,
+    activo: true
+  }))
+
+  const { error } = await supabase
+    .from('price_list')
+    .insert(rows)
+
+  if (error) return { success: false, error: error.message }
+  return { success: true, total: rows.length }
+}

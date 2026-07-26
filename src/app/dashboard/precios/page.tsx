@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getPrecios, crearPrecio, actualizarPrecio, eliminarPrecio, PrecioData } from '@/app/actions/precios'
+import { getPrecios, crearPrecio, actualizarPrecio, eliminarPrecio, importarPreciosMasivo, PrecioData } from '@/app/actions/precios'
+import * as XLSX from 'xlsx'
 import { getMisPermisos } from '@/app/actions/permisos'
 
 export default function ListaPreciosPage() {
@@ -16,6 +17,12 @@ export default function ListaPreciosPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  const [importando, setImportando] = useState(false)
+  const [importPreview, setImportPreview] = useState<{
+    validos: any[],
+    errores: { fila: number, nombre: string, error: string }[]
+  } | null>(null)
 
   const [formData, setFormData] = useState<PrecioData>({
     nombre: '',
@@ -94,6 +101,107 @@ export default function ListaPreciosPage() {
     }
   }
 
+  const descargarPlantilla = () => {
+    const wb = XLSX.utils.book_new()
+    const headers = ['nombre', 'tipo', 'precio', 'precio_tipo', 'descripcion']
+    const ejemplo1 = ['Café espresso', 'producto', '2.50', 'exacto', 'Café solo corto']
+    const ejemplo2 = ['Consultoría hora', 'servicio', '80', 'desde', 'Precio mínimo por hora']
+    const ejemplo3 = ['Menú del día', 'producto', '', 'consultar', 'Pregunta por el menú']
+    const ws = XLSX.utils.aoa_to_sheet([headers, ejemplo1, ejemplo2, ejemplo3])
+    ws['!cols'] = [{ wch: 30 }, { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 40 }]
+    XLSX.utils.book_append_sheet(wb, ws, 'Precios')
+    XLSX.writeFile(wb, 'plantilla_precios_respondi.xlsx')
+  }
+
+  const handleArchivoExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        const data = new Uint8Array(ev.target?.result as ArrayBuffer)
+        const wb = XLSX.read(data, { type: 'array' })
+        const ws = wb.Sheets[wb.SheetNames[0]]
+        const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 })
+
+        if (rows.length < 2) {
+          setImportPreview({ validos: [], errores: [{ fila: 1, nombre: '—', error: 'El archivo está vacío o solo tiene encabezados' }] })
+          setIsImportModalOpen(true)
+          return
+        }
+
+        const validos: any[] = []
+        const errores: { fila: number, nombre: string, error: string }[] = []
+
+        // Saltar la fila 0 (headers)
+        for (let i = 1; i < rows.length; i++) {
+          const row = rows[i]
+          const fila = i + 1
+          const nombre = row[0]?.toString().trim()
+          const tipo = row[1]?.toString().trim().toLowerCase() || 'producto'
+          const precioRaw = row[2]?.toString().trim()
+          const precio_tipo = row[3]?.toString().trim().toLowerCase() || 'exacto'
+          const descripcion = row[4]?.toString().trim() || null
+
+          // Validaciones
+          if (!nombre) {
+            errores.push({ fila, nombre: '(vacío)', error: 'El nombre es obligatorio' })
+            continue
+          }
+          if (!['producto', 'servicio'].includes(tipo)) {
+            errores.push({ fila, nombre, error: `Tipo inválido: "${tipo}". Debe ser "producto" o "servicio"` })
+            continue
+          }
+          if (!['exacto', 'desde', 'consultar'].includes(precio_tipo)) {
+            errores.push({ fila, nombre, error: `precio_tipo inválido: "${precio_tipo}". Debe ser "exacto", "desde" o "consultar"` })
+            continue
+          }
+
+          let precio: number | null = null
+          if (precio_tipo !== 'consultar') {
+            if (!precioRaw) {
+              errores.push({ fila, nombre, error: 'El precio es obligatorio cuando precio_tipo no es "consultar"' })
+              continue
+            }
+            precio = parseFloat(precioRaw.replace(',', '.'))
+            if (isNaN(precio) || precio < 0) {
+              errores.push({ fila, nombre, error: `Precio inválido: "${precioRaw}". Debe ser un número positivo` })
+              continue
+            }
+          }
+
+          validos.push({ nombre, tipo, precio, precio_tipo, descripcion })
+        }
+
+        setImportPreview({ validos, errores })
+        setIsImportModalOpen(true)
+      } catch (err) {
+        setImportPreview({ validos: [], errores: [{ fila: 0, nombre: '—', error: 'Error al leer el archivo. Asegúrate de que sea un .xlsx válido' }] })
+        setIsImportModalOpen(true)
+      }
+    }
+    reader.readAsArrayBuffer(file)
+    // Reset input para permitir subir el mismo archivo de nuevo
+    e.target.value = ''
+  }
+
+  const handleConfirmarImport = async () => {
+    if (!importPreview || importPreview.validos.length === 0) return
+    setImportando(true)
+    const res = await importarPreciosMasivo(importPreview.validos)
+    if (res.success) {
+      setIsImportModalOpen(false)
+      setImportPreview(null)
+      setMensaje({ tipo: 'exito', texto: `${res.total} producto${res.total === 1 ? '' : 's'} importado${res.total === 1 ? '' : 's'} correctamente ✓` })
+      cargar()
+    } else {
+      setMensaje({ tipo: 'error', texto: res.error || 'Error al importar' })
+    }
+    setTimeout(() => setMensaje(null), 4000)
+    setImportando(false)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
@@ -165,11 +273,23 @@ export default function ListaPreciosPage() {
       <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
         <div>
           <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Lista de precios</h1>
-          <p className="text-ink-500 mt-1">Productos y servicios que tu agente de IA usa para responder.</p>
+          <p className="text-ink-500 mt-1">Productos y servicios que tu agente conoce.</p>
         </div>
-        <div className="flex gap-2">
-          {/* El botón de importar excel está fuera de esta fase, se omite por ahora */}
-          <button onClick={openAñadir} disabled={nivelPermiso !== 'escritura'} className="inline-flex items-center gap-2 px-4 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition disabled:opacity-50 disabled:cursor-not-allowed">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={descargarPlantilla}
+            className="inline-flex items-center gap-2 px-4 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            Plantilla Excel
+          </button>
+          <label className={`inline-flex items-center gap-2 px-4 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition cursor-pointer ${nivelPermiso !== 'escritura' ? 'opacity-50 pointer-events-none' : ''}`}>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l4-4m0 0l4 4m-4-4v12"/></svg>
+            Importar Excel
+            <input type="file" accept=".xlsx,.xls" onChange={handleArchivoExcel} className="sr-only" />
+          </label>
+          <button
+            disabled={nivelPermiso !== 'escritura'}
+            onClick={openAñadir}
+            className="inline-flex items-center gap-2 px-4 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 transition shadow-lg shadow-brand-600/30 disabled:opacity-50 disabled:cursor-not-allowed">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
             Añadir ítem
           </button>
@@ -356,6 +476,96 @@ export default function ListaPreciosPage() {
                 </div>
               </form>
         
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL IMPORTAR */}
+      {isImportModalOpen && importPreview && (
+        <div className="fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-ink-900/50 backdrop-blur-sm" onClick={() => !importando && setIsImportModalOpen(false)}></div>
+          <div className="relative min-h-full flex items-center justify-center p-4 pointer-events-none">
+            <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl pointer-events-auto flex flex-col max-h-[85vh]">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
+                <h2 className="font-display font-700 text-lg text-ink-900">Previsualización de importación</h2>
+                <button onClick={() => setIsImportModalOpen(false)} className="p-1.5 rounded-lg text-ink-400 hover:bg-slate-100 transition">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+                {/* Resumen */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200">
+                    <p className="text-2xl font-700 text-emerald-700">{importPreview.validos.length}</p>
+                    <p className="text-sm text-emerald-600 mt-0.5">Filas válidas listas para importar</p>
+                  </div>
+                  <div className={`p-4 rounded-xl border ${importPreview.errores.length > 0 ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-200'}`}>
+                    <p className={`text-2xl font-700 ${importPreview.errores.length > 0 ? 'text-red-700' : 'text-slate-400'}`}>{importPreview.errores.length}</p>
+                    <p className={`text-sm mt-0.5 ${importPreview.errores.length > 0 ? 'text-red-600' : 'text-slate-400'}`}>Filas con errores (se omitirán)</p>
+                  </div>
+                </div>
+
+                {/* Errores */}
+                {importPreview.errores.length > 0 && (
+                  <div>
+                    <p className="text-sm font-600 text-ink-700 mb-2">Errores encontrados</p>
+                    <div className="space-y-2">
+                      {importPreview.errores.map((e, i) => (
+                        <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-red-50 border border-red-100">
+                          <span className="text-xs font-600 text-red-500 shrink-0 mt-0.5">Fila {e.fila}</span>
+                          <div className="min-w-0">
+                            <p className="text-sm font-500 text-red-800 truncate">{e.nombre}</p>
+                            <p className="text-xs text-red-600 mt-0.5">{e.error}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Preview válidos */}
+                {importPreview.validos.length > 0 && (
+                  <div>
+                    <p className="text-sm font-600 text-ink-700 mb-2">Ítems que se importarán</p>
+                    <div className="rounded-xl border border-slate-200 overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-200">
+                            <th className="text-left px-4 py-2.5 font-600 text-ink-600">Nombre</th>
+                            <th className="text-left px-4 py-2.5 font-600 text-ink-600">Tipo</th>
+                            <th className="text-left px-4 py-2.5 font-600 text-ink-600">Precio</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {importPreview.validos.map((v, i) => (
+                            <tr key={i} className="hover:bg-slate-50">
+                              <td className="px-4 py-2.5 text-ink-900 font-500">{v.nombre}</td>
+                              <td className="px-4 py-2.5 text-ink-500 capitalize">{v.tipo}</td>
+                              <td className="px-4 py-2.5 text-ink-700 font-500">
+                                {v.precio_tipo === 'consultar' ? 'A consultar' : v.precio_tipo === 'desde' ? `Desde ${v.precio}` : v.precio}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100 shrink-0">
+                <button onClick={() => setIsImportModalOpen(false)} disabled={importando}
+                  className="px-5 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition disabled:opacity-50">
+                  Cancelar
+                </button>
+                <button onClick={handleConfirmarImport}
+                  disabled={importando || importPreview.validos.length === 0}
+                  className="px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 transition disabled:opacity-50">
+                  {importando ? 'Importando...' : `Importar ${importPreview.validos.length} ítem${importPreview.validos.length === 1 ? '' : 's'}`}
+                </button>
+              </div>
             </div>
           </div>
         </div>

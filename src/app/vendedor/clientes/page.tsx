@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getVendedorClientes, actualizarClienteSeguimiento } from '@/app/actions/superadmin'
+import { getVendedorClientes, actualizarClienteSeguimiento } from '@/app/actions/vendedor'
 
 const ESTADOS = ['trial', 'negociacion', 'activo', 'en_riesgo', 'perdido'] as const
 type EstadoSeguimiento = typeof ESTADOS[number]

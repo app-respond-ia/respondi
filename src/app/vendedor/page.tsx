@@ -1,22 +1,36 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getVendedorDashboard } from '@/app/actions/superadmin'
+import { getVendedorDashboard } from '@/app/actions/vendedor'
 
 export default function VendedorDashboard() {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const cargar = async () => {
       const res = await getVendedorDashboard()
-      if (res.success) setData(res.data)
+      if (res.success && res.data) {
+        setData(res.data)
+      } else {
+        setError(res.error === 'Vendedor no encontrado'
+          ? 'Tu cuenta de vendedor no está configurada correctamente. Contacta con el administrador.'
+          : res.error || 'Error al cargar el dashboard'
+        )
+      }
       setLoading(false)
     }
     cargar()
   }, [])
 
   if (loading) return <div className="py-20 text-center text-ink-500">Cargando...</div>
+  if (error) return (
+    <div className="py-20 text-center">
+      <p className="text-red-500 font-500 mb-2">Error</p>
+      <p className="text-ink-500 text-sm">{error}</p>
+    </div>
+  )
   if (!data) return <div className="py-20 text-center text-red-500">Error al cargar el dashboard.</div>
 
   const { vendedor, totalClientes, clientesActivos, clientesTrial, mrrCartera, comisionesPendientes, comisionesAprobadas, comisionesPagadas } = data

@@ -70,6 +70,22 @@ export async function eliminarSkillGlobal(id: string) {
   const { data: userData } = await supabase.from('users').select('rol').eq('id', user.id).single()
   if (userData?.rol !== 'super_admin') return { success: false, error: 'No autorizado' }
 
+  // Obtener nombre de la skill antes de eliminar
+  const { data: skill } = await supabase
+    .from('skills_globales')
+    .select('nombre')
+    .eq('id', id)
+    .single()
+
+  if (!skill) return { success: false, error: 'Skill no encontrada' }
+
+  // Eliminar toggles de clientes que referencian esta skill
+  await supabase
+    .from('skills')
+    .delete()
+    .eq('nombre', skill.nombre)
+
+  // Eliminar la skill global
   const { error } = await supabase.from('skills_globales').delete().eq('id', id)
   if (error) return { success: false, error: error.message }
   return { success: true }

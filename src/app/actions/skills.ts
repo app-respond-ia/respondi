@@ -1,5 +1,9 @@
 'use server'
 
+// DEPRECATED: Este archivo es legacy. El sistema de skills ahora usa skills_globales.ts
+// Las funciones aquí solo se mantienen por compatibilidad con el onboarding.
+// No crear nuevas llamadas a estas funciones.
+
 import { createClient } from '@/utils/supabase/server'
 import { resolveBranchId } from '@/lib/active-branch'
 

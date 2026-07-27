@@ -77,8 +77,13 @@ export default function ComisionesPage() {
   }
 
   const handleCrearManual = async () => {
-    if (!formCrear.vendedor_id || !formCrear.organizacion_id || formCrear.importe <= 0) {
-      setMensaje({ tipo: 'error', texto: 'Rellena todos los campos obligatorios' })
+    if (!formCrear.vendedor_id || !formCrear.organizacion_id) {
+      setMensaje({ tipo: 'error', texto: 'Selecciona un vendedor y un cliente.' })
+      setTimeout(() => setMensaje(null), 3000)
+      return
+    }
+    if (!formCrear.importe || formCrear.importe <= 0) {
+      setMensaje({ tipo: 'error', texto: 'El importe debe ser mayor que 0.' })
       setTimeout(() => setMensaje(null), 3000)
       return
     }

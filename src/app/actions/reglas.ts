@@ -5,8 +5,10 @@ import { resolveBranchId } from '@/lib/active-branch'
 
 export interface ReglaData {
   nombre: string
-  descripcion_intencion: string
-  tipo_caso: string
+  descripcion_intencion?: string
+  tipo_caso?: string
+  condicion?: string
+  accion?: string
   activa: boolean
 }
 
@@ -51,14 +53,27 @@ export async function crearRegla(data: ReglaData) {
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
+  const condicion = data.condicion || data.descripcion_intencion
+  const accion = data.accion || data.tipo_caso
+
+  if (!data.nombre?.trim()) {
+    return { success: false, error: 'El nombre de la regla es obligatorio.' }
+  }
+  if (!condicion?.trim()) {
+    return { success: false, error: 'La condición de la regla es obligatoria.' }
+  }
+  if (!accion?.trim()) {
+    return { success: false, error: 'La acción de la regla es obligatoria.' }
+  }
+
   const { data: insertedData, error } = await supabase
     .from('case_rules')
     .insert([{
       tenant_id: auth.tenant_id,
       branch_id: auth.branch_id,
       nombre: data.nombre,
-      descripcion_intencion: data.descripcion_intencion,
-      tipo_caso: data.tipo_caso,
+      descripcion_intencion: condicion,
+      tipo_caso: accion,
       activa: data.activa,
       es_plantilla: false
     }])

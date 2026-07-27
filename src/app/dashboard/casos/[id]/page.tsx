@@ -28,11 +28,12 @@ export default function CasoDetallePage() {
   const cargarDatos = async () => {
     setLoading(true)
     const res = await getCasoDetalle(id)
-    if (res.success) {
-      setCaso(res.data)
-    } else {
-      router.push('/dashboard/casos')
+    if (!res.success || !res.data) {
+      // Caso no encontrado o sin acceso
+      router.replace('/dashboard/casos')
+      return
     }
+    setCaso(res.data)
     setLoading(false)
   }
 

@@ -12,9 +12,9 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    async function loadData() {
+    const cargar = async () => {
       setLoading(true)
-      const res = await getDashboardData(period)
+      const res = await getDashboardData(period, filtroCanalDB || undefined)
       if (res.success && res.data) {
         setData(res.data)
       } else {
@@ -22,8 +22,8 @@ export default function DashboardPage() {
       }
       setLoading(false)
     }
-    loadData()
-  }, [period])
+    cargar()
+  }, [period, filtroCanalDB])
 
   if (error) {
     return <div className="p-10 text-center text-red-500 font-medium">{error}</div>

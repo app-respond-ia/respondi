@@ -13,7 +13,12 @@ export default async function VendedorLayout({ children }: { children: React.Rea
     .eq('id', session.user.id)
     .single()
 
-  if (!userData || userData.rol !== 'vendedor') redirect('/login')
+  if (!userData || userData.rol !== 'vendedor') {
+    // Redirigir al dashboard correcto según el rol
+    if (userData?.rol === 'super_admin') redirect('/superadmin')
+    if (userData?.rol === 'admin' || userData?.rol === 'usuario') redirect('/dashboard')
+    redirect('/login')
+  }
 
   const nombreUsuario = userData.nombre || session.user.email || 'Vendedor'
   const iniciales = nombreUsuario.substring(0, 2).toUpperCase()

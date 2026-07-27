@@ -7,6 +7,7 @@ export default function PlanesPage() {
   const [planes, setPlanes] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [modalData, setModalData] = useState<any>(null)
+  const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
   
   const [formData, setFormData] = useState({
     precio_usd: 0, creditos_mensuales: 0, canales_max: 0, sucursales_max: 0, 
@@ -47,16 +48,31 @@ export default function PlanesPage() {
     document.body.style.overflow = ''
   }
 
-  const savePlan = async () => {
+  const handleGuardar = async () => {
+    if (formData.precio_usd !== undefined && formData.precio_usd < 0) {
+      setMensaje({ tipo: 'error', texto: 'El precio no puede ser negativo.' })
+      setTimeout(() => setMensaje(null), 3000)
+      return
+    }
     if (modalData) {
       await actualizarPlan(modalData.id, formData)
     }
     closeModal()
+    setMensaje({ tipo: 'exito', texto: 'Plan actualizado ✓' })
+    setTimeout(() => setMensaje(null), 3000)
     loadPlanes()
   }
 
   return (
     <>
+      {mensaje && (
+        <div className={`mb-6 p-4 rounded-xl font-500 text-sm border flex items-center gap-2 ${
+          mensaje.tipo === 'exito' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'
+        }`}>
+          {mensaje.texto}
+        </div>
+      )}
+
       <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
         <div>
           <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Planes y precios</h1>
@@ -226,7 +242,7 @@ export default function PlanesPage() {
               </div>
               <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl">
                 <button onClick={closeModal} className="px-5 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition">Cancelar</button>
-                <button onClick={savePlan} className="px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 transition">Guardar cambios</button>
+                <button onClick={handleGuardar} className="px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 transition">Guardar cambios</button>
               </div>
             </div>
           </div>

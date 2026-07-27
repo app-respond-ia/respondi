@@ -29,12 +29,11 @@ export default function ConversacionDetallePage() {
   const cargarDatos = async () => {
     setLoading(true)
     const res = await getConversacionDetalle(id)
-    if (res.success) {
-      setConv(res.data)
-    } else {
-      alert(res.error)
-      router.push('/dashboard/conversaciones')
+    if (!res.success || !res.data) {
+      router.replace('/dashboard/conversaciones')
+      return
     }
+    setConv(res.data)
     setLoading(false)
   }
 

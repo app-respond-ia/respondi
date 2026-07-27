@@ -23,10 +23,18 @@ async function getAuthData(supabase: any) {
   return { tenant_id: userData.tenant_id, branch_id: branchId, user_id: user.id }
 }
 
-export async function getDashboardData(period: 'hoy' | 'semana' | 'mes') {
+export async function getDashboardData(period: 'hoy' | 'semana' | 'mes' = 'semana', canalTipo?: string) {
   const supabase = await createClient()
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
+
+  let canalIds: string[] | null = null
+  if (canalTipo) {
+    let canalQuery = supabase.from('channels').select('id').eq('tenant_id', auth.tenant_id).eq('tipo', canalTipo)
+    if (auth.branch_id) canalQuery = canalQuery.eq('branch_id', auth.branch_id)
+    const { data: canales } = await canalQuery
+    canalIds = canales?.map((c: any) => c.id) || []
+  }
 
   const now = new Date()
   let days = 0
@@ -70,6 +78,13 @@ export async function getDashboardData(period: 'hoy' | 'semana' | 'mes') {
     (() => {
       let q = supabase.from('conversations').select('id, estado, fecha_inicio, conversation_tags(created_at, message_categories(nombre))').eq('tenant_id', auth.tenant_id).gte('fecha_inicio', fetchDateIso)
       if (auth.branch_id) q = q.eq('branch_id', auth.branch_id)
+      if (canalIds !== null) {
+        if (canalIds.length > 0) {
+          q = q.in('channel_id', canalIds)
+        } else {
+          q = q.in('channel_id', ['00000000-0000-0000-0000-000000000000'])
+        }
+      }
       return q
     })(),
 

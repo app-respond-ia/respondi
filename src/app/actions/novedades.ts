@@ -51,6 +51,19 @@ export async function crearNovedad(data: NovedadData) {
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
+  // Verificar límite diario de novedades
+  const hoy = new Date()
+  hoy.setHours(0, 0, 0, 0)
+  const { count } = await supabase
+    .from('daily_updates')
+    .select('*', { count: 'exact', head: true })
+    .eq('branch_id', auth.branch_id)
+    .gte('created_at', hoy.toISOString())
+
+  if (count && count >= 20) {
+    return { success: false, error: 'Has alcanzado el límite de 20 novedades por día.' }
+  }
+
   let isActivo = true
   if (data.fecha_vigencia_fin !== null) {
     const fin = new Date(data.fecha_vigencia_fin).getTime()

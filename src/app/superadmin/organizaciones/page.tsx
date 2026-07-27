@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getOrganizaciones } from '@/app/actions/superadmin'
+import { getOrganizaciones, actualizarEstadoOrganizacion } from '@/app/actions/superadmin'
 
 
 export default function OrganizacionesPage() {
@@ -38,6 +38,19 @@ export default function OrganizacionesPage() {
   const closeModal = () => {
     setModalOrganizacion(null)
     document.body.style.overflow = ''
+  }
+
+  const handleCambiarEstado = async (org: any, nuevoEstado: string) => {
+    const accion = nuevoEstado === 'suspendido' ? 'suspender' : 'activar'
+    if (!confirm(`¿Seguro que quieres ${accion} la organización "${org.nombre}"?`)) return
+    
+    const res = await actualizarEstadoOrganizacion(org.id, nuevoEstado)
+    if (res && res.success) {
+      loadOrganizaciones()
+      if (modalOrganizacion?.id === org.id) {
+        setModalOrganizacion({ ...modalOrganizacion, estado: nuevoEstado })
+      }
+    }
   }
 
   const getStatusColor = (estado: string) => {
@@ -165,7 +178,11 @@ export default function OrganizacionesPage() {
                   </button>
                   <div className="grid grid-cols-2 gap-2">
                     <button title="Próximamente" className="h-10 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition">Cambiar plan</button>
-                    <button title="Próximamente" className="h-10 rounded-xl border border-red-200 bg-white hover:bg-red-50 text-sm font-600 text-red-600 transition">Suspender</button>
+                    {modalOrganizacion.estado === 'suspendido' ? (
+                      <button onClick={() => handleCambiarEstado(modalOrganizacion, 'activo')} className="h-10 rounded-xl border border-emerald-200 bg-white hover:bg-emerald-50 text-sm font-600 text-emerald-600 transition">Activar</button>
+                    ) : (
+                      <button onClick={() => handleCambiarEstado(modalOrganizacion, 'suspendido')} className="h-10 rounded-xl border border-red-200 bg-white hover:bg-red-50 text-sm font-600 text-red-600 transition">Suspender</button>
+                    )}
                   </div>
                 </div>
               </div>

@@ -28,18 +28,29 @@ export async function getDashboardData() {
   try {
     const { supabase } = await requireSuperAdmin()
 
-    const { data: organizaciones } = await supabase
-      .from('organizaciones')
-      .select('estado, fecha_vencimiento')
+    const now = new Date()
+    const in3Days = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000)
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+
+    const [
+      organizacionesRes,
+      cuotasRes,
+      erroresRes
+    ] = await Promise.allSettled([
+      supabase.from('organizaciones').select('estado, fecha_vencimiento'),
+      supabase.from('message_quotas').select('cantidad').eq('tipo', 'consumo').gte('created_at', startOfMonth),
+      supabase.from('error_logs').select('*', { count: 'exact', head: true }).eq('resuelto', false)
+    ])
+
+    const organizaciones = organizacionesRes.status === 'fulfilled' ? organizacionesRes.value.data || [] : []
+    const cuotas = cuotasRes.status === 'fulfilled' ? cuotasRes.value.data || [] : []
+    const erroresSinResolver = erroresRes.status === 'fulfilled' ? (erroresRes.value.count || 0) : 0
 
     let organizacionesActivas = 0
     let organizacionesTrial = 0
     let organizacionesVencidas = 0
     let organizacionesSuspendidas = 0
     let trialsPorVencer = 0
-
-    const now = new Date()
-    const in3Days = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000)
 
     organizaciones?.forEach(o => {
       if (o.estado === 'activo') organizacionesActivas++
@@ -53,19 +64,7 @@ export async function getDashboardData() {
       if (o.estado === 'suspendido') organizacionesSuspendidas++
     })
 
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-    const { data: cuotas } = await supabase
-      .from('message_quotas')
-      .select('cantidad')
-      .eq('tipo', 'consumo')
-      .gte('created_at', startOfMonth)
-    
     const totalMensajesMes = cuotas?.reduce((acc, curr) => acc + curr.cantidad, 0) || 0
-
-    const { count: erroresSinResolver } = await supabase
-      .from('error_logs')
-      .select('*', { count: 'exact', head: true })
-      .eq('resuelto', false)
 
     return {
       success: true,
@@ -664,6 +663,21 @@ export async function crearCuentaTrial(data: {
     }])
 
     return { success: true, organizacion: org }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
+
+export async function actualizarEstadoOrganizacion(id: string, estado: string) {
+  try {
+    const { supabase } = await requireSuperAdmin()
+    const { error } = await supabase
+      .from('organizaciones')
+      .update({ estado })
+      .eq('id', id)
+    if (error) return { success: false, error: error.message }
+    revalidatePath('/superadmin/organizaciones')
+    return { success: true }
   } catch (err: any) {
     return { success: false, error: err.message }
   }

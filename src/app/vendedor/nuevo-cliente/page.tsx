@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { crearCuentaTrial } from '@/app/actions/superadmin'
+import { crearCuentaTrial } from '@/app/actions/vendedor'
 
 export default function NuevoClientePage() {
   const [formData, setFormData] = useState({
@@ -41,7 +41,7 @@ export default function NuevoClientePage() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-slate-200 p-6 space-y-5">
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-5">
         <div>
           <label className="block text-sm font-500 text-ink-700 mb-1.5">Nombre del negocio</label>
           <input type="text" required placeholder="Ej: Restaurante La Mar"
@@ -82,7 +82,7 @@ export default function NuevoClientePage() {
           </div>
         </div>
 
-        <button type="submit" disabled={loading}
+        <button type="button" onClick={handleSubmit} disabled={loading}
           className="w-full h-12 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-600 transition disabled:opacity-50 flex items-center justify-center gap-2">
           {loading ? (
             <>
@@ -94,7 +94,7 @@ export default function NuevoClientePage() {
             </>
           ) : 'Crear cuenta trial'}
         </button>
-      </form>
+      </div>
     </div>
   )
 }

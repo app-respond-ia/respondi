@@ -58,6 +58,12 @@ export default function VendedoresPage() {
       setTimeout(() => setMensaje(null), 3000)
       return
     }
+    if (modalMode === 'editar' && formData.activo === false) {
+      if (!confirm(`¿Seguro que quieres desactivar al vendedor "${formData.nombre}"? Perderá acceso al panel.`)) {
+        setSaving(false)
+        return
+      }
+    }
     setSaving(true)
     let res
     if (modalMode === 'crear') {

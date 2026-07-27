@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getVendedorComisiones } from '@/app/actions/superadmin'
+import { getVendedorComisiones } from '@/app/actions/vendedor'
 
 export default function VendedorComisionesPage() {
   const [comisiones, setComisiones] = useState<any[]>([])

@@ -28,11 +28,15 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}/restablecer-contrasena`)
   }
 
-  let { data: userData } = await supabaseAdmin
+  let { data: userData, error: userQueryError } = await supabaseAdmin
     .from('users')
     .select('tenant_id, branch_id, rol, invitacion_aceptada')
     .eq('id', user.id)
     .single()
+
+  if (userQueryError) {
+    console.error('Error consultando users en callback:', userQueryError.message, userQueryError.code)
+  }
 
   if (!userData) {
     const nombre = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuario'

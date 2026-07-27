@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { updateSession } from '@/utils/supabase/middleware'
+import { supabaseAdmin } from '@/utils/supabase/admin'
 
 export async function middleware(request: NextRequest) {
   // Update session
@@ -33,7 +34,7 @@ export async function middleware(request: NextRequest) {
   // Si hay usuario, verificamos su rol para enrutamiento
   if (user && (isPublicRoute || isProtectedRoute)) {
     // Obtenemos el rol desde la tabla public.users
-    const { data: userData, error: userError } = await supabase
+    const { data: userData, error: userError } = await supabaseAdmin
       .from('users')
       .select('rol, tenant_id, invitacion_aceptada')
       .eq('id', user.id)
@@ -56,7 +57,7 @@ export async function middleware(request: NextRequest) {
 
     // Onboarding obligatorio para admins
     if (role === 'admin' && userData?.tenant_id) {
-      const { data: sucursal } = await supabase
+      const { data: sucursal } = await supabaseAdmin
         .from('sucursales')
         .select('onboarding_completado')
         .eq('tenant_id', userData.tenant_id)

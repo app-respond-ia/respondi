@@ -78,8 +78,25 @@ export async function saveStep1(data: {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Unauthenticated')
 
-  const { data: userData } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
-  const tenantId = userData?.tenant_id
+  // Buscar tenant_id con reintentos para manejar race condition post-registro
+  let tenantId: string | null = null
+  let intentos = 0
+  
+  while (!tenantId && intentos < 5) {
+    const { data: userData } = await supabase
+      .from('users')
+      .select('tenant_id')
+      .eq('id', user.id)
+      .single()
+    
+    tenantId = userData?.tenant_id || null
+    
+    if (!tenantId) {
+      intentos++
+      await new Promise(resolve => setTimeout(resolve, 500))
+    }
+  }
+
   if (!tenantId) throw new Error('No tenant')
 
   // Actualizar organización con nombre y dirección fiscal

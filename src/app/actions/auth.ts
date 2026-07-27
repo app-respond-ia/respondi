@@ -3,25 +3,115 @@
 import { createClient } from '@/utils/supabase/server'
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 
-export async function login(formData: FormData) {
+// --- Fix Bug C: Registro Trial (con validación de email duplicado y rollback) ---
+export async function registroTrial(data: {
+  email: string
+  password: string
+  nombre: string
+  nombreNegocio: string
+}) {
   const supabase = await createClient()
 
-  const data = {
-    email: formData.get('email') as string,
-    password: formData.get('password') as string,
+  // Verificar si el email ya existe antes de llamar al RPC
+  const { data: userExistente } = await supabaseAdmin
+    .from('users')
+    .select('id')
+    .eq('email', data.email)
+    .single()
+
+  if (userExistente) {
+    return { success: false, error: 'Este email ya tiene una cuenta en Respondi. Inicia sesión o usa otro email.' }
   }
 
-  const { data: authData, error } = await supabase.auth.signInWithPassword(data)
+  // Crear usuario en Supabase Auth
+  const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+    email: data.email,
+    password: data.password,
+    email_confirm: true
+  })
+
+  if (authError || !authData?.user) {
+    const msg = authError?.message || ''
+    if (msg.includes('already registered') || msg.includes('already exists')) {
+      return { success: false, error: 'Este email ya tiene una cuenta en Respondi. Inicia sesión o usa otro email.' }
+    }
+    return { success: false, error: msg || 'Error al crear la cuenta. Inténtalo de nuevo.' }
+  }
+
+  const userId = authData.user.id
+
+  // Llamar al RPC para crear organización, sucursal y usuario
+  const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('create_trial_account', {
+    p_user_id: userId,
+    p_email: data.email,
+    p_nombre: data.nombre,
+    p_org_nombre: data.nombreNegocio
+  })
+
+  if (rpcError) {
+    // Rollback: eliminar usuario de Auth si el RPC falla
+    await supabaseAdmin.auth.admin.deleteUser(userId)
+    return { success: false, error: 'Error al configurar la cuenta. Inténtalo de nuevo.' }
+  }
+
+  // Iniciar sesión automáticamente
+  const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+    email: data.email,
+    password: data.password
+  })
+
+  if (signInError) {
+    return { success: false, error: 'Cuenta creada pero error al iniciar sesión. Intenta iniciar sesión manualmente.' }
+  }
+
+  return { success: true, redirectUrl: '/dashboard', session: signInData.session }
+}
+
+// Compatibilidad con formularios existentes de registro (SignupForm.tsx)
+export async function signupTrial(formData: FormData) {
+  const email = formData.get('email') as string
+  const password = formData.get('password') as string
+  const nombre = (formData.get('nombre') as string) || 'Usuario'
+  const nombreNegocio = (formData.get('comercio') as string) || 'Mi organización'
+
+  const res = await registroTrial({ email, password, nombre, nombreNegocio })
+  if (!res.success) return { error: res.error }
+  return { success: true, redirectUrl: '/dashboard', session: res.session }
+}
+
+// --- Fix Bug C: Login con mensajes de error descriptivos ---
+export async function loginUser(data: { email: string, password: string }) {
+  const supabase = await createClient()
+
+  const { data: authData, error } = await supabase.auth.signInWithPassword({
+    email: data.email,
+    password: data.password
+  })
 
   if (error) {
-    return { error: error.message }
+    if (error.message.includes('Invalid login credentials')) {
+      return { success: false, error: 'Email o contraseña incorrectos.' }
+    }
+    if (error.message.includes('Email not confirmed')) {
+      return { success: false, error: 'Confirma tu email antes de iniciar sesión.' }
+    }
+    return { success: false, error: error.message }
   }
 
   return { success: true, session: authData.session }
 }
 
-import { cookies } from 'next/headers'
+// Compatibilidad con LoginForm.tsx
+export async function login(formData: FormData) {
+  const email = formData.get('email') as string
+  const password = formData.get('password') as string
+
+  const res = await loginUser({ email, password })
+  if (!res.success) return { error: res.error }
+  return { success: true, session: res.session }
+}
 
 export async function loginWithGoogle(nombreOrganizacion?: string) {
   if (nombreOrganizacion) {
@@ -52,58 +142,49 @@ export async function loginWithGoogle(nombreOrganizacion?: string) {
   }
 }
 
-export async function signupTrial(formData: FormData) {
-  const email = formData.get('email') as string
-  const password = formData.get('password') as string
-  const nombre = (formData.get('nombre') as string) || 'Usuario'
-  const nombreOrganizacion = (formData.get('comercio') as string) || 'Mi organización'
-
-  // 1. Crear el usuario en Auth (usamos admin porque queremos controlar el insert posterior)
-  const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true, // Auto-confirmar en trial
-  })
-
-  if (authError || !authUser.user) {
-    return { error: authError?.message || 'Error al crear usuario' }
-  }
-
-  const userId = authUser.user.id
-
-  // 2. Transacción manual mediante RPC con Security Definer
-  const { error: rpcError } = await supabaseAdmin.rpc('create_trial_account', {
-    p_user_id: userId,
-    p_email: email,
-    p_nombre: nombre,
-    p_org_nombre: nombreOrganizacion
-  })
-
-  if (rpcError) {
-    // Si falla el RPC, borramos el usuario de Auth para hacer rollback
-    await supabaseAdmin.auth.admin.deleteUser(userId)
-    return { error: rpcError.message }
-  }
-
-  // Iniciar sesión automáticamente
+// --- Fix Bug C: Logout ---
+export async function logoutUser() {
   const supabase = await createClient()
-  const { data: authData } = await supabase.auth.signInWithPassword({ email, password })
-
-  return { success: true, redirectUrl: '/dashboard', session: authData.session }
+  await supabase.auth.signOut()
+  return { success: true }
 }
 
-export async function resetPasswordForEmail(formData: FormData) {
+// Compatibilidad con componentes que usan signOut()
+export async function signOut() {
   const supabase = await createClient()
-  const email = formData.get('email') as string
+  await supabase.auth.signOut()
+  redirect('/login')
+}
+
+// --- Fix Bug C: Recuperación y restablecimiento de contraseña ---
+export async function recuperarContrasena(email: string) {
+  const supabase = await createClient()
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/auth/callback`,
+    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/restablecer-contrasena`
   })
 
-  if (error) return { error: error.message }
+  if (error) return { success: false, error: error.message }
+  return { success: true }
+}
+
+// Compatibilidad con RecoveryForm.tsx
+export async function resetPasswordForEmail(formData: FormData) {
+  const email = formData.get('email') as string
+  const res = await recuperarContrasena(email)
+  if (!res.success) return { error: res.error }
   return { success: 'Te hemos enviado un correo con instrucciones.' }
 }
 
+export async function restablecerContrasena(password: string) {
+  const supabase = await createClient()
+
+  const { error } = await supabase.auth.updateUser({ password })
+  if (error) return { success: false, error: error.message }
+  return { success: true }
+}
+
+// --- Fix Bug B: Aceptación de invitación y activación de usuario ---
 export async function updatePasswordAndAcceptInvite(formData: FormData) {
   const supabase = await createClient()
   const password = formData.get('password') as string
@@ -115,17 +196,12 @@ export async function updatePasswordAndAcceptInvite(formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser()
   
   if (user) {
+    // Marcar invitación como aceptada y activo: true en tabla users
     await supabaseAdmin
       .from('users')
-      .update({ nombre, invitacion_aceptada: true })
+      .update({ nombre, invitacion_aceptada: true, activo: true })
       .eq('id', user.id)
   }
 
   return { success: true }
-}
-
-export async function signOut() {
-  const supabase = await createClient()
-  await supabase.auth.signOut()
-  redirect('/login')
 }

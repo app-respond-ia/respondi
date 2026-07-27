@@ -6,43 +6,122 @@ export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
   const type = searchParams.get('type')
+  const next = searchParams.get('next') ?? '/'
 
-  if (code) {
-    const supabase = await createClient()
-    const { data: sessionData, error } = await supabase.auth.exchangeCodeForSession(code)
-    
-    if (!error && sessionData.user) {
-      if (type === 'recovery') {
-        return NextResponse.redirect(`${origin}/restablecer-contrasena`)
+  if (!code) {
+    return NextResponse.redirect(`${origin}/login?error=no_code`)
+  }
+
+  const supabase = await createClient()
+  const { error } = await supabase.auth.exchangeCodeForSession(code)
+
+  if (error) {
+    return NextResponse.redirect(`${origin}/login?error=callback_error`)
+  }
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return NextResponse.redirect(`${origin}/login`)
+  }
+
+  if (type === 'recovery') {
+    return NextResponse.redirect(`${origin}/restablecer-contrasena`)
+  }
+
+  // Obtener datos del usuario
+  let { data: userData } = await supabase
+    .from('users')
+    .select('tenant_id, branch_id, rol, invitacion_aceptada')
+    .eq('id', user.id)
+    .single()
+
+  // Si el usuario no existe en public.users (por ejemplo, primer inicio con Google OAuth), crear cuenta trial
+  if (!userData) {
+    const nombre = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuario'
+    await supabaseAdmin.rpc('create_trial_account', {
+      p_user_id: user.id,
+      p_email: user.email!,
+      p_nombre: nombre,
+      p_org_nombre: 'Organización de ' + nombre
+    })
+
+    const res = await supabase
+      .from('users')
+      .select('tenant_id, branch_id, rol, invitacion_aceptada')
+      .eq('id', user.id)
+      .single()
+    userData = res.data
+  }
+
+  // Usuario no existe en tabla users todavía (puede pasar en race condition si el rpc falló)
+  if (!userData) {
+    return NextResponse.redirect(`${origin}/onboarding`)
+  }
+
+  // Usuario invitado que aún no ha aceptado la invitación
+  if (userData.invitacion_aceptada === false) {
+    // Marcar invitación como aceptada
+    await supabaseAdmin
+      .from('users')
+      .update({ invitacion_aceptada: true, activo: true })
+      .eq('id', user.id)
+
+    return NextResponse.redirect(`${origin}/dashboard`)
+  }
+
+  // Vendedor
+  if (userData.rol === 'vendedor') {
+    return NextResponse.redirect(`${origin}/vendedor`)
+  }
+
+  // Superadmin
+  if (userData.rol === 'super_admin') {
+    return NextResponse.redirect(`${origin}/superadmin`)
+  }
+
+  // Usuario sin tenant — va a onboarding
+  if (!userData.tenant_id) {
+    return NextResponse.redirect(`${origin}/onboarding`)
+  }
+
+  // Verificar onboarding completado
+  let branchId = userData.branch_id
+
+  if (!branchId) {
+    const { data: branch } = await supabase
+      .from('sucursales')
+      .select('id, onboarding_completado')
+      .eq('tenant_id', userData.tenant_id)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .single()
+
+    if (branch) {
+      branchId = branch.id
+      await supabase.from('users').update({ branch_id: branchId }).eq('id', user.id)
+
+      if (!branch.onboarding_completado) {
+        return NextResponse.redirect(`${origin}/onboarding`)
       }
+    } else {
+      return NextResponse.redirect(`${origin}/onboarding`)
+    }
+  } else {
+    const { data: sucursal } = await supabase
+      .from('sucursales')
+      .select('onboarding_completado')
+      .eq('id', branchId)
+      .single()
 
-      const user = sessionData.user
-      
-      // Comprobamos si el usuario ya existe en public.users
-      const { data: existingUser } = await supabaseAdmin
-        .from('users')
-        .select('id')
-        .eq('id', user.id)
-        .single()
-
-      if (!existingUser) {
-        // Nuevo usuario: ejecutar transacción RPC atómica
-        const nombre = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuario'
-        
-        await supabaseAdmin.rpc('create_trial_account', {
-          p_user_id: user.id,
-          p_email: user.email!,
-          p_nombre: nombre,
-          p_org_nombre: 'Organización de ' + nombre
-        })
-      }
-
-      // En ambos casos (nuevo o existente), redirigimos a /onboarding.
-      // El middleware se encargará de mandar a /dashboard si ya lo completó.
+    if (!sucursal?.onboarding_completado) {
       return NextResponse.redirect(`${origin}/onboarding`)
     }
   }
 
-  // Si hay error o no hay código, redirigimos con error
-  return NextResponse.redirect(`${origin}/login?error=AuthCallbackFailed`)
+  // Todo correcto — ir al dashboard o al parámetro next
+  if (next !== '/') {
+    return NextResponse.redirect(`${origin}${next}`)
+  }
+
+  return NextResponse.redirect(`${origin}/dashboard`)
 }

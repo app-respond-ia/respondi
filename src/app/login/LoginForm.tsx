@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { login, loginWithGoogle } from '@/app/actions/auth'
+import { loginUser } from '@/app/actions/auth'
 import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
 
@@ -13,18 +13,13 @@ export default function LoginForm() {
   async function handleSubmit(formData: FormData) {
     setIsLoading(true)
     setError(null)
-    const result = await login(formData)
-    if (result?.error) {
-      setError(result.error)
+    const email = formData.get('email') as string
+    const password = formData.get('password') as string
+    const result = await loginUser({ email, password })
+    if (!result.success) {
+      setError(result.error || 'Error al iniciar sesión')
       setIsLoading(false)
     } else {
-      if (result?.session) {
-        const supabase = createClient()
-        await supabase.auth.setSession({
-          access_token: result.session.access_token,
-          refresh_token: result.session.refresh_token,
-        })
-      }
       window.location.href = '/'
     }
   }
@@ -32,12 +27,18 @@ export default function LoginForm() {
   async function handleGoogle() {
     setIsLoading(true)
     setError(null)
-    const result = await loginWithGoogle()
-    if (result?.error) {
-      setError(result.error)
+    const supabase = createClient()
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`
+      }
+    })
+    if (error) {
+      setError(error.message)
       setIsLoading(false)
-    } else if (result?.url) {
-      window.location.href = result.url
+    } else if (data?.url) {
+      window.location.href = data.url
     }
   }
 

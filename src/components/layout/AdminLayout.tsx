@@ -4,25 +4,29 @@ import { useState } from 'react'
 import Sidebar from './Sidebar'
 import Header from './Header'
 
-type AdminLayoutProps = {
+interface AdminLayoutProps {
   children: React.ReactNode
-  user: {
-    nombre: string
-    email: string
-    initials: string
-    roleName: string
-  }
-  branches: {
-    id: string
-    nombre: string
-  }[]
-  activeBranchId: string
-  permisos: { seccion: string, nivel: string, alcance?: string }[]
-  esAdmin: boolean
+  esAdmin?: boolean
+  permisos?: any[]
+  nombreUsuario?: string
 }
 
-export default function AdminLayout({ children, user, branches, activeBranchId, permisos, esAdmin }: AdminLayoutProps) {
+export default function AdminLayout({
+  children,
+  esAdmin = false,
+  permisos = [],
+  nombreUsuario = ''
+}: AdminLayoutProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+
+  const user = {
+    nombre: nombreUsuario,
+    email: '',
+    initials: nombreUsuario ? nombreUsuario.substring(0, 2).toUpperCase() : 'U',
+    roleName: esAdmin ? 'Administrador' : 'Usuario'
+  }
+  const branches: { id: string; nombre: string }[] = []
+  const activeBranchId = ''
 
   return (
     <div className="min-h-screen lg:flex bg-slate-50 text-ink-900">

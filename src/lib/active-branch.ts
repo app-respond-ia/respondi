@@ -1,30 +1,59 @@
 import { cookies } from 'next/headers'
 
-export async function resolveBranchId(
-  supabase: any,
-  userId: string
-): Promise<string | null> {
+export async function resolveBranchId(supabase: any, userId: string): Promise<string | null> {
   const cookieStore = await cookies()
-  const cookieBranch = cookieStore.get('respondi_active_branch')?.value
+  const cookieBranchId = cookieStore.get('active_branch_id')?.value
 
-  if (cookieBranch) {
-    const { data } = await supabase
-      .from('user_branches')
-      .select('branch_id')
-      .eq('user_id', userId)
-      .eq('branch_id', cookieBranch)
+  if (cookieBranchId) {
+    const { data: branch } = await supabase
+      .from('sucursales')
+      .select('id')
+      .eq('id', cookieBranchId)
       .single()
-    if (data) return data.branch_id
+
+    if (branch) return cookieBranchId
   }
 
-  // Fallback: primera sucursal de user_branches para este usuario
-  const { data } = await supabase
-    .from('user_branches')
-    .select('branch_id')
-    .eq('user_id', userId)
-    .order('branch_id', { ascending: true })
-    .limit(1)
+  const { data: userData } = await supabase
+    .from('users')
+    .select('branch_id, tenant_id')
+    .eq('id', userId)
     .single()
-    
-  return data?.branch_id ?? null
+
+  if (userData?.branch_id) {
+    cookieStore.set('active_branch_id', userData.branch_id, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7
+    })
+    return userData.branch_id
+  }
+
+  if (userData?.tenant_id) {
+    const { data: branch } = await supabase
+      .from('sucursales')
+      .select('id')
+      .eq('tenant_id', userData.tenant_id)
+      .eq('activa', true)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .single()
+
+    if (branch) {
+      cookieStore.set('active_branch_id', branch.id, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 7
+      })
+      await supabase
+        .from('users')
+        .update({ branch_id: branch.id })
+        .eq('id', userId)
+      return branch.id
+    }
+  }
+
+  return null
 }

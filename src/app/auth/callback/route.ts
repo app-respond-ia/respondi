@@ -28,14 +28,12 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}/restablecer-contrasena`)
   }
 
-  // Obtener datos del usuario
-  let { data: userData } = await supabase
+  let { data: userData } = await supabaseAdmin
     .from('users')
     .select('tenant_id, branch_id, rol, invitacion_aceptada')
     .eq('id', user.id)
     .single()
 
-  // Si el usuario no existe en public.users (por ejemplo, primer inicio con Google OAuth), crear cuenta trial
   if (!userData) {
     const nombre = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuario'
     const { error: rpcError } = await supabaseAdmin.rpc('create_trial_account', {
@@ -58,14 +56,11 @@ export async function GET(request: Request) {
     userData = res.data
   }
 
-  // Usuario no existe en tabla users todavía (puede pasar en race condition si el rpc falló)
   if (!userData) {
     return NextResponse.redirect(`${origin}/onboarding`)
   }
 
-  // Usuario invitado que aún no ha aceptado la invitación
   if (userData.invitacion_aceptada === false) {
-    // Marcar invitación como aceptada
     await supabaseAdmin
       .from('users')
       .update({ invitacion_aceptada: true, activo: true })
@@ -74,26 +69,22 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}/dashboard`)
   }
 
-  // Vendedor
   if (userData.rol === 'vendedor') {
     return NextResponse.redirect(`${origin}/vendedor`)
   }
 
-  // Superadmin
   if (userData.rol === 'super_admin') {
     return NextResponse.redirect(`${origin}/superadmin`)
   }
 
-  // Usuario sin tenant — va a onboarding
   if (!userData.tenant_id) {
     return NextResponse.redirect(`${origin}/onboarding`)
   }
 
-  // Verificar onboarding completado
   let branchId = userData.branch_id
 
   if (!branchId) {
-    const { data: branch } = await supabase
+    const { data: branch } = await supabaseAdmin
       .from('sucursales')
       .select('id, onboarding_completado')
       .eq('tenant_id', userData.tenant_id)
@@ -103,7 +94,7 @@ export async function GET(request: Request) {
 
     if (branch) {
       branchId = branch.id
-      await supabase.from('users').update({ branch_id: branchId }).eq('id', user.id)
+      await supabaseAdmin.from('users').update({ branch_id: branchId }).eq('id', user.id)
 
       if (!branch.onboarding_completado) {
         return NextResponse.redirect(`${origin}/onboarding`)
@@ -112,7 +103,7 @@ export async function GET(request: Request) {
       return NextResponse.redirect(`${origin}/onboarding`)
     }
   } else {
-    const { data: sucursal } = await supabase
+    const { data: sucursal } = await supabaseAdmin
       .from('sucursales')
       .select('onboarding_completado')
       .eq('id', branchId)
@@ -123,7 +114,6 @@ export async function GET(request: Request) {
     }
   }
 
-  // Todo correcto — ir al dashboard o al parámetro next
   if (next !== '/') {
     return NextResponse.redirect(`${origin}${next}`)
   }

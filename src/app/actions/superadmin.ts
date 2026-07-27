@@ -137,17 +137,47 @@ export async function crearVendedor(data: {
 }) {
   const { supabase, userId } = await requireSuperAdmin()
 
-  // Invitar al vendedor por email para que tenga acceso
+  // Verificar si el email ya existe en la tabla users
+  const { data: userExistente } = await supabase
+    .from('users')
+    .select('id, rol')
+    .eq('email', data.email)
+    .single()
+
+  if (userExistente) {
+    if (userExistente.rol === 'vendedor') {
+      return { success: false, error: 'Este email ya tiene una cuenta de vendedor en Respondi.' }
+    }
+    return { success: false, error: 'Este email ya está registrado en Respondi con otro rol. Usa un email diferente.' }
+  }
+
+  // Verificar si ya existe en vendedores
+  const { data: vendedorExistente } = await supabase
+    .from('vendedores')
+    .select('id')
+    .eq('email', data.email)
+    .single()
+
+  if (vendedorExistente) {
+    return { success: false, error: 'Ya existe un vendedor con este email.' }
+  }
+
+  // Invitar al vendedor por email
   const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(data.email, {
     redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/auth/callback`
   })
 
   if (inviteError || !inviteData?.user) {
-    return { success: false, error: inviteError?.message || 'Error al invitar al vendedor' }
+    // Manejar error específico de email ya existente en Auth
+    const errMsg = inviteError?.message || ''
+    if (errMsg.includes('already been registered') || errMsg.includes('already exists')) {
+      return { success: false, error: 'Este email ya tiene una cuenta en Respondi. Usa un email diferente.' }
+    }
+    return { success: false, error: errMsg || 'Error al enviar la invitación al vendedor.' }
   }
 
   // Crear registro en users con rol vendedor
-  await supabaseAdmin.from('users').insert([{
+  const { error: userErr } = await supabaseAdmin.from('users').insert([{
     id: inviteData.user.id,
     email: data.email,
     nombre: data.nombre,
@@ -155,6 +185,12 @@ export async function crearVendedor(data: {
     activo: true,
     invitacion_aceptada: false
   }])
+
+  if (userErr) {
+    // Rollback: eliminar el usuario de Auth si falla el insert en users
+    await supabaseAdmin.auth.admin.deleteUser(inviteData.user.id)
+    return { success: false, error: 'Error al crear el usuario. Inténtalo de nuevo.' }
+  }
 
   // Crear registro en vendedores
   const { data: result, error } = await supabase
@@ -171,16 +207,22 @@ export async function crearVendedor(data: {
     .select()
     .single()
 
-  if (error) return { success: false, error: error.message }
+  if (error) {
+    // Rollback completo
+    await supabaseAdmin.auth.admin.deleteUser(inviteData.user.id)
+    await supabaseAdmin.from('users').delete().eq('id', inviteData.user.id)
+    return { success: false, error: error.message }
+  }
 
-  // Log
-  await supabase.from('comisiones_log').insert({
-    comision_id: result.id,
-    accion: 'crear_vendedor',
+  await supabase.from('audit_log').insert({
+    tenant_id: null,
     user_id: userId,
+    accion: 'crear_vendedor',
+    tabla_afectada: 'vendedores',
+    registro_id: result.id,
     valor_anterior: null,
     valor_nuevo: { nombre: data.nombre, email: data.email }
-  }) // no bloquear si falla el log
+  })
 
   revalidatePath('/superadmin/vendedores')
   return { success: true, vendedor: result }

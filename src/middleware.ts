@@ -88,9 +88,19 @@ export async function middleware(request: NextRequest) {
       return redirectWithCookies(roleBasePath)
     }
 
-    // Si está en una ruta protegida, validar que coincida con su rol
-    if (isProtectedRoute && roleBasePath && !pathname.startsWith(roleBasePath) && !pathname.startsWith('/onboarding')) {
-      return redirectWithCookies(roleBasePath)
+    // Si el usuario intenta acceder a una ruta que no le corresponde por rol
+    const isVendedorRoute = pathname.startsWith('/vendedor')
+    const isDashboardRoute = pathname.startsWith('/dashboard')
+    const isSuperadminRoute = pathname.startsWith('/superadmin')
+
+    if (isVendedorRoute && role !== 'vendedor' && role !== null) {
+      return redirectWithCookies(roleBasePath || '/login')
+    }
+    if (isDashboardRoute && (role === 'vendedor' || role === 'super_admin') && role !== null) {
+      return redirectWithCookies(roleBasePath || '/login')
+    }
+    if (isSuperadminRoute && role !== 'super_admin' && role !== null) {
+      return redirectWithCookies(roleBasePath || '/login')
     }
   }
 

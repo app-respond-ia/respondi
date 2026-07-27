@@ -5,7 +5,7 @@ import { createClient } from '@/utils/supabase/server'
 export async function getOnboardingState() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: 'No user' }
+  if (!user) return { success: false, error: 'no_session' }
 
   const { data: userData } = await supabase
     .from('users')
@@ -13,31 +13,52 @@ export async function getOnboardingState() {
     .eq('id', user.id)
     .single()
 
-  if (!userData?.tenant_id) return { success: false, error: 'No tenant' }
+  if (!userData?.tenant_id) return { success: false, error: 'no_tenant' }
 
-  const { data: sucursal } = await supabase
-    .from('sucursales')
-    .select('onboarding_paso, onboarding_completado')
-    .eq('tenant_id', userData.tenant_id)
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .single()
-
+  // Buscar sucursal — primero por branch_id del usuario, luego por tenant_id
   let branchId = userData.branch_id
+
   if (!branchId) {
     const { data: branch } = await supabase
       .from('sucursales')
       .select('id')
       .eq('tenant_id', userData.tenant_id)
+      .order('created_at', { ascending: true })
       .limit(1)
       .single()
-    if (branch) branchId = branch.id
+
+    if (branch) {
+      branchId = branch.id
+      // Asignar branch_id al usuario si no lo tenía
+      await supabase
+        .from('users')
+        .update({ branch_id: branchId })
+        .eq('id', user.id)
+    }
   }
+
+  if (!branchId) {
+    // No hay sucursal todavía — puede pasar justo después del registro
+    // Devolvemos estado inicial sin redirigir a login
+    return {
+      success: true,
+      tenantId: userData.tenant_id,
+      branchId: null,
+      paso: 1,
+      completado: false
+    }
+  }
+
+  const { data: sucursal } = await supabase
+    .from('sucursales')
+    .select('onboarding_paso, onboarding_completado')
+    .eq('id', branchId)
+    .single()
 
   return {
     success: true,
     tenantId: userData.tenant_id,
-    branchId: branchId,
+    branchId,
     paso: sucursal?.onboarding_paso ?? 1,
     completado: sucursal?.onboarding_completado ?? false
   }
@@ -67,8 +88,14 @@ export async function saveStep1(data: {
     .update({ nombre: data.nombreNegocio, direccion_fiscal: data.direccionFiscal })
     .eq('id', tenantId)
 
-  // Check if branch exists
-  let { data: branch } = await supabase.from('sucursales').select('id').eq('tenant_id', tenantId).limit(1).single()
+  // Buscar sucursal existente
+  let { data: branch } = await supabase
+    .from('sucursales')
+    .select('id')
+    .eq('tenant_id', tenantId)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .single()
 
   if (!branch) {
     const { data: newBranch, error: branchErr } = await supabase
@@ -78,14 +105,16 @@ export async function saveStep1(data: {
         nombre: data.nombreSucursal,
         direccion: data.direccionSucursal,
         timezone: data.timezone,
-        activa: true
+        activa: true,
+        onboarding_completado: false,
+        onboarding_paso: 1
       })
       .select('id')
       .single()
     if (branchErr) throw branchErr
     branch = newBranch
   } else {
-    const { error: branchErr } = await supabase
+    await supabase
       .from('sucursales')
       .update({
         nombre: data.nombreSucursal,
@@ -93,28 +122,33 @@ export async function saveStep1(data: {
         timezone: data.timezone
       })
       .eq('id', branch.id)
-    if (branchErr) throw branchErr
   }
 
-  // Update user
-  await supabase.from('users').update({ branch_id: branch.id, nombre: data.nombrePersona }).eq('id', user.id)
+  // Asegurarse de que el usuario tiene branch_id asignado
+  await supabase
+    .from('users')
+    .update({ branch_id: branch.id, nombre: data.nombrePersona })
+    .eq('id', user.id)
 
   // Upsert business_profile
   const politicasStr = data.politicas.join('\n')
-  let { data: profile } = await supabase.from('business_profiles').select('id').eq('branch_id', branch.id).single()
+  const { data: profile } = await supabase
+    .from('business_profiles')
+    .select('id')
+    .eq('branch_id', branch.id)
+    .single()
+
   if (!profile) {
-    const { error: profileErr } = await supabase.from('business_profiles').insert({
+    await supabase.from('business_profiles').insert({
       branch_id: branch.id,
       servicios: data.servicios,
       politicas: politicasStr
     })
-    if (profileErr) throw profileErr
   } else {
-    const { error: profileErr } = await supabase.from('business_profiles').update({
+    await supabase.from('business_profiles').update({
       servicios: data.servicios,
       politicas: politicasStr
     }).eq('id', profile.id)
-    if (profileErr) throw profileErr
   }
 
   await supabase.from('sucursales').update({ onboarding_paso: 2 }).eq('id', branch.id)
@@ -134,8 +168,8 @@ export async function saveStep2(data: {
   const rows = data.horarios.map(h => ({
     branch_id: data.branchId,
     dia_semana: h.dia_semana,
-    apertura: h.activo ? h.apertura : null,
-    cierre: h.activo ? h.cierre : null,
+    apertura: h.activo ? (h.apertura.length === 5 ? `${h.apertura}:00` : h.apertura) : null,
+    cierre: h.activo ? (h.cierre.length === 5 ? `${h.cierre}:00` : h.cierre) : null,
     cerrado: !h.activo,
     orden: 0
   }))
@@ -177,18 +211,21 @@ export async function saveStep3(data: {
 export async function saveStep4(data: { tenantId: string, branchId: string, msg: string }) {
   const supabase = await createClient()
 
-  let { data: profile } = await supabase.from('business_profiles').select('id').eq('branch_id', data.branchId).single()
+  const { data: profile } = await supabase
+    .from('business_profiles')
+    .select('id')
+    .eq('branch_id', data.branchId)
+    .single()
+
   if (!profile) {
-    const { error } = await supabase.from('business_profiles').insert({
+    await supabase.from('business_profiles').insert({
       branch_id: data.branchId,
       msg_fuera_horario: data.msg
     })
-    if (error) throw error
   } else {
-    const { error } = await supabase.from('business_profiles')
+    await supabase.from('business_profiles')
       .update({ msg_fuera_horario: data.msg })
       .eq('branch_id', data.branchId)
-    if (error) throw error
   }
 
   await supabase.from('sucursales').update({ onboarding_paso: 5 }).eq('id', data.branchId)

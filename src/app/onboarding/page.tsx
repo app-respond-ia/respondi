@@ -64,17 +64,23 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     getOnboardingState().then(res => {
-      if (res.success) {
-        if (res.completado) {
-          router.replace('/dashboard')
-        } else {
-          setTenantId(res.tenantId || '')
-          setBranchId(res.branchId || '')
-          setStep(res.paso || 1)
+      if (!res.success) {
+        // Si no hay sesión, ir a login
+        if (res.error === 'no_session') {
+          router.replace('/login')
         }
-      } else {
-        router.replace('/login')
+        // Si hay sesión pero no hay tenant todavía, esperar
+        // No redirigir a login — puede ser race condition post-registro
+        setLoading(false)
+        return
       }
+      if (res.completado) {
+        router.replace('/dashboard')
+        return
+      }
+      setTenantId(res.tenantId || '')
+      setBranchId(res.branchId || '')
+      setStep(res.paso || 1)
       setLoading(false)
     })
   }, [router])

@@ -191,26 +191,43 @@ export async function saveStep3(data: {
   branchId: string
   skills: { idName: string, nombre: string, activo: boolean }[]
 }) {
-  const supabase = await createClient()
+  try {
+    const supabase = await createClient()
 
-  await supabase.from('skills').delete().eq('branch_id', data.branchId)
+    const { error: delError } = await supabase.from('skills').delete().eq('branch_id', data.branchId)
+    if (delError) {
+      console.error('Error borrando skills en paso 3:', delError, JSON.stringify(delError))
+      throw delError
+    }
 
-  const rows = data.skills.filter(s => s.activo).map((s, idx) => ({
-    tenant_id: data.tenantId,
-    branch_id: data.branchId,
-    nombre: s.nombre,
-    descripcion: s.nombre,
-    activo: true,
-    orden: idx
-  }))
+    const rows = data.skills.filter(s => s.activo).map((s, idx) => ({
+      tenant_id: data.tenantId,
+      branch_id: data.branchId,
+      nombre: s.nombre,
+      descripcion: s.nombre,
+      activo: true,
+      orden: idx
+    }))
 
-  if (rows.length > 0) {
-    const { error } = await supabase.from('skills').insert(rows)
-    if (error) throw error
+    if (rows.length > 0) {
+      const { error } = await supabase.from('skills').insert(rows)
+      if (error) {
+        console.error('Error insertando skills en paso 3:', error, JSON.stringify(error))
+        throw error
+      }
+    }
+
+    const { error: updError } = await supabase.from('sucursales').update({ onboarding_paso: 4 }).eq('id', data.branchId)
+    if (updError) {
+      console.error('Error actualizando sucursal en paso 3:', updError, JSON.stringify(updError))
+      throw updError
+    }
+
+    return { success: true }
+  } catch (error: any) {
+    console.error('Error en paso Skills de IA:', error, JSON.stringify(error, Object.getOwnPropertyNames(error || {})))
+    throw error
   }
-
-  await supabase.from('sucursales').update({ onboarding_paso: 4 }).eq('id', data.branchId)
-  return { success: true }
 }
 
 export async function saveStep4(data: { tenantId: string, branchId: string, msg: string }) {

@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
+import { supabaseAdmin } from '@/utils/supabase/admin'
 
 export async function getOnboardingState() {
   const supabase = await createClient()
@@ -78,12 +79,12 @@ export async function saveStep1(data: {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Unauthenticated')
 
-  // Buscar tenant_id con reintentos para manejar race condition post-registro
+  // Usar supabaseAdmin para evitar problemas de RLS
   let tenantId: string | null = null
   let intentos = 0
   
   while (!tenantId && intentos < 5) {
-    const { data: userData } = await supabase
+    const { data: userData } = await supabaseAdmin
       .from('users')
       .select('tenant_id')
       .eq('id', user.id)
@@ -96,7 +97,7 @@ export async function saveStep1(data: {
       await new Promise(resolve => setTimeout(resolve, 500))
     }
   }
-
+  
   if (!tenantId) throw new Error('No tenant')
 
   // Actualizar organización con nombre y dirección fiscal

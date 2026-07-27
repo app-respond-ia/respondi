@@ -143,7 +143,7 @@ export async function getMetricas(periodo: 'hoy' | 'semana' | 'mes' | 'total' = 
     .eq('branch_id', branchId)
 
   const creditosDisponibles = quotaData
-    ?.filter(q => q.tipo === 'credito')
+    ?.filter(q => q.tipo === 'abono')
     .reduce((acc, q) => acc + q.cantidad, 0) || 0
 
   const creditosConsumidos = quotaData

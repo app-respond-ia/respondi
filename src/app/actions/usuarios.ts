@@ -76,6 +76,20 @@ export async function invitarUsuario(data: { email: string, nombre: string | nul
     }
   }
 
+  // Verificar si el email ya existe en Respondi
+  const { data: userExistente } = await supabaseAdmin
+    .from('users')
+    .select('id, tenant_id')
+    .eq('email', data.email)
+    .single()
+
+  if (userExistente) {
+    if (userExistente.tenant_id === auth.tenant_id) {
+      return { success: false, error: 'Este usuario ya pertenece a tu organización.' }
+    }
+    return { success: false, error: 'Este email ya tiene una cuenta en Respondi. Usa otro email.' }
+  }
+
   const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(data.email, {
     redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/aceptar-invitacion`
   })
@@ -141,16 +155,33 @@ export async function invitarUsuario(data: { email: string, nombre: string | nul
   return { success: true, data: newUser }
 }
 
-export async function actualizarUsuario(id: string, data: Partial<{ nombre: string, branch_ids: string[], permisos: { branch_id: string, secciones: { seccion: string, nivel: string, alcance?: string }[] }[] }>) {
+export async function actualizarUsuario(id: string, data: Partial<{ nombre: string, branch_ids: string[], permisos: { branch_id: string, secciones: { seccion: string, nivel: string, alcance?: string }[] }[], activo: boolean, rol: string }>) {
 
   const supabase = await createClient()
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
+  // Proteger al último admin activo
+  if (data.activo === false) {
+    const { count } = await supabase
+      .from('users')
+      .select('*', { count: 'exact', head: true })
+      .eq('tenant_id', auth.tenant_id)
+      .eq('rol', 'admin')
+      .eq('activo', true)
+      .neq('id', id)
+
+    if (!count || count === 0) {
+      return { success: false, error: 'No puedes desactivar al único administrador de la organización.' }
+    }
+  }
+
   const { data: updated, error } = await supabase
     .from('users')
     .update({
       ...(data.nombre !== undefined && { nombre: data.nombre }),
+      ...(data.activo !== undefined && { activo: data.activo }),
+      ...(data.rol !== undefined && { rol: data.rol }),
       ...(data.branch_ids && data.branch_ids.length > 0 && { branch_id: data.branch_ids[0] })
     })
     .eq('id', id)

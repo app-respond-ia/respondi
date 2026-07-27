@@ -3,6 +3,8 @@ import { createClient } from '@/utils/supabase/server'
 import AdminLayout from '@/components/layout/AdminLayout'
 import { getMisPermisos } from '@/app/actions/permisos'
 
+export const dynamic = 'force-dynamic'
+
 export default async function DashboardLayout({
   children,
 }: {

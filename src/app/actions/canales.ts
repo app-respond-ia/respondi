@@ -48,47 +48,59 @@ export async function getCanales() {
   return { success: true, data: { canales, canales_max, canales_activos_count } }
 }
 
-export async function conectarCanal(tipo: 'instagram'|'whatsapp'|'facebook', metodo: 'whaticket'|'meta_oficial') {
+export async function conectarCanal(dataOrTipo: any, argMetodo?: any) {
   const supabase = await createClient()
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
-  const { data: existing } = await supabase
-    .from('channels')
-    .select('id, estado')
-    .eq('branch_id', auth.branch_id)
-    .eq('tipo', tipo)
-    .maybeSingle()
+  const data = typeof dataOrTipo === 'string'
+    ? {
+        tipo: dataOrTipo,
+        nombre: dataOrTipo,
+        configuracion: { metodo: argMetodo }
+      }
+    : dataOrTipo
 
-  if (existing) {
-    if (existing.estado === 'desconectado' || existing.estado === 'error') {
-      const { data, error } = await supabase
+  let canalId: string | null = null
+
+  try {
+    // Crear el canal
+    const { data: newCanal, error: canalError } = await supabase
+      .from('channels')
+      .insert({
+        tenant_id: auth.tenant_id,
+        branch_id: auth.branch_id,
+        tipo: data.tipo,
+        metodo: data.metodo || data.configuracion?.metodo || argMetodo || 'whaticket',
+        estado: data.estado || 'pendiente',
+        nombre: data.nombre || data.tipo,
+        activo: true,
+        configuracion: data.configuracion || {}
+      })
+      .select()
+      .single()
+
+    if (canalError || !newCanal) throw new Error(canalError?.message || 'Error al crear canal')
+    canalId = newCanal.id
+
+    // Si hay credenciales adicionales, guardarlas
+    if (data.credenciales) {
+      const { error: credError } = await supabase
         .from('channels')
-        .update({ estado: 'pendiente', metodo })
-        .eq('id', existing.id)
-        .select()
-        .single()
-      if (error) return { success: false, error: error.message }
-      return { success: true, data }
-    } else {
-      return { success: false, error: 'El canal ya está activo o pendiente' }
+        .update({ credenciales: data.credenciales })
+        .eq('id', canalId)
+
+      if (credError) throw new Error(credError.message)
     }
+
+    return { success: true, canal: newCanal, data: newCanal }
+  } catch (err: any) {
+    // Rollback: eliminar canal si quedó creado a medias
+    if (canalId) {
+      await supabase.from('channels').delete().eq('id', canalId)
+    }
+    return { success: false, error: err.message || 'Error al conectar el canal. Inténtalo de nuevo.' }
   }
-
-  const { data, error } = await supabase
-    .from('channels')
-    .insert({
-      tenant_id: auth.tenant_id,
-      branch_id: auth.branch_id,
-      tipo,
-      metodo,
-      estado: 'pendiente'
-    })
-    .select()
-    .single()
-
-  if (error) return { success: false, error: error.message }
-  return { success: true, data }
 }
 
 export async function desconectarCanal(id: string) {

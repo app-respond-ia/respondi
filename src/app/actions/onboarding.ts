@@ -193,16 +193,61 @@ export async function saveStep3(data: {
 }) {
   try {
     const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
 
-    const { error: delError } = await supabase.from('skills').delete().eq('branch_id', data.branchId)
+    let tenantId = data.tenantId?.trim() || ''
+    let branchId = data.branchId?.trim() || ''
+
+    // Si el frontend envió branchId o tenantId vacíos, resolverlos desde el usuario y la sucursal recién creada
+    if ((!tenantId || !branchId) && user) {
+      const { data: userData } = await supabaseAdmin
+        .from('users')
+        .select('tenant_id, branch_id')
+        .eq('id', user.id)
+        .single()
+
+      if (!tenantId && userData?.tenant_id) {
+        tenantId = userData.tenant_id
+      }
+      if (!branchId && userData?.branch_id) {
+        branchId = userData.branch_id
+      }
+      // Si tenemos tenantId pero no branchId, buscar la primera sucursal creada en el Paso 1
+      if (!branchId && tenantId) {
+        const { data: branches } = await supabaseAdmin
+          .from('sucursales')
+          .select('id')
+          .eq('tenant_id', tenantId)
+          .order('created_at', { ascending: true })
+          .limit(1)
+
+        if (branches && branches.length > 0) {
+          branchId = branches[0].id
+        }
+      }
+    }
+
+    // Validación obligatoria ANTES de cualquier delete o insert para evitar UUID vacío ""
+    if (!branchId || branchId === '') {
+      const msg = 'El ID de sucursal no es válido o está vacío. Por favor, regresa al Paso 1 para crear la sucursal adecuadamente.'
+      console.error('Validation Error en saveStep3:', msg)
+      return { success: false, error: msg }
+    }
+    if (!tenantId || tenantId === '') {
+      const msg = 'El ID de organización no es válido o está vacío.'
+      console.error('Validation Error en saveStep3:', msg)
+      return { success: false, error: msg }
+    }
+
+    const { error: delError } = await supabaseAdmin.from('skills').delete().eq('branch_id', branchId)
     if (delError) {
       console.error('Error borrando skills en paso 3:', delError, JSON.stringify(delError))
       throw delError
     }
 
     const rows = data.skills.filter(s => s.activo).map((s, idx) => ({
-      tenant_id: data.tenantId,
-      branch_id: data.branchId,
+      tenant_id: tenantId,
+      branch_id: branchId,
       nombre: s.nombre,
       descripcion: s.nombre,
       activo: true,
@@ -210,14 +255,14 @@ export async function saveStep3(data: {
     }))
 
     if (rows.length > 0) {
-      const { error } = await supabase.from('skills').insert(rows)
+      const { error } = await supabaseAdmin.from('skills').insert(rows)
       if (error) {
         console.error('Error insertando skills en paso 3:', error, JSON.stringify(error))
         throw error
       }
     }
 
-    const { error: updError } = await supabase.from('sucursales').update({ onboarding_paso: 4 }).eq('id', data.branchId)
+    const { error: updError } = await supabaseAdmin.from('sucursales').update({ onboarding_paso: 4 }).eq('id', branchId)
     if (updError) {
       console.error('Error actualizando sucursal en paso 3:', updError, JSON.stringify(updError))
       throw updError

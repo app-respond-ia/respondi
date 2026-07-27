@@ -54,7 +54,7 @@ export async function getMetricas(periodo: 'hoy' | 'semana' | 'mes' | 'total' = 
   const duracionMedia = cerradas.length > 0
     ? Math.round(cerradas.reduce((acc, c) => {
         const dur = new Date(c.updated_at).getTime() - new Date(c.created_at).getTime()
-        return acc + dur
+        return acc + (isNaN(dur) ? 0 : dur)
       }, 0) / cerradas.length / 60000) // en minutos
     : 0
 
@@ -96,7 +96,8 @@ export async function getMetricas(periodo: 'hoy' | 'semana' | 'mes' | 'total' = 
   const casosCerradosData = casosData?.filter(c => c.status === 'cerrado') || []
   const tiempoMedioResolucion = casosCerradosData.length > 0
     ? Math.round(casosCerradosData.reduce((acc, c) => {
-        return acc + (new Date(c.updated_at).getTime() - new Date(c.created_at).getTime())
+        const dur = new Date(c.updated_at).getTime() - new Date(c.created_at).getTime()
+        return acc + (isNaN(dur) ? 0 : dur)
       }, 0) / casosCerradosData.length / 60000)
     : 0
 
@@ -154,7 +155,7 @@ export async function getMetricas(periodo: 'hoy' | 'semana' | 'mes' | 'total' = 
   const consumoReciente = quotaData
     ?.filter(q => q.tipo === 'consumo' && q.created_at >= hace30dias.toISOString())
     .reduce((acc, q) => acc + q.cantidad, 0) || 0
-  const consumoDiarioPromedio = Math.round(consumoReciente / 30)
+  const consumoDiarioPromedio = consumoReciente > 0 ? Math.round(consumoReciente / 30) : 0
 
   // Proyección días restantes
   const diasRestantes = consumoDiarioPromedio > 0

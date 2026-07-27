@@ -73,6 +73,16 @@ export async function crearEtiqueta(data: EtiquetaData) {
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
+  // Verificar límite máximo de etiquetas
+  const { count } = await supabase
+    .from('message_categories')
+    .select('*', { count: 'exact', head: true })
+    .eq('branch_id', auth.branch_id)
+
+  if (count && count >= 100) {
+    return { success: false, error: 'Has alcanzado el límite máximo de 100 etiquetas.' }
+  }
+
   // Calcular el máximo orden actual
   const { data: currentTags, error: fetchError } = await supabase
     .from('message_categories')

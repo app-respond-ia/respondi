@@ -102,6 +102,10 @@ export async function bloquearContacto(data: BloquearContactoData) {
 
   if (searchError) return { success: false, error: searchError.message }
 
+  if (existing?.blacklist) {
+    return { success: false, error: 'Este contacto ya está en la lista negra.' }
+  }
+
   const ahora = new Date().toISOString()
 
   if (existing) {

@@ -18,18 +18,22 @@ async function getAuthData(supabase: any) {
 }
 
 export async function getRolesPersonalizados() {
-  const supabase = await createClient()
-  const auth = await getAuthData(supabase)
-  if (auth.error) return { success: false, error: auth.error }
+  try {
+    const supabase = await createClient()
+    const auth = await getAuthData(supabase)
+    if (auth.error) return { success: false, error: auth.error }
 
-  const { data, error } = await supabase
-    .from('roles_personalizados')
-    .select('*')
-    .eq('tenant_id', auth.tenant_id)
-    .order('created_at', { ascending: true })
+    const { data, error } = await supabase
+      .from('roles_personalizados')
+      .select('*')
+      .eq('tenant_id', auth.tenant_id)
+      .order('created_at', { ascending: true })
 
-  if (error) return { success: false, error: error.message }
-  return { success: true, data }
+    if (error) return { success: false, error: error.message }
+    return { success: true, data: data || [] }
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Error al cargar los roles' }
+  }
 }
 
 export async function crearRolPersonalizado(data: {

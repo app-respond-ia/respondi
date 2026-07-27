@@ -104,6 +104,17 @@ export async function saveHorarios(horarios: HorarioDia[]) {
   const branchId = await resolveBranchId(supabase, user.id)
   if (!branchId) return { success: false, error: 'Usuario no vinculado a una sucursal' }
 
+  // Validar que apertura < cierre en cada franja
+  for (const h of horarios) {
+    if (!h.cerrado) {
+      for (const franja of h.franjas) {
+        if (franja.apertura && franja.cierre && franja.apertura >= franja.cierre) {
+          return { success: false, error: `El horario de apertura debe ser anterior al de cierre (día ${h.dia_semana}).` }
+        }
+      }
+    }
+  }
+
   // Borrar horarios actuales
   const { error: errorDelete } = await supabase
     .from('business_hours')

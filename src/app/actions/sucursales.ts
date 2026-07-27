@@ -167,17 +167,16 @@ export async function desactivarSucursal(id: string) {
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
-  // Check how many active branches are there
-  const { count, error: countError } = await supabase
+  // Verificar que no es la única sucursal activa
+  const { count } = await supabase
     .from('sucursales')
     .select('*', { count: 'exact', head: true })
     .eq('tenant_id', auth.tenant_id)
     .eq('activa', true)
+    .neq('id', id)
 
-  if (countError) return { success: false, error: countError.message }
-
-  if (count === null || count <= 1) {
-    return { success: false, error: 'No puedes desactivar tu única sucursal activa' }
+  if (!count || count === 0) {
+    return { success: false, error: 'No puedes desactivar la única sucursal activa de la organización.' }
   }
 
   const { data, error } = await supabase

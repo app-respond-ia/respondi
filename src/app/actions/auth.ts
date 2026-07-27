@@ -42,6 +42,9 @@ export async function registroTrial(data: {
 
   const userId = authData.user.id
 
+  // Esperar a que Auth propague el usuario antes de llamar al RPC
+  await new Promise(resolve => setTimeout(resolve, 1000))
+
   // Llamar al RPC para crear organización, sucursal y usuario
   const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('create_trial_account', {
     p_user_id: userId,

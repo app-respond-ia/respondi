@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
+import { supabaseAdmin } from '@/utils/supabase/admin'
 
 async function requireVendedor() {
   const supabase = await createClient()
@@ -115,8 +116,7 @@ export async function crearCuentaTrial(data: {
 }) {
   try {
     const { supabase, vendedor } = await requireVendedor()
-    // Importar supabaseAdmin para crear usuarios
-    const { supabaseAdmin } = await import('@/utils/supabase/admin')
+    // Usar supabaseAdmin importado estáticamente para crear usuarios
 
     const { data: planTrial } = await supabase.from('plans').select('id').eq('nombre', 'Trial').single()
     if (!planTrial) return { success: false, error: 'Plan Trial no encontrado' }

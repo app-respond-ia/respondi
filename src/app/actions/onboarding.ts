@@ -79,44 +79,31 @@ export async function saveStep1(data: {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Unauthenticated')
 
-  // Usar supabaseAdmin para evitar problemas de RLS
-  let tenantId: string | null = null
-  let intentos = 0
-  
-  while (!tenantId && intentos < 5) {
-    const { data: userData } = await supabaseAdmin
-      .from('users')
-      .select('tenant_id')
-      .eq('id', user.id)
-      .single()
-    
-    tenantId = userData?.tenant_id || null
-    
-    if (!tenantId) {
-      intentos++
-      await new Promise(resolve => setTimeout(resolve, 500))
-    }
-  }
-  
-  if (!tenantId) throw new Error('No tenant')
+  const { data: userData, error: userErr } = await supabaseAdmin
+    .from('users')
+    .select('tenant_id')
+    .eq('id', user.id)
+    .single()
 
-  // Actualizar organización con nombre y dirección fiscal
-  await supabase
+  if (userErr || !userData?.tenant_id) throw new Error('No tenant')
+  const tenantId = userData.tenant_id
+
+  await supabaseAdmin
     .from('organizaciones')
     .update({ nombre: data.nombreNegocio, direccion_fiscal: data.direccionFiscal })
     .eq('id', tenantId)
 
-  // Buscar sucursal existente
-  let { data: branch } = await supabase
+  const { data: branches } = await supabaseAdmin
     .from('sucursales')
     .select('id')
     .eq('tenant_id', tenantId)
     .order('created_at', { ascending: true })
     .limit(1)
-    .single()
+
+  let branch = branches && branches.length > 0 ? branches[0] : null
 
   if (!branch) {
-    const { data: newBranch, error: branchErr } = await supabase
+    const { data: newBranch, error: branchErr } = await supabaseAdmin
       .from('sucursales')
       .insert({
         tenant_id: tenantId,
@@ -132,7 +119,7 @@ export async function saveStep1(data: {
     if (branchErr) throw branchErr
     branch = newBranch
   } else {
-    await supabase
+    await supabaseAdmin
       .from('sucursales')
       .update({
         nombre: data.nombreSucursal,
@@ -142,34 +129,34 @@ export async function saveStep1(data: {
       .eq('id', branch.id)
   }
 
-  // Asegurarse de que el usuario tiene branch_id asignado
-  await supabase
+  await supabaseAdmin
     .from('users')
     .update({ branch_id: branch.id, nombre: data.nombrePersona })
     .eq('id', user.id)
 
-  // Upsert business_profile
   const politicasStr = data.politicas.join('\n')
-  const { data: profile } = await supabase
+  const { data: profiles } = await supabaseAdmin
     .from('business_profiles')
     .select('id')
     .eq('branch_id', branch.id)
-    .single()
+    .limit(1)
+
+  const profile = profiles && profiles.length > 0 ? profiles[0] : null
 
   if (!profile) {
-    await supabase.from('business_profiles').insert({
+    await supabaseAdmin.from('business_profiles').insert({
       branch_id: branch.id,
       servicios: data.servicios,
       politicas: politicasStr
     })
   } else {
-    await supabase.from('business_profiles').update({
+    await supabaseAdmin.from('business_profiles').update({
       servicios: data.servicios,
       politicas: politicasStr
     }).eq('id', profile.id)
   }
 
-  await supabase.from('sucursales').update({ onboarding_paso: 2 }).eq('id', branch.id)
+  await supabaseAdmin.from('sucursales').update({ onboarding_paso: 2 }).eq('id', branch.id)
   return { success: true, branchId: branch.id }
 }
 

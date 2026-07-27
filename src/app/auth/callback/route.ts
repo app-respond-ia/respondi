@@ -28,15 +28,17 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}/restablecer-contrasena`)
   }
 
-  let { data: userData, error: userQueryError } = await supabaseAdmin
+  let { data: usersData, error: userQueryError } = await supabaseAdmin
     .from('users')
     .select('tenant_id, branch_id, rol, invitacion_aceptada')
-    .eq('id', user.id)
-    .single()
+    .or(`id.eq.${user.id},email.eq.${user.email}`)
+    .limit(1)
 
   if (userQueryError) {
-    console.error('Error consultando users en callback:', userQueryError.message, userQueryError.code)
+    console.error('Error consultando users en callback:', userQueryError, JSON.stringify(userQueryError))
   }
+
+  let userData = usersData && usersData.length > 0 ? usersData[0] : null
 
   if (!userData) {
     const nombre = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuario'
@@ -48,16 +50,16 @@ export async function GET(request: Request) {
     })
 
     if (rpcError) {
-      console.error('Error en create_trial_account:', rpcError.message)
+      console.error('Error en create_trial_account:', rpcError, JSON.stringify(rpcError))
       return NextResponse.redirect(`${origin}/login?error=account_setup_failed`)
     }
 
     const res = await supabaseAdmin
       .from('users')
       .select('tenant_id, branch_id, rol, invitacion_aceptada')
-      .eq('id', user.id)
-      .single()
-    userData = res.data
+      .or(`id.eq.${user.id},email.eq.${user.email}`)
+      .limit(1)
+    userData = res.data && res.data.length > 0 ? res.data[0] : null
   }
 
   if (!userData) {

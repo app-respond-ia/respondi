@@ -38,14 +38,19 @@ export async function GET(request: Request) {
   // Si el usuario no existe en public.users (por ejemplo, primer inicio con Google OAuth), crear cuenta trial
   if (!userData) {
     const nombre = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuario'
-    await supabaseAdmin.rpc('create_trial_account', {
+    const { error: rpcError } = await supabaseAdmin.rpc('create_trial_account', {
       p_user_id: user.id,
       p_email: user.email!,
       p_nombre: nombre,
       p_org_nombre: 'Organización de ' + nombre
     })
 
-    const res = await supabase
+    if (rpcError) {
+      console.error('Error en create_trial_account:', rpcError.message)
+      return NextResponse.redirect(`${origin}/login?error=account_setup_failed`)
+    }
+
+    const res = await supabaseAdmin
       .from('users')
       .select('tenant_id, branch_id, rol, invitacion_aceptada')
       .eq('id', user.id)

@@ -3,12 +3,58 @@
 import { createClient } from '@/utils/supabase/server'
 import { supabaseAdmin } from '@/utils/supabase/admin'
 
+// Helper privado para resolver y validar tenantId y branchId cuando vienen vacíos desde el cliente
+async function resolveAndValidateIds(user: any, inputTenantId?: string, inputBranchId?: string) {
+  let tenantId = inputTenantId?.trim() || ''
+  let branchId = inputBranchId?.trim() || ''
+
+  if ((!tenantId || !branchId) && user) {
+    const { data: userData } = await supabaseAdmin
+      .from('users')
+      .select('tenant_id, branch_id')
+      .eq('id', user.id)
+      .single()
+
+    if (!tenantId && userData?.tenant_id) {
+      tenantId = userData.tenant_id
+    }
+    if (!branchId && userData?.branch_id) {
+      branchId = userData.branch_id
+    }
+    if (!branchId && tenantId) {
+      const { data: branches } = await supabaseAdmin
+        .from('sucursales')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .order('created_at', { ascending: true })
+        .limit(1)
+
+      if (branches && branches.length > 0) {
+        branchId = branches[0].id
+      }
+    }
+  }
+
+  if (!branchId || branchId === '') {
+    const msg = 'El ID de sucursal no es válido o está vacío. Por favor, regresa al Paso 1 y asegúrate de que la sucursal se haya creado correctamente.'
+    console.error('Validation Error en onboarding:', msg)
+    return { valid: false as const, error: msg }
+  }
+  if (!tenantId || tenantId === '') {
+    const msg = 'El ID de organización no es válido o está vacío.'
+    console.error('Validation Error en onboarding:', msg)
+    return { valid: false as const, error: msg }
+  }
+
+  return { valid: true as const, tenantId, branchId }
+}
+
 export async function getOnboardingState() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: 'no_session' }
 
-  const { data: userData } = await supabase
+  const { data: userData } = await supabaseAdmin
     .from('users')
     .select('tenant_id, branch_id')
     .eq('id', user.id)
@@ -20,7 +66,7 @@ export async function getOnboardingState() {
   let branchId = userData.branch_id
 
   if (!branchId) {
-    const { data: branch } = await supabase
+    const { data: branch } = await supabaseAdmin
       .from('sucursales')
       .select('id')
       .eq('tenant_id', userData.tenant_id)
@@ -31,7 +77,7 @@ export async function getOnboardingState() {
     if (branch) {
       branchId = branch.id
       // Asignar branch_id al usuario si no lo tenía
-      await supabase
+      await supabaseAdmin
         .from('users')
         .update({ branch_id: branchId })
         .eq('id', user.id)
@@ -50,7 +96,7 @@ export async function getOnboardingState() {
     }
   }
 
-  const { data: sucursal } = await supabase
+  const { data: sucursal } = await supabaseAdmin
     .from('sucursales')
     .select('onboarding_paso, onboarding_completado')
     .eq('id', branchId)
@@ -75,115 +121,155 @@ export async function saveStep1(data: {
   servicios: string
   politicas: string[]
 }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Unauthenticated')
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('Unauthenticated')
 
-  const { data: userData, error: userErr } = await supabaseAdmin
-    .from('users')
-    .select('tenant_id')
-    .eq('id', user.id)
-    .single()
-
-  if (userErr || !userData?.tenant_id) throw new Error('No tenant')
-  const tenantId = userData.tenant_id
-
-  await supabaseAdmin
-    .from('organizaciones')
-    .update({ nombre: data.nombreNegocio, direccion_fiscal: data.direccionFiscal })
-    .eq('id', tenantId)
-
-  const { data: branches } = await supabaseAdmin
-    .from('sucursales')
-    .select('id')
-    .eq('tenant_id', tenantId)
-    .order('created_at', { ascending: true })
-    .limit(1)
-
-  let branch = branches && branches.length > 0 ? branches[0] : null
-
-  if (!branch) {
-    const { data: newBranch, error: branchErr } = await supabaseAdmin
-      .from('sucursales')
-      .insert({
-        tenant_id: tenantId,
-        nombre: data.nombreSucursal,
-        direccion: data.direccionSucursal,
-        timezone: data.timezone,
-        activa: true,
-        onboarding_completado: false,
-        onboarding_paso: 1
-      })
-      .select('id')
+    const { data: userData, error: userErr } = await supabaseAdmin
+      .from('users')
+      .select('tenant_id')
+      .eq('id', user.id)
       .single()
-    if (branchErr) throw branchErr
-    branch = newBranch
-  } else {
+
+    if (userErr || !userData?.tenant_id) {
+      console.error('Error buscando tenant en saveStep1:', userErr, JSON.stringify(userErr))
+      throw new Error('No tenant')
+    }
+    const tenantId = userData.tenant_id
+
     await supabaseAdmin
+      .from('organizaciones')
+      .update({ nombre: data.nombreNegocio, direccion_fiscal: data.direccionFiscal })
+      .eq('id', tenantId)
+
+    const { data: branches } = await supabaseAdmin
       .from('sucursales')
-      .update({
-        nombre: data.nombreSucursal,
-        direccion: data.direccionSucursal,
-        timezone: data.timezone
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: true })
+      .limit(1)
+
+    let branch = branches && branches.length > 0 ? branches[0] : null
+
+    if (!branch) {
+      const { data: newBranch, error: branchErr } = await supabaseAdmin
+        .from('sucursales')
+        .insert({
+          tenant_id: tenantId,
+          nombre: data.nombreSucursal,
+          direccion: data.direccionSucursal,
+          timezone: data.timezone,
+          activa: true,
+          onboarding_completado: false,
+          onboarding_paso: 1
+        })
+        .select('id')
+        .single()
+      if (branchErr) {
+        console.error('Error insertando sucursal en saveStep1:', branchErr, JSON.stringify(branchErr))
+        throw branchErr
+      }
+      branch = newBranch
+    } else {
+      await supabaseAdmin
+        .from('sucursales')
+        .update({
+          nombre: data.nombreSucursal,
+          direccion: data.direccionSucursal,
+          timezone: data.timezone
+        })
+        .eq('id', branch.id)
+    }
+
+    await supabaseAdmin
+      .from('users')
+      .update({ branch_id: branch.id, nombre: data.nombrePersona })
+      .eq('id', user.id)
+
+    const politicasStr = data.politicas.join('\n')
+    const { data: profiles } = await supabaseAdmin
+      .from('business_profiles')
+      .select('id')
+      .eq('branch_id', branch.id)
+      .limit(1)
+
+    const profile = profiles && profiles.length > 0 ? profiles[0] : null
+
+    if (!profile) {
+      const { error: insErr } = await supabaseAdmin.from('business_profiles').insert({
+        branch_id: branch.id,
+        servicios: data.servicios,
+        politicas: politicasStr
       })
-      .eq('id', branch.id)
+      if (insErr) {
+        console.error('Error insertando profile en saveStep1:', insErr, JSON.stringify(insErr))
+        throw insErr
+      }
+    } else {
+      const { error: updErr } = await supabaseAdmin.from('business_profiles').update({
+        servicios: data.servicios,
+        politicas: politicasStr
+      }).eq('id', profile.id)
+      if (updErr) {
+        console.error('Error actualizando profile en saveStep1:', updErr, JSON.stringify(updErr))
+        throw updErr
+      }
+    }
+
+    await supabaseAdmin.from('sucursales').update({ onboarding_paso: 2 }).eq('id', branch.id)
+    return { success: true, branchId: branch.id }
+  } catch (error: any) {
+    console.error('Error en paso Datos Generales (saveStep1):', error, JSON.stringify(error, Object.getOwnPropertyNames(error || {})))
+    throw error
   }
-
-  await supabaseAdmin
-    .from('users')
-    .update({ branch_id: branch.id, nombre: data.nombrePersona })
-    .eq('id', user.id)
-
-  const politicasStr = data.politicas.join('\n')
-  const { data: profiles } = await supabaseAdmin
-    .from('business_profiles')
-    .select('id')
-    .eq('branch_id', branch.id)
-    .limit(1)
-
-  const profile = profiles && profiles.length > 0 ? profiles[0] : null
-
-  if (!profile) {
-    await supabaseAdmin.from('business_profiles').insert({
-      branch_id: branch.id,
-      servicios: data.servicios,
-      politicas: politicasStr
-    })
-  } else {
-    await supabaseAdmin.from('business_profiles').update({
-      servicios: data.servicios,
-      politicas: politicasStr
-    }).eq('id', profile.id)
-  }
-
-  await supabaseAdmin.from('sucursales').update({ onboarding_paso: 2 }).eq('id', branch.id)
-  return { success: true, branchId: branch.id }
 }
 
 export async function saveStep2(data: {
   branchId: string
   horarios: { dia_semana: number; apertura: string; cierre: string; activo: boolean }[]
 }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Unauthenticated')
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('Unauthenticated')
 
-  await supabase.from('business_hours').delete().eq('branch_id', data.branchId)
+    const res = await resolveAndValidateIds(user, '', data.branchId)
+    if (!res.valid) return { success: false, error: res.error }
+    const { branchId } = res
 
-  const rows = data.horarios.map(h => ({
-    branch_id: data.branchId,
-    dia_semana: h.dia_semana,
-    apertura: h.activo ? (h.apertura.length === 5 ? `${h.apertura}:00` : h.apertura) : null,
-    cierre: h.activo ? (h.cierre.length === 5 ? `${h.cierre}:00` : h.cierre) : null,
-    cerrado: !h.activo,
-    orden: 0
-  }))
+    const { error: delError } = await supabaseAdmin.from('business_hours').delete().eq('branch_id', branchId)
+    if (delError) {
+      console.error('Error borrando horarios en paso 2:', delError, JSON.stringify(delError))
+      throw delError
+    }
 
-  const { error } = await supabase.from('business_hours').insert(rows)
-  if (error) throw error
+    const rows = data.horarios.map(h => ({
+      branch_id: branchId,
+      dia_semana: h.dia_semana,
+      apertura: h.activo ? (h.apertura.length === 5 ? `${h.apertura}:00` : h.apertura) : null,
+      cierre: h.activo ? (h.cierre.length === 5 ? `${h.cierre}:00` : h.cierre) : null,
+      cerrado: !h.activo,
+      orden: 0
+    }))
 
-  await supabase.from('sucursales').update({ onboarding_paso: 3 }).eq('id', data.branchId)
-  return { success: true }
+    const { error } = await supabaseAdmin.from('business_hours').insert(rows)
+    if (error) {
+      console.error('Error insertando horarios en paso 2:', error, JSON.stringify(error))
+      throw error
+    }
+
+    const { error: updError } = await supabaseAdmin.from('sucursales').update({ onboarding_paso: 3 }).eq('id', branchId)
+    if (updError) {
+      console.error('Error actualizando sucursal en paso 2:', updError, JSON.stringify(updError))
+      throw updError
+    }
+
+    return { success: true }
+  } catch (error: any) {
+    console.error('Error en paso Horarios (saveStep2):', error, JSON.stringify(error, Object.getOwnPropertyNames(error || {})))
+    throw error
+  }
 }
 
 export async function saveStep3(data: {
@@ -194,50 +280,11 @@ export async function saveStep3(data: {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('Unauthenticated')
 
-    let tenantId = data.tenantId?.trim() || ''
-    let branchId = data.branchId?.trim() || ''
-
-    // Si el frontend envió branchId o tenantId vacíos, resolverlos desde el usuario y la sucursal recién creada
-    if ((!tenantId || !branchId) && user) {
-      const { data: userData } = await supabaseAdmin
-        .from('users')
-        .select('tenant_id, branch_id')
-        .eq('id', user.id)
-        .single()
-
-      if (!tenantId && userData?.tenant_id) {
-        tenantId = userData.tenant_id
-      }
-      if (!branchId && userData?.branch_id) {
-        branchId = userData.branch_id
-      }
-      // Si tenemos tenantId pero no branchId, buscar la primera sucursal creada en el Paso 1
-      if (!branchId && tenantId) {
-        const { data: branches } = await supabaseAdmin
-          .from('sucursales')
-          .select('id')
-          .eq('tenant_id', tenantId)
-          .order('created_at', { ascending: true })
-          .limit(1)
-
-        if (branches && branches.length > 0) {
-          branchId = branches[0].id
-        }
-      }
-    }
-
-    // Validación obligatoria ANTES de cualquier delete o insert para evitar UUID vacío ""
-    if (!branchId || branchId === '') {
-      const msg = 'El ID de sucursal no es válido o está vacío. Por favor, regresa al Paso 1 para crear la sucursal adecuadamente.'
-      console.error('Validation Error en saveStep3:', msg)
-      return { success: false, error: msg }
-    }
-    if (!tenantId || tenantId === '') {
-      const msg = 'El ID de organización no es válido o está vacío.'
-      console.error('Validation Error en saveStep3:', msg)
-      return { success: false, error: msg }
-    }
+    const res = await resolveAndValidateIds(user, data.tenantId, data.branchId)
+    if (!res.valid) return { success: false, error: res.error }
+    const { tenantId, branchId } = res
 
     const { error: delError } = await supabaseAdmin.from('skills').delete().eq('branch_id', branchId)
     if (delError) {
@@ -270,33 +317,64 @@ export async function saveStep3(data: {
 
     return { success: true }
   } catch (error: any) {
-    console.error('Error en paso Skills de IA:', error, JSON.stringify(error, Object.getOwnPropertyNames(error || {})))
+    console.error('Error en paso Skills de IA (saveStep3):', error, JSON.stringify(error, Object.getOwnPropertyNames(error || {})))
     throw error
   }
 }
 
 export async function saveStep4(data: { tenantId: string, branchId: string, msg: string }) {
-  const supabase = await createClient()
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('Unauthenticated')
 
-  const { data: profile } = await supabase
-    .from('business_profiles')
-    .select('id')
-    .eq('branch_id', data.branchId)
-    .single()
+    const res = await resolveAndValidateIds(user, data.tenantId, data.branchId)
+    if (!res.valid) return { success: false, error: res.error }
+    const { branchId } = res
 
-  if (!profile) {
-    await supabase.from('business_profiles').insert({
-      branch_id: data.branchId,
-      msg_fuera_horario: data.msg
-    })
-  } else {
-    await supabase.from('business_profiles')
-      .update({ msg_fuera_horario: data.msg })
-      .eq('branch_id', data.branchId)
+    const { data: profiles, error: selError } = await supabaseAdmin
+      .from('business_profiles')
+      .select('id')
+      .eq('branch_id', branchId)
+      .limit(1)
+
+    if (selError) {
+      console.error('Error buscando profile en paso 4:', selError, JSON.stringify(selError))
+      throw selError
+    }
+
+    const profile = profiles && profiles.length > 0 ? profiles[0] : null
+
+    if (!profile) {
+      const { error: insError } = await supabaseAdmin.from('business_profiles').insert({
+        branch_id: branchId,
+        msg_fuera_horario: data.msg
+      })
+      if (insError) {
+        console.error('Error insertando profile en paso 4:', insError, JSON.stringify(insError))
+        throw insError
+      }
+    } else {
+      const { error: updErr } = await supabaseAdmin.from('business_profiles')
+        .update({ msg_fuera_horario: data.msg })
+        .eq('id', profile.id)
+      if (updErr) {
+        console.error('Error actualizando profile en paso 4:', updErr, JSON.stringify(updErr))
+        throw updErr
+      }
+    }
+
+    const { error: updError } = await supabaseAdmin.from('sucursales').update({ onboarding_paso: 5 }).eq('id', branchId)
+    if (updError) {
+      console.error('Error actualizando sucursal en paso 4:', updError, JSON.stringify(updError))
+      throw updError
+    }
+
+    return { success: true }
+  } catch (error: any) {
+    console.error('Error en paso Mensaje fuera de horario (saveStep4):', error, JSON.stringify(error, Object.getOwnPropertyNames(error || {})))
+    throw error
   }
-
-  await supabase.from('sucursales').update({ onboarding_paso: 5 }).eq('id', data.branchId)
-  return { success: true }
 }
 
 export async function saveStep5(data: {
@@ -304,27 +382,50 @@ export async function saveStep5(data: {
   branchId: string
   productos: { nombre: string, precio: number }[]
 }) {
-  const supabase = await createClient()
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('Unauthenticated')
 
-  await supabase.from('price_list').delete().eq('branch_id', data.branchId)
+    const res = await resolveAndValidateIds(user, data.tenantId, data.branchId)
+    if (!res.valid) return { success: false, error: res.error }
+    const { tenantId, branchId } = res
 
-  if (data.productos.length > 0) {
-    const rows = data.productos.map(p => ({
-      tenant_id: data.tenantId,
-      branch_id: data.branchId,
-      nombre: p.nombre,
-      precio: p.precio,
-      precio_tipo: 'exacto',
-      disponible: true
-    }))
-    const { error } = await supabase.from('price_list').insert(rows)
-    if (error) throw error
+    const { error: delError } = await supabaseAdmin.from('price_list').delete().eq('branch_id', branchId)
+    if (delError) {
+      console.error('Error borrando productos en paso 5:', delError, JSON.stringify(delError))
+      throw delError
+    }
+
+    if (data.productos.length > 0) {
+      const rows = data.productos.map(p => ({
+        tenant_id: tenantId,
+        branch_id: branchId,
+        nombre: p.nombre,
+        precio: p.precio,
+        precio_tipo: 'exacto',
+        disponible: true
+      }))
+      const { error } = await supabaseAdmin.from('price_list').insert(rows)
+      if (error) {
+        console.error('Error insertando productos en paso 5:', error, JSON.stringify(error))
+        throw error
+      }
+    }
+
+    const { error: updError } = await supabaseAdmin.from('sucursales').update({
+      onboarding_paso: 5,
+      onboarding_completado: true
+    }).eq('id', branchId)
+
+    if (updError) {
+      console.error('Error actualizando sucursal completado en paso 5:', updError, JSON.stringify(updError))
+      throw updError
+    }
+
+    return { success: true }
+  } catch (error: any) {
+    console.error('Error en paso Lista de Precios (saveStep5):', error, JSON.stringify(error, Object.getOwnPropertyNames(error || {})))
+    throw error
   }
-
-  await supabase.from('sucursales').update({
-    onboarding_paso: 5,
-    onboarding_completado: true
-  }).eq('id', data.branchId)
-
-  return { success: true }
 }

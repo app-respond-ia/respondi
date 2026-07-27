@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { getMisPermisos } from '@/app/actions/permisos'
 import { getSkillsParaCliente, toggleSkillCliente } from '@/app/actions/skills-globales'
-import { resolveBranchId } from '@/lib/active-branch'
 
 export default function SkillsPage() {
   const [loading, setLoading] = useState(true)

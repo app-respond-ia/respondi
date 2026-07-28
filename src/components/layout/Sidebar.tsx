@@ -162,36 +162,6 @@ export default function Sidebar({ user, onCloseMobile, permisos, esAdmin }: Side
 
         <p className="px-3 pt-5 pb-2 text-[11px] uppercase tracking-wider text-ink-400 font-600">Configuración</p>
         {(() => {
-          const nivel = getNivel('perfil')
-          const cls = navItemWithPermClass('/dashboard/perfil-sucursal', 'perfil')
-          return nivel === 'ninguno' ? (
-            <span title="Sin acceso" className={cls}>
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
-              Perfil de la sucursal
-            </span>
-          ) : (
-            <Link href="/dashboard/perfil-sucursal" onClick={onCloseMobile} className={cls}>
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
-              Perfil de la sucursal
-            </Link>
-          )
-        })()}
-        {(() => {
-          const nivel = getNivel('sucursales')
-          const cls = navItemWithPermClass('/dashboard/sucursales', 'sucursales')
-          return nivel === 'ninguno' ? (
-            <span title="Sin acceso" className={cls}>
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"/></svg>
-              Sucursales
-            </span>
-          ) : (
-            <Link href="/dashboard/sucursales" onClick={onCloseMobile} className={cls}>
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"/></svg>
-              Sucursales
-            </Link>
-          )
-        })()}
-        {(() => {
           const nivel = getNivel('skills')
           const cls = navItemWithPermClass('/dashboard/skills', 'skills')
           return nivel === 'ninguno' ? (
@@ -308,6 +278,37 @@ export default function Sidebar({ user, onCloseMobile, permisos, esAdmin }: Side
             <Link href="/dashboard/audit-log" onClick={onCloseMobile} className={cls}>
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
               Audit log
+            </Link>
+          )
+        })()}
+        <p className="px-3 pt-5 pb-2 text-[11px] uppercase tracking-wider text-ink-400 font-600">Organización</p>
+        {(() => {
+          const nivel = getNivel('perfil')
+          const cls = navItemWithPermClass('/dashboard/perfil-sucursal', 'perfil')
+          return nivel === 'ninguno' ? (
+            <span title="Sin acceso" className={cls}>
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+              Perfil de la sucursal
+            </span>
+          ) : (
+            <Link href="/dashboard/perfil-sucursal" onClick={onCloseMobile} className={cls}>
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+              Perfil de la sucursal
+            </Link>
+          )
+        })()}
+        {(() => {
+          const nivel = getNivel('sucursales')
+          const cls = navItemWithPermClass('/dashboard/sucursales', 'sucursales')
+          return nivel === 'ninguno' ? (
+            <span title="Sin acceso" className={cls}>
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"/></svg>
+              Sucursales
+            </span>
+          ) : (
+            <Link href="/dashboard/sucursales" onClick={onCloseMobile} className={cls}>
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"/></svg>
+              Sucursales
             </Link>
           )
         })()}

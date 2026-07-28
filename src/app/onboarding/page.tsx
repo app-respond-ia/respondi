@@ -311,24 +311,42 @@ export default function OnboardingPage() {
                   {errorS1 && <p className="text-red-500 text-sm font-medium mb-4">{errorS1}</p>}
 
                   <div className="space-y-4">
+                    {/* Tu nombre */}
                     <div>
                       <label className="block text-sm font-medium text-ink-700 mb-1.5">Tu nombre completo</label>
                       <input type="text" value={s1.nombrePersona}
                         onChange={e => { setS1({...s1, nombrePersona: e.target.value}); setErrorS1('') }}
+                        placeholder="Ej. Ana Martínez"
                         className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition" />
                     </div>
 
+                    {/* Nombre del negocio */}
                     <div>
                       <label className="block text-sm font-medium text-ink-700 mb-1.5">Nombre del negocio</label>
                       <input type="text" value={s1.nombreNegocio}
                         onChange={e => {
                           const val = e.target.value
-                          setS1(prev => ({ ...prev, nombreNegocio: val, nombreSucursal: prev.nombreSucursal === prev.nombreNegocio ? val : prev.nombreSucursal }))
+                          setS1(prev => ({
+                            ...prev,
+                            nombreNegocio: val,
+                            nombreSucursal: prev.nombreSucursal === prev.nombreNegocio ? val : prev.nombreSucursal
+                          }))
                           setErrorS1('')
                         }}
+                        placeholder="Ej. Pastelería Dulce Hogar"
                         className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition" />
                     </div>
 
+                    {/* Dirección fiscal */}
+                    <div>
+                      <label className="block text-sm font-medium text-ink-700 mb-1.5">Dirección fiscal <span className="text-ink-400 font-normal">· opcional</span></label>
+                      <input type="text" value={s1.direccionFiscal}
+                        onChange={e => setS1({...s1, direccionFiscal: e.target.value})}
+                        placeholder="Dirección fiscal de la empresa"
+                        className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition" />
+                    </div>
+
+                    {/* Separador primera sucursal */}
                     <div className="pt-2">
                       <div className="flex items-center gap-3 mb-4">
                         <div className="h-px flex-1 bg-slate-200"></div>
@@ -342,6 +360,7 @@ export default function OnboardingPage() {
                             <label className="block text-sm font-medium text-ink-700 mb-1.5">Nombre de la sucursal</label>
                             <input type="text" value={s1.nombreSucursal}
                               onChange={e => { setS1({...s1, nombreSucursal: e.target.value}); setErrorS1('') }}
+                              placeholder="Ej. Sede Central"
                               className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition" />
                           </div>
                           <div>
@@ -358,6 +377,20 @@ export default function OnboardingPage() {
                               <option value="PEN">PEN - Sol peruano</option>
                               <option value="BRL">BRL - Real brasileño</option>
                               <option value="GBP">GBP - Libra esterlina</option>
+                              <option value="UYU">UYU - Peso uruguayo</option>
+                              <option value="PYG">PYG - Guaraní paraguayo</option>
+                              <option value="BOB">BOB - Boliviano</option>
+                              <option value="GTQ">GTQ - Quetzal guatemalteco</option>
+                              <option value="HNL">HNL - Lempira hondureño</option>
+                              <option value="NIO">NIO - Córdoba nicaragüense</option>
+                              <option value="CRC">CRC - Colón costarricense</option>
+                              <option value="PAB">PAB - Balboa panameño</option>
+                              <option value="DOP">DOP - Peso dominicano</option>
+                              <option value="CUP">CUP - Peso cubano</option>
+                              <option value="CAD">CAD - Dólar canadiense</option>
+                              <option value="JPY">JPY - Yen japonés</option>
+                              <option value="CNY">CNY - Yuan chino</option>
+                              <option value="CHF">CHF - Franco suizo</option>
                             </select>
                           </div>
                         </div>
@@ -371,6 +404,60 @@ export default function OnboardingPage() {
                             ))}
                           </select>
                         </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-ink-700 mb-1.5">Dirección de la sucursal <span className="text-ink-400 font-normal">· opcional</span></label>
+                          <input type="text" value={s1.direccionSucursal}
+                            onChange={e => setS1({...s1, direccionSucursal: e.target.value})}
+                            placeholder="Calle, número, ciudad"
+                            className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Servicios */}
+                    <div>
+                      <label className="block text-sm font-medium text-ink-700 mb-1.5">Servicios que ofrece</label>
+                      <textarea rows={3} value={s1.servicios}
+                        onChange={e => setS1({...s1, servicios: e.target.value})}
+                        placeholder="Describe los productos o servicios de tu negocio..."
+                        className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white resize-none placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition"></textarea>
+                    </div>
+
+                    {/* Políticas en cajitas */}
+                    <div>
+                      <label className="block text-sm font-medium text-ink-700 mb-1.5">Políticas del negocio <span className="text-ink-400 font-normal">· opcional</span></label>
+                      <p className="text-xs text-ink-500 mb-3">Añade las políticas de tu negocio una por una (devoluciones, envíos, garantías, etc.)</p>
+
+                      {/* Cajitas de políticas añadidas */}
+                      {politicas.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mb-3">
+                          {politicas.map((p, i) => (
+                            <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-brand-50 border border-brand-200 text-sm text-brand-800 font-500">
+                              <span>{p}</span>
+                              <button type="button" onClick={() => removePolitica(i)}
+                                className="text-brand-400 hover:text-brand-700 transition ml-1">
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Input para añadir */}
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={politicaInput}
+                          onChange={e => setPoliticaInput(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addPolitica() } }}
+                          placeholder="Ej. Devoluciones en 30 días"
+                          className="flex-1 h-11 px-4 rounded-xl border border-slate-300 bg-white text-sm placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition"
+                        />
+                        <button type="button" onClick={addPolitica}
+                          className="px-4 h-11 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-600 transition shrink-0">
+                          Añadir
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -380,7 +467,62 @@ export default function OnboardingPage() {
               {/* ===== PASO 2 ===== */}
               {step === 2 && (
                 <div className="animate-in fade-in duration-300">
-                   {/* Content remains as in original code */}
+                  <div className="flex items-center gap-3 mb-1">
+                    <span className="w-9 h-9 rounded-xl bg-brand-100 text-brand-700 font-display font-bold flex items-center justify-center text-sm">2</span>
+                    <span className="text-xs font-semibold uppercase tracking-wider text-brand-600">Horarios de atención</span>
+                  </div>
+                  <h1 className="font-display font-bold text-2xl text-ink-900 mb-1.5">¿Cuándo atiende tu negocio?</h1>
+                  <p className="text-ink-500 mb-6">Añade hasta 4 franjas por día. Fuera de este horario, la IA enviará un mensaje de aviso.</p>
+
+                  <div className="space-y-4">
+                    {s2.map((h, i) => (
+                      <div key={h.dia} className={`p-4 rounded-xl border transition ${h.activo ? 'border-brand-200 bg-white shadow-sm' : 'border-slate-200 bg-slate-50'}`}>
+                        <label className="flex items-center gap-2.5 mb-3 cursor-pointer">
+                          <input type="checkbox" checked={h.activo} onChange={e => {
+                            const n = [...s2]; 
+                            n[i].activo = e.target.checked; 
+                            if (e.target.checked && n[i].franjas.length === 0) {
+                              n[i].franjas = [{ apertura: '', cierre: '' }];
+                            }
+                            setS2(n);
+                            setErrorS2('');
+                          }} className="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-400" />
+                          <span className={`font-semibold ${h.activo ? 'text-ink-900' : 'text-ink-400'}`}>{h.dia}</span>
+                        </label>
+                        
+                        {h.activo && (
+                          <div className="space-y-2.5 pl-6 border-l-2 border-brand-100 ml-2">
+                            {h.franjas.map((f, j) => (
+                              <div key={j} className="flex items-center gap-2 sm:gap-3">
+                                <input type="time" value={f.apertura} onChange={e => {
+                                  const n = [...s2]; n[i].franjas[j].apertura = e.target.value; setS2(n); setErrorS2('');
+                                }} className="flex-1 h-11 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition" />
+                                <span className="text-ink-400 text-sm font-medium">-</span>
+                                <input type="time" value={f.cierre} onChange={e => {
+                                  const n = [...s2]; n[i].franjas[j].cierre = e.target.value; setS2(n); setErrorS2('');
+                                }} className="flex-1 h-11 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition" />
+                                <button type="button" onClick={() => {
+                                  const n = [...s2]; n[i].franjas.splice(j, 1); setS2(n); setErrorS2('');
+                                }} className="p-2.5 text-ink-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition" title="Eliminar franja">
+                                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                </button>
+                              </div>
+                            ))}
+                            {h.franjas.length < 4 && (
+                              <button type="button" onClick={() => {
+                                const n = [...s2]; n[i].franjas.push({ apertura: '', cierre: '' }); setS2(n); setErrorS2('');
+                              }} className="text-xs font-semibold text-brand-600 hover:text-brand-800 transition pt-1 flex items-center gap-1">
+                                + Añadir franja
+                              </button>
+                            )}
+                            {h.franjas.length === 0 && (
+                              <p className="text-xs text-red-500 font-medium">Debe haber al menos una franja si el día está activo.</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 

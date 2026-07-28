@@ -5,10 +5,11 @@ import { useRouter } from 'next/navigation'
 import { getSucursales, getDatosSucursalParaCopiar, crearSucursalConDatos } from '@/app/actions/sucursales'
 
 const MODULOS = [
-  { id: 'perfil', label: 'Perfil e información' },
   { id: 'horarios', label: 'Horarios de atención' },
   { id: 'skills', label: 'Skills de IA' },
   { id: 'precios', label: 'Lista de precios' },
+  { id: 'etiquetas', label: 'Etiquetas' },
+  { id: 'reglas', label: 'Escalado de casos' },
 ]
 
 const DIAS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
@@ -28,7 +29,7 @@ export default function NuevaSucursalPage() {
   const [copiaGlobal, setCopiaGlobal] = useState<string>('') // sucursal a copiar todo
   const [copiaAvanzada, setCopiaAvanzada] = useState(false)
   const [copiaModulos, setCopiaModulos] = useState<Record<string, string>>({
-    perfil: '', horarios: '', skills: '', precios: ''
+    horarios: '', skills: '', precios: '', etiquetas: '', reglas: ''
   })
   const [loadingCopia, setLoadingCopia] = useState(false)
 
@@ -50,9 +51,11 @@ export default function NuevaSucursalPage() {
   const [precios, setPrecios] = useState<any[]>([])
   const [onbStep, setOnbStep] = useState(1)
 
-  // Paso 5 precios
   const [prodNombre, setProdNombre] = useState('')
   const [prodPrecio, setProdPrecio] = useState('')
+
+  const [etiquetas, setEtiquetas] = useState<any[]>([])
+  const [reglas, setReglas] = useState<any[]>([])
 
   useEffect(() => {
     getSucursales().then(res => {
@@ -67,17 +70,6 @@ export default function NuevaSucursalPage() {
     const res = await getDatosSucursalParaCopiar(branchId)
     if (res.success && res.data) {
       const d = res.data
-      if (!modulo || modulo === 'perfil') {
-        setPerfil({
-          servicios: d.perfil?.servicios || '',
-          politicas: d.perfil?.politicas || '',
-          idioma_base: d.perfil?.idioma_base || 'es',
-          tono: d.perfil?.tono || 'cercano',
-          msg_fuera_horario: d.perfil?.msg_fuera_horario || '',
-          ia_activa_fuera_horario: d.perfil?.ia_activa_fuera_horario ?? false,
-          caso_fuera_horario: d.perfil?.caso_fuera_horario ?? false
-        })
-      }
       if (!modulo || modulo === 'horarios') {
         if (d.horarios.length > 0) {
           const horariosAgrupados = [0,1,2,3,4,5,6].map(dia => {
@@ -100,6 +92,12 @@ export default function NuevaSucursalPage() {
       }
       if (!modulo || modulo === 'precios') {
         if (d.precios.length > 0) setPrecios(d.precios)
+      }
+      if (!modulo || modulo === 'etiquetas') {
+        if (d.etiquetas.length > 0) setEtiquetas(d.etiquetas)
+      }
+      if (!modulo || modulo === 'reglas') {
+        if (d.reglas.length > 0) setReglas(d.reglas)
       }
     }
     setLoadingCopia(false)
@@ -134,7 +132,9 @@ export default function NuevaSucursalPage() {
       ...perfil,
       horarios,
       skills,
-      precios
+      precios,
+      etiquetas,
+      reglas
     })
     if (res.success) {
       router.push('/dashboard/sucursales')

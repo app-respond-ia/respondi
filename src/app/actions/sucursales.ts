@@ -239,12 +239,19 @@ export async function getDatosSucursalParaCopiar(branchIdOrigen: string) {
 
   if (!sucursal) return { success: false, error: 'Sucursal no encontrada' }
 
-  // Perfil
-  const { data: perfil } = await supabase
-    .from('business_profiles')
-    .select('servicios, politicas, idioma_base, tono, msg_fuera_horario, ia_activa_fuera_horario, caso_fuera_horario')
+  // Etiquetas
+  const { data: etiquetas } = await supabase
+    .from('message_categories')
+    .select('nombre, descripcion_intencion, color, activa, es_plantilla, orden')
     .eq('branch_id', branchIdOrigen)
-    .single()
+    .eq('tenant_id', userData.tenant_id)
+
+  // Reglas
+  const { data: reglas } = await supabase
+    .from('case_rules')
+    .select('nombre, descripcion_intencion, tipo_caso, activa, es_plantilla')
+    .eq('branch_id', branchIdOrigen)
+    .eq('tenant_id', userData.tenant_id)
 
   // Horarios
   const { data: horarios } = await supabase
@@ -271,10 +278,11 @@ export async function getDatosSucursalParaCopiar(branchIdOrigen: string) {
     success: true,
     data: {
       sucursal,
-      perfil: perfil || null,
       horarios: horarios || [],
       skills: skills || [],
-      precios: precios || []
+      precios: precios || [],
+      etiquetas: etiquetas || [],
+      reglas: reglas || []
     }
   }
 }
@@ -293,6 +301,8 @@ export async function crearSucursalConDatos(data: {
   horarios?: { dia_semana: number, apertura: string | null, cierre: string | null, cerrado: boolean, orden: number }[]
   skills?: { nombre: string, activo: boolean }[]
   precios?: { nombre: string, tipo: string, precio: number | null, precio_tipo: string, descripcion?: string }[]
+  etiquetas?: { nombre: string, descripcion_intencion?: string | null, color: string, activa: boolean, es_plantilla: boolean, orden: number }[]
+  reglas?: { nombre: string, descripcion_intencion?: string | null, tipo_caso: string, activa: boolean, es_plantilla: boolean }[]
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -369,6 +379,29 @@ export async function crearSucursalConDatos(data: {
         precio_tipo: p.precio_tipo || 'exacto',
         descripcion: p.descripcion || null,
         activo: true
+      }))
+    )
+  }
+
+  // Etiquetas
+  if (data.etiquetas && data.etiquetas.length > 0) {
+    await supabase.from('message_categories').insert(
+      data.etiquetas.map((e, idx) => ({
+        ...e,
+        branch_id: newBranch.id,
+        tenant_id: userData.tenant_id,
+        orden: idx
+      }))
+    )
+  }
+
+  // Reglas
+  if (data.reglas && data.reglas.length > 0) {
+    await supabase.from('case_rules').insert(
+      data.reglas.map(r => ({
+        ...r,
+        branch_id: newBranch.id,
+        tenant_id: userData.tenant_id
       }))
     )
   }

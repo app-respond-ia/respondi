@@ -9,13 +9,17 @@ interface AdminLayoutProps {
   esAdmin?: boolean
   permisos?: any[]
   nombreUsuario?: string
+  branches?: { id: string; nombre: string }[]
+  activeBranchId?: string
 }
 
 export default function AdminLayout({
   children,
   esAdmin = false,
   permisos = [],
-  nombreUsuario = ''
+  nombreUsuario = '',
+  branches = [],
+  activeBranchId = ''
 }: AdminLayoutProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
@@ -25,8 +29,6 @@ export default function AdminLayout({
     initials: nombreUsuario ? nombreUsuario.substring(0, 2).toUpperCase() : 'U',
     roleName: esAdmin ? 'Administrador' : 'Usuario'
   }
-  const branches: { id: string; nombre: string }[] = []
-  const activeBranchId = ''
 
   return (
     <div className="min-h-screen lg:flex bg-slate-50 text-ink-900">

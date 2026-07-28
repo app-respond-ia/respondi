@@ -90,13 +90,12 @@ export async function getOnboardingState() {
 
   const { data: userData } = await supabaseAdmin
     .from('users')
-    .select('tenant_id, branch_id')
+    .select('nombre, tenant_id, branch_id')
     .eq('id', user.id)
     .single()
 
   if (!userData?.tenant_id) return { success: false, error: 'no_tenant' }
 
-  // Buscar sucursal — primero por branch_id del usuario, luego por tenant_id
   let branchId = userData.branch_id
 
   if (!branchId) {
@@ -110,7 +109,6 @@ export async function getOnboardingState() {
 
     if (branch) {
       branchId = branch.id
-      // Asignar branch_id al usuario si no lo tenía
       await supabaseAdmin
         .from('users')
         .update({ branch_id: branchId })
@@ -118,30 +116,68 @@ export async function getOnboardingState() {
     }
   }
 
-  if (!branchId) {
-    // No hay sucursal todavía — puede pasar justo después del registro
-    // Devolvemos estado inicial sin redirigir a login
-    return {
-      success: true,
-      tenantId: userData.tenant_id,
-      branchId: null,
-      paso: 1,
-      completado: false
-    }
+  let dataState: any = {
+    paso: 1,
+    completado: false,
+    s1: { nombrePersona: userData?.nombre || '' }
   }
 
-  const { data: sucursal } = await supabaseAdmin
-    .from('sucursales')
-    .select('onboarding_paso, onboarding_completado')
-    .eq('id', branchId)
-    .single()
+  if (branchId) {
+    const [orgData, branchData, profileData, hoursData, skillsData, priceData] = await Promise.all([
+      supabaseAdmin.from('organizaciones').select('nombre, direccion_fiscal').eq('id', userData.tenant_id).single(),
+      supabaseAdmin.from('sucursales').select('nombre, direccion, timezone, moneda, onboarding_paso, onboarding_completado').eq('id', branchId).single(),
+      supabaseAdmin.from('business_profiles').select('servicios, politicas, msg_fuera_horario').eq('branch_id', branchId).limit(1).single(),
+      supabaseAdmin.from('business_hours').select('dia_semana, apertura, cierre, cerrado, orden').eq('branch_id', branchId).order('orden', { ascending: true }),
+      supabaseAdmin.from('skills').select('nombre, activo').eq('branch_id', branchId),
+      supabaseAdmin.from('price_list').select('nombre, precio').eq('branch_id', branchId)
+    ])
+
+    dataState.paso = branchData?.data?.onboarding_paso ?? 1
+    dataState.completado = branchData?.data?.onboarding_completado ?? false
+
+    dataState.s1 = {
+      nombrePersona: userData?.nombre || '',
+      nombreNegocio: orgData?.data?.nombre || '',
+      direccionFiscal: orgData?.data?.direccion_fiscal || '',
+      nombreSucursal: branchData?.data?.nombre || '',
+      direccionSucursal: branchData?.data?.direccion || '',
+      timezone: branchData?.data?.timezone || 'America/Caracas',
+      moneda: branchData?.data?.moneda || 'USD',
+      servicios: profileData?.data?.servicios || '',
+      politicas: profileData?.data?.politicas ? profileData.data.politicas.split('\n') : []
+    }
+
+    if (hoursData?.data && hoursData.data.length > 0) {
+      const daysMap: Record<number, { dia_semana: number, activo: boolean, franjas: any[] }> = {}
+      hoursData.data.forEach(row => {
+        if (!daysMap[row.dia_semana]) {
+          daysMap[row.dia_semana] = { dia_semana: row.dia_semana, activo: !row.cerrado, franjas: [] }
+        }
+        if (!row.cerrado) {
+          daysMap[row.dia_semana].franjas.push({ apertura: row.apertura.substring(0, 5), cierre: row.cierre.substring(0, 5) })
+        }
+      })
+      dataState.s2 = daysMap
+    }
+
+    if (skillsData?.data && skillsData.data.length > 0) {
+      dataState.s3 = skillsData.data
+    }
+
+    if (profileData?.data?.msg_fuera_horario) {
+      dataState.s4 = profileData.data.msg_fuera_horario
+    }
+
+    if (priceData?.data && priceData.data.length > 0) {
+      dataState.s5 = priceData.data
+    }
+  }
 
   return {
     success: true,
     tenantId: userData.tenant_id,
-    branchId,
-    paso: sucursal?.onboarding_paso ?? 1,
-    completado: sucursal?.onboarding_completado ?? false
+    branchId: branchId || null,
+    data: dataState
   }
 }
 
@@ -152,6 +188,7 @@ export async function saveStep1(data: {
   nombreSucursal: string
   direccionSucursal: string
   timezone: string
+  moneda: string
   servicios: string
   politicas: string[]
 }) {
@@ -194,6 +231,7 @@ export async function saveStep1(data: {
           nombre: data.nombreSucursal,
           direccion: data.direccionSucursal,
           timezone: data.timezone,
+          moneda: data.moneda,
           activa: true,
           onboarding_completado: false,
           onboarding_paso: 1
@@ -211,7 +249,8 @@ export async function saveStep1(data: {
         .update({
           nombre: data.nombreSucursal,
           direccion: data.direccionSucursal,
-          timezone: data.timezone
+          timezone: data.timezone,
+          moneda: data.moneda
         })
         .eq('id', branch.id)
     }

@@ -92,19 +92,70 @@ export default function OnboardingPage() {
   useEffect(() => {
     getOnboardingState().then(res => {
       if (!res.success) {
-        if (res.error === 'no_session') {
-          router.replace('/login')
-        }
+        if (res.error === 'no_session') router.replace('/login')
         setLoading(false)
         return
       }
-      if (res.completado) {
+      if (res.data?.completado) {
         router.replace('/dashboard')
         return
       }
+      
       setTenantId(res.tenantId || '')
       setBranchId(res.branchId || '')
-      setStep(res.paso || 1)
+      setStep(res.data?.paso || 1)
+
+      const d = res.data || {}
+
+      if (d.s1) {
+        setS1({
+          nombrePersona: d.s1.nombrePersona || '',
+          nombreNegocio: d.s1.nombreNegocio || '',
+          nombreSucursal: d.s1.nombreSucursal || '',
+          timezone: d.s1.timezone || 'America/Caracas',
+          moneda: d.s1.moneda || 'USD',
+          direccionFiscal: d.s1.direccionFiscal || '',
+          direccionSucursal: d.s1.direccionSucursal || '',
+          servicios: d.s1.servicios || ''
+        })
+        setPoliticas(d.s1.politicas || [])
+      }
+
+      if (d.s2 && Object.keys(d.s2).length > 0) {
+        const s2Array = [
+          { dia: 'Lunes', dia_semana: 1 },
+          { dia: 'Martes', dia_semana: 2 },
+          { dia: 'Miércoles', dia_semana: 3 },
+          { dia: 'Jueves', dia_semana: 4 },
+          { dia: 'Viernes', dia_semana: 5 },
+          { dia: 'Sábado', dia_semana: 6 },
+          { dia: 'Domingo', dia_semana: 0 }
+        ].map(def => {
+          const loaded = d.s2[def.dia_semana]
+          if (loaded) {
+            return {
+              ...def,
+              activo: loaded.activo,
+              franjas: loaded.franjas.length > 0 ? loaded.franjas : [{ apertura: '', cierre: '' }]
+            }
+          }
+          return { ...def, activo: false, franjas: [{ apertura: '', cierre: '' }] }
+        })
+        setS2(s2Array)
+      }
+
+      if (d.s3 && d.s3.length > 0) {
+        setS3(prev => prev.map(skill => {
+          const isFija = skill.idName === 'idioma_multi' || skill.idName === 'politicas'
+          if (isFija) return { ...skill, activo: true }
+          const loadedSkill = d.s3.find((dbSkill: any) => dbSkill.nombre === skill.nombre)
+          return loadedSkill ? { ...skill, activo: loadedSkill.activo } : skill
+        }))
+      }
+
+      if (d.s4) setS4Msg(d.s4)
+      if (d.s5 && d.s5.length > 0) setS5Prods(d.s5)
+
       setLoading(false)
     })
   }, [router])
@@ -344,19 +395,26 @@ export default function OnboardingPage() {
                   <p className="text-ink-500 mb-6">Selecciona las habilidades que quieres que la IA tenga por defecto para esta sucursal. Las podrás cambiar luego.</p>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {s3.map((s, i) => (
-                      <label key={s.idName} className={`flex gap-3 p-4 rounded-xl border cursor-pointer transition ${s.activo ? 'border-brand-200 bg-brand-50/50 shadow-sm' : 'border-slate-200 hover:border-slate-300 bg-white'}`}>
-                        <div className="pt-0.5">
-                          <input type="checkbox" checked={s.activo} onChange={e => {
-                            const n = [...s3]; n[i].activo = e.target.checked; setS3(n)
-                          }} className="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-400" />
-                        </div>
-                        <div>
-                          <span className="block font-bold text-ink-900 text-sm mb-0.5">{s.nombre}</span>
-                          <span className="block text-xs text-ink-500 leading-relaxed">{s.descripcion}</span>
-                        </div>
-                      </label>
-                    ))}
+                    {s3.map((s, i) => {
+                      const isFija = s.idName === 'idioma_multi' || s.idName === 'politicas';
+                      return (
+                        <label key={s.idName} className={`flex gap-3 p-4 rounded-xl border transition ${s.activo ? (isFija ? 'border-brand-200 bg-brand-50/30' : 'border-brand-200 bg-brand-50/50 shadow-sm') : 'border-slate-200 hover:border-slate-300 bg-white'} ${isFija ? 'cursor-default' : 'cursor-pointer'}`}>
+                          <div className="pt-0.5 relative">
+                            <input type="checkbox" checked={s.activo} disabled={isFija} onChange={e => {
+                              if (isFija) return;
+                              const n = [...s3]; n[i].activo = e.target.checked; setS3(n)
+                            }} className="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-400 disabled:opacity-60" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between gap-2 mb-0.5">
+                              <span className="block font-bold text-ink-900 text-sm">{s.nombre}</span>
+                              {isFija && <span className="text-[10px] font-bold tracking-wide uppercase text-brand-600 bg-brand-100/50 px-1.5 py-0.5 rounded">Incluido siempre</span>}
+                            </div>
+                            <span className={`block text-xs leading-relaxed ${isFija ? 'text-ink-400' : 'text-ink-500'}`}>{s.descripcion}</span>
+                          </div>
+                        </label>
+                      )
+                    })}
                   </div>
                 </div>
               )}

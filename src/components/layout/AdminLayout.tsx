@@ -11,6 +11,7 @@ interface AdminLayoutProps {
   nombreUsuario?: string
   branches?: { id: string; nombre: string }[]
   activeBranchId?: string
+  creditos?: { saldo: number; max: number } | null
 }
 
 export default function AdminLayout({
@@ -19,7 +20,8 @@ export default function AdminLayout({
   permisos = [],
   nombreUsuario = '',
   branches = [],
-  activeBranchId = ''
+  activeBranchId = '',
+  creditos = null
 }: AdminLayoutProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
@@ -31,9 +33,9 @@ export default function AdminLayout({
   }
 
   return (
-    <div className="min-h-screen lg:flex bg-slate-50 text-ink-900">
+    <div className="h-screen overflow-hidden lg:flex bg-slate-50 text-ink-900">
       {/* Sidebar Wrapper */}
-      <div className={`fixed inset-y-0 left-0 z-40 transform transition-transform duration-300 ease-out lg:translate-x-0 lg:static lg:z-auto ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <div className={`fixed inset-y-0 left-0 z-40 transform transition-transform duration-300 ease-out lg:translate-x-0 lg:static lg:z-auto h-full overflow-y-auto ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <Sidebar user={user} onCloseMobile={() => setIsMobileMenuOpen(false)} permisos={permisos} esAdmin={esAdmin} />
       </div>
 
@@ -46,12 +48,13 @@ export default function AdminLayout({
       )}
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
         <Header 
           branches={branches} 
           activeBranchId={activeBranchId} 
           onOpenMobile={() => setIsMobileMenuOpen(true)}
           userInitials={user.initials}
+          creditos={creditos}
         />
         <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6">
           {children}

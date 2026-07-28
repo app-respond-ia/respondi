@@ -18,7 +18,7 @@ export default async function DashboardLayout({
 
   const { data: userData } = await supabase
     .from('users')
-    .select('rol, nombre, activo')
+    .select('rol, nombre, activo, tenant_id')
     .eq('id', user.id)
     .single()
 
@@ -49,6 +49,19 @@ export default async function DashboardLayout({
 
   const activeBranchId = await resolveBranchId(supabase, user.id) || ''
 
+  let creditos = null
+  if (userData?.tenant_id) {
+    const [{ data: org }, { data: quotas }] = await Promise.all([
+      supabase.from('organizaciones').select('trial_activo, plans(creditos_diarios_trial, creditos_mensuales)').eq('id', userData.tenant_id).single(),
+      supabase.from('message_quotas').select('saldo').eq('tenant_id', userData.tenant_id).order('timestamp', { ascending: false }).limit(1).maybeSingle()
+    ])
+    if (org) {
+      const plan = Array.isArray(org.plans) ? org.plans[0] : org.plans
+      const max = org.trial_activo ? plan?.creditos_diarios_trial : plan?.creditos_mensuales
+      creditos = { saldo: quotas?.saldo || 0, max: max || 0 }
+    }
+  }
+
   return (
     <AdminLayout
       esAdmin={esAdmin}
@@ -56,6 +69,7 @@ export default async function DashboardLayout({
       nombreUsuario={userData.nombre || user.email || ''}
       branches={branches}
       activeBranchId={activeBranchId}
+      creditos={creditos}
     >
       {children}
     </AdminLayout>

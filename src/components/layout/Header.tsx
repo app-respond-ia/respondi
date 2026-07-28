@@ -13,11 +13,28 @@ type HeaderProps = {
   activeBranchId: string
   onOpenMobile: () => void
   userInitials: string
+  creditos?: { saldo: number; max: number } | null
 }
 
-export default function Header({ branches, activeBranchId, onOpenMobile, userInitials }: HeaderProps) {
+export default function Header({ branches, activeBranchId, onOpenMobile, userInitials, creditos }: HeaderProps) {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+
+  let creditosClasses = ''
+  let dotClasses = ''
+  if (creditos) {
+    const pct = creditos.max > 0 ? (creditos.saldo / creditos.max) * 100 : 0
+    if (pct > 20) {
+      creditosClasses = 'bg-slate-100 text-ink-700'
+      dotClasses = 'bg-emerald-500'
+    } else if (pct > 5) {
+      creditosClasses = 'bg-amber-50 text-amber-700'
+      dotClasses = 'bg-amber-500'
+    } else {
+      creditosClasses = 'bg-rose-50 text-rose-700'
+      dotClasses = 'bg-rose-500'
+    }
+  }
 
   const activeBranch = branches.find((b) => b.id === activeBranchId) || branches[0]
 
@@ -78,6 +95,13 @@ export default function Header({ branches, activeBranchId, onOpenMobile, userIni
             </div>
           )}
         </div>
+
+        {creditos && (
+          <div className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-500 ml-1 ${creditosClasses}`}>
+            <span className={`w-2 h-2 rounded-full ${dotClasses}`}></span>
+            {creditos.saldo.toLocaleString()} / {creditos.max.toLocaleString()} créditos
+          </div>
+        )}
 
         <div className="flex-1"></div>
 

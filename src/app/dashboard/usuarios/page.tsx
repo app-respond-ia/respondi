@@ -10,6 +10,7 @@ import {
   reactivarUsuario
 } from '@/app/actions/usuarios'
 import { getMisPermisos, getPermisosUsuario } from '@/app/actions/permisos'
+import { getRolesPersonalizados } from '@/app/actions/roles'
 
 type PermisoUI = {
   seccion: string
@@ -132,6 +133,7 @@ const renderPermisosEditor = (permisos: PermisoUI[], setPermisos: (p: PermisoUI[
 export default function UsuariosPage() {
   const [loading, setLoading] = useState(true)
   const [usuarios, setUsuarios] = useState<any[]>([])
+  const [roles, setRoles] = useState<any[]>([])
   const [usuariosMax, setUsuariosMax] = useState<number | null>(null)
   const [usuariosActivosCount, setUsuariosActivosCount] = useState<number>(0)
   const [planNombre, setPlanNombre] = useState<string | null>(null)
@@ -148,6 +150,7 @@ export default function UsuariosPage() {
     email: '', nombre: '', branch_ids: []
   })
   const [invitePermisos, setInvitePermisos] = useState<PermisoUI[]>(SECCIONES_DEFAULT)
+  const [inviteRolId, setInviteRolId] = useState<string>('')
   const [inviteError, setInviteError] = useState<string | null>(null)
 
   // Editar Modal
@@ -158,12 +161,27 @@ export default function UsuariosPage() {
     nombre: '', branch_ids: []
   })
   const [editPermisos, setEditPermisos] = useState<PermisoUI[]>([])
+  const [editRolId, setEditRolId] = useState<string>('')
+
+  const applyRoleToPermisos = (rolId: string, setRolId: (id: string) => void, setPermisosState: (p: PermisoUI[]) => void) => {
+    setRolId(rolId)
+    if (!rolId) return
+    const rol = roles.find(r => r.id === rolId)
+    if (!rol) return
+    
+    const newPerms = SECCIONES_DEFAULT.map(s => {
+      const existing = (rol.permisos || []).find((p: any) => p.seccion === s.seccion)
+      return existing ? { ...s, nivel: existing.nivel, alcance: existing.alcance || 'todos' } : s
+    })
+    setPermisosState(newPerms)
+  }
 
   const cargar = async () => {
     setLoading(true)
-    const [res, permisosRes] = await Promise.all([
+    const [res, permisosRes, rolesRes] = await Promise.all([
       getUsuarios(),
-      getMisPermisos()
+      getMisPermisos(),
+      getRolesPersonalizados()
     ])
 
     if (permisosRes.success) {
@@ -185,6 +203,11 @@ export default function UsuariosPage() {
     } else {
       setMensaje({ tipo: 'error', texto: res.error || 'Error al cargar usuarios' })
     }
+
+    if (rolesRes.success && rolesRes.data) {
+      setRoles(rolesRes.data)
+    }
+
     setLoading(false)
   }
 
@@ -195,6 +218,7 @@ export default function UsuariosPage() {
   const handleOpenInvite = () => {
     setInviteData({ email: '', nombre: '', branch_ids: [] })
     setInvitePermisos(SECCIONES_DEFAULT)
+    setInviteRolId('')
     setInviteError(null)
     setIsInviteModalOpen(true)
   }
@@ -252,6 +276,7 @@ export default function UsuariosPage() {
       setEditPermisos([...SECCIONES_DEFAULT])
     }
     
+    setEditRolId('')
     setIsEditModalOpen(true)
   }
 
@@ -564,8 +589,27 @@ export default function UsuariosPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-500 text-ink-700 mb-3">Permisos por sección</label>
-                    {renderPermisosEditor(invitePermisos, setInvitePermisos)}
+                    <div className="flex items-center justify-between mb-3">
+                      <label className="block text-sm font-500 text-ink-700">Permisos por sección</label>
+                      {roles.length > 0 && (
+                        <select 
+                          value={inviteRolId}
+                          onChange={(e) => applyRoleToPermisos(e.target.value, setInviteRolId, setInvitePermisos)}
+                          className="text-xs font-500 border border-slate-200 rounded-lg px-2.5 py-1.5 bg-slate-50 focus:ring-brand-500 focus:border-brand-500 outline-none text-ink-700"
+                        >
+                          <option value="">Personalizado / Empezar de cero</option>
+                          <optgroup label="Plantillas de rol">
+                            {roles.map(r => (
+                              <option key={r.id} value={r.id}>{r.nombre}</option>
+                            ))}
+                          </optgroup>
+                        </select>
+                      )}
+                    </div>
+                    {renderPermisosEditor(invitePermisos, (newPerms) => {
+                      setInvitePermisos(newPerms)
+                      setInviteRolId('')
+                    })}
                   </div>
                 </div>
         
@@ -659,10 +703,29 @@ export default function UsuariosPage() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-500 text-ink-700 mb-3">Permisos por sección</label>
-                  {renderPermisosEditor(editPermisos, setEditPermisos)}
-                </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <label className="block text-sm font-500 text-ink-700">Permisos por sección</label>
+                      {roles.length > 0 && (
+                        <select 
+                          value={editRolId}
+                          onChange={(e) => applyRoleToPermisos(e.target.value, setEditRolId, setEditPermisos)}
+                          className="text-xs font-500 border border-slate-200 rounded-lg px-2.5 py-1.5 bg-slate-50 focus:ring-brand-500 focus:border-brand-500 outline-none text-ink-700"
+                        >
+                          <option value="">Personalizado</option>
+                          <optgroup label="Plantillas de rol">
+                            {roles.map(r => (
+                              <option key={r.id} value={r.id}>{r.nombre}</option>
+                            ))}
+                          </optgroup>
+                        </select>
+                      )}
+                    </div>
+                    {renderPermisosEditor(editPermisos, (newPerms) => {
+                      setEditPermisos(newPerms)
+                      setEditRolId('')
+                    })}
+                  </div>
 
                 {/* Acciones secundarias */}
                 <div className="pt-2 border-t border-slate-100 space-y-2">

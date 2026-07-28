@@ -10,6 +10,7 @@ import {
   saveStep4,
   saveStep5
 } from '@/app/actions/onboarding'
+import { ErrorModal } from '@/components/ui/ErrorModal'
 
 export default function OnboardingPage() {
   const router = useRouter()
@@ -36,15 +37,16 @@ export default function OnboardingPage() {
 
   // Step 2
   const [s2, setS2] = useState([
-    { dia: 'Lunes', dia_semana: 1, activo: true, franjas: [{ apertura: '09:00', cierre: '18:00' }] },
-    { dia: 'Martes', dia_semana: 2, activo: true, franjas: [{ apertura: '09:00', cierre: '18:00' }] },
-    { dia: 'Miércoles', dia_semana: 3, activo: true, franjas: [{ apertura: '09:00', cierre: '18:00' }] },
-    { dia: 'Jueves', dia_semana: 4, activo: true, franjas: [{ apertura: '09:00', cierre: '18:00' }] },
-    { dia: 'Viernes', dia_semana: 5, activo: true, franjas: [{ apertura: '09:00', cierre: '18:00' }] },
-    { dia: 'Sábado', dia_semana: 6, activo: false, franjas: [{ apertura: '09:00', cierre: '18:00' }] },
-    { dia: 'Domingo', dia_semana: 0, activo: false, franjas: [{ apertura: '09:00', cierre: '18:00' }] }
+    { dia: 'Lunes', dia_semana: 1, activo: true, franjas: [{ apertura: '', cierre: '' }] },
+    { dia: 'Martes', dia_semana: 2, activo: true, franjas: [{ apertura: '', cierre: '' }] },
+    { dia: 'Miércoles', dia_semana: 3, activo: true, franjas: [{ apertura: '', cierre: '' }] },
+    { dia: 'Jueves', dia_semana: 4, activo: true, franjas: [{ apertura: '', cierre: '' }] },
+    { dia: 'Viernes', dia_semana: 5, activo: true, franjas: [{ apertura: '', cierre: '' }] },
+    { dia: 'Sábado', dia_semana: 6, activo: false, franjas: [{ apertura: '', cierre: '' }] },
+    { dia: 'Domingo', dia_semana: 0, activo: false, franjas: [{ apertura: '', cierre: '' }] }
   ])
   const [errorS2, setErrorS2] = useState('')
+  const [isErrorModalOpen, setIsErrorModalOpen] = useState(false)
 
   // Step 3
   const [s3, setS3] = useState([
@@ -120,6 +122,7 @@ export default function OnboardingPage() {
         if (!d.activo) continue;
         if (d.franjas.length === 0) {
           setErrorS2(`El día ${d.dia} está activo pero no tiene franjas. Añade al menos una franja o desmarca el día.`);
+          setIsErrorModalOpen(true);
           return; // ERROR BLOQUEANTE: sale de la función sin guardar
         }
         
@@ -129,16 +132,19 @@ export default function OnboardingPage() {
           const f = sortedFranjas[i];
           if (!f.apertura || !f.cierre) {
             setErrorS2(`Revisa las horas del ${d.dia}: faltan datos.`);
+            setIsErrorModalOpen(true);
             return;
           }
           if (f.apertura >= f.cierre) {
             setErrorS2(`Horario inválido el ${d.dia}: el cierre (${f.cierre}) debe ser posterior a la apertura (${f.apertura}).`);
+            setIsErrorModalOpen(true);
             return;
           }
           if (i > 0) {
             const prev = sortedFranjas[i - 1];
             if (f.apertura < prev.cierre) {
               setErrorS2(`Solapamiento el ${d.dia}: la franja que empieza a las ${f.apertura} choca con la que termina a las ${prev.cierre}.`);
+              setIsErrorModalOpen(true);
               return;
             }
           }
@@ -363,8 +369,6 @@ export default function OnboardingPage() {
                   <h1 className="font-display font-bold text-2xl text-ink-900 mb-1.5">¿Cuándo atiende tu negocio?</h1>
                   <p className="text-ink-500 mb-6">Añade hasta 4 franjas por día. Fuera de este horario, la IA enviará un mensaje de aviso.</p>
 
-                  {errorS2 && <p className="text-red-500 text-sm font-medium mb-4">{errorS2}</p>}
-
                   <div className="space-y-4">
                     {s2.map((h, i) => (
                       <div key={h.dia} className={`p-4 rounded-xl border transition ${h.activo ? 'border-brand-200 bg-white shadow-sm' : 'border-slate-200 bg-slate-50'}`}>
@@ -372,9 +376,9 @@ export default function OnboardingPage() {
                           <input type="checkbox" checked={h.activo} onChange={e => {
                             const n = [...s2]; 
                             n[i].activo = e.target.checked; 
-                            // Si se activa y no tenía franjas, inyectar una por defecto
+                            // Si se activa y no tenía franjas, inyectar una por defecto (vacía)
                             if (e.target.checked && n[i].franjas.length === 0) {
-                              n[i].franjas = [{ apertura: '09:00', cierre: '18:00' }];
+                              n[i].franjas = [{ apertura: '', cierre: '' }];
                             }
                             setS2(n);
                             setErrorS2('');
@@ -402,7 +406,7 @@ export default function OnboardingPage() {
                             ))}
                             {h.franjas.length < 4 && (
                               <button type="button" onClick={() => {
-                                const n = [...s2]; n[i].franjas.push({ apertura: '09:00', cierre: '18:00' }); setS2(n); setErrorS2('');
+                                const n = [...s2]; n[i].franjas.push({ apertura: '', cierre: '' }); setS2(n); setErrorS2('');
                               }} className="text-xs font-semibold text-brand-600 hover:text-brand-800 transition pt-1 flex items-center gap-1">
                                 + Añadir franja
                               </button>
@@ -536,6 +540,12 @@ export default function OnboardingPage() {
           </div>
         </div>
       </main>
+
+      <ErrorModal 
+        isOpen={isErrorModalOpen} 
+        message={errorS2} 
+        onClose={() => setIsErrorModalOpen(false)} 
+      />
     </div>
   )
 }

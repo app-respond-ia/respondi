@@ -3,29 +3,66 @@
 import { createClient } from '@/utils/supabase/server'
 import { supabaseAdmin } from '@/utils/supabase/admin'
 
-// Helper privado para resolver y validar tenantId y branchId cuando vienen vacíos desde el cliente
+// Helper privado para resolver y validar tenantId y branchId asegurando la propiedad (prevención de IDOR)
 async function resolveAndValidateIds(user: any, inputTenantId?: string, inputBranchId?: string) {
-  let tenantId = inputTenantId?.trim() || ''
+  if (!user?.id) {
+    return { valid: false as const, error: 'Usuario no autenticado.' }
+  }
+
+  // 1. Obtener SIEMPRE el tenant_id real e inviolable del usuario en la base de datos
+  const { data: userData } = await supabaseAdmin
+    .from('users')
+    .select('tenant_id, branch_id')
+    .eq('id', user.id)
+    .single()
+
+  const realTenantId = userData?.tenant_id
   let branchId = inputBranchId?.trim() || ''
 
-  if ((!tenantId || !branchId) && user) {
-    const { data: userData } = await supabaseAdmin
-      .from('users')
-      .select('tenant_id, branch_id')
-      .eq('id', user.id)
-      .single()
+  if (!realTenantId) {
+    const msg = 'El usuario no tiene una organización asignada.'
+    console.error('Security Error en onboarding:', msg)
+    return { valid: false as const, error: msg }
+  }
 
-    if (!tenantId && userData?.tenant_id) {
-      tenantId = userData.tenant_id
+  // 2. Si se mandó un branchId desde el cliente, verificar rigurosamente que pertenece a SU tenant real
+  if (branchId) {
+    const { data: branchCheck } = await supabaseAdmin
+      .from('sucursales')
+      .select('id')
+      .eq('id', branchId)
+      .eq('tenant_id', realTenantId)
+      .limit(1)
+      
+    // Si no pertenece a su tenant (o no existe), descartamos el ID malicioso/inválido
+    if (!branchCheck || branchCheck.length === 0) {
+      console.warn(`Intento de uso de branch_id inválido o ajeno (${branchId}) por usuario ${user.id}. Forzando resolución automática.`)
+      branchId = ''
     }
-    if (!branchId && userData?.branch_id) {
-      branchId = userData.branch_id
+  }
+
+  // 3. Resolución automática segura (si vino vacío o si se descartó por seguridad)
+  if (!branchId) {
+    if (userData?.branch_id) {
+      // Verificar que el branch asignado en perfil sigue siendo válido y propio
+      const { data: userBranchCheck } = await supabaseAdmin
+        .from('sucursales')
+        .select('id')
+        .eq('id', userData.branch_id)
+        .eq('tenant_id', realTenantId)
+        .limit(1)
+        
+      if (userBranchCheck && userBranchCheck.length > 0) {
+        branchId = userBranchCheck[0].id
+      }
     }
-    if (!branchId && tenantId) {
+
+    // Si aún no tenemos, cogemos la primera sucursal de SU tenant real
+    if (!branchId) {
       const { data: branches } = await supabaseAdmin
         .from('sucursales')
         .select('id')
-        .eq('tenant_id', tenantId)
+        .eq('tenant_id', realTenantId)
         .order('created_at', { ascending: true })
         .limit(1)
 
@@ -35,18 +72,15 @@ async function resolveAndValidateIds(user: any, inputTenantId?: string, inputBra
     }
   }
 
+  // 4. Si después de todo sigue sin haber sucursal, bloqueamos la ejecución
   if (!branchId || branchId === '') {
     const msg = 'El ID de sucursal no es válido o está vacío. Por favor, regresa al Paso 1 y asegúrate de que la sucursal se haya creado correctamente.'
     console.error('Validation Error en onboarding:', msg)
     return { valid: false as const, error: msg }
   }
-  if (!tenantId || tenantId === '') {
-    const msg = 'El ID de organización no es válido o está vacío.'
-    console.error('Validation Error en onboarding:', msg)
-    return { valid: false as const, error: msg }
-  }
 
-  return { valid: true as const, tenantId, branchId }
+  // Devolvemos SIEMPRE el tenantId verificado en el backend, ignorando inputTenantId
+  return { valid: true as const, tenantId: realTenantId, branchId }
 }
 
 export async function getOnboardingState() {

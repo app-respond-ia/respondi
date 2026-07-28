@@ -21,12 +21,6 @@ export async function resolveBranchId(supabase: any, userId: string): Promise<st
     .single()
 
   if (userData?.branch_id) {
-    cookieStore.set('active_branch_id', userData.branch_id, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7
-    })
     return userData.branch_id
   }
 
@@ -41,12 +35,6 @@ export async function resolveBranchId(supabase: any, userId: string): Promise<st
       .single()
 
     if (branch) {
-      cookieStore.set('active_branch_id', branch.id, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 7
-      })
       await supabase
         .from('users')
         .update({ branch_id: branch.id })

@@ -87,6 +87,8 @@ export default function OnboardingPage() {
   // Step 4
   const [s4Msg, setS4Msg] = useState('')
   const [s4Skip, setS4Skip] = useState(false)
+  const [s4IaActiva, setS4IaActiva] = useState(false)
+  const [s4AbrirCaso, setS4AbrirCaso] = useState(false)
 
   // Step 5
   const [s5Prods, setS5Prods] = useState<{ nombre: string, precio: number }[]>([])
@@ -166,6 +168,8 @@ export default function OnboardingPage() {
           setS4Msg(d.s4)
         }
       }
+      if (d.s4_ia_activa !== undefined) setS4IaActiva(d.s4_ia_activa)
+      if (d.s4_abrir_caso !== undefined) setS4AbrirCaso(d.s4_abrir_caso)
       if (d.s5 && d.s5.length > 0) setS5Prods(d.s5)
 
       setLoading(false)
@@ -254,7 +258,13 @@ export default function OnboardingPage() {
         const res = await saveStep3(payload)
         if (res.success) setStep(4)
       } else if (step === 4) {
-        const res = await saveStep4({ tenantId, branchId, msg: s4Msg })
+        const res = await saveStep4({ 
+          tenantId, 
+          branchId, 
+          msg: s4Skip ? '' : s4Msg,
+          iaActiva: s4IaActiva,
+          abrirCaso: s4AbrirCaso
+        })
         if (res.success) setStep(5)
       } else if (step === 5) {
         const res = await saveStep5({ tenantId, branchId, productos: s5Prods })
@@ -590,6 +600,23 @@ export default function OnboardingPage() {
                   <div className="flex items-start gap-3 mt-4 rounded-xl bg-brand-50 border border-brand-100 p-3.5">
                     <svg className="w-5 h-5 text-brand-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     <p className="text-sm text-ink-700">Es buena idea aclarar que se trata de un asistente virtual. Así el cliente sabe que habla con una IA.</p>
+                  </div>
+
+                  <div className="mt-6 space-y-3">
+                    <label className="flex items-start gap-2.5 cursor-pointer group">
+                      <input type="checkbox" checked={s4IaActiva} onChange={e => setS4IaActiva(e.target.checked)}
+                        className="w-4 h-4 mt-0.5 rounded border-slate-300 text-brand-600 focus:ring-brand-400" />
+                      <span className="text-sm font-500 text-ink-900 group-hover:text-brand-700 transition">
+                        Permitir que la IA siga respondiendo fuera del horario de atención
+                      </span>
+                    </label>
+                    <label className="flex items-start gap-2.5 cursor-pointer group">
+                      <input type="checkbox" checked={s4AbrirCaso} onChange={e => setS4AbrirCaso(e.target.checked)}
+                        className="w-4 h-4 mt-0.5 rounded border-slate-300 text-brand-600 focus:ring-brand-400" />
+                      <span className="text-sm font-500 text-ink-900 group-hover:text-brand-700 transition">
+                        Abrir un caso automáticamente cuando llega un mensaje fuera de horario
+                      </span>
+                    </label>
                   </div>
                 </div>
               )}

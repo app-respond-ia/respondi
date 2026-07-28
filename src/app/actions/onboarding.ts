@@ -126,7 +126,7 @@ export async function getOnboardingState() {
     const [orgData, branchData, profileData, hoursData, skillsData, priceData] = await Promise.all([
       supabaseAdmin.from('organizaciones').select('nombre, direccion_fiscal').eq('id', userData.tenant_id).single(),
       supabaseAdmin.from('sucursales').select('nombre, direccion, timezone, moneda, onboarding_paso, onboarding_completado').eq('id', branchId).single(),
-      supabaseAdmin.from('business_profiles').select('servicios, politicas, msg_fuera_horario').eq('branch_id', branchId).limit(1).single(),
+      supabaseAdmin.from('business_profiles').select('servicios, politicas, msg_fuera_horario, ia_activa_fuera_horario, abrir_caso_fuera_horario').eq('branch_id', branchId).limit(1).single(),
       supabaseAdmin.from('business_hours').select('dia_semana, apertura, cierre, cerrado, orden').eq('branch_id', branchId).order('orden', { ascending: true }),
       supabaseAdmin.from('skills').select('nombre, activo').eq('branch_id', branchId),
       supabaseAdmin.from('price_list').select('nombre, precio').eq('branch_id', branchId)
@@ -164,8 +164,12 @@ export async function getOnboardingState() {
       dataState.s3 = skillsData.data
     }
 
-    if (profileData?.data?.msg_fuera_horario) {
+    if (profileData?.data?.msg_fuera_horario !== undefined && profileData?.data?.msg_fuera_horario !== null) {
       dataState.s4 = profileData.data.msg_fuera_horario
+    }
+    if (profileData?.data) {
+      dataState.s4_ia_activa = profileData.data.ia_activa_fuera_horario || false
+      dataState.s4_abrir_caso = profileData.data.abrir_caso_fuera_horario || false
     }
 
     if (priceData?.data && priceData.data.length > 0) {
@@ -442,7 +446,7 @@ export async function saveStep3(data: {
   }
 }
 
-export async function saveStep4(data: { tenantId: string, branchId: string, msg: string }) {
+export async function saveStep4(data: { tenantId: string, branchId: string, msg: string, iaActiva: boolean, abrirCaso: boolean }) {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -468,7 +472,9 @@ export async function saveStep4(data: { tenantId: string, branchId: string, msg:
     if (!profile) {
       const { error: insError } = await supabaseAdmin.from('business_profiles').insert({
         branch_id: branchId,
-        msg_fuera_horario: data.msg
+        msg_fuera_horario: data.msg,
+        ia_activa_fuera_horario: data.iaActiva,
+        abrir_caso_fuera_horario: data.abrirCaso
       })
       if (insError) {
         console.error('Error insertando profile en paso 4:', insError, JSON.stringify(insError))
@@ -476,7 +482,11 @@ export async function saveStep4(data: { tenantId: string, branchId: string, msg:
       }
     } else {
       const { error: updErr } = await supabaseAdmin.from('business_profiles')
-        .update({ msg_fuera_horario: data.msg })
+        .update({ 
+          msg_fuera_horario: data.msg,
+          ia_activa_fuera_horario: data.iaActiva,
+          abrir_caso_fuera_horario: data.abrirCaso
+        })
         .eq('id', profile.id)
       if (updErr) {
         console.error('Error actualizando profile en paso 4:', updErr, JSON.stringify(updErr))

@@ -36,14 +36,15 @@ export default function OnboardingPage() {
 
   // Step 2
   const [s2, setS2] = useState([
-    { dia: 'Lunes', dia_semana: 1, activo: true, apertura: '09:00', cierre: '18:00' },
-    { dia: 'Martes', dia_semana: 2, activo: true, apertura: '09:00', cierre: '18:00' },
-    { dia: 'Miércoles', dia_semana: 3, activo: true, apertura: '09:00', cierre: '18:00' },
-    { dia: 'Jueves', dia_semana: 4, activo: true, apertura: '09:00', cierre: '18:00' },
-    { dia: 'Viernes', dia_semana: 5, activo: true, apertura: '09:00', cierre: '18:00' },
-    { dia: 'Sábado', dia_semana: 6, activo: false, apertura: '09:00', cierre: '18:00' },
-    { dia: 'Domingo', dia_semana: 0, activo: false, apertura: '09:00', cierre: '18:00' }
+    { dia: 'Lunes', dia_semana: 1, activo: true, franjas: [{ apertura: '09:00', cierre: '18:00' }] },
+    { dia: 'Martes', dia_semana: 2, activo: true, franjas: [{ apertura: '09:00', cierre: '18:00' }] },
+    { dia: 'Miércoles', dia_semana: 3, activo: true, franjas: [{ apertura: '09:00', cierre: '18:00' }] },
+    { dia: 'Jueves', dia_semana: 4, activo: true, franjas: [{ apertura: '09:00', cierre: '18:00' }] },
+    { dia: 'Viernes', dia_semana: 5, activo: true, franjas: [{ apertura: '09:00', cierre: '18:00' }] },
+    { dia: 'Sábado', dia_semana: 6, activo: false, franjas: [{ apertura: '09:00', cierre: '18:00' }] },
+    { dia: 'Domingo', dia_semana: 0, activo: false, franjas: [{ apertura: '09:00', cierre: '18:00' }] }
   ])
+  const [errorS2, setErrorS2] = useState('')
 
   // Step 3
   const [s3, setS3] = useState([
@@ -112,6 +113,37 @@ export default function OnboardingPage() {
       if (!s1.nombrePersona.trim()) { setErrorS1('Tu nombre es obligatorio'); return }
       if (!s1.nombreNegocio.trim()) { setErrorS1('El nombre del negocio es obligatorio'); return }
       if (!s1.nombreSucursal.trim()) { setErrorS1('El nombre de la primera sucursal es obligatorio'); return }
+    }
+    if (step === 2) {
+      setErrorS2('')
+      for (const d of s2) {
+        if (!d.activo) continue;
+        if (d.franjas.length === 0) {
+          setErrorS2(`El día ${d.dia} está activo pero no tiene franjas. Añade al menos una franja o desmarca el día.`);
+          return; // ERROR BLOQUEANTE: sale de la función sin guardar
+        }
+        
+        // Ordenamos las franjas para validar consistencia y solapamientos
+        const sortedFranjas = [...d.franjas].sort((a, b) => a.apertura.localeCompare(b.apertura));
+        for (let i = 0; i < sortedFranjas.length; i++) {
+          const f = sortedFranjas[i];
+          if (!f.apertura || !f.cierre) {
+            setErrorS2(`Revisa las horas del ${d.dia}: faltan datos.`);
+            return;
+          }
+          if (f.apertura >= f.cierre) {
+            setErrorS2(`Horario inválido el ${d.dia}: el cierre (${f.cierre}) debe ser posterior a la apertura (${f.apertura}).`);
+            return;
+          }
+          if (i > 0) {
+            const prev = sortedFranjas[i - 1];
+            if (f.apertura < prev.cierre) {
+              setErrorS2(`Solapamiento el ${d.dia}: la franja que empieza a las ${f.apertura} choca con la que termina a las ${prev.cierre}.`);
+              return;
+            }
+          }
+        }
+      }
     }
     if (step === 5 && s5Prods.length === 0) {
       setErrorS5('Añade al menos un producto para continuar')
@@ -329,24 +361,57 @@ export default function OnboardingPage() {
                     <span className="text-xs font-semibold uppercase tracking-wider text-brand-600">Horarios de atención</span>
                   </div>
                   <h1 className="font-display font-bold text-2xl text-ink-900 mb-1.5">¿Cuándo atiende tu negocio?</h1>
-                  <p className="text-ink-500 mb-6">Fuera de este horario, la IA enviará un mensaje de aviso.</p>
+                  <p className="text-ink-500 mb-6">Añade hasta 4 franjas por día. Fuera de este horario, la IA enviará un mensaje de aviso.</p>
 
-                  <div className="space-y-2.5">
+                  {errorS2 && <p className="text-red-500 text-sm font-medium mb-4">{errorS2}</p>}
+
+                  <div className="space-y-4">
                     {s2.map((h, i) => (
-                      <div key={h.dia} className="flex items-center gap-3 sm:gap-4">
-                        <label className="flex items-center gap-2.5 w-32 sm:w-40 shrink-0">
+                      <div key={h.dia} className={`p-4 rounded-xl border transition ${h.activo ? 'border-brand-200 bg-white shadow-sm' : 'border-slate-200 bg-slate-50'}`}>
+                        <label className="flex items-center gap-2.5 mb-3 cursor-pointer">
                           <input type="checkbox" checked={h.activo} onChange={e => {
-                            const n = [...s2]; n[i].activo = e.target.checked; setS2(n)
+                            const n = [...s2]; 
+                            n[i].activo = e.target.checked; 
+                            // Si se activa y no tenía franjas, inyectar una por defecto
+                            if (e.target.checked && n[i].franjas.length === 0) {
+                              n[i].franjas = [{ apertura: '09:00', cierre: '18:00' }];
+                            }
+                            setS2(n);
+                            setErrorS2('');
                           }} className="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-400" />
-                          <span className={`text-sm font-medium ${h.activo ? 'text-ink-700' : 'text-ink-400'}`}>{h.dia}</span>
+                          <span className={`font-semibold ${h.activo ? 'text-ink-900' : 'text-ink-400'}`}>{h.dia}</span>
                         </label>
-                        <input type="time" disabled={!h.activo} value={h.apertura} onChange={e => {
-                          const n = [...s2]; n[i].apertura = e.target.value; setS2(n)
-                        }} className="flex-1 h-11 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition disabled:bg-slate-50 disabled:text-ink-400 disabled:border-slate-200" />
-                        <span className="text-ink-400 text-sm">a</span>
-                        <input type="time" disabled={!h.activo} value={h.cierre} onChange={e => {
-                          const n = [...s2]; n[i].cierre = e.target.value; setS2(n)
-                        }} className="flex-1 h-11 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition disabled:bg-slate-50 disabled:text-ink-400 disabled:border-slate-200" />
+                        
+                        {h.activo && (
+                          <div className="space-y-2.5 pl-6 border-l-2 border-brand-100 ml-2">
+                            {h.franjas.map((f, j) => (
+                              <div key={j} className="flex items-center gap-2 sm:gap-3">
+                                <input type="time" value={f.apertura} onChange={e => {
+                                  const n = [...s2]; n[i].franjas[j].apertura = e.target.value; setS2(n); setErrorS2('');
+                                }} className="flex-1 h-11 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition" />
+                                <span className="text-ink-400 text-sm font-medium">-</span>
+                                <input type="time" value={f.cierre} onChange={e => {
+                                  const n = [...s2]; n[i].franjas[j].cierre = e.target.value; setS2(n); setErrorS2('');
+                                }} className="flex-1 h-11 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition" />
+                                <button type="button" onClick={() => {
+                                  const n = [...s2]; n[i].franjas.splice(j, 1); setS2(n); setErrorS2('');
+                                }} className="p-2.5 text-ink-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition" title="Eliminar franja">
+                                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                </button>
+                              </div>
+                            ))}
+                            {h.franjas.length < 4 && (
+                              <button type="button" onClick={() => {
+                                const n = [...s2]; n[i].franjas.push({ apertura: '09:00', cierre: '18:00' }); setS2(n); setErrorS2('');
+                              }} className="text-xs font-semibold text-brand-600 hover:text-brand-800 transition pt-1 flex items-center gap-1">
+                                + Añadir franja
+                              </button>
+                            )}
+                            {h.franjas.length === 0 && (
+                              <p className="text-xs text-red-500 font-medium">Debe haber al menos una franja si el día está activo.</p>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

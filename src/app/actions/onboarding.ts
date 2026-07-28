@@ -261,7 +261,11 @@ export async function saveStep1(data: {
 
 export async function saveStep2(data: {
   branchId: string
-  horarios: { dia_semana: number; apertura: string; cierre: string; activo: boolean }[]
+  horarios: { 
+    dia_semana: number; 
+    activo: boolean; 
+    franjas: { apertura: string; cierre: string }[] 
+  }[]
 }) {
   try {
     const supabase = await createClient()
@@ -272,20 +276,63 @@ export async function saveStep2(data: {
     if (!res.valid) return { success: false, error: res.error }
     const { branchId } = res
 
+    // 1. VALIDACIÓN BACKEND (Doble chequeo)
+    for (const d of data.horarios) {
+      if (!d.activo) continue;
+      if (!d.franjas || d.franjas.length === 0) {
+        return { success: false, error: `El día ${d.dia_semana} está activo pero no tiene franjas.` }
+      }
+      if (d.franjas.length > 4) {
+        return { success: false, error: `El día ${d.dia_semana} excede el máximo de 4 franjas.` }
+      }
+      
+      const sorted = [...d.franjas].sort((a, b) => a.apertura.localeCompare(b.apertura))
+      for (let i = 0; i < sorted.length; i++) {
+        const f = sorted[i]
+        if (!f.apertura || !f.cierre || f.apertura >= f.cierre) {
+          return { success: false, error: `Horas inválidas en el día ${d.dia_semana}.` }
+        }
+        if (i > 0 && f.apertura < sorted[i-1].cierre) {
+          return { success: false, error: `Solapamiento detectado en el día ${d.dia_semana}.` }
+        }
+      }
+    }
+
+    // 2. BORRAR HORARIOS ANTERIORES
     const { error: delError } = await supabaseAdmin.from('business_hours').delete().eq('branch_id', branchId)
     if (delError) {
       console.error('Error borrando horarios en paso 2:', delError, JSON.stringify(delError))
       throw delError
     }
 
-    const rows = data.horarios.map(h => ({
-      branch_id: branchId,
-      dia_semana: h.dia_semana,
-      apertura: h.activo ? (h.apertura.length === 5 ? `${h.apertura}:00` : h.apertura) : null,
-      cierre: h.activo ? (h.cierre.length === 5 ? `${h.cierre}:00` : h.cierre) : null,
-      cerrado: !h.activo,
-      orden: 0
-    }))
+    // 3. GENERAR FILAS (Una por cada franja de cada día)
+    const rows: any[] = []
+    data.horarios.forEach(h => {
+      if (!h.activo) {
+        // Día cerrado: 1 sola fila con apertura/cierre en null
+        rows.push({
+          branch_id: branchId,
+          dia_semana: h.dia_semana,
+          apertura: null,
+          cierre: null,
+          cerrado: true,
+          orden: 0
+        })
+      } else {
+        // Día activo: N filas, ordenadas
+        const sorted = [...h.franjas].sort((a, b) => a.apertura.localeCompare(b.apertura))
+        sorted.forEach((f, idx) => {
+          rows.push({
+            branch_id: branchId,
+            dia_semana: h.dia_semana,
+            apertura: f.apertura.length === 5 ? `${f.apertura}:00` : f.apertura,
+            cierre: f.cierre.length === 5 ? `${f.cierre}:00` : f.cierre,
+            cerrado: false,
+            orden: idx
+          })
+        })
+      }
+    })
 
     const { error } = await supabaseAdmin.from('business_hours').insert(rows)
     if (error) {

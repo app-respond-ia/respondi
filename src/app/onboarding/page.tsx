@@ -33,7 +33,6 @@ export default function OnboardingPage() {
     direccionSucursal: '',
     servicios: '',
   })
-  const [errorS1, setErrorS1] = useState('')
 
   const timezones = useMemo(() => {
     try {
@@ -68,8 +67,13 @@ export default function OnboardingPage() {
     { dia: 'Sábado', dia_semana: 6, activo: false, franjas: [{ apertura: '', cierre: '' }] },
     { dia: 'Domingo', dia_semana: 0, activo: false, franjas: [{ apertura: '', cierre: '' }] }
   ])
-  const [errorS2, setErrorS2] = useState('')
+  const [modalError, setModalError] = useState('')
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false)
+
+  const showError = (msg: string) => {
+    setModalError(msg)
+    setIsErrorModalOpen(true)
+  }
 
   // Step 3
   const [s3, setS3] = useState([
@@ -82,12 +86,12 @@ export default function OnboardingPage() {
 
   // Step 4
   const [s4Msg, setS4Msg] = useState('')
+  const [s4Skip, setS4Skip] = useState(false)
 
   // Step 5
   const [s5Prods, setS5Prods] = useState<{ nombre: string, precio: number }[]>([])
   const [prodNombre, setProdNombre] = useState('')
   const [prodPrecio, setProdPrecio] = useState('')
-  const [errorS5, setErrorS5] = useState('')
 
   useEffect(() => {
     getOnboardingState().then(res => {
@@ -153,7 +157,15 @@ export default function OnboardingPage() {
         }))
       }
 
-      if (d.s4) setS4Msg(d.s4)
+      if (d.s4 !== undefined && d.s4 !== null) {
+        if (d.s4 === "") {
+          setS4Skip(true)
+          setS4Msg("")
+        } else {
+          setS4Skip(false)
+          setS4Msg(d.s4)
+        }
+      }
       if (d.s5 && d.s5.length > 0) setS5Prods(d.s5)
 
       setLoading(false)
@@ -176,7 +188,6 @@ export default function OnboardingPage() {
       setS5Prods([...s5Prods, { nombre: prodNombre, precio: parseFloat(prodPrecio) }])
       setProdNombre('')
       setProdPrecio('')
-      setErrorS5('')
     }
   }
 
@@ -184,46 +195,43 @@ export default function OnboardingPage() {
     if (saving) return
 
     if (step === 1) {
-      if (!s1.nombrePersona.trim()) { setErrorS1('Tu nombre es obligatorio'); return }
-      if (!s1.nombreNegocio.trim()) { setErrorS1('El nombre del negocio es obligatorio'); return }
-      if (!s1.nombreSucursal.trim()) { setErrorS1('El nombre de la primera sucursal es obligatorio'); return }
+      if (!s1.nombrePersona.trim()) { showError('Tu nombre es obligatorio'); return }
+      if (!s1.nombreNegocio.trim()) { showError('El nombre del negocio es obligatorio'); return }
+      if (!s1.nombreSucursal.trim()) { showError('El nombre de la primera sucursal es obligatorio'); return }
     }
     if (step === 2) {
-      setErrorS2('')
       for (const d of s2) {
         if (!d.activo) continue;
         if (d.franjas.length === 0) {
-          setErrorS2(`El día ${d.dia} está activo pero no tiene franjas.`);
-          setIsErrorModalOpen(true);
+          showError(`El día ${d.dia} está activo pero no tiene franjas.`);
           return;
         }
         const sortedFranjas = [...d.franjas].sort((a, b) => a.apertura.localeCompare(b.apertura));
         for (let i = 0; i < sortedFranjas.length; i++) {
           const f = sortedFranjas[i];
           if (!f.apertura || !f.cierre) {
-            setErrorS2(`Revisa las horas del ${d.dia}: faltan datos.`);
-            setIsErrorModalOpen(true);
+            showError(`Revisa las horas del ${d.dia}: faltan datos.`);
             return;
           }
           if (f.apertura >= f.cierre) {
-            setErrorS2(`Horario inválido el ${d.dia}: el cierre debe ser posterior a la apertura.`);
-            setIsErrorModalOpen(true);
+            showError(`Horario inválido el ${d.dia}: el cierre debe ser posterior a la apertura.`);
             return;
           }
           if (i > 0) {
             const prev = sortedFranjas[i - 1];
             if (f.apertura < prev.cierre) {
-              setErrorS2(`Solapamiento el ${d.dia}: la franja que empieza a las ${f.apertura} choca con la anterior.`);
-              setIsErrorModalOpen(true);
+              showError(`Solapamiento el ${d.dia}: la franja que empieza a las ${f.apertura} choca con la anterior.`);
               return;
             }
           }
         }
       }
     }
-    if (step === 5 && s5Prods.length === 0) {
-      setErrorS5('Añade al menos un producto para continuar')
-      return
+    if (step === 4) {
+      if (!s4Skip && !s4Msg.trim()) {
+        showError('Debes escribir un mensaje de bienvenida, o marcar la casilla de "No quiero enviar mensaje de bienvenida".');
+        return;
+      }
     }
 
     setSaving(true)
@@ -308,14 +316,12 @@ export default function OnboardingPage() {
                   <h1 className="font-display font-bold text-2xl text-ink-900 mb-1.5">Cuéntanos de tu negocio</h1>
                   <p className="text-ink-500 mb-6">Completa los datos de tu empresa y tu primera sucursal.</p>
 
-                  {errorS1 && <p className="text-red-500 text-sm font-medium mb-4">{errorS1}</p>}
-
                   <div className="space-y-4">
                     {/* Tu nombre */}
                     <div>
                       <label className="block text-sm font-medium text-ink-700 mb-1.5">Tu nombre completo</label>
                       <input type="text" value={s1.nombrePersona}
-                        onChange={e => { setS1({...s1, nombrePersona: e.target.value}); setErrorS1('') }}
+                        onChange={e => setS1({...s1, nombrePersona: e.target.value})}
                         placeholder="Ej. Ana Martínez"
                         className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition" />
                     </div>
@@ -331,7 +337,6 @@ export default function OnboardingPage() {
                             nombreNegocio: val,
                             nombreSucursal: prev.nombreSucursal === prev.nombreNegocio ? val : prev.nombreSucursal
                           }))
-                          setErrorS1('')
                         }}
                         placeholder="Ej. Pastelería Dulce Hogar"
                         className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition" />
@@ -359,7 +364,7 @@ export default function OnboardingPage() {
                           <div>
                             <label className="block text-sm font-medium text-ink-700 mb-1.5">Nombre de la sucursal</label>
                             <input type="text" value={s1.nombreSucursal}
-                              onChange={e => { setS1({...s1, nombreSucursal: e.target.value}); setErrorS1('') }}
+                              onChange={e => setS1({...s1, nombreSucursal: e.target.value})}
                               placeholder="Ej. Sede Central"
                               className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition" />
                           </div>
@@ -485,7 +490,6 @@ export default function OnboardingPage() {
                               n[i].franjas = [{ apertura: '', cierre: '' }];
                             }
                             setS2(n);
-                            setErrorS2('');
                           }} className="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-400" />
                           <span className={`font-semibold ${h.activo ? 'text-ink-900' : 'text-ink-400'}`}>{h.dia}</span>
                         </label>
@@ -495,14 +499,14 @@ export default function OnboardingPage() {
                             {h.franjas.map((f, j) => (
                               <div key={j} className="flex items-center gap-2 sm:gap-3">
                                 <input type="time" value={f.apertura} onChange={e => {
-                                  const n = [...s2]; n[i].franjas[j].apertura = e.target.value; setS2(n); setErrorS2('');
+                                  const n = [...s2]; n[i].franjas[j].apertura = e.target.value; setS2(n);
                                 }} className="flex-1 h-11 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition" />
                                 <span className="text-ink-400 text-sm font-medium">-</span>
                                 <input type="time" value={f.cierre} onChange={e => {
-                                  const n = [...s2]; n[i].franjas[j].cierre = e.target.value; setS2(n); setErrorS2('');
+                                  const n = [...s2]; n[i].franjas[j].cierre = e.target.value; setS2(n);
                                 }} className="flex-1 h-11 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition" />
                                 <button type="button" onClick={() => {
-                                  const n = [...s2]; n[i].franjas.splice(j, 1); setS2(n); setErrorS2('');
+                                  const n = [...s2]; n[i].franjas.splice(j, 1); setS2(n);
                                 }} className="p-2.5 text-ink-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition" title="Eliminar franja">
                                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                                 </button>
@@ -510,7 +514,7 @@ export default function OnboardingPage() {
                             ))}
                             {h.franjas.length < 4 && (
                               <button type="button" onClick={() => {
-                                const n = [...s2]; n[i].franjas.push({ apertura: '', cierre: '' }); setS2(n); setErrorS2('');
+                                const n = [...s2]; n[i].franjas.push({ apertura: '', cierre: '' }); setS2(n);
                               }} className="text-xs font-semibold text-brand-600 hover:text-brand-800 transition pt-1 flex items-center gap-1">
                                 + Añadir franja
                               </button>
@@ -571,9 +575,17 @@ export default function OnboardingPage() {
                   <h1 className="font-display font-bold text-2xl text-ink-900 mb-1.5">El primer mensaje al cliente</h1>
                   <p className="text-ink-500 mb-6">La IA enviará este texto al inicio de cada conversación nueva.</p>
 
-                  <textarea rows={5} value={s4Msg} onChange={e => setS4Msg(e.target.value)}
+                  <label className="flex items-center gap-2.5 mb-4 cursor-pointer">
+                    <input type="checkbox" checked={s4Skip} onChange={e => {
+                      setS4Skip(e.target.checked);
+                      if (e.target.checked) setS4Msg('');
+                    }} className="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-400" />
+                    <span className="font-semibold text-ink-900 text-sm">No quiero enviar mensaje de bienvenida</span>
+                  </label>
+
+                  <textarea rows={5} value={s4Msg} onChange={e => setS4Msg(e.target.value)} disabled={s4Skip}
                     placeholder="Ej. ¡Hola! Soy el asistente virtual de Pastelería Dulce Hogar. Estoy aquí para ayudarte con información sobre nuestros productos y precios. ¿En qué puedo ayudarte hoy?"
-                    className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white resize-none placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition"></textarea>
+                    className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white resize-none placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition disabled:opacity-50 disabled:bg-slate-50"></textarea>
 
                   <div className="flex items-start gap-3 mt-4 rounded-xl bg-brand-50 border border-brand-100 p-3.5">
                     <svg className="w-5 h-5 text-brand-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -592,7 +604,9 @@ export default function OnboardingPage() {
                   <h1 className="font-display font-bold text-2xl text-ink-900 mb-1.5">Carga tus productos</h1>
                   <p className="text-ink-500 mb-6">Añade al menos un ítem. La IA usará estos precios para responder.</p>
 
-                  {errorS5 && <p className="text-red-500 text-sm font-medium mb-4">{errorS5}</p>}
+                  <div className="bg-brand-50 border border-brand-200 rounded-xl p-3 mb-6 text-sm text-brand-800">
+                    Puedes continuar sin añadir productos ahora. Más adelante podrás importar tu lista completa de precios.
+                  </div>
 
                   <div className="space-y-3 mb-6">
                     {s5Prods.map((p, i) => (
@@ -659,7 +673,7 @@ export default function OnboardingPage() {
 
       <ErrorModal 
         isOpen={isErrorModalOpen} 
-        message={errorS2} 
+        message={modalError} 
         onClose={() => setIsErrorModalOpen(false)} 
       />
     </div>

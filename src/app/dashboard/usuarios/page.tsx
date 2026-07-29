@@ -26,6 +26,7 @@ export default function UsuariosPage() {
 
   const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
 
   // Invitar Modal
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
@@ -234,6 +235,11 @@ export default function UsuariosPage() {
     )
   }
 
+  const filteredUsuarios = usuarios.filter(u => 
+    (u.nombre && u.nombre.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (u.email && u.email.toLowerCase().includes(searchQuery.toLowerCase()))
+  )
+
   return (
     <div className="p-6 sm:p-10 max-w-4xl w-full mx-auto pb-20">
       {/* Mensaje global */}
@@ -294,9 +300,30 @@ export default function UsuariosPage() {
         )}
       </div>
 
+      {/* Buscador */}
+      <div className="mb-6">
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          </div>
+          <input
+            type="text"
+            placeholder="Buscar usuario por nombre o email..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-shadow"
+          />
+        </div>
+      </div>
+
       {/* Lista de usuarios */}
+      {filteredUsuarios.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-500">
+          No se encontraron usuarios que coincidan con la búsqueda.
+        </div>
+      ) : (
       <div className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100">
-        {usuarios.map(user => {
+        {filteredUsuarios.map(user => {
           const isCurrent = user.id === currentUserId
           const isPending = !user.invitacion_aceptada
           const isDisabled = !user.activo
@@ -334,7 +361,14 @@ export default function UsuariosPage() {
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-ink-500 truncate">{user.email}</p>
+                <p className="text-sm text-ink-500 truncate">
+                  {user.email}
+                  {user.fecha_creacion && (
+                    <span className="text-ink-400 ml-2">
+                      · Añadido el {new Date(user.fecha_creacion).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </span>
+                  )}
+                </p>
               </div>
 
               <div className="hidden sm:flex flex-col items-end gap-1">
@@ -362,10 +396,8 @@ export default function UsuariosPage() {
             </div>
           )
         })}
-        {usuarios.length === 0 && (
-          <div className="p-8 text-center text-ink-500">No hay usuarios.</div>
-        )}
       </div>
+      )}
       <div className="mt-3 px-1 text-xs text-ink-500 sm:hidden">
         Pulsa el menú de un usuario para editar o desactivar.
       </div>
@@ -437,7 +469,7 @@ export default function UsuariosPage() {
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <label className="block text-sm font-500 text-ink-700">Rol del usuario</label>
-                      <Link href="/dashboard/roles" target="_blank" className="text-xs font-500 text-brand-600 hover:text-brand-700 hover:underline">
+                      <Link href="/dashboard/roles" className="text-xs font-500 text-brand-600 hover:text-brand-700 hover:underline">
                         Crear nuevo rol
                       </Link>
                     </div>
@@ -548,7 +580,7 @@ export default function UsuariosPage() {
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <label className="block text-sm font-500 text-ink-700">Rol del usuario</label>
-                      <Link href="/dashboard/roles" target="_blank" className="text-xs font-500 text-brand-600 hover:text-brand-700 hover:underline">
+                      <Link href="/dashboard/roles" className="text-xs font-500 text-brand-600 hover:text-brand-700 hover:underline">
                         Crear nuevo rol
                       </Link>
                     </div>

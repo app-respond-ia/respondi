@@ -27,6 +27,9 @@ export default function UsuariosPage() {
   const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [filterRol, setFilterRol] = useState<string>('todos')
+  const [filterEstado, setFilterEstado] = useState<string>('todos')
+  const [filterSucursal, setFilterSucursal] = useState<string>('todos')
 
   // Invitar Modal
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
@@ -235,10 +238,44 @@ export default function UsuariosPage() {
     )
   }
 
-  const filteredUsuarios = usuarios.filter(u => 
-    (u.nombre && u.nombre.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (u.email && u.email.toLowerCase().includes(searchQuery.toLowerCase()))
-  )
+  const propietarioRoleId = roles.find(r => r.es_propietario)?.id
+
+  const filteredUsuarios = usuarios
+    .filter(u => {
+      // Búsqueda por texto
+      const textMatch = (u.nombre && u.nombre.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                        (u.email && u.email.toLowerCase().includes(searchQuery.toLowerCase()))
+      
+      // Filtro de rol
+      const rolMatch = filterRol === 'todos' || u.rol_personalizado_id === filterRol
+      
+      // Filtro de estado
+      let estadoMatch = true
+      if (filterEstado === 'activo') estadoMatch = u.invitacion_aceptada && u.activo
+      if (filterEstado === 'pendiente') estadoMatch = !u.invitacion_aceptada
+      if (filterEstado === 'desactivado') estadoMatch = u.invitacion_aceptada && !u.activo
+
+      // Filtro de sucursal
+      let sucursalMatch = true
+      if (filterSucursal !== 'todos') {
+        const hasBranch = Array.isArray(u.user_branches) && u.user_branches.some((ub: any) => ub.branch_id === filterSucursal)
+        sucursalMatch = hasBranch
+      }
+
+      return textMatch && rolMatch && estadoMatch && sucursalMatch
+    })
+    .sort((a, b) => {
+      // Propietario siempre primero
+      const aIsPropietario = a.rol_personalizado_id === propietarioRoleId
+      const bIsPropietario = b.rol_personalizado_id === propietarioRoleId
+      if (aIsPropietario && !bIsPropietario) return -1
+      if (!aIsPropietario && bIsPropietario) return 1
+      
+      // Luego por fecha descendente
+      const dateA = a.fecha_creacion ? new Date(a.fecha_creacion).getTime() : 0
+      const dateB = b.fecha_creacion ? new Date(b.fecha_creacion).getTime() : 0
+      return dateB - dateA
+    })
 
   return (
     <div className="p-6 sm:p-10 max-w-4xl w-full mx-auto pb-20">
@@ -300,19 +337,54 @@ export default function UsuariosPage() {
         )}
       </div>
 
-      {/* Buscador */}
-      <div className="mb-6">
-        <div className="relative">
+      {/* Filtros */}
+      <div className="mb-6 flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
           </div>
           <input
             type="text"
-            placeholder="Buscar usuario por nombre o email..."
+            placeholder="Buscar por nombre o email..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-shadow"
+            className="w-full pl-10 pr-4 py-2 h-11 border border-slate-200 rounded-xl bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-shadow"
           />
+        </div>
+
+        <div className="flex gap-3 overflow-x-auto pb-1 sm:pb-0 hide-scrollbar">
+          <select
+            value={filterRol}
+            onChange={(e) => setFilterRol(e.target.value)}
+            className="h-11 px-3 border border-slate-200 rounded-xl bg-white text-sm text-ink-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-shadow shrink-0 min-w-[140px]"
+          >
+            <option value="todos">Todos los roles</option>
+            {roles.map(r => (
+              <option key={r.id} value={r.id}>{r.nombre}</option>
+            ))}
+          </select>
+
+          <select
+            value={filterEstado}
+            onChange={(e) => setFilterEstado(e.target.value)}
+            className="h-11 px-3 border border-slate-200 rounded-xl bg-white text-sm text-ink-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-shadow shrink-0 min-w-[140px]"
+          >
+            <option value="todos">Cualquier estado</option>
+            <option value="activo">Activo</option>
+            <option value="pendiente">Invitación pendiente</option>
+            <option value="desactivado">Desactivado</option>
+          </select>
+
+          <select
+            value={filterSucursal}
+            onChange={(e) => setFilterSucursal(e.target.value)}
+            className="h-11 px-3 border border-slate-200 rounded-xl bg-white text-sm text-ink-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-shadow shrink-0 min-w-[140px]"
+          >
+            <option value="todos">Todas las sucursales</option>
+            {sucursales.map(s => (
+              <option key={s.id} value={s.id}>{s.nombre}</option>
+            ))}
+          </select>
         </div>
       </div>
 

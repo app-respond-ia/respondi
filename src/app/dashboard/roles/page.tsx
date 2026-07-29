@@ -50,6 +50,8 @@ export default function RolesPage() {
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
   const [myLevel, setMyLevel] = useState<number>(5)
   const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filterNivel, setFilterNivel] = useState<string>('todos')
 
   // Modal
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -180,6 +182,21 @@ export default function RolesPage() {
     )
   }
 
+  const filteredRoles = roles
+    .filter(r => 
+      r.nombre.toLowerCase().includes(searchQuery.toLowerCase()) &&
+      (filterNivel === 'todos' || r.nivel?.toString() === filterNivel)
+    )
+    .sort((a, b) => {
+      // Propietario siempre primero
+      if (a.es_propietario && !b.es_propietario) return -1
+      if (!a.es_propietario && b.es_propietario) return 1
+      // Luego por fecha descendente
+      const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
+      const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
+      return dateB - dateA
+    })
+
   return (
     <div className="p-6 sm:p-10 max-w-4xl w-full mx-auto pb-20">
       {mensaje && (
@@ -209,6 +226,34 @@ export default function RolesPage() {
         <p className="text-sm text-brand-800">Los roles son plantillas de permisos reutilizables. Al invitar un usuario puedes aplicar un rol para configurar sus permisos automáticamente.</p>
       </div>
 
+      <div className="mb-6 flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          </div>
+          <input
+            type="text"
+            placeholder="Buscar rol por nombre..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 h-11 border border-slate-200 rounded-xl bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-shadow"
+          />
+        </div>
+        <div className="w-full sm:w-48 shrink-0">
+          <select
+            value={filterNivel}
+            onChange={(e) => setFilterNivel(e.target.value)}
+            className="w-full h-11 px-4 border border-slate-200 rounded-xl bg-white text-sm text-ink-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-shadow"
+          >
+            <option value="todos">Todos los niveles</option>
+            <option value="2">Nivel 2</option>
+            <option value="3">Nivel 3</option>
+            <option value="4">Nivel 4</option>
+            <option value="5">Nivel 5</option>
+          </select>
+        </div>
+      </div>
+
       {/* Lista de roles */}
       {roles.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
@@ -225,9 +270,13 @@ export default function RolesPage() {
             </button>
           )}
         </div>
+      ) : filteredRoles.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-500">
+          No se encontraron roles que coincidan con la búsqueda.
+        </div>
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100">
-          {roles.map(rol => (
+          {filteredRoles.map(rol => (
             <div key={rol.id} className="flex items-center gap-4 p-4">
               <div className="w-10 h-10 rounded-xl bg-brand-100 text-brand-700 flex items-center justify-center shrink-0">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
@@ -237,6 +286,11 @@ export default function RolesPage() {
                 <p className="text-xs text-ink-500 mt-0.5">
                   {rol.descripcion && <span className="mr-2">{rol.descripcion}</span>}
                   <span className="text-ink-400">{getResumenPermisos(rol)}</span>
+                  {rol.created_at && (
+                    <span className="text-ink-400 ml-2">
+                      · Creado el {new Date(rol.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </span>
+                  )}
                 </p>
               </div>
                 <div className="flex items-center gap-1 shrink-0">

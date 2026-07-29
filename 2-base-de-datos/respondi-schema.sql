@@ -112,7 +112,7 @@ create table sucursales (
   blacklist_modo           blacklist_modo not null default 'ignorar',
   blacklist_respuesta_auto text,
   -- Nuevas columnas de onboarding trasladadas
-  onboarding_paso          integer not null default 1,
+  onboarding_paso          integer not null default 0,
   onboarding_completado    boolean not null default false,
   created_at               timestamptz not null default now()
 );
@@ -671,7 +671,7 @@ begin
 
   -- 2. Crear sucursal con datos base del onboarding
   insert into public.sucursales (tenant_id, nombre, activa, onboarding_paso, onboarding_completado)
-  values (v_org_id, 'Principal', true, 1, false)
+  values (v_org_id, 'Principal', true, 0, false)
   returning id into v_sucursal_id;
 
   -- 3. Crear usuario (Admin del tenant)

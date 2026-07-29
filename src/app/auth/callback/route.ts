@@ -34,6 +34,12 @@ export async function GET(request: Request) {
     .or(`id.eq.${user.id},email.eq.${user.email}`)
     .limit(1)
 
+  console.log('--- DEBUG CALLBACK START ---')
+  console.log('User from auth:', user.id, user.email)
+  console.log('Result from users table:', usersData)
+  console.log('Error if any:', userQueryError)
+  console.log('--- DEBUG CALLBACK END ---')
+
   if (userQueryError) {
     console.error('Error consultando users en callback:', userQueryError, JSON.stringify(userQueryError))
   }

@@ -367,7 +367,7 @@ export default function OnboardingPage() {
     }
   }
 
-  const handleBack = () => { if (step > 1) setStep(step - 1) }
+  const handleBack = () => { if (step > 0) setStep(step - 1) }
 
   if (loading) {
     return (
@@ -878,7 +878,7 @@ export default function OnboardingPage() {
             </div>
 
             <div className="flex items-center justify-between gap-3 px-6 sm:px-10 py-5 border-t border-slate-100 bg-slate-50/60">
-              <button disabled={step === 1 || saving} onClick={handleBack}
+              <button disabled={step === 0 || saving} onClick={handleBack}
                 className="px-5 h-11 rounded-xl font-semibold text-ink-500 hover:text-ink-700 hover:bg-white transition disabled:opacity-0 disabled:pointer-events-none">
                 ← Atrás
               </button>

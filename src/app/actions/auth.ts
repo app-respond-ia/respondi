@@ -59,6 +59,7 @@ export async function registroTrial(data: {
     return { success: false, error: 'Error al configurar la cuenta. Inténtalo de nuevo.' }
   }
 
+
   // Iniciar sesión automáticamente
   const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
     email: data.email,

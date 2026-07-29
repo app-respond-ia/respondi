@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { resolveBranchId } from '@/lib/active-branch'
+import { canManageRole } from './roles'
 
 import type { SeccionPermiso, NivelPermiso, PermisoSeccion } from '@/lib/permisos-types'
 import { SECCIONES_CON_ALCANCE } from '@/lib/permisos-types'
@@ -23,8 +24,8 @@ export async function getPermisosUsuario(userId: string, branchId: string) {
 
   if (!adminData) return { success: false, error: 'No autorizado' }
 
-  // El usuario puede ver sus propios permisos, o el admin los de su tenant
-  const esAdmin = false // TODO: sustituir por lógica de nivel/es_propietario en el siguiente paso
+  const check = await canManageRole(user.id, 99, adminData.tenant_id)
+  const esAdmin = check.allowed
   const esPropios = userId === user.id
 
   if (!esAdmin && !esPropios) {

@@ -435,7 +435,12 @@ export default function UsuariosPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-500 text-ink-700 mb-1.5">Rol del usuario</label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-sm font-500 text-ink-700">Rol del usuario</label>
+                      <Link href="/dashboard/roles" target="_blank" className="text-xs font-500 text-brand-600 hover:text-brand-700 hover:underline">
+                        Crear nuevo rol
+                      </Link>
+                    </div>
                     <select 
                       value={inviteRolId}
                       onChange={(e) => setInviteRolId(e.target.value)}
@@ -541,7 +546,12 @@ export default function UsuariosPage() {
                 </div>
 
                   <div>
-                    <label className="block text-sm font-500 text-ink-700 mb-1.5">Rol del usuario</label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-sm font-500 text-ink-700">Rol del usuario</label>
+                      <Link href="/dashboard/roles" target="_blank" className="text-xs font-500 text-brand-600 hover:text-brand-700 hover:underline">
+                        Crear nuevo rol
+                      </Link>
+                    </div>
                     <select 
                       value={editRolId}
                       onChange={(e) => setEditRolId(e.target.value)}

@@ -15,17 +15,19 @@ export async function getPermisosUsuario(userId: string, branchId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: 'No autorizado' }
 
-  // Solo admin puede consultar permisos de otros usuarios
-  const { data: adminData } = await supabase
+  const { data: adminData } = await supabaseAdmin
     .from('users')
-    .select('rol, tenant_id')
+    .select('rol, tenant_id, roles_personalizados(es_propietario)')
     .eq('id', user.id)
     .single()
 
   if (!adminData) return { success: false, error: 'No autorizado' }
 
-  const check = await canManageRole(user.id, 99, adminData.tenant_id)
-  const esAdmin = check.allowed
+  const roleData = Array.isArray(adminData.roles_personalizados) 
+    ? adminData.roles_personalizados[0] 
+    : adminData.roles_personalizados
+
+  const esAdmin = adminData.rol === 'super_admin' || (roleData?.es_propietario || false)
   const esPropios = userId === user.id
 
   if (!esAdmin && !esPropios) {

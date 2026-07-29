@@ -12,123 +12,7 @@ import {
 import { getMisPermisos, getPermisosUsuario } from '@/app/actions/permisos'
 import { getRolesPersonalizados } from '@/app/actions/roles'
 
-type PermisoUI = {
-  seccion: string
-  nivel: 'ninguno' | 'lectura' | 'escritura'
-  alcance?: 'todos' | 'propios'
-}
-
-const SECCIONES_CON_ALCANCE = ['casos', 'conversaciones', 'chats']
-
-const GRUPOS = [
-  {
-    label: 'Operación',
-    secciones: [
-      { id: 'casos', label: 'Casos' },
-      { id: 'conversaciones', label: 'Conversaciones' },
-      { id: 'chats', label: 'Chats' },
-      { id: 'novedades', label: 'Novedades del día' },
-      { id: 'blacklist', label: 'Blacklist' },
-    ]
-  },
-  {
-    label: 'Configuración',
-    secciones: [
-      { id: 'skills', label: 'Skills de IA' },
-      { id: 'precios', label: 'Lista de precios' },
-      { id: 'reglas', label: 'Reglas de casos' },
-      { id: 'etiquetas', label: 'Etiquetas' },
-      { id: 'canales', label: 'Canales' },
-      { id: 'usuarios', label: 'Usuarios' },
-      { id: 'sucursales', label: 'Sucursales' },
-      { id: 'perfil', label: 'Perfil de sucursal' },
-      { id: 'audit_log', label: 'Audit log' },
-    ]
-  }
-]
-
-const SECCIONES_DEFAULT: PermisoUI[] = GRUPOS.flatMap(g => 
-  g.secciones.map(s => ({ seccion: s.id, nivel: 'ninguno', alcance: 'todos' }))
-)
-
-const buildPermisosPayload = (permisos: PermisoUI[], branchIds: string[]) => {
-  return branchIds.map(bid => ({
-    branch_id: bid,
-    secciones: permisos
-      .filter(p => p.nivel !== 'ninguno')
-      .map(p => ({
-        seccion: p.seccion,
-        nivel: p.nivel,
-        ...(SECCIONES_CON_ALCANCE.includes(p.seccion) && { alcance: p.alcance || 'todos' })
-      }))
-  }))
-}
-
-const renderPermisosEditor = (permisos: PermisoUI[], setPermisos: (p: PermisoUI[]) => void) => {
-  const updateNivel = (seccion: string, nivel: 'ninguno' | 'lectura' | 'escritura') => {
-    setPermisos(permisos.map(p => p.seccion === seccion ? { ...p, nivel } : p))
-  }
-  const updateAlcance = (seccion: string, alcance: 'todos' | 'propios') => {
-    setPermisos(permisos.map(p => p.seccion === seccion ? { ...p, alcance } : p))
-  }
-
-  return (
-    <div className="space-y-6">
-      {GRUPOS.map(grupo => (
-        <div key={grupo.label} className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
-          <div className="px-4 py-3 bg-slate-100 border-b border-slate-200">
-            <h3 className="font-600 text-sm text-slate-700">{grupo.label}</h3>
-          </div>
-          <div className="divide-y divide-slate-100">
-            {grupo.secciones.map(sec => {
-              const perm = permisos.find(p => p.seccion === sec.id) || { seccion: sec.id, nivel: 'ninguno', alcance: 'todos' }
-              const showsAlcance = SECCIONES_CON_ALCANCE.includes(sec.id) && perm.nivel !== 'ninguno'
-              
-              return (
-                <div key={sec.id} className="p-4 bg-white flex flex-col gap-3">
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-sm font-500 text-ink-900">{sec.label}</span>
-                    <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
-                      {(['ninguno', 'lectura', 'escritura'] as const).map(n => (
-                        <button
-                          key={n}
-                          type="button"
-                          onClick={() => updateNivel(sec.id, n)}
-                          className={`px-3 py-1.5 text-xs font-600 rounded-md transition capitalize ${
-                            perm.nivel === n 
-                              ? 'bg-brand-600 text-white shadow-sm' 
-                              : 'text-ink-600 hover:bg-slate-200'
-                          }`}
-                        >
-                          {n}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  {showsAlcance && (
-                    <div className="flex justify-end">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-ink-500 font-500">Alcance:</span>
-                        <select 
-                          value={perm.alcance || 'todos'} 
-                          onChange={(e) => updateAlcance(sec.id, e.target.value as 'todos' | 'propios')}
-                          className="text-xs font-500 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50 focus:ring-brand-500 focus:border-brand-500 outline-none text-ink-700"
-                        >
-                          <option value="todos">Todos los registros</option>
-                          <option value="propios">Solo propios</option>
-                        </select>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
+import Link from 'next/link'
 
 export default function UsuariosPage() {
   const [loading, setLoading] = useState(true)
@@ -149,7 +33,6 @@ export default function UsuariosPage() {
   const [inviteData, setInviteData] = useState<{ email: string, nombre: string, branch_ids: string[] }>({
     email: '', nombre: '', branch_ids: []
   })
-  const [invitePermisos, setInvitePermisos] = useState<PermisoUI[]>(SECCIONES_DEFAULT)
   const [inviteRolId, setInviteRolId] = useState<string>('')
   const [inviteError, setInviteError] = useState<string | null>(null)
 
@@ -160,21 +43,7 @@ export default function UsuariosPage() {
   const [editData, setEditData] = useState<{ nombre: string, branch_ids: string[] }>({
     nombre: '', branch_ids: []
   })
-  const [editPermisos, setEditPermisos] = useState<PermisoUI[]>([])
   const [editRolId, setEditRolId] = useState<string>('')
-
-  const applyRoleToPermisos = (rolId: string, setRolId: (id: string) => void, setPermisosState: (p: PermisoUI[]) => void) => {
-    setRolId(rolId)
-    if (!rolId) return
-    const rol = roles.find(r => r.id === rolId)
-    if (!rol) return
-    
-    const newPerms = SECCIONES_DEFAULT.map(s => {
-      const existing = (rol.permisos || []).find((p: any) => p.seccion === s.seccion)
-      return existing ? { ...s, nivel: existing.nivel, alcance: existing.alcance || 'todos' } : s
-    })
-    setPermisosState(newPerms)
-  }
 
   const cargar = async () => {
     setLoading(true)
@@ -217,7 +86,6 @@ export default function UsuariosPage() {
 
   const handleOpenInvite = () => {
     setInviteData({ email: '', nombre: '', branch_ids: [] })
-    setInvitePermisos(SECCIONES_DEFAULT)
     setInviteRolId('')
     setInviteError(null)
     setIsInviteModalOpen(true)
@@ -236,7 +104,7 @@ export default function UsuariosPage() {
       email: inviteData.email,
       nombre: inviteData.nombre || null,
       branch_ids: inviteData.branch_ids,
-      permisos: buildPermisosPayload(invitePermisos, inviteData.branch_ids)
+      rol_personalizado_id: inviteRolId
     })
 
     if (res.success) {
@@ -257,26 +125,7 @@ export default function UsuariosPage() {
       branch_ids: Array.isArray(user.user_branches) ? user.user_branches.map((ub: any) => ub.branch_id) : []
     })
     
-    // Cargar permisos existentes del usuario (usando la primera branch como referencia)
-    const firstBranchId = Array.isArray(user.user_branches) && user.user_branches.length > 0
-      ? user.user_branches[0].branch_id : null
-      
-    if (firstBranchId) {
-      const permRes = await getPermisosUsuario(user.id, firstBranchId)
-      if (permRes.success && permRes.data) {
-        const loaded = SECCIONES_DEFAULT.map(s => {
-          const existing = (permRes.data as any[]).find((p: any) => p.seccion === s.seccion)
-          return existing ? { ...s, nivel: existing.nivel, alcance: existing.alcance || 'todos' } : s
-        })
-        setEditPermisos(loaded)
-      } else {
-        setEditPermisos([...SECCIONES_DEFAULT])
-      }
-    } else {
-      setEditPermisos([...SECCIONES_DEFAULT])
-    }
-    
-    setEditRolId('')
+    setEditRolId(user.rol_personalizado_id || '')
     setIsEditModalOpen(true)
   }
 
@@ -292,7 +141,7 @@ export default function UsuariosPage() {
     const res = await actualizarUsuario(selectedUser.id, {
       nombre: editData.nombre,
       branch_ids: editData.branch_ids,
-      permisos: buildPermisosPayload(editPermisos, editData.branch_ids)
+      rol_personalizado_id: editRolId
     })
 
     if (res.success) {
@@ -456,10 +305,7 @@ export default function UsuariosPage() {
                 .map((ub: any) => sucursales.find((s: any) => s.id === ub.branch_id)?.nombre)
                 .filter(Boolean).join(', ')
             : 'Sin sucursal asignada'
-          // Adaptamos la lógica de canEdit para la nueva estructura sin `rol`, 
-          // asumiendo que `es_admin` (o similar) define si se puede editar, 
-          // o simplemente permitimos editar a todos excepto al currentUserId.
-          const canEdit = !isCurrent && user.rol !== 'admin' && user.rol !== 'super_admin'
+          const canEdit = user.rol !== 'super_admin'
 
           return (
             <div key={user.id} className={`flex items-center gap-3 p-4 ${isDisabled ? 'opacity-50' : ''}`}>
@@ -497,9 +343,9 @@ export default function UsuariosPage() {
                     Desactivado
                   </span>
                 ) : (
-                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-600 ${getRoleBadgeClass(user.rol === 'admin' || user.rol === 'super_admin')}`}>
-                    {getRoleIcon(user.rol === 'admin' || user.rol === 'super_admin')}
-                    {getRoleLabel(user.rol === 'admin' || user.rol === 'super_admin')}
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-600 ${getRoleBadgeClass(user.rol === 'tenant_user' || user.rol === 'super_admin')}`}>
+                    {getRoleIcon(user.rol === 'tenant_user' || user.rol === 'super_admin')}
+                    {getRoleLabel(user.rol === 'tenant_user' || user.rol === 'super_admin')}
                   </span>
                 )}
                 <span className="text-xs text-ink-400">{userBranchNames}</span>
@@ -589,27 +435,18 @@ export default function UsuariosPage() {
                   </div>
 
                   <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <label className="block text-sm font-500 text-ink-700">Permisos por sección</label>
-                      {roles.length > 0 && (
-                        <select 
-                          value={inviteRolId}
-                          onChange={(e) => applyRoleToPermisos(e.target.value, setInviteRolId, setInvitePermisos)}
-                          className="text-xs font-500 border border-slate-200 rounded-lg px-2.5 py-1.5 bg-slate-50 focus:ring-brand-500 focus:border-brand-500 outline-none text-ink-700"
-                        >
-                          <option value="">Personalizado / Empezar de cero</option>
-                          <optgroup label="Plantillas de rol">
-                            {roles.map(r => (
-                              <option key={r.id} value={r.id}>{r.nombre}</option>
-                            ))}
-                          </optgroup>
-                        </select>
-                      )}
-                    </div>
-                    {renderPermisosEditor(invitePermisos, (newPerms) => {
-                      setInvitePermisos(newPerms)
-                      setInviteRolId('')
-                    })}
+                    <label className="block text-sm font-500 text-ink-700 mb-1.5">Rol del usuario</label>
+                    <select 
+                      value={inviteRolId}
+                      onChange={(e) => setInviteRolId(e.target.value)}
+                      required
+                      className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm"
+                    >
+                      <option value="" disabled>Selecciona un rol</option>
+                      {roles.filter(r => !r.es_propietario).map(r => (
+                        <option key={r.id} value={r.id}>{r.nombre}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
         
@@ -704,27 +541,19 @@ export default function UsuariosPage() {
                 </div>
 
                   <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <label className="block text-sm font-500 text-ink-700">Permisos por sección</label>
-                      {roles.length > 0 && (
-                        <select 
-                          value={editRolId}
-                          onChange={(e) => applyRoleToPermisos(e.target.value, setEditRolId, setEditPermisos)}
-                          className="text-xs font-500 border border-slate-200 rounded-lg px-2.5 py-1.5 bg-slate-50 focus:ring-brand-500 focus:border-brand-500 outline-none text-ink-700"
-                        >
-                          <option value="">Personalizado</option>
-                          <optgroup label="Plantillas de rol">
-                            {roles.map(r => (
-                              <option key={r.id} value={r.id}>{r.nombre}</option>
-                            ))}
-                          </optgroup>
-                        </select>
-                      )}
-                    </div>
-                    {renderPermisosEditor(editPermisos, (newPerms) => {
-                      setEditPermisos(newPerms)
-                      setEditRolId('')
-                    })}
+                    <label className="block text-sm font-500 text-ink-700 mb-1.5">Rol del usuario</label>
+                    <select 
+                      value={editRolId}
+                      onChange={(e) => setEditRolId(e.target.value)}
+                      required
+                      disabled={roles.find(r => r.id === selectedUser?.rol_personalizado_id)?.es_propietario}
+                      className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm disabled:bg-slate-50 disabled:text-slate-500"
+                    >
+                      <option value="" disabled>Selecciona un rol</option>
+                      {roles.filter(r => !r.es_propietario || r.id === selectedUser?.rol_personalizado_id).map(r => (
+                        <option key={r.id} value={r.id}>{r.nombre}</option>
+                      ))}
+                    </select>
                   </div>
 
                 {/* Acciones secundarias */}

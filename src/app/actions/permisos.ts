@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
+import { supabaseAdmin } from '@/utils/supabase/admin'
 import { resolveBranchId } from '@/lib/active-branch'
 
 import type { SeccionPermiso, NivelPermiso, PermisoSeccion } from '@/lib/permisos-types'
@@ -23,7 +24,7 @@ export async function getPermisosUsuario(userId: string, branchId: string) {
   if (!adminData) return { success: false, error: 'No autorizado' }
 
   // El usuario puede ver sus propios permisos, o el admin los de su tenant
-  const esAdmin = adminData.rol === 'admin'
+  const esAdmin = false // TODO: sustituir por lógica de nivel/es_propietario en el siguiente paso
   const esPropios = userId === user.id
 
   if (!esAdmin && !esPropios) {
@@ -41,50 +42,51 @@ export async function getPermisosUsuario(userId: string, branchId: string) {
   return { success: true, data: permisos || [] }
 }
 
-// Obtener los permisos del usuario autenticado en su sucursal activa
 export async function getMisPermisos() {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: 'No autorizado' }
 
-  const { data: userData } = await supabase
+  const { data: userData } = await supabaseAdmin
     .from('users')
-    .select('rol, tenant_id')
+    .select('rol, tenant_id, rol_personalizado_id, roles_personalizados(es_propietario, permisos, nivel)')
     .eq('id', user.id)
     .single()
 
   if (!userData) return { success: false, error: 'No autorizado' }
 
-  // Obtenemos el branchId para todos los roles
   const branchId = await resolveBranchId(supabase, user.id)
 
-  if (userData.rol === 'admin' || userData.rol === 'super_admin') {
+  const esSuperAdmin = userData.rol === 'super_admin'
+  const roleData = Array.isArray(userData.roles_personalizados) 
+    ? userData.roles_personalizados[0] 
+    : userData.roles_personalizados
+
+  const esPropietario = roleData?.es_propietario || false
+
+  if (esSuperAdmin || esPropietario) {
     return { 
       success: true, 
       esAdmin: true,
       tenantId: userData.tenant_id,
       branchId: branchId,
-      data: [] 
+      data: [],
+      userLevel: esSuperAdmin ? 0 : 1
     }
   }
 
   if (!branchId) return { success: false, error: 'No hay sucursal activa' }
 
-  const { data: permisos, error } = await supabase
-    .from('user_permissions')
-    .select('seccion, nivel, alcance')
-    .eq('user_id', user.id)
-    .eq('branch_id', branchId)
-
-  if (error) return { success: false, error: error.message }
+  const permisos = roleData?.permisos || []
 
   return { 
     success: true, 
     esAdmin: false, 
     tenantId: userData.tenant_id,
     branchId: branchId,
-    data: permisos || [] 
+    data: permisos,
+    userLevel: roleData?.nivel ?? 5
   }
 }
 
@@ -95,66 +97,5 @@ export async function setPermisosUsuario(
   branchId: string,
   permisos: PermisoSeccion[]
 ) {
-  const supabase = await createClient()
-
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: 'No autorizado' }
-
-  const { data: adminData } = await supabase
-    .from('users')
-    .select('rol, tenant_id')
-    .eq('id', user.id)
-    .single()
-
-  if (!adminData || adminData.rol !== 'admin') {
-    return { success: false, error: 'Solo el administrador puede modificar permisos' }
-  }
-
-  // Verificar que la sucursal pertenece al tenant del admin
-  const { data: branchData } = await supabase
-    .from('sucursales')
-    .select('id')
-    .eq('id', branchId)
-    .eq('tenant_id', adminData.tenant_id)
-    .single()
-
-  if (!branchData) {
-    return { success: false, error: 'Sucursal no encontrada en tu organización' }
-  }
-
-  // Obtener permisos anteriores para audit_log
-  const { data: permisosAnteriores } = await supabase
-    .from('user_permissions')
-    .select('seccion, nivel, alcance')
-    .eq('user_id', userId)
-    .eq('branch_id', branchId)
-
-  // Upsert de todos los permisos enviados
-  const rows = permisos.map(p => ({
-    user_id: userId,
-    branch_id: branchId,
-    seccion: p.seccion,
-    nivel: p.nivel,
-    alcance: SECCIONES_CON_ALCANCE.includes(p.seccion) ? (p.alcance || 'todos') : null,
-    updated_at: new Date().toISOString()
-  }))
-
-  const { error: upsertError } = await supabase
-    .from('user_permissions')
-    .upsert(rows, { onConflict: 'user_id,branch_id,seccion' })
-
-  if (upsertError) return { success: false, error: upsertError.message }
-
-  // Registrar en audit_log
-  await supabase.from('audit_log').insert({
-    tenant_id: adminData.tenant_id,
-    user_id: user.id,
-    accion: 'actualizar_permisos',
-    tabla_afectada: 'user_permissions',
-    registro_id: userId,
-    valor_anterior: permisosAnteriores ? { permisos: permisosAnteriores } : null,
-    valor_nuevo: { permisos: rows, branch_id: branchId }
-  })
-
-  return { success: true }
+  return { success: false, error: 'Los permisos ahora se gestionan por rol' }
 }

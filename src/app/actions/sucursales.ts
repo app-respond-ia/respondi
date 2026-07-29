@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
+import { canManageRole } from './roles'
 
 async function getAuthData(supabase: any) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -40,9 +41,10 @@ export async function getSucursales() {
   const plan = Array.isArray(organizacion?.plans) ? organizacion.plans[0] : organizacion?.plans
   const sucursales_max = plan?.sucursales_max ?? null
   const sucursales_activas_count = (sucursales || []).filter((s: any) => s.activa).length
-
   return { success: true, data: { sucursales, sucursales_max, sucursales_activas_count } }
 }
+
+import { getMisPermisos } from './permisos'
 
 export async function crearSucursal(nombre: string, direccion?: string, copiarDesdeId?: string) {
   if (!nombre || nombre.trim().length === 0) {
@@ -54,6 +56,14 @@ export async function crearSucursal(nombre: string, direccion?: string, copiarDe
   if (auth.error) return { success: false, error: auth.error }
 
   const sucRes = await getSucursales()
+  const misPermisos = await getMisPermisos()
+  if (!misPermisos.success) return { success: false, error: 'Error verificando permisos' }
+  const tienePermiso = (misPermisos as any).esAdmin || 
+                       (misPermisos.data || []).some((p: any) => p.seccion === 'sucursales' && p.nivel === 'escritura')
+  
+  if (!tienePermiso) {
+    return { success: false, error: 'No tienes permisos para crear sucursales' }
+  }
   if (sucRes.success && sucRes.data) {
     const { sucursales_max, sucursales_activas_count } = sucRes.data
     if (sucursales_max !== null && sucursales_activas_count >= sucursales_max) {
@@ -315,13 +325,21 @@ export async function crearSucursalConDatos(data: {
     .single()
 
   if (!userData?.tenant_id) return { success: false, error: 'Sin organización' }
-  if (userData.rol !== 'admin') return { success: false, error: 'Solo el administrador puede crear sucursales' }
+  
+  const misPermisos = await getMisPermisos()
+  if (!misPermisos.success) return { success: false, error: 'Error verificando permisos' }
+  const tienePermiso = (misPermisos as any).esAdmin || 
+                       (misPermisos.data || []).some((p: any) => p.seccion === 'sucursales' && p.nivel === 'escritura')
+
+  if (!tienePermiso) {
+    return { success: false, error: 'No tienes permisos para crear sucursales' }
+  }
 
   // Crear sucursal
   const { data: newBranch, error: branchErr } = await supabase
     .from('sucursales')
     .insert({
-      tenant_id: userData.tenant_id,
+      tenant_id: userData!.tenant_id,
       nombre: data.nombre,
       direccion: data.direccion || null,
       timezone: data.timezone,
@@ -348,18 +366,18 @@ export async function crearSucursalConDatos(data: {
   }
 
   // Horarios
-  if (data.horarios && data.horarios.length > 0) {
+  if (data.horarios && data.horarios!.length > 0) {
     await supabase.from('business_hours').insert(
-      data.horarios.map(h => ({ ...h, branch_id: newBranch.id }))
+      data.horarios!.map(h => ({ ...h, branch_id: newBranch.id }))
     )
   }
 
   // Skills
-  if (data.skills && data.skills.length > 0) {
+  if (data.skills && data.skills!.length > 0) {
     await supabase.from('skills').insert(
-      data.skills.map((s, idx) => ({
+      data.skills!.map((s, idx) => ({
         branch_id: newBranch.id,
-        tenant_id: userData.tenant_id,
+        tenant_id: userData!.tenant_id,
         nombre: s.nombre,
         activo: s.activo,
         orden: idx
@@ -368,11 +386,11 @@ export async function crearSucursalConDatos(data: {
   }
 
   // Precios
-  if (data.precios && data.precios.length > 0) {
+  if (data.precios && data.precios!.length > 0) {
     await supabase.from('price_list').insert(
-      data.precios.map(p => ({
+      data.precios!.map(p => ({
         branch_id: newBranch.id,
-        tenant_id: userData.tenant_id,
+        tenant_id: userData!.tenant_id,
         nombre: p.nombre,
         tipo: p.tipo || 'producto',
         precio: p.precio,
@@ -384,24 +402,24 @@ export async function crearSucursalConDatos(data: {
   }
 
   // Etiquetas
-  if (data.etiquetas && data.etiquetas.length > 0) {
+  if (data.etiquetas && data.etiquetas!.length > 0) {
     await supabase.from('message_categories').insert(
-      data.etiquetas.map((e, idx) => ({
+      data.etiquetas!.map((e, idx) => ({
         ...e,
         branch_id: newBranch.id,
-        tenant_id: userData.tenant_id,
+        tenant_id: userData!.tenant_id,
         orden: idx
       }))
     )
   }
 
   // Reglas
-  if (data.reglas && data.reglas.length > 0) {
+  if (data.reglas && data.reglas!.length > 0) {
     await supabase.from('case_rules').insert(
-      data.reglas.map(r => ({
+      data.reglas!.map(r => ({
         ...r,
         branch_id: newBranch.id,
-        tenant_id: userData.tenant_id
+        tenant_id: userData!.tenant_id
       }))
     )
   }

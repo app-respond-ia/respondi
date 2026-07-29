@@ -32,6 +32,7 @@ const GRUPOS = [
       { id: 'etiquetas', label: 'Etiquetas' },
       { id: 'canales', label: 'Canales' },
       { id: 'usuarios', label: 'Usuarios' },
+      { id: 'roles', label: 'Roles y permisos' },
       { id: 'sucursales', label: 'Sucursales' },
       { id: 'perfil', label: 'Perfil de sucursal' },
       { id: 'audit_log', label: 'Audit log' },
@@ -47,6 +48,7 @@ export default function RolesPage() {
   const [roles, setRoles] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
+  const [myLevel, setMyLevel] = useState<number>(5)
   const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
 
   // Modal
@@ -56,6 +58,7 @@ export default function RolesPage() {
   const [saving, setSaving] = useState(false)
   const [nombre, setNombre] = useState('')
   const [descripcion, setDescripcion] = useState('')
+  const [nivel, setNivel] = useState(5)
   const [permisos, setPermisos] = useState<PermisoUI[]>(SECCIONES_DEFAULT)
 
   useEffect(() => { cargar() }, [])
@@ -74,6 +77,7 @@ export default function RolesPage() {
         const p = (permisosRes.data || []).find((p: any) => p.seccion === 'usuarios')
         setNivelPermiso(p?.nivel || 'ninguno')
       }
+      setMyLevel((permisosRes as any).userLevel ?? 5)
     }
     setLoading(false)
   }
@@ -83,6 +87,7 @@ export default function RolesPage() {
     setSelectedId(null)
     setNombre('')
     setDescripcion('')
+    setNivel(5)
     setPermisos([...SECCIONES_DEFAULT])
     setIsModalOpen(true)
   }
@@ -92,24 +97,13 @@ export default function RolesPage() {
     setSelectedId(rol.id)
     setNombre(rol.nombre)
     setDescripcion(rol.descripcion || '')
+    setNivel(rol.nivel || 5)
     const loaded = SECCIONES_DEFAULT.map(s => {
       const existing = (rol.permisos || []).find((p: any) => p.seccion === s.seccion)
       return existing ? { ...s, nivel: existing.nivel, alcance: existing.alcance || 'todos' } : s
     })
     setPermisos(loaded)
     setIsModalOpen(true)
-  }
-
-  const handleEliminar = async (id: string) => {
-    if (!confirm('¿Eliminar este rol? Los usuarios que lo tengan asignado mantendrán sus permisos actuales.')) return
-    const res = await eliminarRolPersonalizado(id)
-    if (res.success) {
-      setRoles(prev => prev.filter(r => r.id !== id))
-      setMensaje({ tipo: 'exito', texto: 'Rol eliminado ✓' })
-    } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al eliminar' })
-    }
-    setTimeout(() => setMensaje(null), 3000)
   }
 
   const handleGuardar = async () => {
@@ -129,9 +123,9 @@ export default function RolesPage() {
 
     let res
     if (modalMode === 'crear') {
-      res = await crearRolPersonalizado({ nombre, descripcion, permisos: permisosPayload })
+      res = await crearRolPersonalizado({ nombre, descripcion, nivel, permisos: permisosPayload })
     } else {
-      res = await actualizarRolPersonalizado(selectedId!, { nombre, descripcion, permisos: permisosPayload })
+      res = await actualizarRolPersonalizado(selectedId!, { nombre, descripcion, nivel, permisos: permisosPayload })
     }
 
     if (res.success) {
@@ -145,8 +139,17 @@ export default function RolesPage() {
     setSaving(false)
   }
 
-  const updateNivel = (seccion: string, nivel: 'ninguno' | 'lectura' | 'escritura') => {
-    setPermisos(prev => prev.map(p => p.seccion === seccion ? { ...p, nivel } : p))
+  const updateNivel = (seccion: string, n: 'ninguno' | 'lectura' | 'escritura') => {
+    setPermisos(prev => prev.map(p => {
+      if (p.seccion === seccion) {
+        let nuevoAlcance = p.alcance
+        if (n === 'lectura' && SECCIONES_CON_ALCANCE.includes(seccion)) {
+          nuevoAlcance = 'todos'
+        }
+        return { ...p, nivel: n, alcance: nuevoAlcance }
+      }
+      return p
+    }))
   }
 
   const updateAlcance = (seccion: string, alcance: 'todos' | 'propios') => {
@@ -235,16 +238,11 @@ export default function RolesPage() {
                   <span className="text-ink-400">{getResumenPermisos(rol)}</span>
                 </p>
               </div>
-              {nivelPermiso === 'escritura' && (
                 <div className="flex items-center gap-1 shrink-0">
                   <button onClick={() => openEditar(rol)} className="p-1.5 rounded-lg text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                   </button>
-                  <button onClick={() => handleEliminar(rol.id)} className="p-1.5 rounded-lg text-ink-400 hover:text-red-500 hover:bg-red-50 transition">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                  </button>
                 </div>
-              )}
             </div>
           ))}
         </div>
@@ -275,9 +273,21 @@ export default function RolesPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-500 text-ink-700 mb-1.5">Descripción <span className="text-ink-400 font-400">· opcional</span></label>
-                    <input type="text" placeholder="Para qué se usa este rol"
+                    <input type="text" placeholder="Ej: Agentes telefónicos turno mañana"
                       value={descripcion} onChange={e => setDescripcion(e.target.value)}
-                      className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition" />
+                      className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-500 text-ink-700 mb-1.5">Nivel jerárquico</label>
+                    <select 
+                      value={nivel} onChange={e => setNivel(parseInt(e.target.value))}
+                      className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm"
+                    >
+                      {[2, 3, 4, 5].filter(n => n > myLevel).map(n => (
+                        <option key={n} value={n}>Nivel {n}</option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-ink-500 mt-1.5">Los roles solo pueden gestionar a usuarios de nivel estrictamente mayor que el suyo (menor poder).</p>
                   </div>
                 </div>
 
@@ -310,8 +320,12 @@ export default function RolesPage() {
                                   <div className="flex justify-end">
                                     <div className="flex items-center gap-2">
                                       <span className="text-xs text-ink-500">Alcance:</span>
-                                      <select value={perm.alcance || 'todos'} onChange={e => updateAlcance(sec.id, e.target.value as any)}
-                                        className="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-slate-50 focus:ring-brand-500 outline-none text-ink-700">
+                                      <select 
+                                        value={perm.alcance || 'todos'} 
+                                        disabled={perm.nivel === 'lectura'}
+                                        onChange={(e) => updateAlcance(sec.id, e.target.value as 'todos' | 'propios')}
+                                        className="text-xs font-500 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50 focus:ring-brand-500 focus:border-brand-500 outline-none text-ink-700 disabled:opacity-50"
+                                      >
                                         <option value="todos">Todos</option>
                                         <option value="propios">Solo propios</option>
                                       </select>

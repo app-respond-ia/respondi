@@ -121,7 +121,7 @@ export default function OnboardingPage() {
       
       setTenantId(res.tenantId || '')
       setBranchId(res.branchId || '')
-      setStep(res.data?.paso || 1)
+      setStep(res.data?.paso ?? 1)
 
       const d = res.data || {}
 

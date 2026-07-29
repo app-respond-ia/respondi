@@ -148,7 +148,7 @@ export async function getOnboardingState() {
       timezone: branchData?.data?.timezone || 'America/Caracas',
       moneda: branchData?.data?.moneda || 'USD',
       servicios: profileData?.data?.servicios || '',
-      politicas: profileData?.data?.politicas ? profileData.data.politicas.split('\n') : []
+      politicas: profileData?.data?.politicas || []
     }
 
     if (hoursData?.data && hoursData.data.length > 0) {
@@ -228,7 +228,7 @@ export async function saveStep1(data: {
   timezone: string
   moneda: string
   servicios: string
-  politicas: string[]
+  politicas: { titulo: string, descripcion: string }[]
 }) {
   try {
     const supabase = await createClient()
@@ -298,7 +298,7 @@ export async function saveStep1(data: {
       .update({ branch_id: branch.id })
       .eq('id', user.id)
 
-    const politicasStr = data.politicas.join('\n')
+
     const { data: profiles } = await supabaseAdmin
       .from('business_profiles')
       .select('id')
@@ -311,7 +311,7 @@ export async function saveStep1(data: {
       const { error: insErr } = await supabaseAdmin.from('business_profiles').insert({
         branch_id: branch.id,
         servicios: data.servicios,
-        politicas: politicasStr
+        politicas: data.politicas
       })
       if (insErr) {
         console.error('Error insertando profile en saveStep1:', insErr, JSON.stringify(insErr))
@@ -320,7 +320,7 @@ export async function saveStep1(data: {
     } else {
       const { error: updErr } = await supabaseAdmin.from('business_profiles').update({
         servicios: data.servicios,
-        politicas: politicasStr
+        politicas: data.politicas
       }).eq('id', profile.id)
       if (updErr) {
         console.error('Error actualizando profile en saveStep1:', updErr, JSON.stringify(updErr))

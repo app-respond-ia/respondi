@@ -121,7 +121,7 @@ create table business_profiles (
   id                    uuid primary key default gen_random_uuid(),
   branch_id             uuid not null references sucursales(id) on delete cascade,
   descripcion           text,
-  politicas             text,
+  politicas             jsonb default '[]'::jsonb,
   servicios             text,
   idioma_base           text default 'es',
   tono                  text,

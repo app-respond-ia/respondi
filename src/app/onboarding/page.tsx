@@ -66,8 +66,11 @@ export default function OnboardingPage() {
     }
   }, [])
 
-  const [politicas, setPoliticas] = useState<string[]>([])
-  const [politicaInput, setPoliticaInput] = useState('')
+  const [politicas, setPoliticas] = useState<{titulo: string, descripcion: string}[]>([])
+  const [politicaModalOpen, setPoliticaModalOpen] = useState(false)
+  const [politicaEditIndex, setPoliticaEditIndex] = useState<number | null>(null)
+  const [politicaTituloInput, setPoliticaTituloInput] = useState('')
+  const [politicaDescInput, setPoliticaDescInput] = useState('')
 
   // Step 2
   const [s2, setS2] = useState([
@@ -208,11 +211,30 @@ export default function OnboardingPage() {
     })
   }, [router])
 
-  const addPolitica = () => {
-    const val = politicaInput.trim()
-    if (!val) return
-    setPoliticas(prev => [...prev, val])
-    setPoliticaInput('')
+  const openNewPolitica = () => {
+    setPoliticaEditIndex(null)
+    setPoliticaTituloInput('')
+    setPoliticaDescInput('')
+    setPoliticaModalOpen(true)
+  }
+
+  const openEditPolitica = (idx: number) => {
+    setPoliticaEditIndex(idx)
+    setPoliticaTituloInput(politicas[idx].titulo)
+    setPoliticaDescInput(politicas[idx].descripcion)
+    setPoliticaModalOpen(true)
+  }
+
+  const savePolitica = () => {
+    const titulo = politicaTituloInput.trim()
+    const descripcion = politicaDescInput.trim()
+    if (!titulo || !descripcion) return
+    if (politicaEditIndex !== null) {
+      setPoliticas(prev => prev.map((p, i) => i === politicaEditIndex ? { titulo, descripcion } : p))
+    } else {
+      setPoliticas(prev => [...prev, { titulo, descripcion }])
+    }
+    setPoliticaModalOpen(false)
   }
 
   const removePolitica = (idx: number) => {
@@ -578,42 +600,81 @@ export default function OnboardingPage() {
                         className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white resize-none placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition"></textarea>
                     </div>
 
-                    {/* Políticas en cajitas */}
+                    {/* Políticas del negocio */}
                     <div>
                       <label className="block text-sm font-medium text-ink-700 mb-1.5">Políticas del negocio <span className="text-ink-400 font-normal">· opcional</span></label>
-                      <p className="text-xs text-ink-500 mb-3">Añade las políticas de tu negocio una por una (devoluciones, envíos, garantías, etc.)</p>
+                      <p className="text-xs text-ink-500 mb-3">Añade las políticas de tu negocio (devoluciones, envíos, garantías, etc.)</p>
 
-                      {/* Cajitas de políticas añadidas */}
+                      {/* Tarjetas de políticas añadidas */}
                       {politicas.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mb-3">
+                        <div className="flex flex-col gap-2 mb-3">
                           {politicas.map((p, i) => (
-                            <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-brand-50 border border-brand-200 text-sm text-brand-800 font-500">
-                              <span>{p}</span>
-                              <button type="button" onClick={() => removePolitica(i)}
-                                className="text-brand-400 hover:text-brand-700 transition ml-1">
-                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                              </button>
+                            <div key={i} className="flex items-start justify-between gap-3 px-4 py-3 rounded-xl bg-brand-50 border border-brand-200">
+                              <div className="min-w-0">
+                                <p className="text-sm font-600 text-brand-800">{p.titulo}</p>
+                                <p className="text-xs text-brand-600 mt-0.5 line-clamp-2">{p.descripcion}</p>
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button type="button" onClick={() => openEditPolitica(i)}
+                                  className="p-1.5 text-brand-400 hover:text-brand-700 transition">
+                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                </button>
+                                <button type="button" onClick={() => removePolitica(i)}
+                                  className="p-1.5 text-brand-400 hover:text-red-600 transition">
+                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                </button>
+                              </div>
                             </div>
                           ))}
                         </div>
                       )}
 
-                      {/* Input para añadir */}
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={politicaInput}
-                          onChange={e => setPoliticaInput(e.target.value)}
-                          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addPolitica() } }}
-                          placeholder="Ej. Devoluciones en 30 días"
-                          className="flex-1 h-11 px-4 rounded-xl border border-slate-300 bg-white text-sm placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition"
-                        />
-                        <button type="button" onClick={addPolitica}
-                          className="px-4 h-11 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-600 transition shrink-0">
-                          Añadir
-                        </button>
-                      </div>
+                      <button type="button" onClick={openNewPolitica}
+                        className="px-4 h-11 rounded-xl border border-dashed border-slate-300 hover:border-brand-400 hover:bg-brand-50 text-sm font-600 text-ink-600 hover:text-brand-700 transition w-full">
+                        + Añadir política
+                      </button>
                     </div>
+
+                    {/* Modal de política */}
+                    {politicaModalOpen && (
+                      <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40" onClick={() => setPoliticaModalOpen(false)}>
+                        <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+                          <h3 className="font-display font-700 text-lg text-ink-900 mb-4">
+                            {politicaEditIndex !== null ? 'Editar política' : 'Nueva política'}
+                          </h3>
+
+                          <label className="block text-sm font-medium text-ink-700 mb-1.5">Título</label>
+                          <input
+                            type="text"
+                            value={politicaTituloInput}
+                            onChange={e => setPoliticaTituloInput(e.target.value)}
+                            placeholder="Ej. Devoluciones"
+                            className="w-full h-11 px-4 rounded-xl border border-slate-300 bg-white text-sm placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition mb-4"
+                          />
+
+                          <label className="block text-sm font-medium text-ink-700 mb-1.5">Descripción</label>
+                          <textarea
+                            value={politicaDescInput}
+                            onChange={e => setPoliticaDescInput(e.target.value)}
+                            placeholder="Explica en detalle esta política..."
+                            rows={5}
+                            className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white text-sm placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition resize-none mb-5"
+                          />
+
+                          <div className="flex gap-3 justify-end">
+                            <button type="button" onClick={() => setPoliticaModalOpen(false)}
+                              className="px-4 h-10 rounded-xl text-sm font-600 text-ink-600 hover:bg-slate-100 transition">
+                              Cancelar
+                            </button>
+                            <button type="button" onClick={savePolitica}
+                              disabled={!politicaTituloInput.trim() || !politicaDescInput.trim()}
+                              className="px-4 h-10 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-600 transition">
+                              Guardar
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

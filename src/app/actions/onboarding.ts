@@ -90,7 +90,7 @@ export async function getOnboardingState() {
 
   const { data: userData } = await supabaseAdmin
     .from('users')
-    .select('nombre, tenant_id, branch_id')
+    .select('nombre, telefono, avatar_url, tenant_id, branch_id')
     .eq('id', user.id)
     .single()
 
@@ -119,7 +119,12 @@ export async function getOnboardingState() {
   let dataState: any = {
     paso: 1,
     completado: false,
-    s1: { nombrePersona: userData?.nombre || '' }
+    s0: { 
+      nombrePersona: userData?.nombre || '',
+      telefono: userData?.telefono || '',
+      avatar_url: userData?.avatar_url || ''
+    },
+    s1: { }
   }
 
   if (branchId) {
@@ -136,7 +141,6 @@ export async function getOnboardingState() {
     dataState.completado = branchData?.data?.onboarding_completado ?? false
 
     dataState.s1 = {
-      nombrePersona: userData?.nombre || '',
       nombreNegocio: orgData?.data?.nombre || '',
       direccionFiscal: orgData?.data?.direccion_fiscal || '',
       nombreSucursal: branchData?.data?.nombre || '',
@@ -185,8 +189,38 @@ export async function getOnboardingState() {
   }
 }
 
+export async function saveStep0(data: {
+  nombre: string
+  telefono: string
+  avatar_url: string
+}) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('Unauthenticated')
+
+    const { error } = await supabaseAdmin
+      .from('users')
+      .update({
+        nombre: data.nombre,
+        telefono: data.telefono,
+        avatar_url: data.avatar_url
+      })
+      .eq('id', user.id)
+
+    if (error) {
+      console.error('Error actualizando usuario en saveStep0:', error)
+      throw error
+    }
+
+    return { success: true }
+  } catch (err: any) {
+    console.error('saveStep0 error:', err.message)
+    return { success: false, error: err.message }
+  }
+}
+
 export async function saveStep1(data: {
-  nombrePersona: string
   nombreNegocio: string
   direccionFiscal: string
   nombreSucursal: string
@@ -261,7 +295,7 @@ export async function saveStep1(data: {
 
     await supabaseAdmin
       .from('users')
-      .update({ branch_id: branch.id, nombre: data.nombrePersona })
+      .update({ branch_id: branch.id })
       .eq('id', user.id)
 
     const politicasStr = data.politicas.join('\n')

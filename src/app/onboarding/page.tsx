@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   getOnboardingState,
+  saveStep0,
   saveStep1,
   saveStep2,
   saveStep3,
@@ -11,20 +12,31 @@ import {
   saveStep5
 } from '@/app/actions/onboarding'
 import { ErrorModal } from '@/components/ui/ErrorModal'
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
+import { createClient } from '@/utils/supabase/client'
 
 export default function OnboardingPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
-  const [step, setStep] = useState(1)
+  const [step, setStep] = useState(0)
+  const [userId, setUserId] = useState('')
   const [tenantId, setTenantId] = useState('')
   const [branchId, setBranchId] = useState('')
 
-  // Step 1
+  // Step 0
+  const [s0, setS0] = useState({
+    nombre: '',
+    prefijoPais: '+34',
+    telefono: '',
+    avatar_url: ''
+  })
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  const [avatarPreview, setAvatarPreview] = useState<string>('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   const [s1, setS1] = useState({ 
-    nombrePersona: '', 
     nombreNegocio: '', 
     nombreSucursal: '', 
     timezone: 'America/Caracas',
@@ -113,9 +125,29 @@ export default function OnboardingPage() {
 
       const d = res.data || {}
 
+      if (d.s0) {
+        let prefijo = '+34'
+        let num = ''
+        if (d.s0.telefono) {
+          const match = d.s0.telefono.match(/^(\+\d{1,4})(.*)$/)
+          if (match) {
+            prefijo = match[1]
+            num = match[2]
+          } else {
+            num = d.s0.telefono
+          }
+        }
+        setS0({
+          nombre: d.s0.nombrePersona || '',
+          prefijoPais: prefijo,
+          telefono: num,
+          avatar_url: d.s0.avatar_url || ''
+        })
+        if (d.s0.avatar_url) setAvatarPreview(d.s0.avatar_url)
+      }
+
       if (d.s1) {
         setS1({
-          nombrePersona: d.s1.nombrePersona || '',
           nombreNegocio: d.s1.nombreNegocio || '',
           nombreSucursal: d.s1.nombreSucursal || '',
           timezone: d.s1.timezone || 'America/Caracas',
@@ -198,8 +230,10 @@ export default function OnboardingPage() {
   const handleNext = async () => {
     if (saving) return
 
+    if (step === 0) {
+      if (!s0.nombre.trim()) { showError('Tu nombre es obligatorio'); return }
+    }
     if (step === 1) {
-      if (!s1.nombrePersona.trim()) { showError('Tu nombre es obligatorio'); return }
       if (!s1.nombreNegocio.trim()) { showError('El nombre del negocio es obligatorio'); return }
       if (!s1.nombreSucursal.trim()) { showError('El nombre de la primera sucursal es obligatorio'); return }
     }
@@ -240,7 +274,40 @@ export default function OnboardingPage() {
 
     setSaving(true)
     try {
-      if (step === 1) {
+      if (step === 0) {
+        let avatarUrl = s0.avatar_url
+        if (avatarFile) {
+          const supabase = createClient()
+          const { data: { user } } = await supabase.auth.getUser()
+          if (user) {
+            const ext = avatarFile.name.split('.').pop()
+            const filePath = `${user.id}/avatar`
+            const { error: uploadError } = await supabase.storage
+              .from('avatars')
+              .upload(filePath, avatarFile, { upsert: true, contentType: avatarFile.type })
+            if (uploadError) {
+              showError('Error al subir la imagen de perfil: ' + uploadError.message)
+              setSaving(false)
+              return
+            }
+            const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath)
+            avatarUrl = publicUrl + '?t=' + Date.now() // Forzar refresco
+          }
+        }
+        
+        const telefonoCompleto = s0.telefono ? `${s0.prefijoPais}${s0.telefono.replace(/\s+/g, '')}` : ''
+        const res = await saveStep0({
+          nombre: s0.nombre,
+          telefono: telefonoCompleto,
+          avatar_url: avatarUrl
+        })
+        if (res.success) {
+          setS0(prev => ({ ...prev, avatar_url: avatarUrl }))
+          setStep(1)
+        } else {
+          showError(res.error || 'Error al guardar perfil')
+        }
+      } else if (step === 1) {
         const res = await saveStep1({ ...s1, politicas })
         if (res.success && res.branchId) {
           setBranchId(res.branchId)
@@ -288,7 +355,7 @@ export default function OnboardingPage() {
     )
   }
 
-  const pct = Math.round(((step - 1) / 5) * 100)
+  const pct = Math.round((step / 5) * 100)
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-100 via-brand-50 to-slate-100 text-ink-900 antialiased">
@@ -305,7 +372,7 @@ export default function OnboardingPage() {
         <div className="w-full max-w-2xl">
           <div className="mb-5 px-1">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-semibold text-ink-700">Paso {step} de 5</p>
+              <p className="text-sm font-semibold text-ink-700">Paso {step + 1} de 6</p>
               <p className="text-sm font-medium text-brand-600">{pct}% completado</p>
             </div>
             <div className="h-2.5 rounded-full bg-white shadow-inner overflow-hidden">
@@ -316,25 +383,97 @@ export default function OnboardingPage() {
           <div className="bg-white rounded-3xl shadow-xl shadow-brand-900/5 ring-1 ring-slate-200/70 overflow-hidden">
             <div className="p-6 sm:p-10 min-h-[420px]">
 
+              {/* ===== PASO 0 ===== */}
+              {step === 0 && (
+                <div className="animate-in fade-in duration-300">
+                  <div className="flex items-center gap-3 mb-1">
+                    <span className="w-9 h-9 rounded-xl bg-brand-100 text-brand-700 font-display font-bold flex items-center justify-center text-sm">1</span>
+                    <span className="text-xs font-semibold uppercase tracking-wider text-brand-600">Perfil de usuario</span>
+                  </div>
+                  <h1 className="font-display font-bold text-2xl text-ink-900 mb-1.5">Tu perfil personal</h1>
+                  <p className="text-ink-500 mb-6">Completa tus datos antes de configurar tu negocio.</p>
+
+                  <div className="space-y-5">
+                    {/* Foto de perfil */}
+                    <div>
+                      <label className="block text-sm font-medium text-ink-700 mb-2">Foto de perfil <span className="text-ink-400 font-normal">· opcional</span></label>
+                      <div className="flex items-center gap-4">
+                        <div className="relative w-16 h-16 rounded-full overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
+                          {avatarPreview ? (
+                            <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
+                          ) : (
+                            <svg className="w-8 h-8 text-slate-400" fill="currentColor" viewBox="0 0 24 24"><path d="M24 20.993V24H0v-2.996A14.977 14.977 0 0112.004 15c4.904 0 9.26 2.354 11.996 5.993zM16.002 8.999a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                          )}
+                        </div>
+                        <input type="file" accept="image/jpeg, image/png, image/webp" className="hidden" ref={fileInputRef} onChange={e => {
+                          const file = e.target.files?.[0]
+                          if (file) {
+                            if (file.size > 5 * 1024 * 1024) {
+                              showError('La imagen debe pesar menos de 5MB')
+                              return
+                            }
+                            setAvatarFile(file)
+                            setAvatarPreview(URL.createObjectURL(file))
+                          }
+                        }} />
+                        <button onClick={() => fileInputRef.current?.click()} className="px-4 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition">
+                          Subir imagen
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Tu nombre */}
+                    <div>
+                      <label className="block text-sm font-medium text-ink-700 mb-1.5">Tu nombre completo</label>
+                      <input type="text" value={s0.nombre}
+                        onChange={e => setS0({...s0, nombre: e.target.value})}
+                        placeholder="Ej. Ana Martínez"
+                        className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition" />
+                    </div>
+
+                    {/* Teléfono */}
+                    <div>
+                      <label className="block text-sm font-medium text-ink-700 mb-1.5">Teléfono <span className="text-ink-400 font-normal">· opcional</span></label>
+                      <div className="flex gap-2">
+                        <select value={s0.prefijoPais} onChange={e => setS0({...s0, prefijoPais: e.target.value})}
+                          className="w-[120px] h-12 px-3 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition">
+                          <option value="+34">🇪🇸 +34</option>
+                          <option value="+52">🇲🇽 +52</option>
+                          <option value="+57">🇨🇴 +57</option>
+                          <option value="+54">🇦🇷 +54</option>
+                          <option value="+56">🇨🇱 +56</option>
+                          <option value="+51">🇵🇪 +51</option>
+                          <option value="+58">🇻🇪 +58</option>
+                          <option value="+593">🇪🇨 +593</option>
+                          <option value="+598">🇺🇾 +598</option>
+                          <option value="+595">🇵🇾 +595</option>
+                          <option value="+591">🇧🇴 +591</option>
+                          <option value="+1809">🇩🇴 +1809</option>
+                          <option value="+502">🇬🇹 +502</option>
+                          <option value="+506">🇨🇷 +506</option>
+                          <option value="+507">🇵🇦 +507</option>
+                        </select>
+                        <input type="tel" value={s0.telefono}
+                          onChange={e => setS0({...s0, telefono: e.target.value.replace(/\D/g, '')})}
+                          placeholder="612 345 678"
+                          className="flex-1 h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* ===== PASO 1 ===== */}
               {step === 1 && (
                 <div className="animate-in fade-in duration-300">
                   <div className="flex items-center gap-3 mb-1">
-                    <span className="w-9 h-9 rounded-xl bg-brand-100 text-brand-700 font-display font-bold flex items-center justify-center text-sm">1</span>
+                    <span className="w-9 h-9 rounded-xl bg-brand-100 text-brand-700 font-display font-bold flex items-center justify-center text-sm">2</span>
                     <span className="text-xs font-semibold uppercase tracking-wider text-brand-600">Datos de tu negocio</span>
                   </div>
                   <h1 className="font-display font-bold text-2xl text-ink-900 mb-1.5">Cuéntanos de tu negocio</h1>
                   <p className="text-ink-500 mb-6">Completa los datos de tu empresa y tu primera sucursal.</p>
 
                   <div className="space-y-4">
-                    {/* Tu nombre */}
-                    <div>
-                      <label className="block text-sm font-medium text-ink-700 mb-1.5">Tu nombre completo</label>
-                      <input type="text" value={s1.nombrePersona}
-                        onChange={e => setS1({...s1, nombrePersona: e.target.value})}
-                        placeholder="Ej. Ana Martínez"
-                        className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition" />
-                    </div>
 
                     {/* Nombre del negocio */}
                     <div>
@@ -483,7 +622,7 @@ export default function OnboardingPage() {
               {step === 2 && (
                 <div className="animate-in fade-in duration-300">
                   <div className="flex items-center gap-3 mb-1">
-                    <span className="w-9 h-9 rounded-xl bg-brand-100 text-brand-700 font-display font-bold flex items-center justify-center text-sm">2</span>
+                    <span className="w-9 h-9 rounded-xl bg-brand-100 text-brand-700 font-display font-bold flex items-center justify-center text-sm">3</span>
                     <span className="text-xs font-semibold uppercase tracking-wider text-brand-600">Horarios de atención</span>
                   </div>
                   <h1 className="font-display font-bold text-2xl text-ink-900 mb-1.5">¿Cuándo atiende tu negocio?</h1>
@@ -544,7 +683,7 @@ export default function OnboardingPage() {
               {step === 3 && (
                 <div className="animate-in fade-in duration-300">
                   <div className="flex items-center gap-3 mb-1">
-                    <span className="w-9 h-9 rounded-xl bg-brand-100 text-brand-700 font-display font-bold flex items-center justify-center text-sm">3</span>
+                    <span className="w-9 h-9 rounded-xl bg-brand-100 text-brand-700 font-display font-bold flex items-center justify-center text-sm">4</span>
                     <span className="text-xs font-semibold uppercase tracking-wider text-brand-600">Skills de IA</span>
                   </div>
                   <h1 className="font-display font-bold text-2xl text-ink-900 mb-1.5">Activa las Skills de IA</h1>
@@ -579,7 +718,7 @@ export default function OnboardingPage() {
               {step === 4 && (
                 <div className="animate-in fade-in duration-300">
                   <div className="flex items-center gap-3 mb-1">
-                    <span className="w-9 h-9 rounded-xl bg-brand-100 text-brand-700 font-display font-bold flex items-center justify-center text-sm">4</span>
+                    <span className="w-9 h-9 rounded-xl bg-brand-100 text-brand-700 font-display font-bold flex items-center justify-center text-sm">5</span>
                     <span className="text-xs font-semibold uppercase tracking-wider text-brand-600">Mensaje de bienvenida</span>
                   </div>
                   <h1 className="font-display font-bold text-2xl text-ink-900 mb-1.5">El primer mensaje al cliente</h1>
@@ -625,7 +764,7 @@ export default function OnboardingPage() {
               {step === 5 && (
                 <div className="animate-in fade-in duration-300">
                   <div className="flex items-center gap-3 mb-1">
-                    <span className="w-9 h-9 rounded-xl bg-brand-100 text-brand-700 font-display font-bold flex items-center justify-center text-sm">5</span>
+                    <span className="w-9 h-9 rounded-xl bg-brand-100 text-brand-700 font-display font-bold flex items-center justify-center text-sm">6</span>
                     <span className="text-xs font-semibold uppercase tracking-wider text-brand-600">Lista de precios</span>
                   </div>
                   <h1 className="font-display font-bold text-2xl text-ink-900 mb-1.5">Carga tus productos</h1>

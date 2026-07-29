@@ -30,8 +30,7 @@ export default async function DashboardLayout({
 
   const permisosRes = await getMisPermisos()
 
-  const esAdmin = userData.rol === 'admin' ||
-    (permisosRes.success && (permisosRes as any).esAdmin) || false
+  const esAdmin = false // TODO: sustituir por lógica de nivel/es_propietario en el siguiente paso
   const permisos = (permisosRes.success && permisosRes.data) ? permisosRes.data : []
 
   const { data: ubData } = await supabase

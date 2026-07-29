@@ -16,7 +16,7 @@ export default async function VendedorLayout({ children }: { children: React.Rea
   if (!userData || userData.rol !== 'vendedor') {
     // Redirigir al dashboard correcto según el rol
     if (userData?.rol === 'super_admin') redirect('/superadmin')
-    if (userData?.rol === 'admin' || userData?.rol === 'usuario') redirect('/dashboard')
+    if (userData?.rol === 'tenant_user') redirect('/dashboard')
     redirect('/login')
   }
 

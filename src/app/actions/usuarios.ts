@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { supabaseAdmin } from '@/utils/supabase/admin'
+import { canManageRole } from './roles'
 
 async function getAuthData(supabase: any) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -49,9 +50,9 @@ export async function getUsuarios() {
     plan_nombre = plan?.nombre ?? null
   }
 
-  const { data: usuarios, error: usrErr } = await supabase
+  const { data: usuarios, error: usrErr } = await supabaseAdmin
     .from('users')
-    .select('*, user_branches(branch_id)')
+    .select('*, user_branches(branch_id), roles_personalizados(nombre, nivel, es_propietario)')
     .eq('tenant_id', auth.tenant_id)
     .order('fecha_creacion', { ascending: true })
 
@@ -62,11 +63,23 @@ export async function getUsuarios() {
   return { success: true, data: { usuarios, usuarios_max, plan_nombre, current_user_id: auth.user_id, sucursales, usuarios_activos_count } }
 }
 
-export async function invitarUsuario(data: { email: string, nombre: string | null, branch_ids: string[], permisos: { branch_id: string, secciones: { seccion: string, nivel: string, alcance?: string }[] }[] }) {
+export async function invitarUsuario(data: { email: string, nombre: string | null, branch_ids: string[], rol_personalizado_id: string }) {
 
   const supabase = await createClient()
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
+
+  const { data: targetRole } = await supabaseAdmin
+    .from('roles_personalizados')
+    .select('nivel, tenant_id, es_propietario')
+    .eq('id', data.rol_personalizado_id)
+    .single()
+
+  if (!targetRole || targetRole.tenant_id !== auth.tenant_id) return { success: false, error: 'Rol no válido' }
+  if (targetRole.es_propietario) return { success: false, error: 'No puedes asignar el rol Propietario' }
+
+  const check = await canManageRole(auth.user_id, targetRole.nivel, targetRole.tenant_id)
+  if (!check.allowed) return { success: false, error: check.error }
 
   // Comprobar límite de usuarios
   const { data: config } = await getUsuarios()
@@ -106,7 +119,8 @@ export async function invitarUsuario(data: { email: string, nombre: string | nul
       branch_id: data.branch_ids[0],
       email: data.email,
       nombre: data.nombre || null,
-      rol: 'usuario',
+      rol: 'tenant_user',
+      rol_personalizado_id: data.rol_personalizado_id,
       activo: true,
       invitacion_aceptada: false
     }])
@@ -123,29 +137,6 @@ export async function invitarUsuario(data: { email: string, nombre: string | nul
     }))
   )
 
-  if (data.permisos && data.permisos.length > 0) {
-    for (const p of data.permisos) {
-      const rows = p.secciones.map(sec => ({
-        user_id: inviteData.user.id,
-        branch_id: p.branch_id,
-        seccion: sec.seccion,
-        nivel: sec.nivel,
-        alcance: sec.alcance || null,
-        updated_at: new Date().toISOString()
-      }))
-      await supabaseAdmin.from('user_permissions').upsert(rows, { onConflict: 'user_id,branch_id,seccion' })
-    }
-    await supabaseAdmin.from('audit_log').insert({
-      tenant_id: auth.tenant_id,
-      user_id: auth.user_id,
-      accion: 'crear_permisos',
-      tabla_afectada: 'user_permissions',
-      registro_id: inviteData.user.id,
-      valor_anterior: null,
-      valor_nuevo: { permisos: data.permisos }
-    })
-  }
-
   const { data: newUser } = await supabaseAdmin
     .from('users')
     .select('*')
@@ -155,33 +146,50 @@ export async function invitarUsuario(data: { email: string, nombre: string | nul
   return { success: true, data: newUser }
 }
 
-export async function actualizarUsuario(id: string, data: Partial<{ nombre: string, branch_ids: string[], permisos: { branch_id: string, secciones: { seccion: string, nivel: string, alcance?: string }[] }[], activo: boolean, rol: string }>) {
+export async function actualizarUsuario(id: string, data: Partial<{ nombre: string, branch_ids: string[], activo: boolean, rol_personalizado_id: string }>) {
 
   const supabase = await createClient()
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
-  // Proteger al último admin activo
-  if (data.activo === false) {
-    const { count } = await supabase
-      .from('users')
-      .select('*', { count: 'exact', head: true })
-      .eq('tenant_id', auth.tenant_id)
-      .eq('rol', 'admin')
-      .eq('activo', true)
-      .neq('id', id)
+  const { data: targetUser } = await supabaseAdmin
+    .from('users')
+    .select('roles_personalizados(nivel, es_propietario)')
+    .eq('id', id)
+    .single()
 
-    if (!count || count === 0) {
-      return { success: false, error: 'No puedes desactivar al único administrador de la organización.' }
-    }
+  if (!targetUser) return { success: false, error: 'Usuario no encontrado' }
+  
+  const targetRoleData = Array.isArray(targetUser.roles_personalizados) ? targetUser.roles_personalizados[0] : targetUser.roles_personalizados
+  const currentTargetLevel = targetRoleData?.nivel ?? 5
+  
+  const userCheck = await canManageRole(auth.user_id, currentTargetLevel)
+  if (!userCheck.allowed) return { success: false, error: 'No tienes jerarquía suficiente para editar a este usuario' }
+
+  if (data.activo === false && targetRoleData?.es_propietario) {
+    return { success: false, error: 'No puedes desactivar al Propietario de la organización.' }
   }
 
-  const { data: updated, error } = await supabase
+  if (data.rol_personalizado_id) {
+    const { data: targetRole } = await supabaseAdmin
+      .from('roles_personalizados')
+      .select('nivel, tenant_id, es_propietario')
+      .eq('id', data.rol_personalizado_id)
+      .single()
+
+    if (!targetRole || targetRole.tenant_id !== auth.tenant_id) return { success: false, error: 'Rol no válido' }
+    if (targetRole.es_propietario) return { success: false, error: 'No puedes asignar el rol Propietario' }
+
+    const check = await canManageRole(auth.user_id, targetRole.nivel, targetRole.tenant_id)
+    if (!check.allowed) return { success: false, error: check.error }
+  }
+
+  const { data: updated, error } = await supabaseAdmin
     .from('users')
     .update({
       ...(data.nombre !== undefined && { nombre: data.nombre }),
       ...(data.activo !== undefined && { activo: data.activo }),
-      ...(data.rol !== undefined && { rol: data.rol }),
+      ...(data.rol_personalizado_id !== undefined && { rol_personalizado_id: data.rol_personalizado_id }),
       ...(data.branch_ids && data.branch_ids.length > 0 && { branch_id: data.branch_ids[0] })
     })
     .eq('id', id)
@@ -192,38 +200,15 @@ export async function actualizarUsuario(id: string, data: Partial<{ nombre: stri
   if (error) return { success: false, error: error.message }
 
   if (data.branch_ids) {
-    await supabase.from('user_branches')
+    await supabaseAdmin.from('user_branches')
       .delete().eq('user_id', id)
     if (data.branch_ids.length > 0) {
-      await supabase.from('user_branches').insert(
+      await supabaseAdmin.from('user_branches').insert(
         data.branch_ids.map(bid => ({
           user_id: id, branch_id: bid
         }))
       )
     }
-  }
-
-  if (data.permisos && data.permisos.length > 0) {
-    for (const p of data.permisos) {
-      const rows = p.secciones.map(sec => ({
-        user_id: id,
-        branch_id: p.branch_id,
-        seccion: sec.seccion,
-        nivel: sec.nivel,
-        alcance: sec.alcance || null,
-        updated_at: new Date().toISOString()
-      }))
-      await supabase.from('user_permissions').upsert(rows, { onConflict: 'user_id,branch_id,seccion' })
-    }
-    await supabase.from('audit_log').insert({
-      tenant_id: auth.tenant_id,
-      user_id: auth.user_id,
-      accion: 'actualizar_permisos',
-      tabla_afectada: 'user_permissions',
-      registro_id: id,
-      valor_anterior: null,
-      valor_nuevo: { permisos: data.permisos }
-    })
   }
 
   return { success: true, data: updated }

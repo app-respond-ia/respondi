@@ -42,7 +42,7 @@ export async function middleware(request: NextRequest) {
 
     const role = userData?.rol
 
-    if (role === 'usuario' && userData?.invitacion_aceptada === false) {
+    if (role === 'tenant_user' && userData?.invitacion_aceptada === false) {
       if (pathname.startsWith('/aceptar-invitacion') || pathname.startsWith('/auth/callback')) {
         return supabaseResponse
       }
@@ -52,11 +52,11 @@ export async function middleware(request: NextRequest) {
     // Determinar la ruta base según el rol
     let roleBasePath = ''
     if (role === 'super_admin') roleBasePath = '/superadmin'
-    else if (role === 'admin' || role === 'usuario') roleBasePath = '/dashboard'
+    else if (role === 'tenant_user') roleBasePath = '/dashboard'
     else if (role === 'vendedor') roleBasePath = '/vendedor'
 
     // Onboarding obligatorio para admins
-    if (role === 'admin' && userData?.tenant_id) {
+    if (role === 'tenant_user' && userData?.tenant_id) {
       const { data: sucursal } = await supabaseAdmin
         .from('sucursales')
         .select('onboarding_completado')

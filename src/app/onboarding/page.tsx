@@ -82,6 +82,8 @@ export default function OnboardingPage() {
     { dia: 'Sábado', dia_semana: 6, activo: false, franjas: [{ apertura: '', cierre: '' }] },
     { dia: 'Domingo', dia_semana: 0, activo: false, franjas: [{ apertura: '', cierre: '' }] }
   ])
+  const [copyPopoverOpen, setCopyPopoverOpen] = useState<number | null>(null)
+  const [copyTargets, setCopyTargets] = useState<number[]>([])
   const [modalError, setModalError] = useState('')
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false)
 
@@ -368,6 +370,22 @@ export default function OnboardingPage() {
   }
 
   const handleBack = () => { if (step > 0) setStep(step - 1) }
+
+  const applyCopyHorario = (sourceIndex: number) => {
+    const sourceFranjas = s2[sourceIndex].franjas
+    if (sourceFranjas.length === 0) return
+    const n = [...s2]
+    copyTargets.forEach(targetIndex => {
+      n[targetIndex] = {
+        ...n[targetIndex],
+        activo: true,
+        franjas: sourceFranjas.map(f => ({ apertura: f.apertura, cierre: f.cierre }))
+      }
+    })
+    setS2(n)
+    setCopyPopoverOpen(null)
+    setCopyTargets([])
+  }
 
   if (loading) {
     return (
@@ -731,6 +749,52 @@ export default function OnboardingPage() {
                             )}
                             {h.franjas.length === 0 && (
                               <p className="text-xs text-red-500 font-medium">Debe haber al menos una franja si el día está activo.</p>
+                            )}
+
+                            {h.franjas.some(f => f.apertura && f.cierre) && (
+                              <div className="relative pt-1">
+                                <button type="button" onClick={() => {
+                                  setCopyPopoverOpen(copyPopoverOpen === i ? null : i)
+                                  setCopyTargets([])
+                                }} className="text-xs font-semibold text-ink-500 hover:text-ink-700 transition flex items-center gap-1">
+                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                                  Copiar a...
+                                </button>
+
+                                {copyPopoverOpen === i && (
+                                  <div className="absolute z-10 mt-2 w-56 bg-white rounded-xl shadow-lg border border-slate-200 p-3">
+                                    <p className="text-xs font-semibold text-ink-700 mb-2">Copiar horario de {h.dia} a:</p>
+                                    <div className="space-y-1.5 mb-3">
+                                      {s2.map((otherDay, otherIndex) => otherIndex !== i && (
+                                        <label key={otherDay.dia} className="flex items-center gap-2 text-sm text-ink-700 cursor-pointer">
+                                          <input type="checkbox"
+                                            checked={copyTargets.includes(otherIndex)}
+                                            onChange={e => {
+                                              if (e.target.checked) {
+                                                setCopyTargets(prev => [...prev, otherIndex])
+                                              } else {
+                                                setCopyTargets(prev => prev.filter(idx => idx !== otherIndex))
+                                              }
+                                            }}
+                                            className="w-3.5 h-3.5 rounded border-slate-300 text-brand-600 focus:ring-brand-400" />
+                                          {otherDay.dia}
+                                        </label>
+                                      ))}
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <button type="button" onClick={() => { setCopyPopoverOpen(null); setCopyTargets([]) }}
+                                        className="flex-1 h-8 rounded-lg text-xs font-600 text-ink-600 hover:bg-slate-100 transition">
+                                        Cancelar
+                                      </button>
+                                      <button type="button" onClick={() => applyCopyHorario(i)}
+                                        disabled={copyTargets.length === 0}
+                                        className="flex-1 h-8 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-600 transition">
+                                        Aplicar
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             )}
                           </div>
                         )}

@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { canManageRole } from './roles'
+import { registrarAuditoria } from '@/lib/auditoria'
 
 async function getAuthData(supabase: any) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -143,6 +144,15 @@ export async function invitarUsuario(data: { email: string, nombre: string | nul
     .eq('id', inviteData.user.id)
     .single()
 
+  await registrarAuditoria({
+    tenant_id: auth.tenant_id,
+    user_id: auth.user_id,
+    accion: `invitó al usuario "${data.email}"`,
+    tabla_afectada: 'users',
+    registro_id: inviteData.user.id,
+    valor_nuevo: newUser
+  })
+
   return { success: true, data: newUser }
 }
 
@@ -154,7 +164,7 @@ export async function actualizarUsuario(id: string, data: Partial<{ nombre: stri
 
   const { data: targetUser } = await supabaseAdmin
     .from('users')
-    .select('roles_personalizados(nivel, es_propietario)')
+    .select('*, roles_personalizados(nivel, es_propietario)')
     .eq('id', id)
     .single()
 
@@ -211,6 +221,16 @@ export async function actualizarUsuario(id: string, data: Partial<{ nombre: stri
     }
   }
 
+  await registrarAuditoria({
+    tenant_id: auth.tenant_id,
+    user_id: auth.user_id,
+    accion: `editó al usuario "${updated.email}"`,
+    tabla_afectada: 'users',
+    registro_id: id,
+    valor_anterior: targetUser,
+    valor_nuevo: updated
+  })
+
   return { success: true, data: updated }
 }
 
@@ -256,6 +276,17 @@ export async function desactivarUsuario(id: string) {
     .single()
 
   if (error) return { success: false, error: error.message }
+
+  await registrarAuditoria({
+    tenant_id: auth.tenant_id,
+    user_id: auth.user_id,
+    accion: `desactivó al usuario "${updated.email}"`,
+    tabla_afectada: 'users',
+    registro_id: id,
+    valor_anterior: { activo: true },
+    valor_nuevo: { activo: false }
+  })
+
   return { success: true, data: updated }
 }
 
@@ -273,5 +304,16 @@ export async function reactivarUsuario(id: string) {
     .single()
 
   if (error) return { success: false, error: error.message }
+
+  await registrarAuditoria({
+    tenant_id: auth.tenant_id,
+    user_id: auth.user_id,
+    accion: `reactivó al usuario "${updated.email}"`,
+    tabla_afectada: 'users',
+    registro_id: id,
+    valor_anterior: { activo: false },
+    valor_nuevo: { activo: true }
+  })
+
   return { success: true, data: updated }
 }

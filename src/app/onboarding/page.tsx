@@ -905,7 +905,7 @@ export default function OnboardingPage() {
                   <p className="text-ink-500 mb-6">Añade al menos un ítem. La IA usará estos precios para responder.</p>
 
                   <div className="bg-brand-50 border border-brand-200 rounded-xl p-3 mb-6 text-sm text-brand-800">
-                    Puedes continuar sin añadir productos ahora. Más adelante podrás importar tu lista completa de precios.
+                    Puedes continuar sin añadir productos ahora. Más adelante podrás descargar una plantilla y hacer la importación masiva de tu lista completa de precios.
                   </div>
 
                   <div className="space-y-3 mb-6">

@@ -462,7 +462,7 @@ export default function Sidebar({ user, onCloseMobile, permisos, esAdmin, collap
         </div>
       </div>
       <button onClick={onToggleCollapse}
-        className="hidden lg:flex absolute top-1/2 -translate-y-1/2 -right-3 w-6 h-6 rounded-full bg-ink-800 border border-white/10 shadow-lg items-center justify-center text-ink-400 hover:text-white hover:bg-brand-600 hover:border-brand-600 transition z-20">
+        className="hidden lg:flex absolute top-1/2 -translate-y-1/2 -right-3 w-6 h-14 rounded-full bg-ink-800 border border-white/10 shadow-lg items-center justify-center text-ink-400 hover:text-white hover:bg-brand-600 hover:border-brand-600 transition z-20">
         <svg className={`w-3.5 h-3.5 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
           <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/>
         </svg>

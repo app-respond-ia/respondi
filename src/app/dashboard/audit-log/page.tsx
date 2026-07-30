@@ -62,15 +62,54 @@ export default function AuditLogPage() {
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
 
-  const getDateGroup = (dateStr: string) => {
-    const d = new Date(dateStr)
+  const getDateGroup = (dateString: string) => {
     const today = new Date()
-    const yesterday = new Date()
-    yesterday.setDate(yesterday.getDate() - 1)
+    const date = new Date(dateString)
+    
+    today.setHours(0, 0, 0, 0)
+    const logDate = new Date(date)
+    logDate.setHours(0, 0, 0, 0)
+    
+    const diffTime = Math.abs(today.getTime() - logDate.getTime())
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+    
+    if (diffDays === 0) return 'Hoy'
+    if (diffDays === 1) return 'Ayer'
+    if (diffDays < 7) return `Hace ${diffDays} días`
+    return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })
+  }
 
-    if (d.toDateString() === today.toDateString()) return 'Hoy'
-    if (d.toDateString() === yesterday.toDateString()) return 'Ayer'
-    return d.toLocaleDateString([], { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const exportarCSV = () => {
+    if (entradasFiltradas.length === 0) return
+
+    const escaparCSV = (valor: any) => {
+      const texto = valor === null || valor === undefined ? '' : String(valor)
+      if (texto.includes(',') || texto.includes('"') || texto.includes('\n')) {
+        return `"${texto.replace(/"/g, '""')}"`
+      }
+      return texto
+    }
+
+    const encabezados = ['Fecha', 'Hora', 'Usuario', 'Acción', 'Módulo']
+    const filas = entradasFiltradas.map(item => {
+      const fecha = new Date(item.timestamp)
+      return [
+        fecha.toLocaleDateString('es-ES'),
+        fecha.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+        item.users?.nombre || item.users?.email || 'Sistema',
+        item.accion,
+        item.tabla_afectada || 'Sistema'
+      ].map(escaparCSV).join(',')
+    })
+
+    const csv = [encabezados.join(','), ...filas].join('\n')
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `registro_actividad_${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   const getBadgeColor = (tabla: string) => {
@@ -172,7 +211,7 @@ export default function AuditLogPage() {
           <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Registro de actividad</h1>
           <p className="text-ink-500 mt-1">Historial de cambios realizados por tu equipo.</p>
         </div>
-        <button disabled title="Próximamente" className="inline-flex items-center gap-2 px-4 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+        <button onClick={exportarCSV} disabled={entradasFiltradas.length === 0} title={entradasFiltradas.length === 0 ? 'No hay datos para exportar' : 'Exportar a CSV'} className="inline-flex items-center gap-2 px-4 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
           Exportar
         </button>

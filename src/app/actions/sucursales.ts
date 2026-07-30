@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { canManageRole } from './roles'
+import { registrarAuditoria } from '@/lib/auditoria'
 
 async function getAuthData(supabase: any) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -169,6 +170,15 @@ export async function crearSucursal(nombre: string, direccion?: string, copiarDe
     )
   }
 
+  await registrarAuditoria({
+    tenant_id: auth.tenant_id,
+    user_id: auth.user_id,
+    accion: `creó la sucursal "${nuevaSucursal.nombre}"`,
+    tabla_afectada: 'sucursales',
+    registro_id: nuevaSucursal.id,
+    valor_nuevo: nuevaSucursal
+  })
+
   return { success: true, data: nuevaSucursal }
 }
 
@@ -198,6 +208,17 @@ export async function desactivarSucursal(id: string) {
     .single()
 
   if (error) return { success: false, error: error.message }
+
+  await registrarAuditoria({
+    tenant_id: auth.tenant_id,
+    user_id: auth.user_id,
+    accion: `desactivó la sucursal "${data.nombre}"`,
+    tabla_afectada: 'sucursales',
+    registro_id: id,
+    valor_anterior: { activa: true },
+    valor_nuevo: { activa: false }
+  })
+
   return { success: true, data }
 }
 
@@ -223,6 +244,17 @@ export async function reactivarSucursal(id: string) {
     .single()
 
   if (error) return { success: false, error: error.message }
+
+  await registrarAuditoria({
+    tenant_id: auth.tenant_id,
+    user_id: auth.user_id,
+    accion: `reactivó la sucursal "${data.nombre}"`,
+    tabla_afectada: 'sucursales',
+    registro_id: id,
+    valor_anterior: { activa: false },
+    valor_nuevo: { activa: true }
+  })
+
   return { success: true, data }
 }
 
@@ -423,6 +455,15 @@ export async function crearSucursalConDatos(data: {
       }))
     )
   }
+
+  await registrarAuditoria({
+    tenant_id: userData!.tenant_id,
+    user_id: user.id,
+    accion: `creó la sucursal "${newBranch.nombre}" con configuración inicial`,
+    tabla_afectada: 'sucursales',
+    registro_id: newBranch.id,
+    valor_nuevo: newBranch
+  })
 
   return { success: true, sucursal: newBranch }
 }

@@ -828,7 +828,13 @@ export default function OnboardingPage() {
                           <div className="flex-1">
                             <div className="flex items-center justify-between gap-2 mb-0.5">
                               <span className="block font-bold text-ink-900 text-sm">{s.nombre}</span>
-                              {isFija && <span className="text-[10px] font-bold tracking-wide uppercase text-brand-600 bg-brand-100/50 px-1.5 py-0.5 rounded">Incluido siempre</span>}
+                              {isFija && (
+                                <span title="Incluido siempre" className="shrink-0 inline-flex items-center justify-center w-5 h-5 rounded-full bg-brand-100/50 text-brand-600">
+                                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                                  </svg>
+                                </span>
+                              )}
                             </div>
                             <span className={`block text-xs leading-relaxed ${isFija ? 'text-ink-400' : 'text-ink-500'}`}>{s.descripcion}</span>
                           </div>

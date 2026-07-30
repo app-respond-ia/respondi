@@ -4,7 +4,6 @@ import Loading from '@/components/Loading'
 import { useState, useEffect } from 'react'
 import { getPrecios, crearPrecio, actualizarPrecio, eliminarPrecio, importarPreciosMasivo, PrecioData } from '@/app/actions/precios'
 import { getCategorias, crearCategoria, actualizarCategoria, eliminarCategoria } from '@/app/actions/categorias-precios'
-import * as XLSX from 'xlsx'
 import { getMisPermisos } from '@/app/actions/permisos'
 
 export default function ListaPreciosPage() {
@@ -39,7 +38,9 @@ export default function ListaPreciosPage() {
     tipo: 'producto',
     precio: null,
     precio_tipo: 'exacto',
-    descripcion: ''
+    descripcion: '',
+    categoria: null,
+    subcategoria: null
   } as any)
 
   const cargar = async () => {
@@ -80,7 +81,9 @@ export default function ListaPreciosPage() {
       tipo: 'producto',
       precio: null,
       precio_tipo: 'exacto',
-      descripcion: ''
+      descripcion: '',
+      categoria: null,
+      subcategoria: null
     } as any)
     setIsModalOpen(true)
   }
@@ -94,6 +97,8 @@ export default function ListaPreciosPage() {
       precio: item.precio,
       precio_tipo: item.precio_tipo,
       descripcion: item.descripcion || '',
+      categoria: item.categoria || null,
+      subcategoria: item.subcategoria || null
     } as any)
     setIsModalOpen(true)
   }
@@ -219,76 +224,89 @@ export default function ListaPreciosPage() {
     URL.revokeObjectURL(url)
   }
 
-  const handleArchivoExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleArchivoExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    const esCSV = file.name.toLowerCase().endsWith('.csv')
 
-    const reader = new FileReader()
-    reader.onload = (ev) => {
-      try {
-        const data = new Uint8Array(ev.target?.result as ArrayBuffer)
-        const wb = XLSX.read(data, { type: 'array' })
-        const ws = wb.Sheets[wb.SheetNames[0]]
-        const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 })
-
-        if (rows.length < 2) {
-          setImportPreview({ validos: [], errores: [{ fila: 1, nombre: '—', error: 'El archivo está vacío o solo tiene encabezados' }] })
-          setIsImportModalOpen(true)
-          return
-        }
-
-        const validos: any[] = []
-        const errores: { fila: number, nombre: string, error: string }[] = []
-
-        // Saltar la fila 0 (headers)
-        for (let i = 1; i < rows.length; i++) {
-          const row = rows[i]
-          const fila = i + 1
-          const nombre = row[0]?.toString().trim()
-          const tipo = row[1]?.toString().trim().toLowerCase() || 'producto'
-          const precioRaw = row[2]?.toString().trim()
-          const precio_tipo = row[3]?.toString().trim().toLowerCase() || 'exacto'
-          const descripcion = row[4]?.toString().trim() || null
-
-          // Validaciones
-          if (!nombre) {
-            errores.push({ fila, nombre: '(vacío)', error: 'El nombre es obligatorio' })
-            continue
-          }
-          if (!['producto', 'servicio'].includes(tipo)) {
-            errores.push({ fila, nombre, error: `Tipo inválido: "${tipo}". Debe ser "producto" o "servicio"` })
-            continue
-          }
-          if (!['exacto', 'desde', 'consultar'].includes(precio_tipo)) {
-            errores.push({ fila, nombre, error: `precio_tipo inválido: "${precio_tipo}". Debe ser "exacto", "desde" o "consultar"` })
-            continue
-          }
-
-          let precio: number | null = null
-          if (precio_tipo !== 'consultar') {
-            if (!precioRaw) {
-              errores.push({ fila, nombre, error: 'El precio es obligatorio cuando precio_tipo no es "consultar"' })
-              continue
-            }
-            precio = parseFloat(precioRaw.replace(',', '.'))
-            if (isNaN(precio) || precio < 0) {
-              errores.push({ fila, nombre, error: `Precio inválido: "${precioRaw}". Debe ser un número positivo` })
-              continue
-            }
-          }
-
-          validos.push({ nombre, tipo, precio, precio_tipo, descripcion })
-        }
-
-        setImportPreview({ validos, errores })
+    const procesarFilas = (rows: any[][]) => {
+      if (rows.length < 2) {
+        setImportPreview({ validos: [], errores: [{ fila: 1, nombre: '—', error: 'El archivo está vacío o solo tiene encabezados' }] })
         setIsImportModalOpen(true)
-      } catch (err) {
-        setImportPreview({ validos: [], errores: [{ fila: 0, nombre: '—', error: 'Error al leer el archivo. Asegúrate de que sea un .xlsx válido' }] })
-        setIsImportModalOpen(true)
+        return
       }
+
+      const validos: any[] = []
+      const errores: { fila: number, nombre: string, error: string }[] = []
+
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i]
+        const fila = i + 1
+        const nombre = row[0]?.toString().trim()
+        const tipo = row[1]?.toString().trim().toLowerCase() || 'producto'
+        const precioRaw = row[2]?.toString().trim()
+        const precio_tipo = row[3]?.toString().trim().toLowerCase() || 'exacto'
+        const categoria = row[4]?.toString().trim() || null
+        const subcategoria = row[5]?.toString().trim() || null
+        const descripcion = row[6]?.toString().trim() || null
+
+        if (!nombre) {
+          errores.push({ fila, nombre: '(vacío)', error: 'El nombre es obligatorio' })
+          continue
+        }
+        if (!['producto', 'servicio'].includes(tipo)) {
+          errores.push({ fila, nombre, error: `Tipo inválido: "${tipo}". Debe ser "producto" o "servicio"` })
+          continue
+        }
+        if (!['exacto', 'desde', 'consultar'].includes(precio_tipo)) {
+          errores.push({ fila, nombre, error: `precio_tipo inválido: "${precio_tipo}". Debe ser "exacto", "desde" o "consultar"` })
+          continue
+        }
+
+        let precio: number | null = null
+        if (precio_tipo !== 'consultar') {
+          if (!precioRaw) {
+            errores.push({ fila, nombre, error: 'El precio es obligatorio cuando precio_tipo no es "consultar"' })
+            continue
+          }
+          precio = parseFloat(precioRaw.replace(',', '.'))
+          if (isNaN(precio) || precio < 0) {
+            errores.push({ fila, nombre, error: `Precio inválido: "${precioRaw}". Debe ser un número positivo` })
+            continue
+          }
+        }
+
+        validos.push({ nombre, tipo, precio, precio_tipo, categoria, subcategoria, descripcion })
+      }
+
+      setImportPreview({ validos, errores })
+      setIsImportModalOpen(true)
     }
-    reader.readAsArrayBuffer(file)
-    // Reset input para permitir subir el mismo archivo de nuevo
+
+    try {
+      if (esCSV) {
+        const Papa = (await import('papaparse')).default
+        const text = await file.text()
+        const result = Papa.parse<string[]>(text.trim(), { skipEmptyLines: true })
+        procesarFilas(result.data)
+      } else {
+        const ExcelJS = await import('exceljs')
+        const buffer = await file.arrayBuffer()
+        const wb = new ExcelJS.Workbook()
+        await wb.xlsx.load(buffer)
+        const ws = wb.worksheets[0]
+        const rows: any[][] = []
+        ws.eachRow((row) => {
+          const values = (row.values as any[]).slice(1)
+          rows.push(values.map(v => v?.toString?.() ?? v ?? ''))
+        })
+        procesarFilas(rows)
+      }
+    } catch (err) {
+      setImportPreview({ validos: [], errores: [{ fila: 0, nombre: '—', error: 'Error al leer el archivo. Asegúrate de que sea un .xlsx o .csv válido' }] })
+      setIsImportModalOpen(true)
+    }
+
     e.target.value = ''
   }
 
@@ -395,7 +413,7 @@ export default function ListaPreciosPage() {
           <label className={`inline-flex items-center gap-2 px-4 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition cursor-pointer ${nivelPermiso !== 'escritura' ? 'opacity-50 pointer-events-none' : ''}`}>
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l4-4m0 0l4 4m-4-4v12"/></svg>
             Importar Excel
-            <input type="file" accept=".xlsx,.xls" onChange={handleArchivoExcel} className="sr-only" />
+            <input type="file" accept=".xlsx,.xls,.csv" onChange={handleArchivoExcel} className="sr-only" />
           </label>
           <button
             disabled={nivelPermiso !== 'escritura'}
@@ -434,6 +452,7 @@ export default function ListaPreciosPage() {
                   <tr className="border-b border-slate-200 text-left text-ink-500">
                     <th className="font-600 px-5 py-3">Ítem</th>
                     <th className="font-600 px-5 py-3">Tipo</th>
+                    <th className="font-600 px-5 py-3">Categoría</th>
                     <th className="font-600 px-5 py-3">Precio</th>
                     <th className="font-600 px-5 py-3 text-right">Acciones</th>
                   </tr>
@@ -450,6 +469,13 @@ export default function ListaPreciosPage() {
                           {item.tipo === 'producto' ? 'Producto' : 'Servicio'}
                         </span>
                       </td>
+                      <td className="px-5 py-3.5 text-ink-600 text-sm">
+                        {item.categoria ? (
+                          <span>{item.categoria}{item.subcategoria ? ` › ${item.subcategoria}` : ''}</span>
+                        ) : (
+                          <span className="text-ink-300">—</span>
+                        )}
+                      </td>
                       <td className="px-5 py-3.5 font-600 text-ink-900">
                         {formatearPrecio(item)}
                       </td>
@@ -463,7 +489,7 @@ export default function ListaPreciosPage() {
                   ))}
                   {itemsFiltrados.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="px-5 py-8 text-center text-ink-500 text-sm">
+                      <td colSpan={6} className="px-5 py-8 text-center text-ink-500 text-sm">
                         No hay ítems que coincidan con este filtro.
                       </td>
                     </tr>
@@ -565,7 +591,29 @@ export default function ListaPreciosPage() {
                       className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white resize-none placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition"></textarea>
                   </div>
         
-
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-500 text-ink-700 mb-1.5">Categoría <span className="text-ink-400 font-400">· opcional</span></label>
+                      <select value={formData.categoria || ''} onChange={e => setFormData({...formData, categoria: e.target.value, subcategoria: ''})}
+                        className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition">
+                        <option value="">Sin categoría</option>
+                        {categoriasRaiz.map(cat => (
+                          <option key={cat.id} value={cat.nombre}>{cat.nombre}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-500 text-ink-700 mb-1.5">Subcategoría <span className="text-ink-400 font-400">· opcional</span></label>
+                      <select value={formData.subcategoria || ''} onChange={e => setFormData({...formData, subcategoria: e.target.value})}
+                        disabled={!formData.categoria}
+                        className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition disabled:bg-slate-50 disabled:text-ink-400">
+                        <option value="">Sin subcategoría</option>
+                        {formData.categoria && subcategoriasDe(categoriasRaiz.find(c => c.nombre === formData.categoria)?.id || '').map(sub => (
+                          <option key={sub.id} value={sub.nombre}>{sub.nombre}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                 </div>
         
                 {/* Pie con botones */}

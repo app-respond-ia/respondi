@@ -11,6 +11,8 @@ export interface PrecioData {
   moneda: string
   descripcion: string | null
   disponible: boolean
+  categoria: string | null
+  subcategoria: string | null
 }
 
 // Función auxiliar para obtener credenciales del usuario activo
@@ -65,7 +67,9 @@ export async function crearPrecio(data: PrecioData) {
       precio_tipo: data.precio_tipo,
       moneda: data.moneda,
       descripcion: data.descripcion,
-      disponible: data.disponible
+      disponible: data.disponible,
+      categoria: data.categoria || null,
+      subcategoria: data.subcategoria || null
     }])
     .select()
     .single()
@@ -112,6 +116,8 @@ export async function importarPreciosMasivo(items: {
   tipo: string
   precio: number | null
   precio_tipo: string
+  categoria?: string | null
+  subcategoria?: string | null
   descripcion: string | null
 }[]) {
   const supabase = await createClient()
@@ -127,6 +133,8 @@ export async function importarPreciosMasivo(items: {
     tipo: item.tipo || 'producto',
     precio: item.precio,
     precio_tipo: item.precio_tipo || 'exacto',
+    categoria: item.categoria || null,
+    subcategoria: item.subcategoria || null,
     descripcion: item.descripcion || null,
     disponible: true
   }))

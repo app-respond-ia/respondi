@@ -190,27 +190,66 @@ export default function ListaPreciosPage() {
     ws.getRow(1).font = { bold: true }
     ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEDE9FE' } }
 
-    ws.addRow({ nombre: 'Café espresso', tipo: 'producto', precio: 2.50, precio_tipo: 'exacto', categoria: 'Bebidas', subcategoria: 'Cafés', descripcion: 'Café solo corto' })
-    ws.addRow({ nombre: 'Consultoría hora', tipo: 'servicio', precio: 80, precio_tipo: 'desde', categoria: 'Servicios', subcategoria: '', descripcion: 'Precio mínimo por hora' })
-    ws.addRow({ nombre: 'Menú del día', tipo: 'producto', precio: '', precio_tipo: 'consultar', categoria: 'Menús', subcategoria: '', descripcion: 'Pregunta por el menú' })
+    ws.addRow({ nombre: 'Café espresso', tipo: 'producto', precio: 2.50, precio_tipo: 'exacto', categoria: '', subcategoria: '', descripcion: 'Café solo corto' })
+    ws.addRow({ nombre: 'Consultoría hora', tipo: 'servicio', precio: 80, precio_tipo: 'desde', categoria: '', subcategoria: '', descripcion: 'Precio mínimo por hora' })
+    ws.addRow({ nombre: 'Menú del día', tipo: 'producto', precio: '', precio_tipo: 'consultar', categoria: '', subcategoria: '', descripcion: 'Pregunta por el menú' })
 
-    // Dropdown para "tipo" (columna B), filas 2 a 500
+    // Dropdown simple para "tipo" y "precio_tipo"
     for (let i = 2; i <= 500; i++) {
       ws.getCell(`B${i}`).dataValidation = {
-        type: 'list',
-        allowBlank: false,
-        formulae: ['"producto,servicio"'],
-        showErrorMessage: true,
-        errorTitle: 'Valor inválido',
+        type: 'list', allowBlank: false, formulae: ['"producto,servicio"'],
+        showErrorMessage: true, errorTitle: 'Valor inválido',
         error: 'Selecciona "producto" o "servicio" de la lista.'
       }
       ws.getCell(`D${i}`).dataValidation = {
-        type: 'list',
-        allowBlank: false,
-        formulae: ['"exacto,desde,consultar"'],
-        showErrorMessage: true,
-        errorTitle: 'Valor inválido',
+        type: 'list', allowBlank: false, formulae: ['"exacto,desde,consultar"'],
+        showErrorMessage: true, errorTitle: 'Valor inválido',
         error: 'Selecciona "exacto", "desde" o "consultar" de la lista.'
+      }
+    }
+
+    // Dropdown dependiente para categoría/subcategoría, solo si 
+    // el negocio tiene categorías creadas
+    if (categoriasRaiz.length > 0) {
+      const sanitizar = (nombre: string) =>
+        'CAT_' + nombre.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-zA-Z0-9]/g, '_').slice(0, 200)
+
+      const wsListas = wb.addWorksheet('Listas')
+      wsListas.state = 'veryHidden'
+
+      // Columna A: nombres de categorías
+      categoriasRaiz.forEach((cat, i) => {
+        wsListas.getCell(`A${i + 1}`).value = cat.nombre
+      })
+      wb.definedNames.add(`Listas!$A$1:$A$${categoriasRaiz.length}`, 'ListaCategorias')
+
+      // Una columna por categoría con sus subcategorías, y un 
+      // rango con nombre sanitizado apuntando a esa columna
+      categoriasRaiz.forEach((cat, colIndex) => {
+        const subs = subcategoriasDe(cat.id)
+        const col = colIndex + 2 // empieza en B
+        const colLetter = wsListas.getColumn(col).letter
+        subs.forEach((sub, i) => {
+          wsListas.getCell(`${colLetter}${i + 1}`).value = sub.nombre
+        })
+        if (subs.length > 0) {
+          const rangeName = sanitizar(cat.nombre)
+          wb.definedNames.add(`Listas!$${colLetter}$1:$${colLetter}$${subs.length}`, rangeName)
+        }
+      })
+
+      for (let i = 2; i <= 500; i++) {
+        ws.getCell(`E${i}`).dataValidation = {
+          type: 'list', allowBlank: true, formulae: ['=ListaCategorias'],
+          showErrorMessage: true, errorTitle: 'Valor inválido',
+          error: 'Selecciona una categoría de la lista.'
+        }
+        ws.getCell(`F${i}`).dataValidation = {
+          type: 'list', allowBlank: true,
+          formulae: [`=INDIRECT("CAT_"&SUBSTITUTE(SUBSTITUTE(E${i}," ","_"),"-","_"))`],
+          showErrorMessage: false
+        }
       }
     }
 

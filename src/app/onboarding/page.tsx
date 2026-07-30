@@ -1,4 +1,5 @@
 'use client'
+import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -388,11 +389,7 @@ export default function OnboardingPage() {
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <p className="text-ink-500 font-500">Cargando...</p>
-      </div>
-    )
+    return <Loading />
   }
 
   const pct = Math.round((step / 5) * 100)

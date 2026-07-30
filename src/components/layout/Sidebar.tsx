@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut } from '@/app/actions/auth'
@@ -20,6 +21,8 @@ type SidebarProps = {
 
 export default function Sidebar({ user, onCloseMobile, permisos, esAdmin, collapsed, onToggleCollapse }: SidebarProps) {
   const pathname = usePathname()
+  const [configColapsada, setConfigColapsada] = useState(false)
+  const [organizacionColapsada, setOrganizacionColapsada] = useState(false)
 
   const isActive = (path: string) => pathname === path
 
@@ -198,19 +201,24 @@ export default function Sidebar({ user, onCloseMobile, permisos, esAdmin, collap
         })()}
 
         {collapsed ? (
-          <div className="flex flex-col items-center gap-2 pt-5 pb-2">
+          <div className="flex flex-col items-center gap-1 pt-5 pb-1">
             <div className="h-px w-8 bg-white/10"></div>
-            <span title="Configuración" className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-ink-500">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+            <button onClick={() => setConfigColapsada(v => !v)} title="Configuración" className={`w-full flex flex-col items-center gap-0.5 py-1.5 rounded-lg transition ${configColapsada ? 'bg-brand-500/15' : 'hover:bg-white/5'}`}>
+              <span className={`w-8 h-8 rounded-lg flex items-center justify-center transition ${configColapsada ? 'bg-brand-500/20 text-brand-400' : 'bg-white/5 text-ink-500'}`}>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+              </span>
+              <svg className={`w-3 h-3 text-ink-500 transition-transform duration-200 ${configColapsada ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/>
               </svg>
-            </span>
+            </button>
           </div>
         ) : (
           <p className="px-3 pt-5 pb-2 text-[10px] uppercase tracking-widest text-ink-500/70 font-600">Configuración</p>
         )}
-        {!collapsed && (
+        {(!collapsed || configColapsada) && (
         <>
         {(() => {
           const nivel = getNivel('skills')
@@ -367,18 +375,23 @@ export default function Sidebar({ user, onCloseMobile, permisos, esAdmin, collap
         </>
         )}
         {collapsed ? (
-          <div className="flex flex-col items-center gap-2 pt-5 pb-2">
+          <div className="flex flex-col items-center gap-1 pt-5 pb-1">
             <div className="h-px w-8 bg-white/10"></div>
-            <span title="Organización" className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-ink-500">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"/>
+            <button onClick={() => setOrganizacionColapsada(v => !v)} title="Organización" className={`w-full flex flex-col items-center gap-0.5 py-1.5 rounded-lg transition ${organizacionColapsada ? 'bg-brand-500/15' : 'hover:bg-white/5'}`}>
+              <span className={`w-8 h-8 rounded-lg flex items-center justify-center transition ${organizacionColapsada ? 'bg-brand-500/20 text-brand-400' : 'bg-white/5 text-ink-500'}`}>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"/>
+                </svg>
+              </span>
+              <svg className={`w-3 h-3 text-ink-500 transition-transform duration-200 ${organizacionColapsada ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/>
               </svg>
-            </span>
+            </button>
           </div>
         ) : (
           <p className="px-3 pt-5 pb-2 text-[10px] uppercase tracking-widest text-ink-500/70 font-600">Organización</p>
         )}
-        {!collapsed && (
+        {(!collapsed || organizacionColapsada) && (
         <>
         {(() => {
           const nivel = getNivel('perfil')
@@ -449,7 +462,7 @@ export default function Sidebar({ user, onCloseMobile, permisos, esAdmin, collap
         </div>
       </div>
       <button onClick={onToggleCollapse}
-        className="hidden lg:flex absolute top-9 -right-3 w-6 h-6 rounded-full bg-ink-800 border border-white/10 shadow-lg items-center justify-center text-ink-400 hover:text-white hover:bg-brand-600 hover:border-brand-600 transition z-20">
+        className="hidden lg:flex absolute top-1/2 -translate-y-1/2 -right-3 w-6 h-6 rounded-full bg-ink-800 border border-white/10 shadow-lg items-center justify-center text-ink-400 hover:text-white hover:bg-brand-600 hover:border-brand-600 transition z-20">
         <svg className={`w-3.5 h-3.5 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
           <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/>
         </svg>

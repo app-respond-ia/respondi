@@ -89,9 +89,10 @@ export async function getDashboardData() {
 
 // B) getOrganizaciones
 export async function getOrganizaciones(filtro?: string) {
-  const { supabase } = await requireSuperAdmin()
+  const { userId } = await requireSuperAdmin()
+  void userId // verificación de auth; la query usa supabaseAdmin para evitar RLS en el join con vendedores
 
-  let query = supabase
+  let query = supabaseAdmin
     .from('organizaciones')
     .select(`
       id, nombre, estado, plan_id, fecha_vencimiento, id_vendedor, created_at,
@@ -671,15 +672,16 @@ export async function crearCuentaTrial(data: {
 
 export async function actualizarEstadoOrganizacion(id: string, estado: string) {
   try {
-    const { supabase, userId } = await requireSuperAdmin()
+    const { userId } = await requireSuperAdmin()
+    // Usamos supabaseAdmin para bypassear RLS y poder leer/escribir organizaciones sin restricciones
 
-    const { data: anterior } = await supabase
+    const { data: anterior } = await supabaseAdmin
       .from('organizaciones')
       .select('estado')
       .eq('id', id)
       .single()
 
-    const { error } = await supabase
+    const { error } = await supabaseAdmin
       .from('organizaciones')
       .update({ estado })
       .eq('id', id)

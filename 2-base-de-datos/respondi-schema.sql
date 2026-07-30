@@ -656,7 +656,21 @@ create policy ailogs_tenant on ai_logs for select
   using (is_super_admin() or tenant_id = auth_tenant_id());
 
 create policy audit_tenant on audit_log for select
-  using (is_super_admin() or (tenant_id = auth_tenant_id() and (auth_rol() = 'admin' or auth_has_permission((select branch_id from public.users where id = auth.uid()), 'audit_log', 'lectura'))));
+  using (
+    is_super_admin()
+    or (
+      tenant_id = auth_tenant_id()
+      and (
+        auth_rol() = 'admin'
+        or exists (
+          select 1 from public.users u
+          join public.roles_personalizados rp on rp.id = u.rol_personalizado_id
+          where u.id = auth.uid() and rp.es_propietario = true
+        )
+        or auth_has_permission((select branch_id from public.users where id = auth.uid()), 'audit_log', 'lectura')
+      )
+    )
+  );
 
 create policy notif_own on notifications for all
   using (is_super_admin() or user_id = auth.uid())

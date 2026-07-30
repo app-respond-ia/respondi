@@ -23,6 +23,7 @@ export default function ReglasPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
+  const [busqueda, setBusqueda] = useState('')
 
   const [formData, setFormData] = useState<ReglaData>({
     nombre: '',
@@ -148,6 +149,16 @@ export default function ReglasPage() {
     setSaving(false)
   }
 
+  const itemsFiltrados = items.filter(item => {
+    if (!busqueda.trim()) return true
+    const q = busqueda.toLowerCase()
+    return (
+      item.nombre?.toLowerCase().includes(q) ||
+      item.descripcion_intencion?.toLowerCase().includes(q) ||
+      item.tipo_caso?.toLowerCase().includes(q)
+    )
+  })
+
   if (loading || nivelPermiso === null) {
     return <Loading />
   }
@@ -181,9 +192,22 @@ export default function ReglasPage() {
         </button>
       </div>
 
-      {items.length > 0 ? (
+      {items.length > 0 && (
+        <div className="relative mb-5">
+          <svg className="w-4 h-4 text-ink-400 absolute left-3.5 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <input
+            type="text"
+            placeholder="Buscar por nombre, descripción o tipo..."
+            value={busqueda}
+            onChange={e => setBusqueda(e.target.value)}
+            className="w-full h-11 pl-10 pr-4 rounded-xl border border-slate-300 bg-white text-sm placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition"
+          />
+        </div>
+      )}
+
+      {itemsFiltrados.length > 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col divide-y divide-slate-100 relative">
-          {items.map((item) => (
+          {itemsFiltrados.map((item) => (
             <div key={item.id} className="p-4 sm:p-5 flex items-start gap-4 hover:bg-slate-50 transition-colors bg-white">
               {/* Icono fijo */}
               <div className="w-10 h-10 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center shrink-0 mt-0.5">
@@ -213,6 +237,11 @@ export default function ReglasPage() {
                     </span>
                   </div>
                 )}
+                {item.created_at && (
+                  <p className="text-[11px] text-ink-300 mt-1.5">
+                    Creado el {new Date(item.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })} a las {new Date(item.created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                )}
               </div>
 
               {/* Controles de la derecha */}
@@ -240,6 +269,10 @@ export default function ReglasPage() {
               </div>
             </div>
           ))}
+        </div>
+      ) : items.length > 0 ? (
+        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
+          <p className="text-ink-500 text-sm">No hay resultados para "{busqueda}".</p>
         </div>
       ) : (
         /* Estado Vacío */
@@ -311,13 +344,13 @@ export default function ReglasPage() {
 
                   <div>
                     <label className="block text-sm font-500 text-ink-700 mb-1.5">Tipo de escalado</label>
-                    <input type="text" required placeholder="Ej. atencion_urgente"
+                    <input type="text" required placeholder="EJ. ATENCION_URGENTE"
                       value={formData.tipo_caso}
-                      onChange={e => setFormData({...formData, tipo_caso: e.target.value})}
-                      className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition" 
+                      onChange={e => setFormData({...formData, tipo_caso: e.target.value.toUpperCase()})}
+                      className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition uppercase" 
                     />
                     <p className="text-xs text-ink-400 mt-1.5">
-                      Esta etiqueta identificará el motivo del escalado en la bandeja de casos.
+                      Se escribe en mayúsculas para diferenciarlo de las etiquetas normales. Manténlo breve y conciso, ej. "RECLAMO" o "PEDIDO_URGENTE".
                     </p>
                   </div>
         

@@ -42,7 +42,7 @@ export async function getReglas() {
     .from('case_rules')
     .select('*')
     .eq('branch_id', auth.branch_id)
-    .order('created_at', { ascending: true })
+    .order('created_at', { ascending: false })
 
   if (error) return { success: false, error: error.message }
   return { success: true, data }

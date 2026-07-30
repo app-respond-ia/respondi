@@ -103,7 +103,11 @@ export default function SkillsPage() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="text-sm font-600 text-ink-900">{item.nombre}</h3>
                   {!item.cliente_puede_toggle && (
-                    <span className="text-[10px] font-600 px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">Siempre activa</span>
+                    <span title="Incluido siempre" className="shrink-0 inline-flex items-center justify-center w-5 h-5 rounded-full bg-brand-100/50 text-brand-600">
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                      </svg>
+                    </span>
                   )}
                 </div>
                 {item.descripcion && (

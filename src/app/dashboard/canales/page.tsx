@@ -32,6 +32,7 @@ export default function CanalesPage() {
   const [modalMetodo, setModalMetodo] = useState<'oficial' | 'whaticket'>('oficial')
   const [modalLoading, setModalLoading] = useState(false)
   const [aceptaRiesgo, setAceptaRiesgo] = useState(false)
+  const [conexionConfirmada, setConexionConfirmada] = useState(false)
 
   const cargar = async () => {
     setLoading(true)
@@ -68,6 +69,7 @@ export default function CanalesPage() {
     setModalTipo(tipo)
     setModalMetodo('oficial')
     setAceptaRiesgo(false)
+    setConexionConfirmada(false)
     setIsModalOpen(true)
   }
 
@@ -78,15 +80,18 @@ export default function CanalesPage() {
     setModalLoading(true)
     const res = await conectarCanal(modalTipo, modalMetodo === 'oficial' ? 'meta_oficial' : 'whaticket')
     if (res.success) {
-      setMensaje({ tipo: 'exito', texto: 'Canal configurado. Esperando validación.' })
-      setTimeout(() => setMensaje(null), 3000)
-      setIsModalOpen(false)
+      setConexionConfirmada(true)
       cargar()
     } else {
       setMensaje({ tipo: 'error', texto: res.error || 'Error al conectar canal' })
       setTimeout(() => setMensaje(null), 3000)
     }
     setModalLoading(false)
+  }
+
+  const handleCerrarConfirmacion = () => {
+    setIsModalOpen(false)
+    setConexionConfirmada(false)
   }
 
   const handleDesconectar = async (id: string) => {
@@ -271,13 +276,35 @@ export default function CanalesPage() {
           <div className="relative min-h-full flex items-center justify-center p-4">
             <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl z-10">
               <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-                <h2 className="font-display font-700 text-lg text-ink-900">Conectar {modalTipo}</h2>
-                <button onClick={() => !modalLoading && setIsModalOpen(false)} className="p-1.5 rounded-lg text-ink-400 hover:text-ink-700 hover:bg-slate-100 transition" aria-label="Cerrar">
+                <h2 className="font-display font-700 text-lg text-ink-900">
+                  {conexionConfirmada ? 'Solicitud enviada' : `Conectar ${modalTipo}`}
+                </h2>
+                <button onClick={() => !modalLoading && (conexionConfirmada ? handleCerrarConfirmacion() : setIsModalOpen(false))} className="p-1.5 rounded-lg text-ink-400 hover:text-ink-700 hover:bg-slate-100 transition" aria-label="Cerrar">
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
               </div>
-              <div className="px-6 py-5 space-y-3">
-                <p className="text-sm text-ink-500 mb-2">Elige cómo quieres conectar este canal:</p>
+
+              {conexionConfirmada ? (
+                <>
+                  <div className="px-6 py-8 text-center">
+                    <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-8 h-8 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+                    </div>
+                    <p className="font-600 text-ink-900 mb-2">¡Todo listo por tu parte!</p>
+                    <p className="text-sm text-ink-600 max-w-sm mx-auto">
+                      En breve, nuestro equipo de soporte se pondrá en contacto contigo para activar la conexión de este canal. No necesitas hacer nada más por ahora.
+                    </p>
+                  </div>
+                  <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100">
+                    <button onClick={handleCerrarConfirmacion} className="px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition">
+                      Entendido
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="px-6 py-5 space-y-3">
+                    <p className="text-sm text-ink-500 mb-2">Elige cómo quieres conectar este canal:</p>
 
                 {/* Opción 1: Meta oficial */}
                 <label className={`relative block rounded-2xl border-2 p-4 cursor-pointer transition ${modalMetodo === 'oficial' ? 'border-emerald-500 bg-emerald-50/40 ring-4 ring-emerald-100' : 'border-slate-200 bg-white hover:border-amber-300'}`}>
@@ -294,7 +321,7 @@ export default function CanalesPage() {
                         <p className="font-600 text-sm text-ink-900">Conexión oficial con Meta</p>
                         <span className="text-[10px] font-600 text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded uppercase tracking-wide">Recomendado</span>
                       </div>
-                      <p className="text-xs text-ink-600 mb-2">Autoriza tu página desde Meta. Sin riesgo de baneo, conexión estable.</p>
+                      <p className="text-xs text-ink-600 mb-2">Autoriza tu página desde Meta. Sin riesgo de baneo, conexión estable y respaldada oficialmente. Tras elegir esta opción, nuestro equipo de soporte te contactará para completar la autorización junto a ti.</p>
                       <p className="text-xs text-emerald-700 font-500">Sin costo adicional</p>
                     </div>
                   </div>
@@ -312,7 +339,7 @@ export default function CanalesPage() {
                     <svg className="w-6 h-6 text-amber-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0L3.16 16.25A2 2 0 005 19z"/></svg>
                     <div className="flex-1">
                       <p className="font-600 text-sm text-ink-900 mb-1">Conexión vía Whaticket</p>
-                      <p className="text-xs text-ink-600 mb-2">Se conecta escaneando un código QR desde tu cuenta. Más rápido pero con riesgo de que Meta detecte la sesión y bloquee tu cuenta.</p>
+                      <p className="text-xs text-ink-600 mb-2">Se conecta escaneando un código QR desde tu propio celular. Más rápido de activar, pero al no ser un canal oficial de Meta, existe riesgo de que la cuenta sea detectada y bloqueada. Tras elegir esta opción, nuestro equipo de soporte te contactará para guiarte en el escaneo del código.</p>
                       <p className="text-xs text-amber-700 font-500">Requiere aceptación de riesgo</p>
                     </div>
                   </div>
@@ -328,12 +355,14 @@ export default function CanalesPage() {
                 )}
 
               </div>
-              <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100">
-                <button onClick={() => setIsModalOpen(false)} disabled={modalLoading} className="px-5 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition disabled:opacity-50">Cancelar</button>
-                <button onClick={handleConectar} disabled={modalLoading || (modalMetodo === 'whaticket' && !aceptaRiesgo)} className="px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition disabled:opacity-50">
-                  {modalLoading ? 'Conectando...' : 'Continuar →'}
-                </button>
-              </div>
+                  <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100">
+                    <button onClick={() => setIsModalOpen(false)} disabled={modalLoading} className="px-5 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition disabled:opacity-50">Cancelar</button>
+                    <button onClick={handleConectar} disabled={modalLoading || (modalMetodo === 'whaticket' && !aceptaRiesgo)} className="px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition disabled:opacity-50">
+                      {modalLoading ? 'Conectando...' : 'Continuar →'}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { resolveBranchId } from '@/lib/active-branch'
+import { registrarAuditoria } from '@/lib/auditoria'
 
 export async function getPerfilSucursal() {
   const supabase = await createClient()
@@ -75,6 +76,18 @@ export async function savePerfilSucursal(data: {
   const branchId = await resolveBranchId(supabase, user.id)
   if (!branchId) return { success: false, error: 'Usuario no vinculado a una sucursal' }
 
+  const { data: sucursalAnterior } = await supabase
+    .from('sucursales')
+    .select('nombre, direccion, timezone')
+    .eq('id', branchId)
+    .single()
+
+  const { data: perfilAnterior } = await supabase
+    .from('business_profiles')
+    .select('*')
+    .eq('branch_id', branchId)
+    .single()
+
   // 1. Actualizar sucursales
   const { error: errorSucursal } = await supabase
     .from('sucursales')
@@ -128,6 +141,16 @@ export async function savePerfilSucursal(data: {
       
     if (errorInsert) return { success: false, error: errorInsert.message }
   }
+
+  await registrarAuditoria({
+    tenant_id: userData.tenant_id,
+    user_id: user.id,
+    accion: 'actualizó el perfil de la sucursal',
+    tabla_afectada: 'perfil',
+    registro_id: branchId,
+    valor_anterior: { ...sucursalAnterior, ...perfilAnterior },
+    valor_nuevo: data
+  })
 
   return { success: true }
 }

@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { resolveBranchId } from '@/lib/active-branch'
+import { registrarAuditoria } from '@/lib/auditoria'
 
 export type Franja = {
   apertura: string
@@ -115,6 +116,11 @@ export async function saveHorarios(horarios: HorarioDia[]) {
     }
   }
 
+  const { data: horariosAnteriores } = await supabase
+    .from('business_hours')
+    .select('*')
+    .eq('branch_id', branchId)
+
   // Borrar horarios actuales
   const { error: errorDelete } = await supabase
     .from('business_hours')
@@ -155,6 +161,15 @@ export async function saveHorarios(horarios: HorarioDia[]) {
     .insert(records)
 
   if (errorInsert) return { success: false, error: errorInsert.message }
+
+  await registrarAuditoria({
+    tenant_id: userData.tenant_id,
+    user_id: user.id,
+    accion: 'actualizó los horarios de atención',
+    tabla_afectada: 'horarios',
+    valor_anterior: horariosAnteriores,
+    valor_nuevo: records
+  })
 
   return { success: true }
 }

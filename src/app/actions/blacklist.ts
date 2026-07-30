@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { resolveBranchId } from '@/lib/active-branch'
+import { registrarAuditoria } from '@/lib/auditoria'
 
 export interface BlacklistConfigData {
   blacklist_modo: 'ignorar' | 'respuesta_automatica' | 'derivar'
@@ -56,6 +57,12 @@ export async function actualizarBlacklistConfig(data: BlacklistConfigData) {
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
+  const { data: anterior } = await supabase
+    .from('sucursales')
+    .select('blacklist_modo, blacklist_respuesta_auto')
+    .eq('id', auth.branch_id)
+    .single()
+
   const { data: updatedData, error } = await supabase
     .from('sucursales')
     .update({
@@ -67,6 +74,17 @@ export async function actualizarBlacklistConfig(data: BlacklistConfigData) {
     .single()
 
   if (error) return { success: false, error: error.message }
+
+  await registrarAuditoria({
+    tenant_id: auth.tenant_id,
+    user_id: auth.user_id,
+    accion: 'actualizó la configuración de blacklist',
+    tabla_afectada: 'blacklist',
+    registro_id: auth.branch_id,
+    valor_anterior: anterior,
+    valor_nuevo: updatedData
+  })
+
   return { success: true, data: updatedData }
 }
 
@@ -128,6 +146,17 @@ export async function bloquearContacto(data: BloquearContactoData) {
       .single()
 
     if (updateError) return { success: false, error: updateError.message }
+
+    await registrarAuditoria({
+      tenant_id: auth.tenant_id,
+      user_id: auth.user_id,
+      accion: `bloqueó el contacto "${updated.nombre || updated.identificador_canal}"`,
+      tabla_afectada: 'blacklist',
+      registro_id: updated.id,
+      valor_anterior: existing,
+      valor_nuevo: updated
+    })
+
     return { success: true, data: updated }
   } else {
     // 3. Si no existe, insertar
@@ -146,6 +175,16 @@ export async function bloquearContacto(data: BloquearContactoData) {
       .single()
 
     if (insertError) return { success: false, error: insertError.message }
+
+    await registrarAuditoria({
+      tenant_id: auth.tenant_id,
+      user_id: auth.user_id,
+      accion: `bloqueó el contacto "${inserted.nombre || inserted.identificador_canal}"`,
+      tabla_afectada: 'blacklist',
+      registro_id: inserted.id,
+      valor_nuevo: inserted
+    })
+
     return { success: true, data: inserted }
   }
 }
@@ -164,5 +203,16 @@ export async function desbloquearContacto(id: string) {
     .single()
 
   if (error) return { success: false, error: error.message }
+
+  await registrarAuditoria({
+    tenant_id: auth.tenant_id,
+    user_id: auth.user_id,
+    accion: `desbloqueó el contacto "${data.nombre || data.identificador_canal}"`,
+    tabla_afectada: 'blacklist',
+    registro_id: id,
+    valor_anterior: { blacklist: true },
+    valor_nuevo: { blacklist: false }
+  })
+
   return { success: true, data }
 }

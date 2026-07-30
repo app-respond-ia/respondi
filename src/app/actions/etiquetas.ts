@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { resolveBranchId } from '@/lib/active-branch'
+import { registrarAuditoria } from '@/lib/auditoria'
 
 export interface EtiquetaData {
   nombre: string
@@ -28,7 +29,7 @@ async function getAuthData(supabase: any) {
   const branchId = await resolveBranchId(supabase, user.id)
   if (!branchId) return { error: 'Usuario no vinculado a una sucursal' }
 
-  return { tenant_id: userData.tenant_id, branch_id: branchId }
+  return { tenant_id: userData.tenant_id, branch_id: branchId, user_id: user.id }
 }
 
 export async function getEtiquetas() {
@@ -112,6 +113,16 @@ export async function crearEtiqueta(data: EtiquetaData) {
     .single()
 
   if (error) return { success: false, error: error.message }
+
+  await registrarAuditoria({
+    tenant_id: auth.tenant_id,
+    user_id: auth.user_id,
+    accion: `creó la etiqueta "${data.nombre}"`,
+    tabla_afectada: 'etiquetas',
+    registro_id: insertedData.id,
+    valor_nuevo: insertedData
+  })
+
   return { success: true, data: { ...insertedData, aplicadas_este_mes: 0 } }
 }
 
@@ -119,6 +130,12 @@ export async function actualizarEtiqueta(id: string, data: Partial<{ nombre: str
   const supabase = await createClient()
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
+
+  const { data: anterior } = await supabase
+    .from('message_categories')
+    .select('*')
+    .eq('id', id)
+    .single()
 
   const { data: updatedData, error } = await supabase
     .from('message_categories')
@@ -129,8 +146,17 @@ export async function actualizarEtiqueta(id: string, data: Partial<{ nombre: str
     .single()
 
   if (error) return { success: false, error: error.message }
-  
-  // No devolvemos aplicadas_este_mes modificado porque no cambia en un update de metadata
+
+  await registrarAuditoria({
+    tenant_id: auth.tenant_id,
+    user_id: auth.user_id,
+    accion: `editó la etiqueta "${updatedData.nombre}"`,
+    tabla_afectada: 'etiquetas',
+    registro_id: id,
+    valor_anterior: anterior,
+    valor_nuevo: updatedData
+  })
+
   return { success: true, data: updatedData }
 }
 
@@ -139,6 +165,12 @@ export async function eliminarEtiqueta(id: string) {
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
+  const { data: anterior } = await supabase
+    .from('message_categories')
+    .select('*')
+    .eq('id', id)
+    .single()
+
   const { error } = await supabase
     .from('message_categories')
     .delete()
@@ -146,6 +178,16 @@ export async function eliminarEtiqueta(id: string) {
     .eq('branch_id', auth.branch_id)
 
   if (error) return { success: false, error: error.message }
+
+  await registrarAuditoria({
+    tenant_id: auth.tenant_id,
+    user_id: auth.user_id,
+    accion: `eliminó la etiqueta "${anterior?.nombre || id}"`,
+    tabla_afectada: 'etiquetas',
+    registro_id: id,
+    valor_anterior: anterior
+  })
+
   return { success: true }
 }
 

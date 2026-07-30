@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { resolveBranchId } from '@/lib/active-branch'
+import { registrarAuditoria } from '@/lib/auditoria'
 
 async function getAuthData(supabase: any) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -73,6 +74,15 @@ export async function conectarCanal(dataOrTipo: any, argMetodo?: any) {
     return { success: false, error: canalError?.message || 'Error al conectar el canal. Inténtalo de nuevo.' }
   }
 
+  await registrarAuditoria({
+    tenant_id: auth.tenant_id,
+    user_id: auth.user_id,
+    accion: `solicitó conectar el canal "${newCanal.tipo}" (método: ${newCanal.metodo})`,
+    tabla_afectada: 'canales',
+    registro_id: newCanal.id,
+    valor_nuevo: newCanal
+  })
+
   return { success: true, canal: newCanal, data: newCanal }
 }
 
@@ -80,6 +90,12 @@ export async function desconectarCanal(id: string) {
   const supabase = await createClient()
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
+
+  const { data: anterior } = await supabase
+    .from('channels')
+    .select('*')
+    .eq('id', id)
+    .single()
 
   const { data, error } = await supabase
     .from('channels')
@@ -90,5 +106,16 @@ export async function desconectarCanal(id: string) {
     .single()
 
   if (error) return { success: false, error: error.message }
+
+  await registrarAuditoria({
+    tenant_id: auth.tenant_id,
+    user_id: auth.user_id,
+    accion: `desconectó el canal "${data.tipo}"`,
+    tabla_afectada: 'canales',
+    registro_id: id,
+    valor_anterior: anterior,
+    valor_nuevo: data
+  })
+
   return { success: true, data }
 }

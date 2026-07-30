@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { resolveBranchId } from '@/lib/active-branch'
+import { registrarAuditoria } from '@/lib/auditoria'
 
 export interface ReglaData {
   nombre: string
@@ -30,7 +31,7 @@ async function getAuthData(supabase: any) {
   const branchId = await resolveBranchId(supabase, user.id)
   if (!branchId) return { error: 'Usuario no vinculado a una sucursal' }
 
-  return { tenant_id: userData.tenant_id, branch_id: branchId }
+  return { tenant_id: userData.tenant_id, branch_id: branchId, user_id: user.id }
 }
 
 export async function getReglas() {
@@ -81,6 +82,16 @@ export async function crearRegla(data: ReglaData) {
     .single()
 
   if (error) return { success: false, error: error.message }
+
+  await registrarAuditoria({
+    tenant_id: auth.tenant_id,
+    user_id: auth.user_id,
+    accion: `creó la regla de escalado "${data.nombre}"`,
+    tabla_afectada: 'reglas',
+    registro_id: insertedData.id,
+    valor_nuevo: insertedData
+  })
+
   return { success: true, data: insertedData }
 }
 
@@ -88,6 +99,12 @@ export async function actualizarRegla(id: string, data: Partial<{ nombre: string
   const supabase = await createClient()
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
+
+  const { data: anterior } = await supabase
+    .from('case_rules')
+    .select('*')
+    .eq('id', id)
+    .single()
 
   const { data: updatedData, error } = await supabase
     .from('case_rules')
@@ -98,6 +115,17 @@ export async function actualizarRegla(id: string, data: Partial<{ nombre: string
     .single()
 
   if (error) return { success: false, error: error.message }
+
+  await registrarAuditoria({
+    tenant_id: auth.tenant_id,
+    user_id: auth.user_id,
+    accion: `editó la regla de escalado "${updatedData.nombre}"`,
+    tabla_afectada: 'reglas',
+    registro_id: id,
+    valor_anterior: anterior,
+    valor_nuevo: updatedData
+  })
+
   return { success: true, data: updatedData }
 }
 
@@ -106,6 +134,12 @@ export async function eliminarRegla(id: string) {
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
+  const { data: anterior } = await supabase
+    .from('case_rules')
+    .select('*')
+    .eq('id', id)
+    .single()
+
   const { error } = await supabase
     .from('case_rules')
     .delete()
@@ -113,6 +147,16 @@ export async function eliminarRegla(id: string) {
     .eq('branch_id', auth.branch_id)
 
   if (error) return { success: false, error: error.message }
+
+  await registrarAuditoria({
+    tenant_id: auth.tenant_id,
+    user_id: auth.user_id,
+    accion: `eliminó la regla de escalado "${anterior?.nombre || id}"`,
+    tabla_afectada: 'reglas',
+    registro_id: id,
+    valor_anterior: anterior
+  })
+
   return { success: true }
 }
 

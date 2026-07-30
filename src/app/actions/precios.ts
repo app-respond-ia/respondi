@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { resolveBranchId } from '@/lib/active-branch'
+import { registrarAuditoria } from '@/lib/auditoria'
 
 export interface PrecioData {
   nombre: string
@@ -33,7 +34,7 @@ async function getAuthData(supabase: any) {
   const branchId = await resolveBranchId(supabase, user.id)
   if (!branchId) return { error: 'Usuario no vinculado a una sucursal' }
 
-  return { tenant_id: userData.tenant_id, branch_id: branchId }
+  return { tenant_id: userData.tenant_id, branch_id: branchId, user_id: user.id }
 }
 
 export async function getPrecios() {
@@ -75,6 +76,16 @@ export async function crearPrecio(data: PrecioData) {
     .single()
 
   if (error) return { success: false, error: error.message }
+
+  await registrarAuditoria({
+    tenant_id: auth.tenant_id,
+    user_id: auth.user_id,
+    accion: `añadió el ítem "${data.nombre}" a la lista de precios`,
+    tabla_afectada: 'precios',
+    registro_id: insertedData.id,
+    valor_nuevo: insertedData
+  })
+
   return { success: true, data: insertedData }
 }
 
@@ -82,6 +93,12 @@ export async function actualizarPrecio(id: string, data: Partial<PrecioData>) {
   const supabase = await createClient()
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
+
+  const { data: anterior } = await supabase
+    .from('price_list')
+    .select('*')
+    .eq('id', id)
+    .single()
 
   const { data: updatedData, error } = await supabase
     .from('price_list')
@@ -92,6 +109,17 @@ export async function actualizarPrecio(id: string, data: Partial<PrecioData>) {
     .single()
 
   if (error) return { success: false, error: error.message }
+
+  await registrarAuditoria({
+    tenant_id: auth.tenant_id,
+    user_id: auth.user_id,
+    accion: `editó el ítem "${updatedData.nombre}" de la lista de precios`,
+    tabla_afectada: 'precios',
+    registro_id: id,
+    valor_anterior: anterior,
+    valor_nuevo: updatedData
+  })
+
   return { success: true, data: updatedData }
 }
 
@@ -99,6 +127,12 @@ export async function eliminarPrecio(id: string) {
   const supabase = await createClient()
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
+
+  const { data: anterior } = await supabase
+    .from('price_list')
+    .select('*')
+    .eq('id', id)
+    .single()
 
   // Se fuerza validación eq('branch_id', auth.branch_id) por seguridad
   const { error } = await supabase
@@ -108,6 +142,16 @@ export async function eliminarPrecio(id: string) {
     .eq('branch_id', auth.branch_id)
 
   if (error) return { success: false, error: error.message }
+
+  await registrarAuditoria({
+    tenant_id: auth.tenant_id,
+    user_id: auth.user_id,
+    accion: `eliminó el ítem "${anterior?.nombre || id}" de la lista de precios`,
+    tabla_afectada: 'precios',
+    registro_id: id,
+    valor_anterior: anterior
+  })
+
   return { success: true }
 }
 
@@ -144,5 +188,14 @@ export async function importarPreciosMasivo(items: {
     .insert(rows)
 
   if (error) return { success: false, error: error.message }
+
+  await registrarAuditoria({
+    tenant_id: auth.tenant_id,
+    user_id: auth.user_id,
+    accion: `importó ${rows.length} ítems a la lista de precios desde un archivo`,
+    tabla_afectada: 'precios',
+    valor_nuevo: { total_importados: rows.length }
+  })
+
   return { success: true, total: rows.length }
 }

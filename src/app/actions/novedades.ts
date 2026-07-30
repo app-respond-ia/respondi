@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { resolveBranchId } from '@/lib/active-branch'
+import { registrarAuditoria } from '@/lib/auditoria'
 
 export interface NovedadData {
   tipo: 'horario' | 'stock' | 'promo' | 'evento' | 'otro'
@@ -87,6 +88,16 @@ export async function crearNovedad(data: NovedadData) {
     .single()
 
   if (error) return { success: false, error: error.message }
+
+  await registrarAuditoria({
+    tenant_id: auth.tenant_id,
+    user_id: auth.user_id,
+    accion: `publicó una novedad del día (${data.tipo})`,
+    tabla_afectada: 'novedades',
+    registro_id: insertedData.id,
+    valor_nuevo: insertedData
+  })
+
   return { success: true, data: insertedData }
 }
 
@@ -94,6 +105,12 @@ export async function actualizarNovedad(id: string, data: Partial<NovedadData & 
   const supabase = await createClient()
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
+
+  const { data: anterior } = await supabase
+    .from('daily_updates')
+    .select('*')
+    .eq('id', id)
+    .single()
 
   if ('fecha_vigencia_fin' in data) {
     if (data.fecha_vigencia_fin === null) {
@@ -114,5 +131,16 @@ export async function actualizarNovedad(id: string, data: Partial<NovedadData & 
     .single()
 
   if (error) return { success: false, error: error.message }
+
+  await registrarAuditoria({
+    tenant_id: auth.tenant_id,
+    user_id: auth.user_id,
+    accion: 'editó una novedad del día',
+    tabla_afectada: 'novedades',
+    registro_id: id,
+    valor_anterior: anterior,
+    valor_nuevo: updatedData
+  })
+
   return { success: true, data: updatedData }
 }

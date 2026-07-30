@@ -1,7 +1,7 @@
 'use client'
 import Loading from '@/components/Loading'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { getPerfilSucursal, savePerfilSucursal } from '@/app/actions/perfil'
 import { getHorarios, saveHorarios } from '@/app/actions/horarios'
 import { getMisPermisos } from '@/app/actions/permisos'
@@ -17,6 +17,25 @@ const DIAS_SEMANA = [
 ]
 
 export default function PerfilSucursalPage() {
+  const timezones = useMemo(() => {
+    try {
+      const tzList = Intl.supportedValuesOf('timeZone')
+      return tzList.map(tz => {
+        const formatter = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'shortOffset' })
+        const parts = formatter.formatToParts(new Date())
+        const offset = parts.find(p => p.type === 'timeZoneName')?.value || 'GMT'
+        return { id: tz, label: `${tz.replace(/_/g, ' ')} (${offset})` }
+      })
+    } catch (e) {
+      return [
+        { id: 'America/Caracas', label: 'America/Caracas (GMT-4)' },
+        { id: 'America/Bogota', label: 'America/Bogota (GMT-5)' },
+        { id: 'America/Mexico_City', label: 'America/Mexico City (GMT-6)' },
+        { id: 'America/Argentina/Buenos_Aires', label: 'America/Argentina/Buenos Aires (GMT-3)' },
+        { id: 'Europe/Madrid', label: 'Europe/Madrid (GMT+1)' }
+      ]
+    }
+  }, [])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
@@ -35,6 +54,9 @@ export default function PerfilSucursalPage() {
     caso_fuera_horario: false
   })
   const [horarios, setHorarios] = useState<any[]>([])
+
+  const [copyPopoverOpen, setCopyPopoverOpen] = useState<number | null>(null)
+  const [copyTargets, setCopyTargets] = useState<number[]>([])
 
   const [politicaModalOpen, setPoliticaModalOpen] = useState(false)
   const [politicaEditIndex, setPoliticaEditIndex] = useState<number | null>(null)
@@ -155,6 +177,21 @@ export default function PerfilSucursalPage() {
     }))
   }
 
+  const applyCopyHorario = (sourceDiaId: number) => {
+    const source = horarios.find(h => h.dia_semana === sourceDiaId)
+    if (!source || !source.franjas || source.franjas.length === 0) return
+    setHorarios(prev => prev.map(h => {
+      if (!copyTargets.includes(h.dia_semana)) return h
+      return {
+        ...h,
+        cerrado: false,
+        franjas: source.franjas.map((f: any) => ({ apertura: f.apertura, cierre: f.cierre }))
+      }
+    }))
+    setCopyPopoverOpen(null)
+    setCopyTargets([])
+  }
+
   const normalizeTime = (timeValue: string | null | undefined) => {
     if (!timeValue) return null
     if (timeValue.length === 5) return `${timeValue}:00`
@@ -229,11 +266,9 @@ export default function PerfilSucursalPage() {
                   disabled={nivelPermiso !== 'escritura'}
                   className="w-full h-11 px-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition outline-none bg-white"
                 >
-                  <option value="America/Caracas">Caracas (UTC-4)</option>
-                  <option value="America/Bogota">Bogotá (UTC-5)</option>
-                  <option value="America/Mexico_City">Ciudad de México (UTC-6)</option>
-                  <option value="America/Argentina/Buenos_Aires">Buenos Aires (UTC-3)</option>
-                  <option value="Europe/Madrid">Madrid (UTC+1)</option>
+                  {timezones.map(tz => (
+                    <option key={tz.id} value={tz.id}>{tz.label}</option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -417,6 +452,51 @@ export default function PerfilSucursalPage() {
                           Añadir franja
                         </button>
                       )}
+                      {nivelPermiso === 'escritura' && (
+                        <div className="relative pt-1">
+                          <button type="button" onClick={() => {
+                            setCopyPopoverOpen(copyPopoverOpen === h.dia_semana ? null : h.dia_semana)
+                            setCopyTargets([])
+                          }} className="text-xs font-semibold text-ink-500 hover:text-ink-700 transition flex items-center gap-1">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                            Copiar a...
+                          </button>
+
+                          {copyPopoverOpen === h.dia_semana && (
+                            <div className="absolute z-10 mt-2 w-56 bg-white rounded-xl shadow-lg border border-slate-200 p-3">
+                              <p className="text-xs font-semibold text-ink-700 mb-2">Copiar horario de {DIAS_SEMANA.find(d => d.id === h.dia_semana)?.label} a:</p>
+                              <div className="space-y-1.5 mb-3">
+                                {horarios.map(otherDay => otherDay.dia_semana !== h.dia_semana && (
+                                  <label key={otherDay.dia_semana} className="flex items-center gap-2 text-sm text-ink-700 cursor-pointer">
+                                    <input type="checkbox"
+                                      checked={copyTargets.includes(otherDay.dia_semana)}
+                                      onChange={e => {
+                                        if (e.target.checked) {
+                                          setCopyTargets(prev => [...prev, otherDay.dia_semana])
+                                        } else {
+                                          setCopyTargets(prev => prev.filter(id => id !== otherDay.dia_semana))
+                                        }
+                                      }}
+                                      className="w-3.5 h-3.5 rounded border-slate-300 text-brand-600 focus:ring-brand-400" />
+                                    {DIAS_SEMANA.find(d => d.id === otherDay.dia_semana)?.label}
+                                  </label>
+                                ))}
+                              </div>
+                              <div className="flex gap-2">
+                                <button type="button" onClick={() => { setCopyPopoverOpen(null); setCopyTargets([]) }}
+                                  className="flex-1 h-8 rounded-lg text-xs font-600 text-ink-600 hover:bg-slate-100 transition">
+                                  Cancelar
+                                </button>
+                                <button type="button" onClick={() => applyCopyHorario(h.dia_semana)}
+                                  disabled={copyTargets.length === 0}
+                                  className="flex-1 h-8 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-600 transition">
+                                  Aplicar
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -498,7 +578,11 @@ export default function PerfilSucursalPage() {
                   <input
                     type="checkbox"
                     checked={formData.ia_activa_fuera_horario}
-                    onChange={e => setFormData({...formData, ia_activa_fuera_horario: e.target.checked})}
+                    onChange={e => setFormData({
+                      ...formData,
+                      ia_activa_fuera_horario: e.target.checked,
+                      caso_fuera_horario: e.target.checked ? false : formData.caso_fuera_horario
+                    })}
                     disabled={nivelPermiso !== 'escritura'}
                     className="peer sr-only"
                   />
@@ -507,7 +591,7 @@ export default function PerfilSucursalPage() {
                 </div>
               </label>
 
-              <label className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition">
+              <label className={`flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50 transition ${formData.ia_activa_fuera_horario ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100'}`}>
                 <div>
                   <p className="text-sm font-500 text-ink-900">Abrir caso automáticamente fuera de horario</p>
                   <p className="text-xs text-ink-500 mt-0.5">Se crea un caso para que un agente lo atienda cuando vuelva a haber horario.</p>
@@ -517,7 +601,7 @@ export default function PerfilSucursalPage() {
                     type="checkbox"
                     checked={formData.caso_fuera_horario}
                     onChange={e => setFormData({...formData, caso_fuera_horario: e.target.checked})}
-                    disabled={nivelPermiso !== 'escritura'}
+                    disabled={nivelPermiso !== 'escritura' || formData.ia_activa_fuera_horario}
                     className="peer sr-only"
                   />
                   <div className={`w-11 h-6 rounded-full transition-colors ${formData.caso_fuera_horario ? 'bg-brand-600' : 'bg-slate-300'} peer-disabled:opacity-50`}></div>

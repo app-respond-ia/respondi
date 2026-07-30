@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { revalidatePath } from 'next/cache'
+import { registrarAuditoria } from '@/lib/auditoria'
 
 // Helper de auth para asegurar que la action solo la ejecuta un super admin
 async function requireSuperAdmin() {
@@ -670,12 +671,30 @@ export async function crearCuentaTrial(data: {
 
 export async function actualizarEstadoOrganizacion(id: string, estado: string) {
   try {
-    const { supabase } = await requireSuperAdmin()
+    const { supabase, userId } = await requireSuperAdmin()
+
+    const { data: anterior } = await supabase
+      .from('organizaciones')
+      .select('estado')
+      .eq('id', id)
+      .single()
+
     const { error } = await supabase
       .from('organizaciones')
       .update({ estado })
       .eq('id', id)
     if (error) return { success: false, error: error.message }
+
+    await registrarAuditoria({
+      tenant_id: id,
+      user_id: userId,
+      accion: `un super-admin cambió el estado de la organización a "${estado}"`,
+      tabla_afectada: 'organizaciones',
+      registro_id: id,
+      valor_anterior: anterior,
+      valor_nuevo: { estado }
+    })
+
     revalidatePath('/superadmin/organizaciones')
     return { success: true }
   } catch (err: any) {

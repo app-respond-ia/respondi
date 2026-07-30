@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { supabaseAdmin } from '@/utils/supabase/admin'
+import { registrarAuditoria } from '@/lib/auditoria'
 
 async function requireVendedor() {
   const supabase = await createClient()
@@ -46,7 +47,14 @@ export async function actualizarClienteSeguimiento(id: string, data: {
   notas?: string
 }) {
   try {
-    const { supabase, vendedor } = await requireVendedor()
+    const { supabase, vendedor, userId } = await requireVendedor()
+
+    const { data: anterior } = await supabase
+      .from('vendedor_clientes')
+      .select('*')
+      .eq('id', id)
+      .single()
+
     const { data: result, error } = await supabase
       .from('vendedor_clientes')
       .update(data)
@@ -55,6 +63,19 @@ export async function actualizarClienteSeguimiento(id: string, data: {
       .select()
       .single()
     if (error) return { success: false, error: error.message }
+
+    if (result.organizacion_id) {
+      await registrarAuditoria({
+        tenant_id: result.organizacion_id,
+        user_id: userId,
+        accion: `el vendedor "${vendedor.nombre}" actualizó el seguimiento de este cliente`,
+        tabla_afectada: 'vendedor_clientes',
+        registro_id: id,
+        valor_anterior: anterior,
+        valor_nuevo: result
+      })
+    }
+
     return { success: true, cliente: result }
   } catch (err: any) {
     return { success: false, error: err.message }
@@ -175,6 +196,15 @@ export async function crearCuentaTrial(data: {
       organizacion_id: org.id,
       estado_seguimiento: 'trial'
     }])
+
+    await registrarAuditoria({
+      tenant_id: org.id,
+      user_id: vendedor.user_id,
+      accion: `el vendedor "${vendedor.nombre}" creó esta cuenta trial`,
+      tabla_afectada: 'organizaciones',
+      registro_id: org.id,
+      valor_nuevo: org
+    })
 
     return { success: true, organizacion: org }
   } catch (err: any) {

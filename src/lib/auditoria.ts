@@ -1,4 +1,4 @@
-import { createClient } from '@/utils/supabase/server'
+import { supabaseAdmin } from '@/utils/supabase/admin'
 
 interface RegistrarAuditoriaParams {
   tenant_id: string
@@ -12,8 +12,7 @@ interface RegistrarAuditoriaParams {
 
 export async function registrarAuditoria(params: RegistrarAuditoriaParams) {
   try {
-    const supabase = await createClient()
-    await supabase.from('audit_log').insert({
+    await supabaseAdmin.from('audit_log').insert({
       tenant_id: params.tenant_id,
       user_id: params.user_id,
       accion: params.accion,

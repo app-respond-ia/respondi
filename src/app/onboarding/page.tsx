@@ -96,7 +96,7 @@ export default function OnboardingPage() {
   const [s3, setS3] = useState([
     { idName: 'idioma_multi', nombre: 'Idioma multi', descripcion: 'La IA detecta y responde en el idioma en que le escribe el cliente.', activo: true },
     { idName: 'precio', nombre: 'Preguntas de precio', descripcion: 'Responder dudas sobre tarifas o cotizaciones (más adelante podrás añadir la lista completa de precios).', activo: false },
-    { idName: 'reclamos', nombre: 'Escalado de reclamos a humano', descripcion: 'Derivar a un agente humano cuando el cliente tiene un problema o queja.', activo: false },
+    { idName: 'reclamos', nombre: 'Escalado a humanos', descripcion: 'Derivar a un agente humano cuando el cliente tiene un problema o queja.', activo: true },
     { idName: 'presupuestos', nombre: 'Hacer presupuestos', descripcion: 'Armar presupuestos a medida según lo que pide el cliente.', activo: false },
     { idName: 'politicas', nombre: 'Políticas del negocio', descripcion: 'Informar sobre reglas, envíos, devoluciones, garantías, etc.', activo: true }
   ])
@@ -189,7 +189,7 @@ export default function OnboardingPage() {
 
       if (d.s3 && d.s3.length > 0) {
         setS3(prev => prev.map(skill => {
-          const isFija = skill.idName === 'idioma_multi' || skill.idName === 'politicas'
+          const isFija = skill.idName === 'idioma_multi' || skill.idName === 'politicas' || skill.idName === 'reclamos'
           if (isFija) return { ...skill, activo: true }
           const loadedSkill = d.s3.find((dbSkill: any) => dbSkill.nombre === skill.nombre)
           return loadedSkill ? { ...skill, activo: loadedSkill.activo } : skill
@@ -816,7 +816,7 @@ export default function OnboardingPage() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {s3.map((s, i) => {
-                      const isFija = s.idName === 'idioma_multi' || s.idName === 'politicas';
+                      const isFija = s.idName === 'idioma_multi' || s.idName === 'politicas' || s.idName === 'reclamos';
                       return (
                         <label key={s.idName} className={`flex gap-3 p-4 rounded-xl border transition ${s.activo ? (isFija ? 'border-brand-200 bg-brand-50/30' : 'border-brand-200 bg-brand-50/50 shadow-sm') : 'border-slate-200 hover:border-slate-300 bg-white'} ${isFija ? 'cursor-default' : 'cursor-pointer'}`}>
                           <div className="pt-0.5 relative">

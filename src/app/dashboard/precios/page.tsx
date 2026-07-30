@@ -241,13 +241,13 @@ export default function ListaPreciosPage() {
 
       for (let i = 2; i <= 500; i++) {
         ws.getCell(`E${i}`).dataValidation = {
-          type: 'list', allowBlank: true, formulae: ['=ListaCategorias'],
+          type: 'list', allowBlank: true, formulae: ['ListaCategorias'],
           showErrorMessage: true, errorTitle: 'Valor inválido',
           error: 'Selecciona una categoría de la lista.'
         }
         ws.getCell(`F${i}`).dataValidation = {
           type: 'list', allowBlank: true,
-          formulae: [`=INDIRECT("CAT_"&SUBSTITUTE(SUBSTITUTE(E${i}," ","_"),"-","_"))`],
+          formulae: [`INDIRECT("CAT_"&SUBSTITUTE(SUBSTITUTE(E${i}," ","_"),"-","_"))`],
           showErrorMessage: false
         }
       }

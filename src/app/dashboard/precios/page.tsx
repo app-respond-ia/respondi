@@ -3,6 +3,7 @@ import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
 import { getPrecios, crearPrecio, actualizarPrecio, eliminarPrecio, importarPreciosMasivo, PrecioData } from '@/app/actions/precios'
+import { getCategorias, crearCategoria, actualizarCategoria, eliminarCategoria } from '@/app/actions/categorias-precios'
 import * as XLSX from 'xlsx'
 import { getMisPermisos } from '@/app/actions/permisos'
 
@@ -24,6 +25,14 @@ export default function ListaPreciosPage() {
     validos: any[],
     errores: { fila: number, nombre: string, error: string }[]
   } | null>(null)
+
+  const [categorias, setCategorias] = useState<any[]>([])
+  const [isCategoriasModalOpen, setIsCategoriasModalOpen] = useState(false)
+  const [categoriaSeleccionada, setCategoriaSeleccionada] = useState<string | null>(null)
+  const [nuevoNombreCategoria, setNuevoNombreCategoria] = useState('')
+  const [nuevoNombreSubcategoria, setNuevoNombreSubcategoria] = useState('')
+  const [editandoCatId, setEditandoCatId] = useState<string | null>(null)
+  const [editandoCatNombre, setEditandoCatNombre] = useState('')
 
   const [formData, setFormData] = useState<PrecioData>({
     nombre: '',
@@ -55,6 +64,7 @@ export default function ListaPreciosPage() {
 
   useEffect(() => {
     cargar()
+    cargarCategorias()
   }, [])
 
   const itemsFiltrados = items.filter(item => {
@@ -101,6 +111,61 @@ export default function ListaPreciosPage() {
       setTimeout(() => setMensaje(null), 3000)
     }
   }
+
+  const cargarCategorias = async () => {
+    const res = await getCategorias()
+    if (res.success && res.data) setCategorias(res.data)
+  }
+
+  const abrirGestionCategorias = () => {
+    cargarCategorias()
+    setCategoriaSeleccionada(null)
+    setIsCategoriasModalOpen(true)
+  }
+
+  const handleCrearCategoria = async () => {
+    if (!nuevoNombreCategoria.trim()) return
+    const res = await crearCategoria({ nombre: nuevoNombreCategoria.trim(), parent_id: null })
+    if (res.success) {
+      setNuevoNombreCategoria('')
+      cargarCategorias()
+    }
+  }
+
+  const handleCrearSubcategoria = async () => {
+    if (!nuevoNombreSubcategoria.trim() || !categoriaSeleccionada) return
+    const res = await crearCategoria({ nombre: nuevoNombreSubcategoria.trim(), parent_id: categoriaSeleccionada })
+    if (res.success) {
+      setNuevoNombreSubcategoria('')
+      cargarCategorias()
+    }
+  }
+
+  const handleEliminarCategoria = async (id: string) => {
+    if (!window.confirm('¿Eliminar esta categoría? Si tiene subcategorías, también se eliminarán.')) return
+    const res = await eliminarCategoria(id)
+    if (res.success) {
+      if (categoriaSeleccionada === id) setCategoriaSeleccionada(null)
+      cargarCategorias()
+    }
+  }
+
+  const iniciarEdicion = (cat: any) => {
+    setEditandoCatId(cat.id)
+    setEditandoCatNombre(cat.nombre)
+  }
+
+  const guardarEdicion = async () => {
+    if (!editandoCatId || !editandoCatNombre.trim()) return
+    const res = await actualizarCategoria(editandoCatId, { nombre: editandoCatNombre.trim() })
+    if (res.success) {
+      setEditandoCatId(null)
+      cargarCategorias()
+    }
+  }
+
+  const categoriasRaiz = categorias.filter(c => !c.parent_id)
+  const subcategoriasDe = (parentId: string) => categorias.filter(c => c.parent_id === parentId)
 
   const descargarPlantilla = async () => {
     const ExcelJS = await import('exceljs')
@@ -317,6 +382,11 @@ export default function ListaPreciosPage() {
           <p className="text-ink-500 mt-1">Productos y servicios que tu agente conoce.</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={abrirGestionCategorias}
+            className="inline-flex items-center gap-2 px-4 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.99 1.99 0 013 12V7a4 4 0 014-4z"/></svg>
+            Categorías
+          </button>
           <button onClick={descargarPlantilla}
             className="inline-flex items-center gap-2 px-4 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
@@ -605,6 +675,127 @@ export default function ListaPreciosPage() {
                   disabled={importando || importPreview.validos.length === 0}
                   className="px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 transition disabled:opacity-50">
                   {importando ? 'Importando...' : `Importar ${importPreview.validos.length} ítem${importPreview.validos.length === 1 ? '' : 's'}`}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL GESTIONAR CATEGORÍAS */}
+      {isCategoriasModalOpen && (
+        <div className="fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-ink-900/50 backdrop-blur-sm" onClick={() => setIsCategoriasModalOpen(false)}></div>
+          <div className="relative min-h-full flex items-center justify-center p-4 pointer-events-none">
+            <div className="w-full max-w-3xl bg-white rounded-2xl shadow-2xl pointer-events-auto flex flex-col max-h-[85vh]">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
+                <div>
+                  <h2 className="font-display font-700 text-lg text-ink-900">Categorías y subcategorías</h2>
+                  <p className="text-xs text-ink-500 mt-0.5">Organiza tu catálogo. Ambas son opcionales al crear un ítem.</p>
+                </div>
+                <button onClick={() => setIsCategoriasModalOpen(false)} className="p-1.5 rounded-lg text-ink-400 hover:bg-slate-100 transition">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-hidden grid grid-cols-2 divide-x divide-slate-100">
+                {/* Columna izquierda: categorías */}
+                <div className="flex flex-col overflow-hidden">
+                  <div className="px-5 py-3 border-b border-slate-100 shrink-0">
+                    <p className="text-xs font-600 uppercase tracking-wide text-ink-500">Categorías</p>
+                  </div>
+                  <div className="flex-1 overflow-y-auto px-5 py-3 space-y-1.5">
+                    {categoriasRaiz.length === 0 && (
+                      <p className="text-sm text-ink-400 py-4 text-center">Aún no hay categorías.</p>
+                    )}
+                    {categoriasRaiz.map(cat => (
+                      <div key={cat.id}
+                        onClick={() => setCategoriaSeleccionada(cat.id)}
+                        className={`flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl border cursor-pointer transition ${categoriaSeleccionada === cat.id ? 'border-brand-300 bg-brand-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                        {editandoCatId === cat.id ? (
+                          <input autoFocus value={editandoCatNombre} onChange={e => setEditandoCatNombre(e.target.value)}
+                            onClick={e => e.stopPropagation()}
+                            onKeyDown={e => { if (e.key === 'Enter') guardarEdicion(); if (e.key === 'Escape') setEditandoCatId(null) }}
+                            onBlur={guardarEdicion}
+                            className="flex-1 h-8 px-2 rounded-lg border border-brand-300 text-sm focus:outline-none" />
+                        ) : (
+                          <span className="text-sm font-500 text-ink-800 flex-1 truncate">{cat.nombre}</span>
+                        )}
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button onClick={e => { e.stopPropagation(); iniciarEdicion(cat) }} className="p-1 rounded text-ink-400 hover:text-brand-600 hover:bg-brand-100 transition">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                          </button>
+                          <button onClick={e => { e.stopPropagation(); handleEliminarCategoria(cat.id) }} className="p-1 rounded text-ink-400 hover:text-red-500 hover:bg-red-50 transition">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="px-5 py-3 border-t border-slate-100 shrink-0 flex gap-2">
+                    <input value={nuevoNombreCategoria} onChange={e => setNuevoNombreCategoria(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleCrearCategoria() }}
+                      placeholder="Nueva categoría..."
+                      className="flex-1 h-10 px-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition" />
+                    <button onClick={handleCrearCategoria} className="px-3 h-10 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-sm font-600 transition shrink-0">
+                      Añadir
+                    </button>
+                  </div>
+                </div>
+
+                {/* Columna derecha: subcategorías */}
+                <div className="flex flex-col overflow-hidden">
+                  <div className="px-5 py-3 border-b border-slate-100 shrink-0">
+                    <p className="text-xs font-600 uppercase tracking-wide text-ink-500">
+                      {categoriaSeleccionada ? `Subcategorías de "${categorias.find(c => c.id === categoriaSeleccionada)?.nombre}"` : 'Subcategorías'}
+                    </p>
+                  </div>
+                  <div className="flex-1 overflow-y-auto px-5 py-3 space-y-1.5">
+                    {!categoriaSeleccionada && (
+                      <p className="text-sm text-ink-400 py-4 text-center">Selecciona una categoría a la izquierda.</p>
+                    )}
+                    {categoriaSeleccionada && subcategoriasDe(categoriaSeleccionada).length === 0 && (
+                      <p className="text-sm text-ink-400 py-4 text-center">Sin subcategorías todavía.</p>
+                    )}
+                    {categoriaSeleccionada && subcategoriasDe(categoriaSeleccionada).map(sub => (
+                      <div key={sub.id} className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl border border-slate-200">
+                        {editandoCatId === sub.id ? (
+                          <input autoFocus value={editandoCatNombre} onChange={e => setEditandoCatNombre(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') guardarEdicion(); if (e.key === 'Escape') setEditandoCatId(null) }}
+                            onBlur={guardarEdicion}
+                            className="flex-1 h-8 px-2 rounded-lg border border-brand-300 text-sm focus:outline-none" />
+                        ) : (
+                          <span className="text-sm font-500 text-ink-800 flex-1 truncate">{sub.nombre}</span>
+                        )}
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button onClick={() => iniciarEdicion(sub)} className="p-1 rounded text-ink-400 hover:text-brand-600 hover:bg-brand-100 transition">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                          </button>
+                          <button onClick={() => handleEliminarCategoria(sub.id)} className="p-1 rounded text-ink-400 hover:text-red-500 hover:bg-red-50 transition">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="px-5 py-3 border-t border-slate-100 shrink-0 flex gap-2">
+                    <input value={nuevoNombreSubcategoria} onChange={e => setNuevoNombreSubcategoria(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleCrearSubcategoria() }}
+                      disabled={!categoriaSeleccionada}
+                      placeholder={categoriaSeleccionada ? 'Nueva subcategoría...' : 'Selecciona una categoría'}
+                      className="flex-1 h-10 px-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition disabled:bg-slate-50 disabled:text-ink-400" />
+                    <button onClick={handleCrearSubcategoria} disabled={!categoriaSeleccionada}
+                      className="px-3 h-10 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-600 transition shrink-0">
+                      Añadir
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end px-6 py-4 border-t border-slate-100 shrink-0">
+                <button onClick={() => setIsCategoriasModalOpen(false)}
+                  className="px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 transition">
+                  Listo
                 </button>
               </div>
             </div>

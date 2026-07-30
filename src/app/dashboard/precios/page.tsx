@@ -19,6 +19,7 @@ export default function ListaPreciosPage() {
   const [saving, setSaving] = useState(false)
   const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  const [isAyudaModalOpen, setIsAyudaModalOpen] = useState(false)
   const [importando, setImportando] = useState(false)
   const [importPreview, setImportPreview] = useState<{
     validos: any[],
@@ -190,66 +191,20 @@ export default function ListaPreciosPage() {
     ws.getRow(1).font = { bold: true }
     ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEDE9FE' } }
 
-    ws.addRow({ nombre: 'Café espresso', tipo: 'producto', precio: 2.50, precio_tipo: 'exacto', categoria: '', subcategoria: '', descripcion: 'Café solo corto' })
-    ws.addRow({ nombre: 'Consultoría hora', tipo: 'servicio', precio: 80, precio_tipo: 'desde', categoria: '', subcategoria: '', descripcion: 'Precio mínimo por hora' })
-    ws.addRow({ nombre: 'Menú del día', tipo: 'producto', precio: '', precio_tipo: 'consultar', categoria: '', subcategoria: '', descripcion: 'Pregunta por el menú' })
+    ws.addRow({ nombre: 'Café espresso', tipo: 'producto', precio: 2.50, precio_tipo: 'exacto', categoria: 'Bebidas', subcategoria: 'Cafés', descripcion: 'Café solo corto' })
+    ws.addRow({ nombre: 'Consultoría hora', tipo: 'servicio', precio: 80, precio_tipo: 'desde', categoria: 'Servicios', subcategoria: '', descripcion: 'Precio mínimo por hora' })
+    ws.addRow({ nombre: 'Menú del día', tipo: 'producto', precio: '', precio_tipo: 'consultar', categoria: 'Menús', subcategoria: '', descripcion: 'Pregunta por el menú' })
 
-    // Dropdown simple para "tipo" y "precio_tipo"
     for (let i = 2; i <= 500; i++) {
       ws.getCell(`B${i}`).dataValidation = {
-        type: 'list', allowBlank: false, formulae: ['"producto,servicio"'],
+        type: 'list', allowBlank: false, formulae: ['producto,servicio'],
         showErrorMessage: true, errorTitle: 'Valor inválido',
         error: 'Selecciona "producto" o "servicio" de la lista.'
       }
       ws.getCell(`D${i}`).dataValidation = {
-        type: 'list', allowBlank: false, formulae: ['"exacto,desde,consultar"'],
+        type: 'list', allowBlank: false, formulae: ['exacto,desde,consultar'],
         showErrorMessage: true, errorTitle: 'Valor inválido',
         error: 'Selecciona "exacto", "desde" o "consultar" de la lista.'
-      }
-    }
-
-    // Dropdown dependiente para categoría/subcategoría, solo si 
-    // el negocio tiene categorías creadas
-    if (categoriasRaiz.length > 0) {
-      const sanitizar = (nombre: string) =>
-        'CAT_' + nombre.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-          .replace(/[^a-zA-Z0-9]/g, '_').slice(0, 200)
-
-      const wsListas = wb.addWorksheet('Listas')
-      wsListas.state = 'veryHidden'
-
-      // Columna A: nombres de categorías
-      categoriasRaiz.forEach((cat, i) => {
-        wsListas.getCell(`A${i + 1}`).value = cat.nombre
-      })
-      wb.definedNames.add(`Listas!$A$1:$A$${categoriasRaiz.length}`, 'ListaCategorias')
-
-      // Una columna por categoría con sus subcategorías, y un 
-      // rango con nombre sanitizado apuntando a esa columna
-      categoriasRaiz.forEach((cat, colIndex) => {
-        const subs = subcategoriasDe(cat.id)
-        const col = colIndex + 2 // empieza en B
-        const colLetter = wsListas.getColumn(col).letter
-        subs.forEach((sub, i) => {
-          wsListas.getCell(`${colLetter}${i + 1}`).value = sub.nombre
-        })
-        if (subs.length > 0) {
-          const rangeName = sanitizar(cat.nombre)
-          wb.definedNames.add(`Listas!$${colLetter}$1:$${colLetter}$${subs.length}`, rangeName)
-        }
-      })
-
-      for (let i = 2; i <= 500; i++) {
-        ws.getCell(`E${i}`).dataValidation = {
-          type: 'list', allowBlank: true, formulae: ['ListaCategorias'],
-          showErrorMessage: true, errorTitle: 'Valor inválido',
-          error: 'Selecciona una categoría de la lista.'
-        }
-        ws.getCell(`F${i}`).dataValidation = {
-          type: 'list', allowBlank: true,
-          formulae: [`INDIRECT("CAT_"&SUBSTITUTE(SUBSTITUTE(E${i}," ","_"),"-","_"))`],
-          showErrorMessage: false
-        }
       }
     }
 
@@ -454,6 +409,11 @@ export default function ListaPreciosPage() {
             Importar Excel
             <input type="file" accept=".xlsx,.xls,.csv" onChange={handleArchivoExcel} className="sr-only" />
           </label>
+          <button onClick={() => setIsAyudaModalOpen(true)}
+            title="Cómo rellenar el Excel"
+            className="w-11 h-11 shrink-0 inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-ink-600 transition">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </button>
           <button
             disabled={nivelPermiso !== 'escritura'}
             onClick={openAñadir}
@@ -883,6 +843,75 @@ export default function ListaPreciosPage() {
                 <button onClick={() => setIsCategoriasModalOpen(false)}
                   className="px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 transition">
                   Listo
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* MODAL AYUDA */}
+      {isAyudaModalOpen && (
+        <div className="fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-ink-900/50 backdrop-blur-sm" onClick={() => setIsAyudaModalOpen(false)}></div>
+          <div className="relative min-h-full flex items-center justify-center p-4 pointer-events-none">
+            <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl pointer-events-auto flex flex-col max-h-[85vh]">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
+                <h2 className="font-display font-700 text-lg text-ink-900">Cómo rellenar el Excel de precios</h2>
+                <button onClick={() => setIsAyudaModalOpen(false)} className="p-1.5 rounded-lg text-ink-400 hover:bg-slate-100 transition">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+                <div className="p-4 rounded-xl bg-brand-50 border border-brand-200">
+                  <p className="text-sm text-brand-800">
+                    <span className="font-600">Formatos aceptados:</span> puedes subir un archivo <span className="font-600">.xlsx</span> (Excel) o <span className="font-600">.csv</span>. Te recomendamos descargar la plantilla y rellenarla directamente, sin cambiar el orden de las columnas.
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-sm font-600 text-ink-900 mb-3">Columnas del archivo:</p>
+                  <div className="space-y-3">
+                    <div className="flex gap-3">
+                      <span className="shrink-0 w-28 text-xs font-600 text-ink-500 pt-0.5">nombre</span>
+                      <p className="text-sm text-ink-700"><span className="font-600">Obligatorio.</span> Nombre del producto o servicio. Texto libre, ej. "Café espresso".</p>
+                    </div>
+                    <div className="flex gap-3">
+                      <span className="shrink-0 w-28 text-xs font-600 text-ink-500 pt-0.5">tipo</span>
+                      <p className="text-sm text-ink-700"><span className="font-600">Obligatorio.</span> Debe ser exactamente <span className="font-mono bg-slate-100 px-1 rounded">producto</span> o <span className="font-mono bg-slate-100 px-1 rounded">servicio</span>.</p>
+                    </div>
+                    <div className="flex gap-3">
+                      <span className="shrink-0 w-28 text-xs font-600 text-ink-500 pt-0.5">precio</span>
+                      <p className="text-sm text-ink-700">Un número (ej. 2.50 o 2,50). <span className="font-600">Obligatorio</span> salvo que precio_tipo sea "consultar".</p>
+                    </div>
+                    <div className="flex gap-3">
+                      <span className="shrink-0 w-28 text-xs font-600 text-ink-500 pt-0.5">precio_tipo</span>
+                      <p className="text-sm text-ink-700"><span className="font-600">Obligatorio.</span> Debe ser <span className="font-mono bg-slate-100 px-1 rounded">exacto</span>, <span className="font-mono bg-slate-100 px-1 rounded">desde</span> o <span className="font-mono bg-slate-100 px-1 rounded">consultar</span>.</p>
+                    </div>
+                    <div className="flex gap-3">
+                      <span className="shrink-0 w-28 text-xs font-600 text-ink-500 pt-0.5">categoria</span>
+                      <p className="text-sm text-ink-700">Opcional. Texto libre, ej. "Bebidas". Si quieres reutilizar tus categorías ya creadas, escribe el nombre exacto tal como aparece en "Categorías".</p>
+                    </div>
+                    <div className="flex gap-3">
+                      <span className="shrink-0 w-28 text-xs font-600 text-ink-500 pt-0.5">subcategoria</span>
+                      <p className="text-sm text-ink-700">Opcional. Texto libre, ej. "Cafés".</p>
+                    </div>
+                    <div className="flex gap-3">
+                      <span className="shrink-0 w-28 text-xs font-600 text-ink-500 pt-0.5">descripcion</span>
+                      <p className="text-sm text-ink-700">Opcional. Texto libre que ayuda a la IA a responder mejor sobre este ítem.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                  <p className="text-sm text-ink-600">Si alguna fila tiene un error, se te mostrará antes de importar y podrás corregirla en tu archivo y volver a subirlo — las filas con errores no se importan, pero el resto sí.</p>
+                </div>
+              </div>
+
+              <div className="flex justify-end px-6 py-4 border-t border-slate-100 shrink-0">
+                <button onClick={() => setIsAyudaModalOpen(false)}
+                  className="px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 transition">
+                  Entendido
                 </button>
               </div>
             </div>

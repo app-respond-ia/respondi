@@ -24,6 +24,7 @@ export default function ReglasPage() {
   const [saving, setSaving] = useState(false)
   const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
   const [busqueda, setBusqueda] = useState('')
+  const [filtro, setFiltro] = useState<'todas' | 'activas' | 'inactivas'>('todas')
 
   const [formData, setFormData] = useState<ReglaData>({
     nombre: '',
@@ -150,6 +151,11 @@ export default function ReglasPage() {
   }
 
   const itemsFiltrados = items.filter(item => {
+    const matchFiltro =
+      filtro === 'activas' ? item.activa :
+      filtro === 'inactivas' ? !item.activa :
+      true
+    if (!matchFiltro) return false
     if (!busqueda.trim()) return true
     const q = busqueda.toLowerCase()
     return (
@@ -193,16 +199,45 @@ export default function ReglasPage() {
       </div>
 
       {items.length > 0 && (
-        <div className="relative mb-5">
-          <svg className="w-4 h-4 text-ink-400 absolute left-3.5 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-          <input
-            type="text"
-            placeholder="Buscar por nombre, descripción o tipo..."
-            value={busqueda}
-            onChange={e => setBusqueda(e.target.value)}
-            className="w-full h-11 pl-10 pr-4 rounded-xl border border-slate-300 bg-white text-sm placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition"
-          />
-        </div>
+        <>
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+              <p className="text-sm font-500 text-ink-500 mb-1">Total</p>
+              <p className="text-2xl font-bold text-ink-900">{items.length}</p>
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+              <p className="text-sm font-500 text-ink-500 mb-1">Activas</p>
+              <p className="text-2xl font-bold text-ink-900">{items.filter(i => i.activa).length}</p>
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+              <p className="text-sm font-500 text-ink-500 mb-1">Inactivas</p>
+              <p className="text-2xl font-bold text-ink-900">{items.filter(i => !i.activa).length}</p>
+            </div>
+          </div>
+
+          <div className="relative mb-5">
+            <svg className="w-4 h-4 text-ink-400 absolute left-3.5 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <input
+              type="text"
+              placeholder="Buscar por nombre, descripción o tipo..."
+              value={busqueda}
+              onChange={e => setBusqueda(e.target.value)}
+              className="w-full h-11 pl-10 pr-4 rounded-xl border border-slate-300 bg-white text-sm placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition"
+            />
+          </div>
+
+          <div className="flex gap-2 p-1 bg-slate-100 rounded-xl mb-6 w-fit">
+            {(['todas', 'activas', 'inactivas'] as const).map(f => (
+              <button
+                key={f}
+                onClick={() => setFiltro(f)}
+                className={`px-4 py-2 text-sm font-600 rounded-lg transition-all ${filtro === f ? 'bg-white text-ink-900 shadow-sm' : 'text-slate-500 hover:text-ink-700 hover:bg-slate-200/50'}`}
+              >
+                {f.charAt(0).toUpperCase() + f.slice(1)}
+              </button>
+            ))}
+          </div>
+        </>
       )}
 
       {itemsFiltrados.length > 0 ? (

@@ -95,6 +95,11 @@ function EtiquetaRow({ item, onToggle, onEdit, onDelete, dragHandleProps, disabl
         {item.descripcion_intencion && (
           <p className="text-xs text-ink-500 line-clamp-2 pr-4">{item.descripcion_intencion}</p>
         )}
+        {item.created_at && (
+          <p className="text-[11px] text-ink-300 mt-1">
+            Creada el {new Date(item.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })} a las {new Date(item.created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+          </p>
+        )}
       </div>
 
       {/* Toggle */}

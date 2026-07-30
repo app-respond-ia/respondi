@@ -106,6 +106,13 @@ export async function getOrganizaciones(filtro?: string) {
   }
 
   const { data, error } = await query
+  
+  console.log('--- DEBUG getOrganizaciones ---')
+  console.log(`Filtro: ${filtro}`)
+  console.log(`Filas devueltas: ${data?.length || 0}`)
+  if (error) console.log('Error:', error)
+  console.log('-------------------------------')
+
   if (error) return { success: false, error: error.message }
   return { success: true, organizaciones: data }
 }

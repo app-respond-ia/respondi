@@ -207,6 +207,7 @@ export default function AuditLogPage() {
         >
           <option value="todas">Todos los módulos</option>
           <option value="users">Usuarios</option>
+          <option value="roles">Roles</option>
           <option value="channels">Canales</option>
           <option value="skills">Skills</option>
           <option value="precios">Precios</option>

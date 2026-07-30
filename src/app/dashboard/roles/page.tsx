@@ -1,4 +1,5 @@
 'use client'
+import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
 import { getRolesPersonalizados, crearRolPersonalizado, actualizarRolPersonalizado, eliminarRolPersonalizado } from '@/app/actions/roles'
@@ -171,7 +172,7 @@ export default function RolesPage() {
   }
 
   if (loading || nivelPermiso === null) {
-    return <div className="p-10 text-center text-slate-500 font-medium">Cargando roles...</div>
+    return <Loading />
   }
 
   if (nivelPermiso === 'ninguno') {

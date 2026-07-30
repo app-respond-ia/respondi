@@ -1,4 +1,5 @@
 'use client'
+import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
 import { getOrganizaciones, actualizarEstadoOrganizacion } from '@/app/actions/superadmin'
@@ -110,7 +111,7 @@ export default function OrganizacionesPage() {
       {/* Lista de organizaciones */}
       <div className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100">
         {loading ? (
-          <div className="p-8 text-center text-ink-500">Cargando organizaciones...</div>
+          <Loading />
         ) : organizacionesFiltradas.length === 0 ? (
           <div className="p-8 text-center text-ink-500">No se encontraron organizaciones.</div>
         ) : (

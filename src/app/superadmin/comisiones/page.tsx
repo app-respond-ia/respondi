@@ -1,4 +1,5 @@
 'use client'
+import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
 import { getComisiones, getVendedores, aprobarComision, marcarComisionPagada, crearComisionManual } from '@/app/actions/superadmin'
@@ -190,7 +191,7 @@ export default function ComisionesPage() {
       {/* Tabla */}
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-ink-500">Cargando comisiones...</div>
+          <Loading />
         ) : comisiones.length === 0 ? (
           <div className="p-8 text-center text-ink-500">No hay comisiones con estos filtros.</div>
         ) : (

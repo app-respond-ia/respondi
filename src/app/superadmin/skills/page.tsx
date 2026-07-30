@@ -1,4 +1,5 @@
 'use client'
+import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
 import { getSkillsGlobales, crearSkillGlobal, actualizarSkillGlobal, eliminarSkillGlobal } from '@/app/actions/skills-globales'
@@ -106,7 +107,7 @@ export default function SuperadminSkillsPage() {
 
       <div className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100">
         {loading ? (
-          <div className="p-8 text-center text-ink-500">Cargando skills...</div>
+          <Loading />
         ) : skills.length === 0 ? (
           <div className="p-8 text-center text-ink-500">No hay skills creadas.</div>
         ) : (

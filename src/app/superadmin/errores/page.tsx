@@ -1,4 +1,5 @@
 'use client'
+import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
 import { getErrores, resolverError } from '@/app/actions/superadmin'
@@ -90,7 +91,7 @@ export default function ErroresPage() {
       {/* Lista */}
       <div className="space-y-3">
         {loading ? (
-          <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-ink-500">Cargando errores...</div>
+          <Loading />
         ) : erroresFiltrados.length === 0 ? (
           <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-ink-500 flex flex-col items-center">
             <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mb-4 text-ink-300">

@@ -1,4 +1,5 @@
 'use client'
+import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
 import { getVendedorDashboard } from '@/app/actions/vendedor'
@@ -24,7 +25,7 @@ export default function VendedorDashboard() {
     cargar()
   }, [])
 
-  if (loading) return <div className="py-20 text-center text-ink-500">Cargando...</div>
+  if (loading) return <Loading />
   if (error) return (
     <div className="py-20 text-center">
       <p className="text-red-500 font-500 mb-2">Error</p>

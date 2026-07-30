@@ -1,4 +1,5 @@
 'use client'
+import Loading from '@/components/Loading'
 
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
@@ -62,7 +63,7 @@ export default function ConversacionDetallePage() {
     setEnviando(false)
   }
 
-  if (loading) return <div className="p-10 text-center text-slate-500 font-medium">Cargando detalle...</div>
+  if (loading) return <Loading />
   if (!conv) return null
 
   const contact = Array.isArray(conv.contacts) ? conv.contacts[0] : conv.contacts

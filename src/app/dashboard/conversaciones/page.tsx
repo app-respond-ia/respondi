@@ -1,4 +1,5 @@
 'use client'
+import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
@@ -79,7 +80,7 @@ export default function ConversacionesPage() {
   }
 
   if (loading || nivelPermiso === null) {
-    return <div className="p-10 text-center text-slate-500 font-medium">Cargando conversaciones...</div>
+    return <Loading />
   }
 
   if (nivelPermiso === 'ninguno') {

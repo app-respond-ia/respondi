@@ -1,4 +1,5 @@
 'use client'
+import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
 import { getVendedorClientes, actualizarClienteSeguimiento } from '@/app/actions/vendedor'
@@ -104,7 +105,7 @@ export default function VendedorClientesPage() {
       {/* Lista */}
       <div className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100">
         {loading ? (
-          <div className="p-8 text-center text-ink-500">Cargando clientes...</div>
+          <Loading />
         ) : clientesFiltrados.length === 0 ? (
           <div className="p-8 text-center text-ink-500">No hay clientes con este filtro.</div>
         ) : (

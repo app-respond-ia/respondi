@@ -1,4 +1,5 @@
 'use client'
+import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
 import { getPlanes, actualizarPlan } from '@/app/actions/superadmin'
@@ -85,7 +86,7 @@ export default function PlanesPage() {
       </div>
 
       {loading ? (
-        <div className="p-8 text-center text-ink-500">Cargando planes...</div>
+        <Loading />
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {planes.map(p => {

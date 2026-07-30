@@ -1,4 +1,5 @@
 'use client'
+import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
 import {
@@ -326,7 +327,7 @@ export default function EtiquetasPage() {
   }
 
   if (loading || nivelPermiso === null) {
-    return <div className="p-10 text-center text-slate-500 font-medium">Cargando etiquetas...</div>
+    return <Loading />
   }
 
   if (nivelPermiso === 'ninguno') {

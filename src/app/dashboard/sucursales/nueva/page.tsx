@@ -1,4 +1,5 @@
 'use client'
+import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -145,7 +146,7 @@ export default function NuevaSucursalPage() {
     setSaving(false)
   }
 
-  if (loading) return <div className="p-10 text-center text-ink-500">Cargando...</div>
+  if (loading) return <Loading />
 
   // ── PASO CONFIG INICIAL ──────────────────────────────────────
   if (step === 'config') {

@@ -1,4 +1,5 @@
 'use client'
+import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
 import { getVendedorComisiones } from '@/app/actions/vendedor'
@@ -90,7 +91,7 @@ export default function VendedorComisionesPage() {
       {/* Lista */}
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-ink-500">Cargando comisiones...</div>
+          <Loading />
         ) : comisionesFiltradas.length === 0 ? (
           <div className="p-8 text-center text-ink-500">No hay comisiones en este filtro.</div>
         ) : (

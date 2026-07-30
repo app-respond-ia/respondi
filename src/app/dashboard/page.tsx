@@ -1,4 +1,5 @@
 'use client'
+import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
 import { getDashboardData } from '@/app/actions/dashboard'
@@ -30,7 +31,7 @@ export default function DashboardPage() {
   }
 
   if (loading || !data) {
-    return <div className="p-10 text-center text-slate-500 font-medium">Cargando dashboard...</div>
+    return <Loading />
   }
 
   const { trial, creditos_disponibles, periodo, evolucion, temas_frecuentes } = data

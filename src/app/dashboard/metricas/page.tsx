@@ -1,4 +1,5 @@
 'use client'
+import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
 import { getMetricas } from '@/app/actions/metricas'
@@ -123,7 +124,7 @@ export default function MetricasPage() {
       </div>
 
       {loading ? (
-        <div className="py-20 text-center text-ink-500">Cargando métricas...</div>
+        <Loading />
       ) : error ? (
         <div className="py-20 text-center text-red-500">{error}</div>
       ) : data && (

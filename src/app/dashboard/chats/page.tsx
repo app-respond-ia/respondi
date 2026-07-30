@@ -1,4 +1,5 @@
 'use client'
+import Loading from '@/components/Loading'
 
 import { useState, useEffect, useRef } from 'react'
 import { getConversaciones, getMensajes, toggleIAPausa, cerrarConversacion } from '@/app/actions/chats'
@@ -122,7 +123,7 @@ export default function ChatsPage() {
   const selectedConv = conversaciones.find(c => c.id === selectedConvId)
 
   if (loadingChats || nivelPermiso === null) {
-    return <div className="p-10 text-center text-slate-500 font-medium">Cargando chats...</div>
+    return <Loading />
   }
 
   if (nivelPermiso === 'ninguno') {

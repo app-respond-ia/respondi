@@ -1,4 +1,5 @@
 'use client'
+import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
 import { getVendedores, crearVendedor, actualizarVendedor } from '@/app/actions/superadmin'
@@ -132,7 +133,7 @@ export default function VendedoresPage() {
       {/* Lista */}
       <div className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100">
         {loading ? (
-          <div className="p-8 text-center text-ink-500">Cargando vendedores...</div>
+          <Loading />
         ) : vendedores.length === 0 ? (
           <div className="p-8 text-center text-ink-500">No hay vendedores registrados.</div>
         ) : (

@@ -1,4 +1,5 @@
 'use client'
+import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
 import { getPrecios, crearPrecio, actualizarPrecio, eliminarPrecio, importarPreciosMasivo, PrecioData } from '@/app/actions/precios'
@@ -249,7 +250,7 @@ export default function ListaPreciosPage() {
   }
 
   if (loading || nivelPermiso === null) {
-    return <div className="p-10 text-center text-slate-500 font-medium">Cargando lista de precios...</div>
+    return <Loading />
   }
 
   if (nivelPermiso === 'ninguno') {

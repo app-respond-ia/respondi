@@ -1,4 +1,5 @@
 'use client'
+import Loading from '@/components/Loading'
 
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
@@ -60,7 +61,7 @@ export default function CasoDetallePage() {
     setEnviando(false)
   }
 
-  if (loading) return <div className="p-10 text-center text-slate-500">Cargando detalle...</div>
+  if (loading) return <Loading />
   if (!caso) return null
 
   const esPendiente = caso.estatus === 'pendiente'

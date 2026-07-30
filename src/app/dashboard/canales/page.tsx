@@ -1,4 +1,5 @@
 'use client'
+import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
 import { getCanales, conectarCanal, desconectarCanal } from '@/app/actions/canales'
@@ -103,7 +104,7 @@ export default function CanalesPage() {
   }
 
   if (loading || nivelPermiso === null) {
-    return <div className="p-10 text-center text-slate-500 font-medium">Cargando canales...</div>
+    return <Loading />
   }
 
   if (nivelPermiso === 'ninguno') {

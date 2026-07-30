@@ -44,21 +44,22 @@ export default function Sidebar({ user, onCloseMobile, permisos, esAdmin, collap
 
   return (
     <aside className={`relative ${collapsed ? 'w-20' : 'w-72'} bg-ink-900 text-white flex flex-col h-full transition-all duration-300 ease-out`}>
-      <div className={`flex items-center gap-3 h-20 border-b border-white/10 shrink-0 ${collapsed ? 'justify-center px-2' : 'px-6'}`}>
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center shadow-lg shadow-brand-600/30 shrink-0">
+      <div className={`relative flex items-center gap-3 h-20 border-b border-white/10 shrink-0 overflow-hidden ${collapsed ? 'justify-center px-2' : 'px-6'}`}>
+        <div className="absolute -top-8 -left-8 w-24 h-24 rounded-full bg-brand-600/20 blur-2xl pointer-events-none"></div>
+        <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center shadow-lg shadow-brand-600/40 shrink-0 ring-1 ring-white/10">
           <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
             <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h8M8 14h5M21 12c0 4.418-4.03 8-9 8a9.7 9.7 0 01-4-.85L3 20l1.1-3.3A7.6 7.6 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
           </svg>
         </div>
         {!collapsed && (
-          <div className="min-w-0">
+          <div className="relative min-w-0">
             <p className="font-display font-700 text-lg leading-none truncate">Respondi</p>
-            <p className="text-[11px] text-brand-300 mt-1 tracking-wide truncate">Panel de administración</p>
+            <p className="text-[11px] text-brand-300/80 mt-1 tracking-wide truncate">Panel de administración</p>
           </div>
         )}
         
         {/* Botón para cerrar en móvil */}
-        <button onClick={onCloseMobile} className="lg:hidden ml-auto p-2 text-ink-400 hover:text-white">
+        <button onClick={onCloseMobile} className="relative lg:hidden ml-auto p-2 text-ink-400 hover:text-white">
           <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
@@ -414,9 +415,12 @@ export default function Sidebar({ user, onCloseMobile, permisos, esAdmin, collap
       </nav>
 
       <div className="px-3 py-4 border-t border-white/10 shrink-0">
-        <div className={`flex items-center gap-3 py-2 group relative ${collapsed ? 'justify-center px-0' : 'px-3'}`}>
-          <div className="w-9 h-9 rounded-full bg-brand-500 flex items-center justify-center font-600 text-sm shrink-0" title={collapsed ? user.nombre : undefined}>
-            {user.initials}
+        <div className={`flex items-center gap-3 py-2 rounded-xl group relative transition hover:bg-white/5 ${collapsed ? 'justify-center px-0' : 'px-3'}`}>
+          <div className="relative shrink-0">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center font-600 text-sm ring-2 ring-white/10" title={collapsed ? user.nombre : undefined}>
+              {user.initials}
+            </div>
+            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-ink-900"></span>
           </div>
           {!collapsed && (
             <>

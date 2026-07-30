@@ -24,6 +24,7 @@ export default function AdminLayout({
   creditos = null
 }: AdminLayoutProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
 
   const user = {
     nombre: nombreUsuario,
@@ -36,7 +37,7 @@ export default function AdminLayout({
     <div className="h-screen overflow-hidden lg:flex bg-slate-50 text-ink-900">
       {/* Sidebar Wrapper */}
       <div className={`fixed inset-y-0 left-0 z-40 transform transition-transform duration-300 ease-out lg:translate-x-0 lg:static lg:z-auto h-full overflow-y-auto ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <Sidebar user={user} onCloseMobile={() => setIsMobileMenuOpen(false)} permisos={permisos} esAdmin={esAdmin} />
+        <Sidebar user={user} onCloseMobile={() => setIsMobileMenuOpen(false)} permisos={permisos} esAdmin={esAdmin} collapsed={collapsed} onToggleCollapse={() => setCollapsed(c => !c)} />
       </div>
 
       {/* Overlay Mobile */}

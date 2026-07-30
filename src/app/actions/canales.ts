@@ -54,53 +54,26 @@ export async function conectarCanal(dataOrTipo: any, argMetodo?: any) {
   if (auth.error) return { success: false, error: auth.error }
 
   const data = typeof dataOrTipo === 'string'
-    ? {
-        tipo: dataOrTipo,
-        nombre: dataOrTipo,
-        configuracion: { metodo: argMetodo }
-      }
+    ? { tipo: dataOrTipo, metodo: argMetodo }
     : dataOrTipo
 
-  let canalId: string | null = null
+  const { data: newCanal, error: canalError } = await supabase
+    .from('channels')
+    .insert({
+      tenant_id: auth.tenant_id,
+      branch_id: auth.branch_id,
+      tipo: data.tipo,
+      metodo: data.metodo || argMetodo || 'whaticket',
+      estado: data.estado || 'pendiente'
+    })
+    .select()
+    .single()
 
-  try {
-    // Crear el canal
-    const { data: newCanal, error: canalError } = await supabase
-      .from('channels')
-      .insert({
-        tenant_id: auth.tenant_id,
-        branch_id: auth.branch_id,
-        tipo: data.tipo,
-        metodo: data.metodo || data.configuracion?.metodo || argMetodo || 'whaticket',
-        estado: data.estado || 'pendiente',
-        nombre: data.nombre || data.tipo,
-        activo: true,
-        configuracion: data.configuracion || {}
-      })
-      .select()
-      .single()
-
-    if (canalError || !newCanal) throw new Error(canalError?.message || 'Error al crear canal')
-    canalId = newCanal.id
-
-    // Si hay credenciales adicionales, guardarlas
-    if (data.credenciales) {
-      const { error: credError } = await supabase
-        .from('channels')
-        .update({ credenciales: data.credenciales })
-        .eq('id', canalId)
-
-      if (credError) throw new Error(credError.message)
-    }
-
-    return { success: true, canal: newCanal, data: newCanal }
-  } catch (err: any) {
-    // Rollback: eliminar canal si quedó creado a medias
-    if (canalId) {
-      await supabase.from('channels').delete().eq('id', canalId)
-    }
-    return { success: false, error: err.message || 'Error al conectar el canal. Inténtalo de nuevo.' }
+  if (canalError || !newCanal) {
+    return { success: false, error: canalError?.message || 'Error al conectar el canal. Inténtalo de nuevo.' }
   }
+
+  return { success: true, canal: newCanal, data: newCanal }
 }
 
 export async function desconectarCanal(id: string) {

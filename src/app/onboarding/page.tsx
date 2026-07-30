@@ -874,15 +874,18 @@ export default function OnboardingPage() {
 
                   <div className="mt-6 space-y-3">
                     <label className="flex items-start gap-2.5 cursor-pointer group">
-                      <input type="checkbox" checked={s4IaActiva} onChange={e => setS4IaActiva(e.target.checked)}
+                      <input type="checkbox" checked={s4IaActiva} onChange={e => {
+                        setS4IaActiva(e.target.checked);
+                        if (e.target.checked) setS4AbrirCaso(false);
+                      }}
                         className="w-4 h-4 mt-0.5 rounded border-slate-300 text-brand-600 focus:ring-brand-400" />
                       <span className="text-sm font-500 text-ink-900 group-hover:text-brand-700 transition">
                         Permitir que la IA siga respondiendo fuera del horario de atención
                       </span>
                     </label>
-                    <label className="flex items-start gap-2.5 cursor-pointer group">
-                      <input type="checkbox" checked={s4AbrirCaso} onChange={e => setS4AbrirCaso(e.target.checked)}
-                        className="w-4 h-4 mt-0.5 rounded border-slate-300 text-brand-600 focus:ring-brand-400" />
+                    <label className={`flex items-start gap-2.5 group ${s4IaActiva ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
+                      <input type="checkbox" checked={s4AbrirCaso} disabled={s4IaActiva} onChange={e => setS4AbrirCaso(e.target.checked)}
+                        className="w-4 h-4 mt-0.5 rounded border-slate-300 text-brand-600 focus:ring-brand-400 disabled:cursor-not-allowed" />
                       <span className="text-sm font-500 text-ink-900 group-hover:text-brand-700 transition">
                         Abrir un caso automáticamente cuando llega un mensaje fuera de horario
                       </span>

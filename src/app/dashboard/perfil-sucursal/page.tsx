@@ -378,8 +378,8 @@ export default function PerfilSucursalPage() {
         </section>
 
         {/* SECCIÓN: HORARIOS DE ATENCIÓN */}
-        <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-6 sm:p-8 border-b border-slate-100">
+        <section className="bg-white rounded-2xl shadow-sm border border-slate-200">
+          <div className="p-6 sm:p-8 border-b border-slate-100 rounded-t-2xl">
             <h2 className="text-xl font-bold text-ink-900">Horarios de atención</h2>
             <p className="text-sm text-ink-500 mt-1">Puedes añadir varias franjas por día para horarios partidos.</p>
           </div>

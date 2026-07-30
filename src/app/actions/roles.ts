@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { resolveBranchId } from '@/lib/active-branch'
 import { supabaseAdmin } from '@/utils/supabase/admin'
+import { registrarAuditoria } from '@/lib/auditoria'
 
 export async function canManageRole(userId: string, targetRoleLevel: number, targetRoleTenantId?: string) {
   const { data: user } = await supabaseAdmin
@@ -100,6 +101,16 @@ export async function crearRolPersonalizado(data: {
     .single()
 
   if (error) return { success: false, error: error!.message }
+
+  await registrarAuditoria({
+    tenant_id: auth.tenant_id,
+    user_id: auth.user_id,
+    accion: `creó el rol "${data.nombre}"`,
+    tabla_afectada: 'roles',
+    registro_id: result.id,
+    valor_nuevo: result
+  })
+
   return { success: true, data: result }
 }
 
@@ -115,7 +126,7 @@ export async function actualizarRolPersonalizado(id: string, data: {
 
   const { data: targetRole } = await supabaseAdmin
     .from('roles_personalizados')
-    .select('nivel, tenant_id, es_propietario')
+    .select('*')
     .eq('id', id)
     .single()
 
@@ -140,6 +151,17 @@ export async function actualizarRolPersonalizado(id: string, data: {
     .single()
 
   if (error) return { success: false, error: error!.message }
+
+  await registrarAuditoria({
+    tenant_id: auth.tenant_id,
+    user_id: auth.user_id,
+    accion: `editó el rol "${result.nombre}"`,
+    tabla_afectada: 'roles',
+    registro_id: result.id,
+    valor_anterior: targetRole,
+    valor_nuevo: result
+  })
+
   return { success: true, data: result }
 }
 
@@ -150,7 +172,7 @@ export async function eliminarRolPersonalizado(id: string) {
 
   const { data: targetRole } = await supabaseAdmin
     .from('roles_personalizados')
-    .select('nivel, tenant_id, es_propietario')
+    .select('*')
     .eq('id', id)
     .single()
 
@@ -167,5 +189,15 @@ export async function eliminarRolPersonalizado(id: string) {
     .eq('tenant_id', auth.tenant_id)
 
   if (error) return { success: false, error: error!.message }
+
+  await registrarAuditoria({
+    tenant_id: auth.tenant_id,
+    user_id: auth.user_id,
+    accion: `eliminó el rol "${targetRole.nombre}"`,
+    tabla_afectada: 'roles',
+    registro_id: id,
+    valor_anterior: targetRole
+  })
+
   return { success: true }
 }

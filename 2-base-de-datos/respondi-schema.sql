@@ -209,6 +209,16 @@ create table price_list (
   created_at  timestamptz not null default now()
 );
 
+create table categorias_precios (
+  id          uuid primary key default gen_random_uuid(),
+  tenant_id   uuid not null references organizaciones(id) on delete cascade,
+  branch_id   uuid not null references sucursales(id) on delete cascade,
+  nombre      text not null,
+  parent_id   uuid references categorias_precios(id) on delete cascade,
+  orden       integer not null default 0,
+  created_at  timestamptz not null default now()
+);
+
 create table daily_updates (
   id                     uuid primary key default gen_random_uuid(),
   tenant_id              uuid not null references organizaciones(id) on delete cascade,
@@ -515,6 +525,7 @@ alter table user_branches      enable row level security;
 alter table user_permissions   enable row level security;
 alter table skills             enable row level security;
 alter table price_list         enable row level security;
+alter table categorias_precios enable row level security;
 alter table daily_updates      enable row level security;
 alter table case_rules         enable row level security;
 alter table message_categories enable row level security;
@@ -583,6 +594,10 @@ create policy skills_tenant on skills for all
   with check (is_super_admin() or tenant_id = auth_tenant_id());
 
 create policy price_tenant on price_list for all
+  using (is_super_admin() or tenant_id = auth_tenant_id())
+  with check (is_super_admin() or tenant_id = auth_tenant_id());
+
+create policy categorias_precios_tenant on categorias_precios for all
   using (is_super_admin() or tenant_id = auth_tenant_id())
   with check (is_super_admin() or tenant_id = auth_tenant_id());
 

@@ -102,16 +102,56 @@ export default function ListaPreciosPage() {
     }
   }
 
-  const descargarPlantilla = () => {
-    const wb = XLSX.utils.book_new()
-    const headers = ['nombre', 'tipo', 'precio', 'precio_tipo', 'descripcion']
-    const ejemplo1 = ['Café espresso', 'producto', '2.50', 'exacto', 'Café solo corto']
-    const ejemplo2 = ['Consultoría hora', 'servicio', '80', 'desde', 'Precio mínimo por hora']
-    const ejemplo3 = ['Menú del día', 'producto', '', 'consultar', 'Pregunta por el menú']
-    const ws = XLSX.utils.aoa_to_sheet([headers, ejemplo1, ejemplo2, ejemplo3])
-    ws['!cols'] = [{ wch: 30 }, { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 40 }]
-    XLSX.utils.book_append_sheet(wb, ws, 'Precios')
-    XLSX.writeFile(wb, 'plantilla_precios_respondi.xlsx')
+  const descargarPlantilla = async () => {
+    const ExcelJS = await import('exceljs')
+    const wb = new ExcelJS.Workbook()
+    const ws = wb.addWorksheet('Precios')
+
+    ws.columns = [
+      { header: 'nombre', key: 'nombre', width: 30 },
+      { header: 'tipo', key: 'tipo', width: 14 },
+      { header: 'precio', key: 'precio', width: 10 },
+      { header: 'precio_tipo', key: 'precio_tipo', width: 14 },
+      { header: 'categoria', key: 'categoria', width: 20 },
+      { header: 'subcategoria', key: 'subcategoria', width: 20 },
+      { header: 'descripcion', key: 'descripcion', width: 40 },
+    ]
+
+    ws.getRow(1).font = { bold: true }
+    ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEDE9FE' } }
+
+    ws.addRow({ nombre: 'Café espresso', tipo: 'producto', precio: 2.50, precio_tipo: 'exacto', categoria: 'Bebidas', subcategoria: 'Cafés', descripcion: 'Café solo corto' })
+    ws.addRow({ nombre: 'Consultoría hora', tipo: 'servicio', precio: 80, precio_tipo: 'desde', categoria: 'Servicios', subcategoria: '', descripcion: 'Precio mínimo por hora' })
+    ws.addRow({ nombre: 'Menú del día', tipo: 'producto', precio: '', precio_tipo: 'consultar', categoria: 'Menús', subcategoria: '', descripcion: 'Pregunta por el menú' })
+
+    // Dropdown para "tipo" (columna B), filas 2 a 500
+    for (let i = 2; i <= 500; i++) {
+      ws.getCell(`B${i}`).dataValidation = {
+        type: 'list',
+        allowBlank: false,
+        formulae: ['"producto,servicio"'],
+        showErrorMessage: true,
+        errorTitle: 'Valor inválido',
+        error: 'Selecciona "producto" o "servicio" de la lista.'
+      }
+      ws.getCell(`D${i}`).dataValidation = {
+        type: 'list',
+        allowBlank: false,
+        formulae: ['"exacto,desde,consultar"'],
+        showErrorMessage: true,
+        errorTitle: 'Valor inválido',
+        error: 'Selecciona "exacto", "desde" o "consultar" de la lista.'
+      }
+    }
+
+    const buffer = await wb.xlsx.writeBuffer()
+    const blob = new Blob([buffer], { type: 'application/octet-stream' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'plantilla_precios_respondi.xlsx'
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   const handleArchivoExcel = (e: React.ChangeEvent<HTMLInputElement>) => {

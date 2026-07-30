@@ -395,8 +395,8 @@ export default function OnboardingPage() {
   const pct = Math.round((step / 5) * 100)
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-100 via-brand-50 to-slate-100 text-ink-900 antialiased">
-      <header className="flex items-center justify-between px-5 sm:px-8 h-20 max-w-5xl w-full mx-auto">
+    <div className="h-screen flex flex-col overflow-hidden bg-gradient-to-br from-slate-100 via-brand-50 to-slate-100 text-ink-900 antialiased">
+      <header className="shrink-0 flex items-center justify-between px-5 sm:px-8 h-20 max-w-5xl w-full mx-auto">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center">
             <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 10h8M8 14h5M21 12c0 4.418-4.03 8-9 8a9.7 9.7 0 01-4-.85L3 20l1.1-3.3A7.6 7.6 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
@@ -405,9 +405,9 @@ export default function OnboardingPage() {
         </div>
       </header>
 
-      <main className="flex-1 flex items-start sm:items-center justify-center px-4 sm:px-6 pb-10">
-        <div className="w-full max-w-2xl">
-          <div className="mb-5 px-1">
+      <main className="flex-1 min-h-0 flex items-start sm:items-center justify-center px-4 sm:px-6 pb-6 overflow-hidden">
+        <div className="w-full max-w-2xl h-full flex flex-col">
+          <div className="mb-5 px-1 shrink-0">
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm font-semibold text-ink-700">Paso {step + 1} de 6</p>
               <p className="text-sm font-medium text-brand-600">{pct}% completado</p>
@@ -417,8 +417,8 @@ export default function OnboardingPage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl shadow-xl shadow-brand-900/5 ring-1 ring-slate-200/70 overflow-hidden">
-            <div className="p-6 sm:p-10 min-h-[420px]">
+          <div className="bg-white rounded-3xl shadow-xl shadow-brand-900/5 ring-1 ring-slate-200/70 overflow-hidden flex flex-col min-h-0 flex-1">
+            <div className="p-6 sm:p-10 overflow-y-auto flex-1 min-h-0">
 
               {/* ===== PASO 0 ===== */}
               {step === 0 && (
@@ -947,7 +947,7 @@ export default function OnboardingPage() {
 
             </div>
 
-            <div className="flex items-center justify-between gap-3 px-6 sm:px-10 py-5 border-t border-slate-100 bg-slate-50/60">
+            <div className="shrink-0 flex items-center justify-between gap-3 px-6 sm:px-10 py-5 border-t border-slate-100 bg-slate-50/60">
               <button disabled={step === 0 || saving} onClick={handleBack}
                 className="px-5 h-11 rounded-xl font-semibold text-ink-500 hover:text-ink-700 hover:bg-white transition disabled:opacity-0 disabled:pointer-events-none">
                 ← Atrás

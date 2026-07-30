@@ -189,11 +189,17 @@ export default function ConversacionesPage() {
                           {conv.resumen || <span className="italic opacity-60 font-normal">Sin resumen aún...</span>}
                         </p>
                         <div className="flex gap-1 flex-wrap">
-                          {conv.conversation_tags?.map((t:any, i:number) => (
-                            <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200 font-medium">
-                              {t.message_categories?.nombre}
+                          {conv.conversation_tags && conv.conversation_tags.length > 0 ? (
+                            conv.conversation_tags.map((t:any, i:number) => (
+                              <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200 font-medium">
+                                {t.message_categories?.nombre}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-50 text-slate-400 border border-slate-200 font-medium italic">
+                              Descategorizado
                             </span>
-                          ))}
+                          )}
                         </div>
                       </td>
                       <td className="p-4 text-center relative z-10 pointer-events-none">

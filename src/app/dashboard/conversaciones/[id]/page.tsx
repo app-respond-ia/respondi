@@ -190,18 +190,22 @@ export default function ConversacionDetallePage() {
             </div>
           </div>
 
-          {conv.etiquetas && conv.etiquetas.length > 0 && (
-            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-              <h3 className="font-semibold text-ink-900 mb-3 pb-2 border-b border-slate-100">Etiquetas aplicadas</h3>
-              <div className="flex flex-wrap gap-2">
-                {conv.etiquetas.map((t: any, i: number) => (
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+            <h3 className="font-semibold text-ink-900 mb-3 pb-2 border-b border-slate-100">Etiquetas aplicadas</h3>
+            <div className="flex flex-wrap gap-2">
+              {conv.etiquetas && conv.etiquetas.length > 0 ? (
+                conv.etiquetas.map((t: any, i: number) => (
                   <span key={i} className="text-xs font-semibold px-2.5 py-1 bg-slate-100 text-slate-700 rounded-md border border-slate-200">
                     {t.nombre}
                   </span>
-                ))}
-              </div>
+                ))
+              ) : (
+                <span className="text-xs font-semibold px-2.5 py-1 bg-slate-50 text-slate-400 rounded-md border border-slate-200 italic">
+                  Descategorizado
+                </span>
+              )}
             </div>
-          )}
+          </div>
         </div>
       </div>
     </div>

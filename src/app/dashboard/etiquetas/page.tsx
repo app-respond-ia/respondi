@@ -175,6 +175,7 @@ export default function EtiquetasPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
+  const [busqueda, setBusqueda] = useState('')
 
   const [formData, setFormData] = useState<EtiquetaData>({
     nombre: '',
@@ -339,9 +340,17 @@ export default function EtiquetasPage() {
   }
 
   const filteredItems = items.filter(item => {
-    if (filtro === 'activas') return item.activa
-    if (filtro === 'inactivas') return !item.activa
-    return true
+    const matchFiltro =
+      filtro === 'activas' ? item.activa :
+      filtro === 'inactivas' ? !item.activa :
+      true
+    if (!matchFiltro) return false
+    if (!busqueda.trim()) return true
+    const q = busqueda.toLowerCase()
+    return (
+      item.nombre?.toLowerCase().includes(q) ||
+      item.descripcion_intencion?.toLowerCase().includes(q)
+    )
   })
 
   // Estadísticas
@@ -391,6 +400,17 @@ export default function EtiquetasPage() {
             </div>
           </div>
 
+          <div className="relative mb-5">
+            <svg className="w-4 h-4 text-ink-400 absolute left-3.5 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <input
+              type="text"
+              placeholder="Buscar por nombre o descripción..."
+              value={busqueda}
+              onChange={e => setBusqueda(e.target.value)}
+              className="w-full h-11 pl-10 pr-4 rounded-xl border border-slate-300 bg-white text-sm placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition"
+            />
+          </div>
+
           {/* Pestañas de filtrado */}
           <div className="flex gap-2 p-1 bg-slate-100 rounded-xl mb-6 w-fit">
             {(['todas', 'activas', 'inactivas'] as const).map(f => (
@@ -407,7 +427,7 @@ export default function EtiquetasPage() {
           {/* Lista */}
           {filteredItems.length === 0 ? (
             <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center text-slate-500">
-              No hay etiquetas en esta vista.
+              {busqueda.trim() ? `No hay resultados para "${busqueda}".` : 'No hay etiquetas en esta vista.'}
             </div>
           ) : (
             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col divide-y divide-slate-100 relative">
@@ -508,11 +528,14 @@ export default function EtiquetasPage() {
 
                   <div>
                     <label className="block text-sm font-500 text-ink-700 mb-1.5">Nombre</label>
-                    <input type="text" required placeholder="Ej. Devolución"
+                    <input type="text" required placeholder="ej. devolución"
                       value={formData.nombre}
-                      onChange={e => setFormData({...formData, nombre: e.target.value})}
-                      className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition" 
+                      onChange={e => setFormData({...formData, nombre: e.target.value.toLowerCase()})}
+                      className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition lowercase" 
                     />
+                    <p className="text-xs text-ink-400 mt-1.5">
+                      Se escribe en minúsculas para diferenciarlo del "Tipo de escalado" (que va en mayúsculas).
+                    </p>
                   </div>
         
                   <div>

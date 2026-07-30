@@ -83,17 +83,18 @@ export async function crearEtiqueta(data: EtiquetaData) {
     return { success: false, error: 'Has alcanzado el límite máximo de 100 etiquetas.' }
   }
 
-  // Calcular el máximo orden actual
+  // Calcular el mínimo orden actual, para que la nueva etiqueta 
+  // quede siempre primera
   const { data: currentTags, error: fetchError } = await supabase
     .from('message_categories')
     .select('orden')
     .eq('branch_id', auth.branch_id)
-    .order('orden', { ascending: false })
+    .order('orden', { ascending: true })
     .limit(1)
 
   if (fetchError) return { success: false, error: fetchError.message }
 
-  const nuevoOrden = currentTags && currentTags.length > 0 ? currentTags[0].orden + 1 : 0
+  const nuevoOrden = currentTags && currentTags.length > 0 ? currentTags[0].orden - 1 : 0
 
   const { data: insertedData, error } = await supabase
     .from('message_categories')

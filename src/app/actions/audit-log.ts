@@ -19,7 +19,7 @@ async function getAuthData(supabase: any) {
   return { tenant_id: userData.tenant_id, user_id: user.id }
 }
 
-export async function getAuditLog(filtros?: { userId?: string, tabla?: string, busqueda?: string }) {
+export async function getAuditLog(filtros?: { userId?: string, tabla?: string, busqueda?: string, fechaInicio?: string, fechaFin?: string }) {
   const supabase = await createClient()
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
@@ -39,6 +39,8 @@ export async function getAuditLog(filtros?: { userId?: string, tabla?: string, b
   if (filtros?.userId) query = query.eq('user_id', filtros.userId)
   if (filtros?.tabla) query = query.eq('tabla_afectada', filtros.tabla)
   if (filtros?.busqueda) query = query.ilike('accion', `%${filtros.busqueda}%`)
+  if (filtros?.fechaInicio) query = query.gte('timestamp', filtros.fechaInicio)
+  if (filtros?.fechaFin) query = query.lte('timestamp', filtros.fechaFin)
 
   query = query.order('timestamp', { ascending: false }).limit(200)
 

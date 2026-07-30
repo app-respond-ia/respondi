@@ -15,15 +15,20 @@ export default function AuditLogPage() {
   const [busqueda, setBusqueda] = useState('')
   const [filtroUser, setFiltroUser] = useState('todos')
   const [filtroTabla, setFiltroTabla] = useState('todas')
+  const [fechaInicio, setFechaInicio] = useState('')
+  const [fechaFin, setFechaFin] = useState('')
 
   useEffect(() => {
     cargarDatos()
-  }, [])
+  }, [fechaInicio, fechaFin])
 
   const cargarDatos = async () => {
     setLoading(true)
     const [res, permisosRes] = await Promise.all([
-      getAuditLog(),
+      getAuditLog({
+        fechaInicio: fechaInicio ? new Date(fechaInicio).toISOString() : undefined,
+        fechaFin: fechaFin ? new Date(fechaFin + 'T23:59:59').toISOString() : undefined
+      }),
       getMisPermisos()
     ])
     
@@ -214,6 +219,31 @@ export default function AuditLogPage() {
           <option value="conversations">Conversaciones / Chats</option>
           <option value="sucursales">Sucursales</option>
         </select>
+        <div className="flex items-center gap-1.5">
+          <input
+            type="date"
+            value={fechaInicio}
+            onChange={(e) => setFechaInicio(e.target.value)}
+            max={fechaFin || undefined}
+            className="h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm text-ink-700 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition"
+          />
+          <span className="text-ink-400 text-sm">–</span>
+          <input
+            type="date"
+            value={fechaFin}
+            onChange={(e) => setFechaFin(e.target.value)}
+            min={fechaInicio || undefined}
+            className="h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm text-ink-700 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition"
+          />
+          {(fechaInicio || fechaFin) && (
+            <button
+              onClick={() => { setFechaInicio(''); setFechaFin('') }}
+              className="text-xs text-ink-400 hover:text-ink-600 underline underline-offset-2 ml-1"
+            >
+              Limpiar
+            </button>
+          )}
+        </div>
       </div>
 
       {errorMsg ? (

@@ -203,6 +203,8 @@ create table price_list (
   precio_tipo text not null default 'exacto',
   moneda      text not null default 'USD',
   descripcion text,
+  categoria     text,
+  subcategoria  text,
   disponible  boolean not null default true,
   created_at  timestamptz not null default now()
 );

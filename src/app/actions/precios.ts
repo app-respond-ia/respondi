@@ -128,7 +128,7 @@ export async function importarPreciosMasivo(items: {
     precio: item.precio,
     precio_tipo: item.precio_tipo || 'exacto',
     descripcion: item.descripcion || null,
-    activo: true
+    disponible: true
   }))
 
   const { error } = await supabase

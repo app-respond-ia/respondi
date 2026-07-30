@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut } from '@/app/actions/auth'
@@ -20,6 +21,8 @@ type SidebarProps = {
 
 export default function Sidebar({ user, onCloseMobile, permisos, esAdmin, collapsed, onToggleCollapse }: SidebarProps) {
   const pathname = usePathname()
+  const [configColapsada, setConfigColapsada] = useState(false)
+  const [organizacionColapsada, setOrganizacionColapsada] = useState(false)
 
   const isActive = (path: string) => pathname === path
 
@@ -200,16 +203,18 @@ export default function Sidebar({ user, onCloseMobile, permisos, esAdmin, collap
         {collapsed ? (
           <div className="flex flex-col items-center gap-2 pt-5 pb-2">
             <div className="h-px w-8 bg-white/10"></div>
-            <span title="Configuración" className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-ink-500">
+            <button onClick={() => setConfigColapsada(v => !v)} title="Configuración" className={`w-8 h-8 rounded-lg flex items-center justify-center transition ${configColapsada ? 'bg-brand-500/20 text-brand-400' : 'bg-white/5 text-ink-500 hover:text-white'}`}>
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
               </svg>
-            </span>
+            </button>
           </div>
         ) : (
           <p className="px-3 pt-5 pb-2 text-[10px] uppercase tracking-widest text-ink-500/70 font-600">Configuración</p>
         )}
+        {!(collapsed && configColapsada) && (
+        <>
         {(() => {
           const nivel = getNivel('skills')
           const cls = navItemWithPermClass('/dashboard/skills', 'skills')
@@ -362,18 +367,22 @@ export default function Sidebar({ user, onCloseMobile, permisos, esAdmin, collap
             </Link>
           )
         })()}
+        </>
+        )}
         {collapsed ? (
           <div className="flex flex-col items-center gap-2 pt-5 pb-2">
             <div className="h-px w-8 bg-white/10"></div>
-            <span title="Organización" className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-ink-500">
+            <button onClick={() => setOrganizacionColapsada(v => !v)} title="Organización" className={`w-8 h-8 rounded-lg flex items-center justify-center transition ${organizacionColapsada ? 'bg-brand-500/20 text-brand-400' : 'bg-white/5 text-ink-500 hover:text-white'}`}>
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"/>
               </svg>
-            </span>
+            </button>
           </div>
         ) : (
           <p className="px-3 pt-5 pb-2 text-[10px] uppercase tracking-widest text-ink-500/70 font-600">Organización</p>
         )}
+        {!(collapsed && organizacionColapsada) && (
+        <>
         {(() => {
           const nivel = getNivel('perfil')
           const cls = navItemWithPermClass('/dashboard/perfil-sucursal', 'perfil')
@@ -412,6 +421,8 @@ export default function Sidebar({ user, onCloseMobile, permisos, esAdmin, collap
             </Link>
           )
         })()}
+        </>
+        )}
       </nav>
 
       <div className="px-3 py-4 border-t border-white/10 shrink-0">

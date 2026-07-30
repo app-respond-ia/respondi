@@ -316,6 +316,13 @@ export async function getDatosSucursalParaCopiar(branchIdOrigen: string) {
     .eq('branch_id', branchIdOrigen)
     .eq('activo', true)
 
+  // Business profile (servicios, políticas, configuración IA)
+  const { data: businessProfile } = await supabase
+    .from('business_profiles')
+    .select('servicios, politicas, msg_fuera_horario, idioma_base, tono, ia_activa_fuera_horario, caso_fuera_horario')
+    .eq('branch_id', branchIdOrigen)
+    .maybeSingle()
+
   return {
     success: true,
     data: {
@@ -324,7 +331,14 @@ export async function getDatosSucursalParaCopiar(branchIdOrigen: string) {
       skills: skills || [],
       precios: precios || [],
       etiquetas: etiquetas || [],
-      reglas: reglas || []
+      reglas: reglas || [],
+      servicios: businessProfile?.servicios ?? null,
+      politicas: businessProfile?.politicas ?? null,
+      msg_fuera_horario: businessProfile?.msg_fuera_horario ?? null,
+      idioma_base: businessProfile?.idioma_base ?? null,
+      tono: businessProfile?.tono ?? null,
+      ia_activa_fuera_horario: businessProfile?.ia_activa_fuera_horario ?? false,
+      caso_fuera_horario: businessProfile?.caso_fuera_horario ?? false
     }
   }
 }
@@ -334,14 +348,14 @@ export async function crearSucursalConDatos(data: {
   direccion?: string
   timezone: string
   servicios?: string
-  politicas?: string
+  politicas?: { titulo: string, descripcion: string }[]
   idioma_base?: string
   tono?: string
   msg_fuera_horario?: string
   ia_activa_fuera_horario?: boolean
   caso_fuera_horario?: boolean
   horarios?: { dia_semana: number, apertura: string | null, cierre: string | null, cerrado: boolean, orden: number }[]
-  skills?: { nombre: string, activo: boolean }[]
+  skills?: { idName?: string, nombre: string, activo: boolean }[]
   precios?: { nombre: string, tipo: string, precio: number | null, precio_tipo: string, descripcion?: string }[]
   etiquetas?: { nombre: string, descripcion_intencion?: string | null, color: string, activa: boolean, es_plantilla: boolean, orden: number }[]
   reglas?: { nombre: string, descripcion_intencion?: string | null, tipo_caso: string, activa: boolean, es_plantilla: boolean }[]

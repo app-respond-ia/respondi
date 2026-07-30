@@ -13,6 +13,8 @@ export default function SucursalesPage() {
   const [sucursalesActivasCount, setSucursalesActivasCount] = useState<number>(0)
   const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
+  // CAMBIO 6: Modal de confirmación para desactivar
+  const [confirmarDesactivar, setConfirmarDesactivar] = useState<any | null>(null)
 
   // Modal Crear
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -77,21 +79,34 @@ export default function SucursalesPage() {
   }
 
   const handleToggleActivo = async (sucursal: any) => {
-    const isDesactivando = sucursal.activa
-    let res
-
-    if (isDesactivando) {
-      res = await desactivarSucursal(sucursal.id)
-    } else {
-      res = await reactivarSucursal(sucursal.id)
+    if (sucursal.activa) {
+      // CAMBIO 6: Mostrar modal de confirmación antes de desactivar
+      setConfirmarDesactivar(sucursal)
+      return
     }
-
+    // Reactivar directamente sin confirmación
+    const res = await reactivarSucursal(sucursal.id)
     if (res.success) {
-      setMensaje({ tipo: 'exito', texto: `Sucursal ${isDesactivando ? 'desactivada' : 'reactivada'} correctamente ✓` })
+      setMensaje({ tipo: 'exito', texto: 'Sucursal reactivada correctamente ✓' })
       setTimeout(() => setMensaje(null), 3000)
       cargar()
     } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al cambiar estado de la sucursal' })
+      setMensaje({ tipo: 'error', texto: res.error || 'Error al reactivar la sucursal' })
+      setTimeout(() => setMensaje(null), 3000)
+    }
+  }
+
+  const handleConfirmarDesactivar = async () => {
+    if (!confirmarDesactivar) return
+    const sucursal = confirmarDesactivar
+    setConfirmarDesactivar(null)
+    const res = await desactivarSucursal(sucursal.id)
+    if (res.success) {
+      setMensaje({ tipo: 'exito', texto: 'Sucursal desactivada correctamente ✓' })
+      setTimeout(() => setMensaje(null), 3000)
+      cargar()
+    } else {
+      setMensaje({ tipo: 'error', texto: res.error || 'Error al desactivar la sucursal' })
       setTimeout(() => setMensaje(null), 3000)
     }
   }
@@ -281,6 +296,37 @@ export default function SucursalesPage() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CAMBIO 6: Modal de confirmación para desactivar sucursal */}
+      {confirmarDesactivar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-ink-900/50 backdrop-blur-sm">
+          <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-6">
+            <div className="w-12 h-12 rounded-2xl bg-red-100 flex items-center justify-center mx-auto mb-4">
+              <svg className="w-6 h-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+              </svg>
+            </div>
+            <h3 className="font-display font-700 text-lg text-ink-900 text-center mb-2">¿Desactivar sucursal?</h3>
+            <p className="text-sm text-ink-500 text-center mb-6">
+              Vas a desactivar <span className="font-600 text-ink-800">{confirmarDesactivar.nombre}</span>. La sucursal no se eliminará y podrás reactivarla cuando quieras.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmarDesactivar(null)}
+                className="flex-1 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmarDesactivar}
+                className="flex-1 h-11 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-600 transition shadow-lg shadow-red-600/30"
+              >
+                Sí, desactivar
+              </button>
             </div>
           </div>
         </div>

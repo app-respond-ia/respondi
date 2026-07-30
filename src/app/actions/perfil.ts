@@ -51,7 +51,7 @@ export async function savePerfilSucursal(data: {
   direccion: string, 
   timezone: string, 
   servicios: string, 
-  politicas: string, 
+  politicas: {titulo: string, descripcion: string}[], 
   idioma_base: string, 
   tono: string, 
   msg_fuera_horario: string,

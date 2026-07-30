@@ -43,7 +43,7 @@ export default function Sidebar({ user, onCloseMobile, permisos, esAdmin, collap
   }
 
   return (
-    <aside className={`${collapsed ? 'w-20' : 'w-72'} bg-ink-900 text-white flex flex-col h-full transition-all duration-300 ease-out`}>
+    <aside className={`relative ${collapsed ? 'w-20' : 'w-72'} bg-ink-900 text-white flex flex-col h-full transition-all duration-300 ease-out`}>
       <div className={`flex items-center gap-3 h-20 border-b border-white/10 shrink-0 ${collapsed ? 'justify-center px-2' : 'px-6'}`}>
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center shadow-lg shadow-brand-600/30 shrink-0">
           <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
@@ -93,7 +93,13 @@ export default function Sidebar({ user, onCloseMobile, permisos, esAdmin, collap
           )
         })()}
 
-        {!collapsed && <p className="px-3 pt-5 pb-2 text-[10px] uppercase tracking-widest text-ink-500/70 font-600">Operación</p>}
+        {collapsed ? (
+          <div className="flex justify-center pt-5 pb-2">
+            <div className="h-px w-8 bg-white/10"></div>
+          </div>
+        ) : (
+          <p className="px-3 pt-5 pb-2 text-[10px] uppercase tracking-widest text-ink-500/70 font-600">Operación</p>
+        )}
         {(() => {
           const nivel = getNivel('casos')
           const cls = navItemWithPermClass('/dashboard/casos', 'casos')
@@ -190,7 +196,19 @@ export default function Sidebar({ user, onCloseMobile, permisos, esAdmin, collap
           )
         })()}
 
-        {!collapsed && <p className="px-3 pt-5 pb-2 text-[10px] uppercase tracking-widest text-ink-500/70 font-600">Configuración</p>}
+        {collapsed ? (
+          <div className="flex flex-col items-center gap-2 pt-5 pb-2">
+            <div className="h-px w-8 bg-white/10"></div>
+            <span title="Configuración" className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-ink-500">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+              </svg>
+            </span>
+          </div>
+        ) : (
+          <p className="px-3 pt-5 pb-2 text-[10px] uppercase tracking-widest text-ink-500/70 font-600">Configuración</p>
+        )}
         {(() => {
           const nivel = getNivel('skills')
           const cls = navItemWithPermClass('/dashboard/skills', 'skills')
@@ -343,7 +361,18 @@ export default function Sidebar({ user, onCloseMobile, permisos, esAdmin, collap
             </Link>
           )
         })()}
-        {!collapsed && <p className="px-3 pt-5 pb-2 text-[10px] uppercase tracking-widest text-ink-500/70 font-600">Organización</p>}
+        {collapsed ? (
+          <div className="flex flex-col items-center gap-2 pt-5 pb-2">
+            <div className="h-px w-8 bg-white/10"></div>
+            <span title="Organización" className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-ink-500">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"/>
+              </svg>
+            </span>
+          </div>
+        ) : (
+          <p className="px-3 pt-5 pb-2 text-[10px] uppercase tracking-widest text-ink-500/70 font-600">Organización</p>
+        )}
         {(() => {
           const nivel = getNivel('perfil')
           const cls = navItemWithPermClass('/dashboard/perfil-sucursal', 'perfil')
@@ -408,9 +437,9 @@ export default function Sidebar({ user, onCloseMobile, permisos, esAdmin, collap
         </div>
       </div>
       <button onClick={onToggleCollapse}
-        className="hidden lg:flex items-center justify-center h-10 border-t border-white/10 text-ink-400 hover:text-white hover:bg-white/5 transition shrink-0">
-        <svg className={`w-4 h-4 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/>
+        className="hidden lg:flex absolute top-24 -right-3 w-6 h-6 rounded-full bg-ink-800 border border-white/10 shadow-lg items-center justify-center text-ink-400 hover:text-white hover:bg-brand-600 hover:border-brand-600 transition z-10">
+        <svg className={`w-3.5 h-3.5 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/>
         </svg>
       </button>
     </aside>

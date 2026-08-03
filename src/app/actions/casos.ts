@@ -116,7 +116,7 @@ export async function getCasoDetalle(casoId: string) {
     etiquetas = tags?.map(t => t.message_categories) || []
   }
 
-  return { success: true, data: { ...caso, mensajes, etiquetas } }
+  return { success: true, data: { ...caso, mensajes, etiquetas, current_user_id: user.id } }
 }
 
 export async function tomarCaso(casoId: string) {
@@ -227,4 +227,68 @@ export async function crearCasoDesdeConversacion(conversationId: string) {
   }
 
   return { success: !error, data: nuevoCaso, error: error?.message }
+}
+
+export async function asignarCaso(casoId: string, agenteId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'No autorizado' }
+
+  const { data: userData } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
+
+  const { error } = await supabase
+    .from('cases')
+    .update({ agente_id: agenteId })
+    .eq('id', casoId)
+    .eq('tenant_id', userData?.tenant_id)
+
+  return { success: !error, error: error?.message }
+}
+
+export async function soltarCaso(casoId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'No autorizado' }
+
+  const { data: userData } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
+
+  const { error } = await supabase
+    .from('cases')
+    .update({ agente_id: null })
+    .eq('id', casoId)
+    .eq('tenant_id', userData?.tenant_id)
+
+  return { success: !error, error: error?.message }
+}
+
+export async function getAgentesParaCasos() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'No autorizado' }
+
+  const { data: userData } = await supabase.from('users').select('tenant_id, branch_id').eq('id', user.id).single()
+  if (!userData?.tenant_id || !userData?.branch_id) return { success: false, error: 'Sin sucursal' }
+
+  const { data: users, error } = await supabase
+    .from('users')
+    .select('id, nombre, email, roles_personalizados(es_propietario, permisos)')
+    .eq('tenant_id', userData.tenant_id)
+    .eq('branch_id', userData.branch_id)
+    .eq('activo', true)
+
+  if (error) return { success: false, error: error.message }
+
+  // Filtrar los que tengan acceso a la sección de casos
+  const agentesValidos = (users || []).filter((u: any) => {
+    const rol = Array.isArray(u.roles_personalizados) ? u.roles_personalizados[0] : u.roles_personalizados
+    if (!rol) return false
+    if (rol.es_propietario) return true
+    
+    // Verificar permisos
+    const permisos = rol.permisos || []
+    const pCasos = permisos.find((p: any) => p.seccion === 'casos')
+    return pCasos && pCasos.nivel !== 'ninguno'
+  })
+
+  return { success: true, data: agentesValidos }
 }

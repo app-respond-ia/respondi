@@ -3,10 +3,12 @@ import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { getCasos } from '@/app/actions/casos'
 import { getMisPermisos } from '@/app/actions/permisos'
 
 export default function CasosPage() {
+  const router = useRouter()
   const [casos, setCasos] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
@@ -156,7 +158,7 @@ export default function CasosPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {casos.map(caso => (
-                  <tr key={caso.id} className="hover:bg-slate-50/50 transition group">
+                  <tr key={caso.id} onClick={() => router.push(`/dashboard/casos/${caso.id}`)} className="hover:bg-slate-100 transition group cursor-pointer">
                     <td className="p-4 pl-6">
                       <div className="flex items-center gap-3">
                         <div className="relative">
@@ -168,15 +170,15 @@ export default function CasosPage() {
                           </div>
                         </div>
                         <div>
-                          <p className="font-semibold text-ink-900">{caso.contacts?.nombre || 'Desconocido'}</p>
+                          <p className="font-semibold text-ink-900 group-hover:text-brand-600 transition">{caso.contacts?.nombre || 'Desconocido'}</p>
                           <p className="text-xs text-slate-500">{caso.contacts?.identificador_canal}</p>
                         </div>
                       </div>
                     </td>
                     <td className="p-4">
-                      <Link href={`/dashboard/casos/${caso.id}`} className="text-brand-600 font-medium hover:underline">
+                      <span className="text-brand-600 font-medium group-hover:underline">
                         #{caso.id.substring(0,8).toUpperCase()}
-                      </Link>
+                      </span>
                       <div className="flex gap-1 mt-1 flex-wrap">
                         {caso.conversations?.conversation_tags?.map((t:any, i:number) => (
                           <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">

@@ -4,7 +4,7 @@ import Loading from '@/components/Loading'
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { getCasoDetalle, tomarCaso, cerrarCaso } from '@/app/actions/casos'
+import { getCasoDetalle, tomarCaso, cerrarCaso, asignarCaso, soltarCaso, getAgentesParaCasos } from '@/app/actions/casos'
 
 export default function CasoDetallePage() {
   const params = useParams()
@@ -13,16 +13,24 @@ export default function CasoDetallePage() {
 
   const [caso, setCaso] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [agentes, setAgentes] = useState<any[]>([])
+  const [procesando, setProcesando] = useState(false)
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     cargarDatos()
+    cargarAgentes()
   }, [id])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [caso?.mensajes])
+
+  const cargarAgentes = async () => {
+    const res = await getAgentesParaCasos()
+    if (res.success && res.data) setAgentes(res.data)
+  }
 
   const cargarDatos = async () => {
     setLoading(true)
@@ -37,13 +45,40 @@ export default function CasoDetallePage() {
   }
 
   const handleTomar = async () => {
+    setProcesando(true)
     const res = await tomarCaso(id)
-    if (res.success) cargarDatos()
+    if (res.success) await cargarDatos()
+    setProcesando(false)
   }
 
   const handleCerrar = async () => {
+    setProcesando(true)
     const res = await cerrarCaso(id)
-    if (res.success) cargarDatos()
+    if (res.success) await cargarDatos()
+    setProcesando(false)
+  }
+
+  const handleAsignarme = async () => {
+    if (!caso?.current_user_id) return
+    setProcesando(true)
+    const res = await asignarCaso(id, caso.current_user_id)
+    if (res.success) await cargarDatos()
+    setProcesando(false)
+  }
+
+  const handleSoltar = async () => {
+    setProcesando(true)
+    const res = await soltarCaso(id)
+    if (res.success) await cargarDatos()
+    setProcesando(false)
+  }
+
+  const handleTransferir = async (agenteId: string) => {
+    if (!agenteId) return
+    setProcesando(true)
+    const res = await asignarCaso(id, agenteId)
+    if (res.success) await cargarDatos()
+    setProcesando(false)
   }
 
   if (loading) return <Loading />
@@ -90,7 +125,7 @@ export default function CasoDetallePage() {
 
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-6">
         {/* PANEL IZQUIERDO: CHAT */}
-        <div className="flex-1 bg-white border border-slate-200 rounded-2xl shadow-sm flex flex-col overflow-hidden min-h-[400px]">
+        <div className="flex-1 bg-white border border-slate-200 rounded-2xl shadow-sm flex flex-col min-h-0 overflow-hidden">
           <div className="bg-slate-50 border-b border-slate-200 p-4 shrink-0">
             <h3 className="font-semibold text-ink-900">Historial de conversación</h3>
           </div>
@@ -136,7 +171,7 @@ export default function CasoDetallePage() {
         </div>
 
         {/* PANEL DERECHO: INFO */}
-        <div className="w-full lg:w-80 flex flex-col gap-4 shrink-0 overflow-y-auto pb-6">
+        <div className="w-full lg:w-80 flex flex-col gap-4 shrink-0 min-h-0 overflow-y-auto pb-6">
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
             <h3 className="font-semibold text-ink-900 mb-4 pb-2 border-b border-slate-100">Información del Cliente</h3>
             <div className="space-y-4">
@@ -190,6 +225,45 @@ export default function CasoDetallePage() {
                   <p className="text-sm font-bold text-amber-600">{caso.sla_horas} horas</p>
                 </div>
               )}
+            </div>
+          </div>
+
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+            <h3 className="font-semibold text-ink-900 mb-4 pb-2 border-b border-slate-100">Gestión de Asignación</h3>
+            
+            <div className="space-y-3">
+              {caso.agente_id !== caso.current_user_id ? (
+                <button 
+                  onClick={handleAsignarme} 
+                  disabled={procesando}
+                  className="w-full py-2 bg-brand-50 hover:bg-brand-100 text-brand-700 font-semibold rounded-xl transition text-sm disabled:opacity-50"
+                >
+                  Asignarme este caso
+                </button>
+              ) : (
+                <button 
+                  onClick={handleSoltar} 
+                  disabled={procesando}
+                  className="w-full py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold rounded-xl border border-slate-200 transition text-sm disabled:opacity-50"
+                >
+                  Soltar caso
+                </button>
+              )}
+
+              <div className="pt-2 border-t border-slate-100">
+                <label className="text-xs text-slate-500 font-medium block mb-1.5">Transferir a...</label>
+                <select 
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-slate-50 disabled:opacity-50"
+                  value=""
+                  onChange={(e) => handleTransferir(e.target.value)}
+                  disabled={procesando || agentes.length === 0}
+                >
+                  <option value="" disabled>Selecciona un agente</option>
+                  {agentes.filter(a => a.id !== caso.agente_id).map(a => (
+                    <option key={a.id} value={a.id}>{a.nombre}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 

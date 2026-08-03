@@ -89,7 +89,7 @@ export default function ConversacionDetallePage() {
 
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-6">
         {/* PANEL IZQUIERDO: CHAT */}
-        <div className="flex-1 bg-white border border-slate-200 rounded-2xl shadow-sm flex flex-col overflow-hidden min-h-[400px]">
+        <div className="flex-1 bg-white border border-slate-200 rounded-2xl shadow-sm flex flex-col min-h-0 overflow-hidden">
           <div className="bg-slate-50 border-b border-slate-200 p-4 shrink-0 flex items-center justify-between">
             <h3 className="font-semibold text-ink-900">Mensajes</h3>
             <p className="text-xs font-semibold text-slate-500 bg-white px-2 py-1 rounded-md border border-slate-200 shadow-sm">
@@ -137,7 +137,7 @@ export default function ConversacionDetallePage() {
         </div>
 
         {/* PANEL DERECHO: INFO */}
-        <div className="w-full lg:w-80 flex flex-col gap-4 shrink-0 overflow-y-auto pb-6">
+        <div className="w-full lg:w-80 flex flex-col gap-4 shrink-0 min-h-0 overflow-y-auto pb-6">
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
             <h3 className="font-semibold text-ink-900 mb-4 pb-2 border-b border-slate-100">Información del Cliente</h3>
             <div className="space-y-4">

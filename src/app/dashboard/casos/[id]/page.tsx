@@ -4,7 +4,7 @@ import Loading from '@/components/Loading'
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { getCasoDetalle, tomarCaso, cerrarCaso, enviarMensajeAgente } from '@/app/actions/casos'
+import { getCasoDetalle, tomarCaso, cerrarCaso } from '@/app/actions/casos'
 
 export default function CasoDetallePage() {
   const params = useParams()
@@ -13,8 +13,6 @@ export default function CasoDetallePage() {
 
   const [caso, setCaso] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [mensaje, setMensaje] = useState('')
-  const [enviando, setEnviando] = useState(false)
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -46,19 +44,6 @@ export default function CasoDetallePage() {
   const handleCerrar = async () => {
     const res = await cerrarCaso(id)
     if (res.success) cargarDatos()
-  }
-
-  const handleEnviar = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!mensaje.trim() || !caso?.conversation_id) return
-    
-    setEnviando(true)
-    const res = await enviarMensajeAgente(caso.conversation_id, mensaje)
-    if (res.success) {
-      setMensaje('')
-      cargarDatos()
-    }
-    setEnviando(false)
   }
 
   if (loading) return <Loading />
@@ -135,24 +120,17 @@ export default function CasoDetallePage() {
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="p-4 bg-white border-t border-slate-200 shrink-0">
-            {esCerrado ? (
-              <p className="text-center text-slate-500 text-sm font-medium p-2 bg-slate-50 rounded-lg">Este caso está resuelto y cerrado.</p>
-            ) : esAtendiendo ? (
-              <form onSubmit={handleEnviar} className="flex gap-2">
-                <input 
-                  type="text" 
-                  value={mensaje} 
-                  onChange={e=>setMensaje(e.target.value)} 
-                  placeholder="Escribe tu respuesta como agente..." 
-                  className="flex-1 h-11 px-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition outline-none"
-                />
-                <button disabled={enviando || !mensaje.trim()} className="px-5 h-11 bg-brand-600 hover:bg-brand-700 disabled:bg-brand-400 text-white font-semibold rounded-xl transition">
-                  Enviar
-                </button>
-              </form>
+          <div className="p-4 bg-white border-t border-slate-200 shrink-0 flex justify-center">
+            {caso?.conversation_id ? (
+              <Link 
+                href={`/dashboard/chats?chat=${caso.conversation_id}`}
+                className="w-full sm:w-auto px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-xl shadow-sm transition flex items-center justify-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                Abrir en Chats
+              </Link>
             ) : (
-              <p className="text-center text-slate-500 text-sm font-medium p-2 bg-slate-50 rounded-lg">Debes tomar el caso para poder responder.</p>
+              <p className="text-center text-slate-500 text-sm font-medium p-2 bg-slate-50 rounded-lg w-full">Este caso no tiene un chat asociado.</p>
             )}
           </div>
         </div>

@@ -1,11 +1,17 @@
 'use client'
 import Loading from '@/components/Loading'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { getConversaciones, getMensajes, toggleIAPausa, cerrarConversacion } from '@/app/actions/chats'
+import { enviarMensajeAgenteConv } from '@/app/actions/conversaciones'
 import { getMisPermisos } from '@/app/actions/permisos'
 
-export default function ChatsPage() {
+function ChatsContent() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const initialChatId = searchParams.get('chat')
+
   const [conversaciones, setConversaciones] = useState<any[]>([])
   const [mensajes, setMensajes] = useState<any[]>([])
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null)
@@ -16,6 +22,9 @@ export default function ChatsPage() {
   const [loadingChats, setLoadingChats] = useState(true)
   const [loadingMsgs, setLoadingMsgs] = useState(false)
   const [mensajeGlobal, setMensajeGlobal] = useState<{tipo: string, texto: string} | null>(null)
+  
+  const [mensajeText, setMensajeText] = useState('')
+  const [enviando, setEnviando] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -40,6 +49,17 @@ export default function ChatsPage() {
         setNivelPermiso(p?.nivel || 'ninguno')
       }
     }
+    
+    // Set initial chat from URL if provided and exists
+    if (initialChatId && res.success && res.data) {
+      const exists = (res.data.conversaciones || []).find((c: any) => c.id === initialChatId)
+      if (exists) {
+        setSelectedConvId(initialChatId)
+        // Clean URL to avoid sticking to this chat on refresh without intent
+        router.replace('/dashboard/chats', { scroll: false })
+      }
+    }
+
     setLoadingChats(false)
   }
 
@@ -85,6 +105,21 @@ export default function ChatsPage() {
         setSelectedConvId(null)
       }
     }
+  }
+
+  const handleEnviar = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!mensajeText.trim() || !selectedConvId) return
+    
+    setEnviando(true)
+    const res = await enviarMensajeAgenteConv(selectedConvId, mensajeText)
+    if (res.success) {
+      setMensajeText('')
+      cargarMensajes(selectedConvId)
+    } else {
+      setMensajeGlobal({ tipo: 'error', texto: res.error || 'Error al enviar mensaje' })
+    }
+    setEnviando(false)
   }
 
   // Formatting helpers
@@ -324,20 +359,49 @@ export default function ChatsPage() {
 
             {selectedConv?.estado === 'activa' && (
               <div className="p-3 sm:p-4 bg-white border-t border-slate-200 shrink-0">
-                <div className="flex items-end gap-2">
+                <form onSubmit={handleEnviar} className="flex items-end gap-2">
                   <div className="flex-1 relative">
-                    <textarea rows={1} placeholder="Escribe un mensaje..." disabled={nivelPermiso !== 'escritura'}
-                      className="w-full px-4 py-2.5 rounded-2xl border border-slate-300 bg-white resize-none text-sm placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition max-h-32 disabled:opacity-50 disabled:bg-slate-50"></textarea>
+                    <textarea 
+                      rows={1} 
+                      value={mensajeText}
+                      onChange={e => setMensajeText(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault()
+                          handleEnviar(e as unknown as React.FormEvent)
+                        }
+                      }}
+                      placeholder="Escribe un mensaje..." 
+                      disabled={nivelPermiso !== 'escritura' || enviando}
+                      className="w-full px-4 py-2.5 rounded-2xl border border-slate-300 bg-white resize-none text-sm placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition max-h-32 disabled:opacity-50 disabled:bg-slate-50"
+                    ></textarea>
                   </div>
-                  <button disabled={nivelPermiso !== 'escritura'} className="p-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white transition shrink-0 disabled:opacity-50 disabled:cursor-not-allowed" aria-label="Enviar">
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                  <button 
+                    type="submit"
+                    disabled={nivelPermiso !== 'escritura' || enviando || !mensajeText.trim()} 
+                    className="p-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white transition shrink-0 disabled:opacity-50 disabled:cursor-not-allowed" 
+                    aria-label="Enviar"
+                  >
+                    {enviando ? (
+                      <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    ) : (
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                    )}
                   </button>
-                </div>
+                </form>
               </div>
             )}
           </>
         )}
       </section>
     </div>
+  )
+}
+
+export default function ChatsPage() {
+  return (
+    <Suspense fallback={<Loading />}>
+      <ChatsContent />
+    </Suspense>
   )
 }

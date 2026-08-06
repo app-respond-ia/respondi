@@ -1,7 +1,7 @@
 'use client'
 import Loading from '@/components/Loading'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { getCasos, getAgentesParaCasos } from '@/app/actions/casos'
@@ -11,6 +11,7 @@ export default function CasosPage() {
   const router = useRouter()
   const [casos, setCasos] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const isFirstMount = useRef(true)
   const [isFetching, setIsFetching] = useState(false)
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
   
@@ -21,6 +22,18 @@ export default function CasosPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [estadoFilter, setEstadoFilter] = useState('Todos')
   const [canalFilter, setCanalFilter] = useState('Todos')
+  const [dateRange, setDateRange] = useState({ from: '', to: '' })
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc')
+  
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false)
+  const [agentSearch, setAgentSearch] = useState('')
+  
+  const filteredAgentes = agentesOpciones.filter(ag => (ag.nombre || ag.email).toLowerCase().includes(agentSearch.toLowerCase()))
+  
+  const getAgentFilterLabel = () => {
+    if (agentesFilter.length === 0) return 'Todos los agentes'
+    return `Agentes (${agentesFilter.length})`
+  }
 
   const estados = ['Todos', 'Pendiente', 'Atendiendo', 'Resuelto']
   const canales = ['Todos', 'Instagram', 'WhatsApp', 'Facebook']
@@ -42,7 +55,9 @@ export default function CasosPage() {
 
   useEffect(() => {
     const cargar = async () => {
-      if (casos.length === 0) setLoading(true)
+      if (isFirstMount.current) {
+        setLoading(true)
+      }
       setIsFetching(true)
 
       const [res, permisosRes] = await Promise.all([
@@ -50,7 +65,9 @@ export default function CasosPage() {
           estado: estadoFilter,
           canal: canalFilter,
           search: debouncedSearch,
-          agentesIds: agentesFilter
+          agentesIds: agentesFilter,
+          dateRange: dateRange.from || dateRange.to ? dateRange : undefined,
+          sort: sortOrder
         }),
         getMisPermisos()
       ])
@@ -65,11 +82,14 @@ export default function CasosPage() {
           setNivelPermiso(p?.nivel || 'ninguno')
         }
       }
-      setLoading(false)
+      if (isFirstMount.current) {
+        setLoading(false)
+        isFirstMount.current = false
+      }
       setIsFetching(false)
     }
     cargar()
-  }, [estadoFilter, canalFilter, debouncedSearch, agentesFilter])
+  }, [estadoFilter, canalFilter, debouncedSearch, agentesFilter, dateRange, sortOrder])
 
   const getCanalIcon = (canal: string) => {
     if (canal === 'instagram') {
@@ -161,33 +181,63 @@ export default function CasosPage() {
           
           <div className="flex items-center gap-3 border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6">
             <span className="text-sm font-medium text-slate-500">Agentes:</span>
-            <div className="flex flex-wrap gap-2">
+            <div className="relative">
               <button 
-                onClick={() => {
-                  if (agentesFilter.includes('unassigned')) {
-                    setAgentesFilter(agentesFilter.filter(id => id !== 'unassigned'))
-                  } else {
-                    setAgentesFilter([...agentesFilter, 'unassigned'])
-                  }
-                }}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${agentesFilter.includes('unassigned') ? 'bg-indigo-100 text-indigo-700 border-indigo-200 border' : 'bg-slate-100 text-slate-600 border-transparent border hover:bg-slate-200'}`}
+                onClick={() => setIsPopoverOpen(!isPopoverOpen)}
+                className="px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 flex items-center gap-2"
               >
-                Sin asignar
+                {getAgentFilterLabel()}
+                <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/></svg>
               </button>
-              {agentesOpciones.map(ag => (
-                <button key={ag.id} 
-                  onClick={() => {
-                    if (agentesFilter.includes(ag.id)) {
-                      setAgentesFilter(agentesFilter.filter(id => id !== ag.id))
-                    } else {
-                      setAgentesFilter([...agentesFilter, ag.id])
-                    }
-                  }}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${agentesFilter.includes(ag.id) ? 'bg-indigo-100 text-indigo-700 border-indigo-200 border' : 'bg-slate-100 text-slate-600 border-transparent border hover:bg-slate-200'}`}>
-                  {ag.nombre || ag.email}
-                </button>
-              ))}
+              
+              {isPopoverOpen && (
+                <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-slate-200 z-50 overflow-hidden flex flex-col">
+                  <div className="p-2 border-b border-slate-100">
+                    <input type="text" placeholder="Buscar agente..." value={agentSearch} onChange={e => setAgentSearch(e.target.value)} className="w-full px-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:outline-none focus:border-brand-500" />
+                  </div>
+                  <div className="max-h-60 overflow-y-auto p-2">
+                    <label className="flex items-center gap-2 p-2 hover:bg-slate-50 rounded-lg cursor-pointer">
+                      <input type="checkbox" checked={agentesFilter.includes('unassigned')} onChange={() => {
+                        if (agentesFilter.includes('unassigned')) setAgentesFilter(agentesFilter.filter(id => id !== 'unassigned'))
+                        else setAgentesFilter([...agentesFilter, 'unassigned'])
+                      }} className="rounded border-slate-300 text-brand-600 focus:ring-brand-500" />
+                      <span className="text-sm text-slate-700">Sin asignar</span>
+                    </label>
+                    {filteredAgentes.map(ag => (
+                      <label key={ag.id} className="flex items-center gap-2 p-2 hover:bg-slate-50 rounded-lg cursor-pointer">
+                        <input type="checkbox" checked={agentesFilter.includes(ag.id)} onChange={() => {
+                          if (agentesFilter.includes(ag.id)) setAgentesFilter(agentesFilter.filter(id => id !== ag.id))
+                          else setAgentesFilter([...agentesFilter, ag.id])
+                        }} className="rounded border-slate-300 text-brand-600 focus:ring-brand-500" />
+                        <span className="text-sm text-slate-700">{ag.nombre || ag.email}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {agentesFilter.length > 0 && (
+                    <div className="p-2 border-t border-slate-100 bg-slate-50">
+                      <button onClick={() => setAgentesFilter([])} className="w-full text-xs text-brand-600 font-semibold py-1">Limpiar selección</button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
+          </div>
+          
+          <div className="flex items-center gap-3 border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6">
+            <span className="text-sm font-medium text-slate-500">Fecha:</span>
+            <div className="flex items-center gap-2">
+              <input type="date" value={dateRange.from} onChange={e => setDateRange({...dateRange, from: e.target.value})} className="px-3 py-1.5 rounded-lg text-sm border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-slate-700" />
+              <span className="text-slate-400">-</span>
+              <input type="date" value={dateRange.to} onChange={e => setDateRange({...dateRange, to: e.target.value})} className="px-3 py-1.5 rounded-lg text-sm border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-slate-700" />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6">
+            <span className="text-sm font-medium text-slate-500">Orden:</span>
+            <select value={sortOrder} onChange={e => setSortOrder(e.target.value as 'desc'|'asc')} className="px-3 py-1.5 rounded-lg text-sm border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-slate-700 bg-white">
+              <option value="desc">Más recientes primero</option>
+              <option value="asc">Más antiguos primero</option>
+            </select>
           </div>
         </div>
       </div>

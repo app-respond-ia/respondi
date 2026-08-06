@@ -2,7 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 
-export async function getCasos(filtros?: { estado?: string, canal?: string, search?: string, agentesIds?: string[] }) {
+export async function getCasos(filtros?: { estado?: string, canal?: string, search?: string, agentesIds?: string[], dateRange?: { from: string, to: string }, sort?: 'asc' | 'desc' }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: 'No autorizado' }
@@ -31,7 +31,7 @@ export async function getCasos(filtros?: { estado?: string, canal?: string, sear
       )
     `)
     .eq('tenant_id', tenantId)
-    .order('fecha_apertura', { ascending: false })
+    .order('fecha_apertura', { ascending: filtros?.sort === 'asc' })
 
   if (filtros?.estado && filtros.estado !== 'Todos') {
     query = query.eq('estatus', filtros.estado.toLowerCase())
@@ -54,6 +54,14 @@ export async function getCasos(filtros?: { estado?: string, canal?: string, sear
     }
   }
 
+  if (filtros?.dateRange?.from) {
+    query = query.gte('fecha_apertura', filtros.dateRange.from)
+  }
+  if (filtros?.dateRange?.to) {
+    // Add 23:59:59 to include the whole end day
+    query = query.lte('fecha_apertura', filtros.dateRange.to + 'T23:59:59.999Z')
+  }
+
   const { data, error } = await query
   if (error) return { success: false, error: error.message }
 
@@ -74,6 +82,7 @@ export async function getCasos(filtros?: { estado?: string, canal?: string, sear
       return (
         c.id.toLowerCase().includes(s) ||
         (contact?.nombre && contact.nombre.toLowerCase().includes(s)) ||
+        (contact?.identificador_canal && contact.identificador_canal.toLowerCase().includes(s)) ||
         (c.descripcion && c.descripcion.toLowerCase().includes(s))
       )
     })

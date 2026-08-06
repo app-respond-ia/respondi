@@ -2,7 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 
-export async function getConversaciones(filtros?: { estado?: string, canal?: string, search?: string, iaPausada?: boolean }) {
+export async function getConversaciones(filtros?: { estado?: string, canal?: string, search?: string, iaPausada?: boolean, dateRange?: { from: string, to: string }, sort?: 'asc' | 'desc' }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: 'No autorizado' }
@@ -29,7 +29,7 @@ export async function getConversaciones(filtros?: { estado?: string, canal?: str
       cases (id, estatus)
     `)
     .eq('tenant_id', tenantId)
-    .order('fecha_ultimo_mensaje', { ascending: false, nullsFirst: false })
+    .order('fecha_ultimo_mensaje', { ascending: filtros?.sort === 'asc', nullsFirst: false })
 
   if (filtros?.estado && filtros.estado !== 'Todas') {
     const est = filtros.estado === 'Activas' ? 'activa' : filtros.estado === 'Cerradas' ? 'cerrada' : null
@@ -44,6 +44,14 @@ export async function getConversaciones(filtros?: { estado?: string, canal?: str
     query = query.eq('ia_pausada', true)
   }
 
+  if (filtros?.dateRange?.from) {
+    query = query.gte('fecha_inicio', filtros.dateRange.from)
+  }
+  if (filtros?.dateRange?.to) {
+    // Add 23:59:59 to include the whole end day
+    query = query.lte('fecha_inicio', filtros.dateRange.to + 'T23:59:59.999Z')
+  }
+
   const { data, error } = await query
   if (error) return { success: false, error: error.message }
 
@@ -56,7 +64,8 @@ export async function getConversaciones(filtros?: { estado?: string, canal?: str
       return (
         (contact?.nombre && contact.nombre.toLowerCase().includes(s)) ||
         (contact?.identificador_canal && contact.identificador_canal.toLowerCase().includes(s)) ||
-        (c.resumen && c.resumen.toLowerCase().includes(s))
+        (c.resumen && c.resumen.toLowerCase().includes(s)) ||
+        (c.conversation_tags && c.conversation_tags.some((t: any) => t.message_categories?.nombre?.toLowerCase().includes(s)))
       )
     })
   }

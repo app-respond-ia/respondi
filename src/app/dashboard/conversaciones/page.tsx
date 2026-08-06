@@ -1,7 +1,7 @@
 'use client'
 import Loading from '@/components/Loading'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { getConversaciones } from '@/app/actions/conversaciones'
@@ -11,6 +11,7 @@ export default function ConversacionesPage() {
   const router = useRouter()
   const [conversaciones, setConversaciones] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const isFirstMount = useRef(true)
   const [isFetching, setIsFetching] = useState(false)
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
   
@@ -19,6 +20,8 @@ export default function ConversacionesPage() {
   const [estadoFilter, setEstadoFilter] = useState('Todas')
   const [canalFilter, setCanalFilter] = useState('Todos')
   const [iaPausada, setIaPausada] = useState(false)
+  const [dateRange, setDateRange] = useState({ from: '', to: '' })
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc')
 
   const estados = ['Todas', 'Activas', 'Cerradas']
   const canales = ['Todos', 'Instagram', 'WhatsApp', 'Facebook']
@@ -32,8 +35,9 @@ export default function ConversacionesPage() {
 
   useEffect(() => {
     const cargar = async () => {
-      // Solo hacer set loading true la primera vez si esta vacio
-      if (conversaciones.length === 0) setLoading(true)
+      if (isFirstMount.current) {
+        setLoading(true)
+      }
       setIsFetching(true)
       
       const [res, permisosRes] = await Promise.all([
@@ -41,7 +45,9 @@ export default function ConversacionesPage() {
           estado: estadoFilter,
           canal: canalFilter,
           search: debouncedSearch,
-          iaPausada: iaPausada
+          iaPausada: iaPausada,
+          dateRange: dateRange.from || dateRange.to ? dateRange : undefined,
+          sort: sortOrder
         }),
         getMisPermisos()
       ])
@@ -56,11 +62,15 @@ export default function ConversacionesPage() {
           setNivelPermiso(p?.nivel || 'ninguno')
         }
       }
-      setLoading(false)
+      
+      if (isFirstMount.current) {
+        setLoading(false)
+        isFirstMount.current = false
+      }
       setIsFetching(false)
     }
     cargar()
-  }, [estadoFilter, canalFilter, debouncedSearch, iaPausada])
+  }, [estadoFilter, canalFilter, debouncedSearch, iaPausada, dateRange, sortOrder])
 
   const getCanalIcon = (canal: string) => {
     if (canal === 'instagram') {
@@ -143,15 +153,34 @@ export default function ConversacionesPage() {
           </div>
         </div>
 
-        <div className="mt-4 pt-4 border-t border-slate-100 flex items-center gap-3">
-          <span className="text-sm font-medium text-slate-500">Canal:</span>
-          <div className="flex flex-wrap gap-2">
-            {canales.map(can => (
-              <button key={can} onClick={() => setCanalFilter(can)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${canalFilter === can ? 'bg-slate-800 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
-                {can}
-              </button>
-            ))}
+        <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col md:flex-row gap-6">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-slate-500">Canal:</span>
+            <div className="flex flex-wrap gap-2">
+              {canales.map(can => (
+                <button key={can} onClick={() => setCanalFilter(can)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${canalFilter === can ? 'bg-slate-800 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                  {can}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6">
+            <span className="text-sm font-medium text-slate-500">Fecha:</span>
+            <div className="flex items-center gap-2">
+              <input type="date" value={dateRange.from} onChange={e => setDateRange({...dateRange, from: e.target.value})} className="px-3 py-1.5 rounded-lg text-sm border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-slate-700" />
+              <span className="text-slate-400">-</span>
+              <input type="date" value={dateRange.to} onChange={e => setDateRange({...dateRange, to: e.target.value})} className="px-3 py-1.5 rounded-lg text-sm border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-slate-700" />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6">
+            <span className="text-sm font-medium text-slate-500">Orden:</span>
+            <select value={sortOrder} onChange={e => setSortOrder(e.target.value as 'desc'|'asc')} className="px-3 py-1.5 rounded-lg text-sm border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-slate-700 bg-white">
+              <option value="desc">Más recientes primero</option>
+              <option value="asc">Más antiguos primero</option>
+            </select>
           </div>
         </div>
       </div>
@@ -201,26 +230,9 @@ export default function ConversacionesPage() {
                         </div>
                       </td>
                       <td className="p-4 max-w-sm">
-                        <div className="flex items-center gap-2 mb-1.5">
-                          {casoAsociado && (
-                            <button 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                router.push(`/dashboard/casos/${casoAsociado.id}`);
-                              }}
-                              className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide transition hover:shadow-sm ${
-                                casoAsociado.estatus === 'pendiente' ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-200' :
-                                casoAsociado.estatus === 'atendiendo' ? 'bg-blue-100 text-blue-800 hover:bg-blue-200 border border-blue-200' :
-                                'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border border-emerald-200'
-                              }`}
-                            >
-                              Caso {casoAsociado.estatus}
-                            </button>
-                          )}
-                          <p className="text-sm text-slate-600 truncate font-medium">
-                            {conv.resumen || <span className="italic opacity-60 font-normal">Sin resumen aún...</span>}
-                          </p>
-                        </div>
+                        <p className="text-sm text-slate-600 truncate mb-1.5 font-medium">
+                          {conv.resumen || <span className="italic opacity-60 font-normal">Sin resumen aún...</span>}
+                        </p>
                         <div className="flex gap-1 flex-wrap">
                           {conv.conversation_tags && conv.conversation_tags.length > 0 ? (
                             conv.conversation_tags.map((t:any, i:number) => (
@@ -232,6 +244,21 @@ export default function ConversacionesPage() {
                             <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-50 text-slate-400 border border-slate-200 font-medium italic">
                               Descategorizado
                             </span>
+                          )}
+                          {casoAsociado && (
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/dashboard/casos/${casoAsociado.id}`);
+                              }}
+                              className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide transition hover:shadow-sm ${
+                                casoAsociado.estatus === 'pendiente' ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-200' :
+                                casoAsociado.estatus === 'atendiendo' ? 'bg-blue-100 text-blue-800 hover:bg-blue-200 border border-blue-200' :
+                                'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border border-emerald-200'
+                              }`}
+                            >
+                              Caso {casoAsociado.estatus}
+                            </button>
                           )}
                         </div>
                       </td>

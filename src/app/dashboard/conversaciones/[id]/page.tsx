@@ -56,7 +56,7 @@ export default function ConversacionDetallePage() {
                     contact?.canal === 'instagram' ? 'text-purple-500' : 'text-[#1877F2]'
 
   return (
-    <div className="h-[calc(100vh-4rem)] flex flex-col p-4 sm:p-6 mx-auto max-w-7xl overflow-hidden">
+    <div className="h-full flex flex-col p-4 sm:p-6 mx-auto max-w-7xl overflow-hidden">
       <div className="mb-4 shrink-0">
         <Link href="/dashboard/conversaciones" className="text-sm font-semibold text-slate-500 hover:text-brand-600 flex items-center gap-1 w-max">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>

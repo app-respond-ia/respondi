@@ -84,7 +84,8 @@ export async function getConversacionDetalle(convId: string) {
       contacts:contact_id (nombre, canal, identificador_canal),
       conversation_tags (
         message_categories (nombre, color)
-      )
+      ),
+      cases (id)
     `)
     .eq('id', convId)
     .eq('tenant_id', tenantId)
@@ -104,7 +105,9 @@ export async function getConversacionDetalle(convId: string) {
     data: { 
       ...conv, 
       mensajes: msgs || [],
-      etiquetas: conv.conversation_tags?.map((t: any) => t.message_categories) || []
+      etiquetas: conv.conversation_tags?.map((t: any) => t.message_categories) || [],
+      caso_asociado_id: conv.cases && conv.cases.length > 0 ? conv.cases[0].id : null,
+      current_user_id: user.id
     } 
   }
 }

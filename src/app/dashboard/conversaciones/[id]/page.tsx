@@ -4,7 +4,9 @@ import Loading from '@/components/Loading'
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { getConversacionDetalle, pausarIA, reanudarIA } from '@/app/actions/conversaciones'
+import { getAgentesParaCasos, crearCasoDesdeConversacion } from '@/app/actions/casos'
 
 export default function ConversacionDetallePage() {
   const params = useParams()
@@ -14,12 +16,26 @@ export default function ConversacionDetallePage() {
   const [conv, setConv] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [cambiandoIA, setCambiandoIA] = useState(false)
+  const [agentes, setAgentes] = useState<any[]>([])
+  const [procesandoCaso, setProcesandoCaso] = useState(false)
+  
+  const [modalState, setModalState] = useState<{
+    isOpen: boolean;
+    action: 'asignar_mi' | 'asignar_otro' | 'cola' | null;
+    targetId?: string;
+  }>({ isOpen: false, action: null })
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     cargarDatos()
+    cargarAgentes()
   }, [id])
+
+  const cargarAgentes = async () => {
+    const res = await getAgentesParaCasos()
+    if (res.success && res.data) setAgentes(res.data)
+  }
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -48,6 +64,26 @@ export default function ConversacionDetallePage() {
     setCambiandoIA(false)
   }
 
+  const handleConfirmCaso = async () => {
+    if (!modalState.action) return
+    setProcesandoCaso(true)
+    
+    let targetAgenteId = null
+    if (modalState.action === 'asignar_mi') targetAgenteId = conv?.current_user_id
+    if (modalState.action === 'asignar_otro' && modalState.targetId) targetAgenteId = modalState.targetId
+
+    const res = await crearCasoDesdeConversacion(id, targetAgenteId)
+    if (res.success) {
+      setModalState({ isOpen: false, action: null })
+      await cargarDatos()
+    }
+    setProcesandoCaso(false)
+  }
+
+  const openModal = (action: typeof modalState.action, targetId?: string) => {
+    setModalState({ isOpen: true, action, targetId })
+  }
+
   if (loading) return <Loading />
   if (!conv) return null
 
@@ -56,7 +92,7 @@ export default function ConversacionDetallePage() {
                     contact?.canal === 'instagram' ? 'text-purple-500' : 'text-[#1877F2]'
 
   return (
-    <div className="h-full flex flex-col p-4 sm:p-6 mx-auto max-w-7xl overflow-hidden">
+    <div className="h-full flex flex-col p-4 sm:p-6 mx-auto w-full max-w-7xl overflow-hidden">
       <div className="mb-4 shrink-0">
         <Link href="/dashboard/conversaciones" className="text-sm font-semibold text-slate-500 hover:text-brand-600 flex items-center gap-1 w-max">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
@@ -152,6 +188,58 @@ export default function ConversacionDetallePage() {
           </div>
 
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+            <h3 className="font-semibold text-ink-900 mb-4 pb-2 border-b border-slate-100">Gestión de Caso</h3>
+            {conv.caso_asociado_id ? (
+              <div>
+                <p className="text-sm text-slate-500 mb-3">Esta conversación ya forma parte de un caso.</p>
+                <Link 
+                  href={`/dashboard/casos/${conv.caso_asociado_id}`}
+                  className="w-full inline-flex items-center justify-center gap-2 py-2 bg-brand-50 hover:bg-brand-100 text-brand-700 font-semibold rounded-xl transition text-sm"
+                >
+                  Ver caso #{conv.caso_asociado_id.substring(0,8).toUpperCase()}
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <button 
+                  onClick={() => openModal('asignar_mi')}
+                  disabled={procesandoCaso}
+                  className="w-full py-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-xl shadow-md shadow-brand-600/20 transition text-sm disabled:opacity-50"
+                >
+                  Asignarme a mí
+                </button>
+                <button 
+                  onClick={() => openModal('cola')}
+                  disabled={procesandoCaso}
+                  className="w-full py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold rounded-xl border border-slate-200 transition text-sm disabled:opacity-50"
+                >
+                  Dejar en cola (sin asignar)
+                </button>
+                <div className="pt-3 border-t border-slate-100">
+                  <p className="text-xs text-slate-500 font-medium mb-2">Asignar a...</p>
+                  <select 
+                    className="w-full h-10 px-3 border border-slate-200 rounded-xl bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-shadow disabled:opacity-50"
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        openModal('asignar_otro', e.target.value)
+                        e.target.value = "" // Reset select
+                      }
+                    }}
+                    defaultValue=""
+                    disabled={procesandoCaso}
+                  >
+                    <option value="" disabled>Selecciona un agente</option>
+                    {agentes.map(a => (
+                      <option key={a.id} value={a.id}>{a.nombre || a.email}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
             <h3 className="font-semibold text-ink-900 mb-4 pb-2 border-b border-slate-100">Detalles de Conversación</h3>
             <div className="space-y-4">
               <div>
@@ -188,6 +276,21 @@ export default function ConversacionDetallePage() {
           </div>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={modalState.isOpen}
+        title="Crear caso"
+        message={
+          modalState.action === 'asignar_mi' ? 'Se creará un nuevo caso vinculado a esta conversación y se te asignará a ti.' :
+          modalState.action === 'cola' ? 'Se creará un nuevo caso vinculado a esta conversación y quedará en cola (sin asignar).' :
+          'Se creará un nuevo caso vinculado a esta conversación y se le asignará al agente seleccionado.'
+        }
+        confirmText="Confirmar"
+        type="info"
+        onConfirm={handleConfirmCaso}
+        onClose={() => setModalState({ isOpen: false, action: null })}
+        isLoading={procesandoCaso}
+      />
     </div>
   )
 }

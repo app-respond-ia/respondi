@@ -4,6 +4,7 @@ import Loading from '@/components/Loading'
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { getCasoDetalle, tomarCaso, cerrarCaso, asignarCaso, soltarCaso, getAgentesParaCasos } from '@/app/actions/casos'
 
 export default function CasoDetallePage() {
@@ -15,6 +16,11 @@ export default function CasoDetallePage() {
   const [loading, setLoading] = useState(true)
   const [agentes, setAgentes] = useState<any[]>([])
   const [procesando, setProcesando] = useState(false)
+  const [modalState, setModalState] = useState<{
+    isOpen: boolean;
+    action: 'tomar' | 'cerrar' | 'asignar' | 'soltar' | 'transferir' | null;
+    targetId?: string;
+  }>({ isOpen: false, action: null })
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -44,41 +50,40 @@ export default function CasoDetallePage() {
     setLoading(false)
   }
 
-  const handleTomar = async () => {
+  const handleConfirmAction = async () => {
+    if (!modalState.action) return
     setProcesando(true)
-    const res = await tomarCaso(id)
-    if (res.success) await cargarDatos()
+    
+    let res
+    switch (modalState.action) {
+      case 'tomar':
+        res = await tomarCaso(id)
+        break
+      case 'cerrar':
+        res = await cerrarCaso(id)
+        break
+      case 'asignar':
+        res = await asignarCaso(id, caso.current_user_id)
+        break
+      case 'soltar':
+        res = await soltarCaso(id)
+        break
+      case 'transferir':
+        if (modalState.targetId) {
+          res = await asignarCaso(id, modalState.targetId)
+        }
+        break
+    }
+
+    if (res?.success) {
+      setModalState({ isOpen: false, action: null })
+      await cargarDatos()
+    }
     setProcesando(false)
   }
 
-  const handleCerrar = async () => {
-    setProcesando(true)
-    const res = await cerrarCaso(id)
-    if (res.success) await cargarDatos()
-    setProcesando(false)
-  }
-
-  const handleAsignarme = async () => {
-    if (!caso?.current_user_id) return
-    setProcesando(true)
-    const res = await asignarCaso(id, caso.current_user_id)
-    if (res.success) await cargarDatos()
-    setProcesando(false)
-  }
-
-  const handleSoltar = async () => {
-    setProcesando(true)
-    const res = await soltarCaso(id)
-    if (res.success) await cargarDatos()
-    setProcesando(false)
-  }
-
-  const handleTransferir = async (agenteId: string) => {
-    if (!agenteId) return
-    setProcesando(true)
-    const res = await asignarCaso(id, agenteId)
-    if (res.success) await cargarDatos()
-    setProcesando(false)
+  const openModal = (action: typeof modalState.action, targetId?: string) => {
+    setModalState({ isOpen: true, action, targetId })
   }
 
   if (loading) return <Loading />
@@ -92,7 +97,7 @@ export default function CasoDetallePage() {
                     caso.contacts?.canal === 'instagram' ? 'text-purple-500' : 'text-[#1877F2]'
 
   return (
-    <div className="h-full flex flex-col p-4 sm:p-6 mx-auto max-w-7xl overflow-hidden">
+    <div className="h-full flex flex-col p-4 sm:p-6 mx-auto w-full max-w-7xl overflow-hidden">
       <div className="mb-4 shrink-0">
         <Link href="/dashboard/casos" className="text-sm font-semibold text-slate-500 hover:text-brand-600 flex items-center gap-1 w-max">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
@@ -110,12 +115,12 @@ export default function CasoDetallePage() {
           </h1>
           <div className="flex gap-3">
             {esPendiente && (
-              <button onClick={handleTomar} className="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-xl shadow-md shadow-brand-600/20 transition">
+              <button onClick={() => openModal('tomar')} className="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-xl shadow-md shadow-brand-600/20 transition">
                 Tomar caso
               </button>
             )}
             {esAtendiendo && (
-              <button onClick={handleCerrar} className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow-md shadow-emerald-600/20 transition">
+              <button onClick={() => openModal('cerrar')} className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow-md shadow-emerald-600/20 transition">
                 Cerrar caso
               </button>
             )}
@@ -234,7 +239,7 @@ export default function CasoDetallePage() {
             <div className="space-y-3">
               {caso.agente_id !== caso.current_user_id ? (
                 <button 
-                  onClick={handleAsignarme} 
+                  onClick={() => openModal('asignar')} 
                   disabled={procesando}
                   className="w-full py-2 bg-brand-50 hover:bg-brand-100 text-brand-700 font-semibold rounded-xl transition text-sm disabled:opacity-50"
                 >
@@ -242,25 +247,30 @@ export default function CasoDetallePage() {
                 </button>
               ) : (
                 <button 
-                  onClick={handleSoltar} 
+                  onClick={() => openModal('soltar')} 
                   disabled={procesando}
                   className="w-full py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold rounded-xl border border-slate-200 transition text-sm disabled:opacity-50"
                 >
                   Soltar caso
                 </button>
               )}
-
-              <div className="pt-2 border-t border-slate-100">
-                <label className="text-xs text-slate-500 font-medium block mb-1.5">Transferir a...</label>
+              
+              <div className="pt-3 border-t border-slate-100">
+                <p className="text-xs text-slate-500 font-medium mb-2">Transferir a...</p>
                 <select 
-                  className="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-slate-50 disabled:opacity-50"
-                  value=""
-                  onChange={(e) => handleTransferir(e.target.value)}
-                  disabled={procesando || agentes.length === 0}
+                  className="w-full h-10 px-3 border border-slate-200 rounded-xl bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-shadow disabled:opacity-50"
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      openModal('transferir', e.target.value)
+                      e.target.value = "" // Reset select
+                    }
+                  }}
+                  defaultValue=""
+                  disabled={procesando}
                 >
                   <option value="" disabled>Selecciona un agente</option>
                   {agentes.filter(a => a.id !== caso.agente_id).map(a => (
-                    <option key={a.id} value={a.id}>{a.nombre}</option>
+                    <option key={a.id} value={a.id}>{a.nombre || a.email}</option>
                   ))}
                 </select>
               </div>
@@ -281,6 +291,29 @@ export default function CasoDetallePage() {
           )}
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={modalState.isOpen}
+        title={
+          modalState.action === 'tomar' ? 'Tomar caso' :
+          modalState.action === 'cerrar' ? 'Cerrar caso' :
+          modalState.action === 'asignar' ? 'Asignarme este caso' :
+          modalState.action === 'soltar' ? 'Soltar caso' :
+          'Transferir caso'
+        }
+        message={
+          modalState.action === 'tomar' ? '¿Estás seguro de que deseas asignarte este caso y empezar a atenderlo?' :
+          modalState.action === 'cerrar' ? '¿Estás seguro de que deseas marcar este caso como resuelto/cerrado?' :
+          modalState.action === 'asignar' ? '¿Deseas tomar la propiedad de este caso?' :
+          modalState.action === 'soltar' ? '¿Estás seguro de que deseas soltar este caso? Quedará libre para que otro agente lo tome.' :
+          `¿Estás seguro de que deseas transferir este caso al agente seleccionado?`
+        }
+        confirmText="Confirmar"
+        type={modalState.action === 'cerrar' ? 'success' : modalState.action === 'soltar' ? 'warning' : 'info'}
+        onConfirm={handleConfirmAction}
+        onClose={() => setModalState({ isOpen: false, action: null })}
+        isLoading={procesando}
+      />
     </div>
   )
 }

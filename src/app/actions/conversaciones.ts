@@ -25,7 +25,8 @@ export async function getConversaciones(filtros?: { estado?: string, canal?: str
       contacts:contact_id (nombre, canal, identificador_canal),
       conversation_tags (
         message_categories (nombre, color)
-      )
+      ),
+      cases (id, estatus)
     `)
     .eq('tenant_id', tenantId)
     .order('fecha_ultimo_mensaje', { ascending: false, nullsFirst: false })

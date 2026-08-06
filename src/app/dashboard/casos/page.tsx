@@ -4,16 +4,21 @@ import Loading from '@/components/Loading'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { getCasos } from '@/app/actions/casos'
+import { getCasos, getAgentesParaCasos } from '@/app/actions/casos'
 import { getMisPermisos } from '@/app/actions/permisos'
 
 export default function CasosPage() {
   const router = useRouter()
   const [casos, setCasos] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [isFetching, setIsFetching] = useState(false)
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
   
+  const [agentesOpciones, setAgentesOpciones] = useState<any[]>([])
+  const [agentesFilter, setAgentesFilter] = useState<string[]>([])
+  
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [estadoFilter, setEstadoFilter] = useState('Todos')
   const [canalFilter, setCanalFilter] = useState('Todos')
 
@@ -21,13 +26,31 @@ export default function CasosPage() {
   const canales = ['Todos', 'Instagram', 'WhatsApp', 'Facebook']
 
   useEffect(() => {
+    const fetchAgentes = async () => {
+      const res = await getAgentesParaCasos()
+      if (res.success && res.data) setAgentesOpciones(res.data)
+    }
+    fetchAgentes()
+  }, [])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search)
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [search])
+
+  useEffect(() => {
     const cargar = async () => {
-      setLoading(true)
+      if (casos.length === 0) setLoading(true)
+      setIsFetching(true)
+
       const [res, permisosRes] = await Promise.all([
         getCasos({
           estado: estadoFilter,
           canal: canalFilter,
-          search: search
+          search: debouncedSearch,
+          agentesIds: agentesFilter
         }),
         getMisPermisos()
       ])
@@ -43,9 +66,10 @@ export default function CasosPage() {
         }
       }
       setLoading(false)
+      setIsFetching(false)
     }
     cargar()
-  }, [estadoFilter, canalFilter, search])
+  }, [estadoFilter, canalFilter, debouncedSearch, agentesFilter])
 
   const getCanalIcon = (canal: string) => {
     if (canal === 'instagram') {
@@ -122,15 +146,48 @@ export default function CasosPage() {
           </div>
         </div>
 
-        <div className="mt-4 pt-4 border-t border-slate-100 flex items-center gap-3">
-          <span className="text-sm font-medium text-slate-500">Canal:</span>
-          <div className="flex flex-wrap gap-2">
-            {canales.map(can => (
-              <button key={can} onClick={() => setCanalFilter(can)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${canalFilter === can ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
-                {can}
+        <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col md:flex-row gap-6">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-slate-500">Canal:</span>
+            <div className="flex flex-wrap gap-2">
+              {canales.map(can => (
+                <button key={can} onClick={() => setCanalFilter(can)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${canalFilter === can ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                  {can}
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3 border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6">
+            <span className="text-sm font-medium text-slate-500">Agentes:</span>
+            <div className="flex flex-wrap gap-2">
+              <button 
+                onClick={() => {
+                  if (agentesFilter.includes('unassigned')) {
+                    setAgentesFilter(agentesFilter.filter(id => id !== 'unassigned'))
+                  } else {
+                    setAgentesFilter([...agentesFilter, 'unassigned'])
+                  }
+                }}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${agentesFilter.includes('unassigned') ? 'bg-indigo-100 text-indigo-700 border-indigo-200 border' : 'bg-slate-100 text-slate-600 border-transparent border hover:bg-slate-200'}`}
+              >
+                Sin asignar
               </button>
-            ))}
+              {agentesOpciones.map(ag => (
+                <button key={ag.id} 
+                  onClick={() => {
+                    if (agentesFilter.includes(ag.id)) {
+                      setAgentesFilter(agentesFilter.filter(id => id !== ag.id))
+                    } else {
+                      setAgentesFilter([...agentesFilter, ag.id])
+                    }
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${agentesFilter.includes(ag.id) ? 'bg-indigo-100 text-indigo-700 border-indigo-200 border' : 'bg-slate-100 text-slate-600 border-transparent border hover:bg-slate-200'}`}>
+                  {ag.nombre || ag.email}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -156,7 +213,7 @@ export default function CasosPage() {
                   <th className="p-4 pr-6 font-medium text-right">Tiempo</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className={`divide-y divide-slate-100 transition-opacity duration-200 ${isFetching ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
                 {casos.map(caso => (
                   <tr key={caso.id} onClick={() => router.push(`/dashboard/casos/${caso.id}`)} className="hover:bg-slate-100 transition group cursor-pointer">
                     <td className="p-4 pl-6">

@@ -2,7 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 
-export async function getCasos(filtros?: { estado?: string, canal?: string, search?: string }) {
+export async function getCasos(filtros?: { estado?: string, canal?: string, search?: string, agentesIds?: string[] }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: 'No autorizado' }
@@ -39,6 +39,19 @@ export async function getCasos(filtros?: { estado?: string, canal?: string, sear
   
   if (filtros?.canal && filtros.canal !== 'Todos') {
     query = query.eq('contacts.canal', filtros.canal.toLowerCase())
+  }
+
+  if (filtros?.agentesIds && filtros.agentesIds.length > 0) {
+    const ids = filtros.agentesIds.filter(id => id !== 'unassigned')
+    const hasUnassigned = filtros.agentesIds.includes('unassigned')
+    
+    if (ids.length > 0 && hasUnassigned) {
+      query = query.or(`agente_id.in.(${ids.join(',')}),agente_id.is.null`)
+    } else if (ids.length > 0) {
+      query = query.in('agente_id', ids)
+    } else if (hasUnassigned) {
+      query = query.is('agente_id', null)
+    }
   }
 
   const { data, error } = await query

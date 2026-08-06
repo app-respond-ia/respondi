@@ -3,15 +3,19 @@ import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { getConversaciones } from '@/app/actions/conversaciones'
 import { getMisPermisos } from '@/app/actions/permisos'
 
 export default function ConversacionesPage() {
+  const router = useRouter()
   const [conversaciones, setConversaciones] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [isFetching, setIsFetching] = useState(false)
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
   
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [estadoFilter, setEstadoFilter] = useState('Todas')
   const [canalFilter, setCanalFilter] = useState('Todos')
   const [iaPausada, setIaPausada] = useState(false)
@@ -20,13 +24,23 @@ export default function ConversacionesPage() {
   const canales = ['Todos', 'Instagram', 'WhatsApp', 'Facebook']
 
   useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search)
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [search])
+
+  useEffect(() => {
     const cargar = async () => {
-      setLoading(true)
+      // Solo hacer set loading true la primera vez si esta vacio
+      if (conversaciones.length === 0) setLoading(true)
+      setIsFetching(true)
+      
       const [res, permisosRes] = await Promise.all([
         getConversaciones({
           estado: estadoFilter,
           canal: canalFilter,
-          search: search,
+          search: debouncedSearch,
           iaPausada: iaPausada
         }),
         getMisPermisos()
@@ -43,9 +57,10 @@ export default function ConversacionesPage() {
         }
       }
       setLoading(false)
+      setIsFetching(false)
     }
     cargar()
-  }, [estadoFilter, canalFilter, search, iaPausada])
+  }, [estadoFilter, canalFilter, debouncedSearch, iaPausada])
 
   const getCanalIcon = (canal: string) => {
     if (canal === 'instagram') {
@@ -162,14 +177,15 @@ export default function ConversacionesPage() {
                   <th className="p-4 pr-6 font-medium text-right">Último mensaje</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className={`divide-y divide-slate-100 transition-opacity duration-200 ${isFetching ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
                 {conversaciones.map((conv) => {
                   const contact = Array.isArray(conv.contacts) ? conv.contacts[0] : conv.contacts
+                  const casoAsociado = conv.cases && conv.cases.length > 0 ? conv.cases[0] : null
+                  
                   return (
-                    <tr key={conv.id} className="hover:bg-slate-50/50 transition group cursor-pointer relative">
+                    <tr key={conv.id} onClick={() => router.push(`/dashboard/conversaciones/${conv.id}`)} className="hover:bg-slate-100 transition group cursor-pointer">
                       <td className="p-4 pl-6">
-                        <Link href={`/dashboard/conversaciones/${conv.id}`} className="absolute inset-0 z-0"></Link>
-                        <div className="flex items-center gap-3 relative z-10 pointer-events-none">
+                        <div className="flex items-center gap-3">
                           <div className="relative">
                             <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold font-display">
                               {contact?.nombre?.substring(0,2).toUpperCase() || 'US'}
@@ -184,10 +200,27 @@ export default function ConversacionesPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="p-4 max-w-sm relative z-10 pointer-events-none">
-                        <p className="text-sm text-slate-600 truncate mb-1.5 font-medium">
-                          {conv.resumen || <span className="italic opacity-60 font-normal">Sin resumen aún...</span>}
-                        </p>
+                      <td className="p-4 max-w-sm">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          {casoAsociado && (
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/dashboard/casos/${casoAsociado.id}`);
+                              }}
+                              className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide transition hover:shadow-sm ${
+                                casoAsociado.estatus === 'pendiente' ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-200' :
+                                casoAsociado.estatus === 'atendiendo' ? 'bg-blue-100 text-blue-800 hover:bg-blue-200 border border-blue-200' :
+                                'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border border-emerald-200'
+                              }`}
+                            >
+                              Caso {casoAsociado.estatus}
+                            </button>
+                          )}
+                          <p className="text-sm text-slate-600 truncate font-medium">
+                            {conv.resumen || <span className="italic opacity-60 font-normal">Sin resumen aún...</span>}
+                          </p>
+                        </div>
                         <div className="flex gap-1 flex-wrap">
                           {conv.conversation_tags && conv.conversation_tags.length > 0 ? (
                             conv.conversation_tags.map((t:any, i:number) => (
@@ -202,21 +235,21 @@ export default function ConversacionesPage() {
                           )}
                         </div>
                       </td>
-                      <td className="p-4 text-center relative z-10 pointer-events-none">
+                      <td className="p-4 text-center">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide ${
                           conv.ia_pausada ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                         }`}>
                           {conv.ia_pausada ? 'Pausada' : 'Activa'}
                         </span>
                       </td>
-                      <td className="p-4 text-center relative z-10 pointer-events-none">
+                      <td className="p-4 text-center">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold capitalize ${
                           conv.estado === 'activa' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-600'
                         }`}>
                           {conv.estado}
                         </span>
                       </td>
-                      <td className="p-4 pr-6 text-right relative z-10 pointer-events-none">
+                      <td className="p-4 pr-6 text-right">
                         <p className="text-sm font-semibold text-slate-700">
                           {formatFecha(conv.fecha_ultimo_mensaje || conv.fecha_inicio)}
                         </p>

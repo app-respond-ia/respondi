@@ -23,6 +23,27 @@ export default function ConversacionesPage() {
   const [dateRange, setDateRange] = useState({ from: '', to: '' })
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc')
 
+  const [showFilters, setShowFilters] = useState(false)
+  const filtersRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (filtersRef.current && !filtersRef.current.contains(event.target as Node)) {
+        setShowFilters(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
+
+  const getActiveFiltersCount = () => {
+    let count = 0
+    if (canalFilter !== 'Todos') count++
+    if (dateRange.from || dateRange.to) count++
+    if (sortOrder !== 'desc') count++
+    return count
+  }
+
   const estados = ['Todas', 'Activas', 'Cerradas']
   const canales = ['Todos', 'Instagram', 'WhatsApp', 'Facebook']
 
@@ -123,13 +144,77 @@ export default function ConversacionesPage() {
         <p className="text-ink-500 mt-1">Revisa el historial de interacciones con tus clientes.</p>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mb-6">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mb-6 relative">
         <div className="flex flex-col md:flex-row gap-4 items-start md:items-center w-full">
-          <div className="relative flex-1 w-full">
-            <svg className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-            <input type="text" placeholder="Buscar por nombre, teléfono o contenido..." 
-              value={search} onChange={e => setSearch(e.target.value)}
-              className="w-full h-10 pl-10 pr-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition outline-none" />
+          <div className="flex-1 flex gap-2 w-full">
+            <div className="relative flex-1">
+              <svg className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              <input type="text" placeholder="Buscar por nombre, teléfono o contenido..." 
+                value={search} onChange={e => setSearch(e.target.value)}
+                className="w-full h-10 pl-10 pr-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition outline-none" />
+            </div>
+            
+            <div className="relative" ref={filtersRef}>
+              <button 
+                onClick={() => setShowFilters(!showFilters)}
+                className={`h-10 px-4 rounded-xl text-sm font-medium border flex items-center gap-2 transition ${getActiveFiltersCount() > 0 ? 'bg-brand-50 text-brand-700 border-brand-200' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}`}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+                Filtros
+                {getActiveFiltersCount() > 0 && (
+                  <span className="bg-brand-600 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold">{getActiveFiltersCount()}</span>
+                )}
+              </button>
+
+              {showFilters && (
+                <div className="absolute top-full right-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden flex flex-col">
+                  <div className="p-4 flex flex-col gap-5">
+                    
+                    <div>
+                      <span className="block text-sm font-semibold text-slate-700 mb-2">Canal</span>
+                      <div className="flex flex-wrap gap-2">
+                        {canales.map(can => (
+                          <button key={can} onClick={() => setCanalFilter(can)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${canalFilter === can ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                            {can}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="block text-sm font-semibold text-slate-700 mb-2">Fecha</span>
+                      <div className="flex items-center gap-2">
+                        <input type="date" value={dateRange.from} onChange={e => setDateRange({...dateRange, from: e.target.value})} className="flex-1 w-full px-2 py-1.5 rounded-lg text-sm border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-slate-700 bg-white" />
+                        <span className="text-slate-400">-</span>
+                        <input type="date" value={dateRange.to} onChange={e => setDateRange({...dateRange, to: e.target.value})} className="flex-1 w-full px-2 py-1.5 rounded-lg text-sm border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-slate-700 bg-white" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="block text-sm font-semibold text-slate-700 mb-2">Orden</span>
+                      <select value={sortOrder} onChange={e => setSortOrder(e.target.value as 'desc'|'asc')} className="w-full px-3 py-2 rounded-lg text-sm border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-slate-700 bg-white">
+                        <option value="desc">Más recientes primero</option>
+                        <option value="asc">Más antiguos primero</option>
+                      </select>
+                    </div>
+
+                  </div>
+                  
+                  {getActiveFiltersCount() > 0 && (
+                    <div className="p-3 border-t border-slate-100 bg-slate-50">
+                      <button onClick={() => {
+                        setCanalFilter('Todos')
+                        setDateRange({ from: '', to: '' })
+                        setSortOrder('desc')
+                      }} className="w-full text-sm text-brand-600 font-semibold py-1.5 hover:bg-brand-50 rounded-lg transition">
+                        Limpiar filtros
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
           
           <div className="flex flex-wrap items-center gap-4 shrink-0">
@@ -150,41 +235,6 @@ export default function ConversacionesPage() {
               </div>
               <span className="text-sm font-medium text-slate-700 select-none">Solo IA pausada</span>
             </label>
-          </div>
-        </div>
-
-        <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap gap-4 items-center">
-          <div className="flex items-center">
-            <span className="text-sm font-medium text-slate-500 mr-2">Canal:</span>
-            <div className="flex bg-slate-100 p-1 rounded-lg">
-              {canales.map(can => (
-                <button key={can} onClick={() => setCanalFilter(can)}
-                  className={`px-3 h-7 rounded-md text-sm font-medium transition ${canalFilter === can ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>
-                  {can}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="h-5 w-px bg-slate-200 hidden sm:block"></div>
-
-          <div className="flex items-center">
-            <span className="text-sm font-medium text-slate-500 mr-2">Fecha:</span>
-            <div className="flex items-center gap-1">
-              <input type="date" value={dateRange.from} onChange={e => setDateRange({...dateRange, from: e.target.value})} className="h-9 px-2 rounded-lg text-sm border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-slate-700 bg-white" />
-              <span className="text-slate-400">-</span>
-              <input type="date" value={dateRange.to} onChange={e => setDateRange({...dateRange, to: e.target.value})} className="h-9 px-2 rounded-lg text-sm border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-slate-700 bg-white" />
-            </div>
-          </div>
-
-          <div className="h-5 w-px bg-slate-200 hidden md:block"></div>
-
-          <div className="flex items-center">
-            <span className="text-sm font-medium text-slate-500 mr-2">Orden:</span>
-            <select value={sortOrder} onChange={e => setSortOrder(e.target.value as 'desc'|'asc')} className="h-9 px-2 pr-8 rounded-lg text-sm border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-slate-700 bg-white">
-              <option value="desc">Más recientes primero</option>
-              <option value="asc">Más antiguos primero</option>
-            </select>
           </div>
         </div>
       </div>
@@ -216,29 +266,31 @@ export default function ConversacionesPage() {
                   const casoAsociado = conv.cases && conv.cases.length > 0 ? conv.cases[0] : null
                   
                   return (
-                    <tr key={conv.id} onClick={() => router.push(`/dashboard/conversaciones/${conv.id}`)} className="hover:bg-slate-100 transition group cursor-pointer">
+                    <tr key={conv.id} onClick={() => router.push(`/dashboard/conversaciones/${conv.id}`)} 
+                      className={`hover:bg-slate-100 transition group cursor-pointer ${
+                        casoAsociado ? (
+                          casoAsociado.estatus === 'pendiente' ? 'border-l-4 border-l-amber-400' :
+                          casoAsociado.estatus === 'atendiendo' ? 'border-l-4 border-l-blue-400' :
+                          'border-l-4 border-l-emerald-400'
+                        ) : 'border-l-4 border-l-transparent'
+                      }`}
+                    >
                       <td className="p-4 pl-6">
-                        <div className="flex items-center gap-3">
-                          <div className="relative">
-                            <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold font-display">
-                              {contact?.nombre?.substring(0,2).toUpperCase() || 'US'}
-                            </div>
-                            <div className="absolute -bottom-1 -right-1 ring-2 ring-white rounded-full">
-                              {getCanalIcon(contact?.canal || conv.canal)}
-                            </div>
-                          </div>
-                          <div>
-                            <p className="font-semibold text-ink-900 group-hover:text-brand-600 transition">{contact?.nombre || 'Desconocido'}</p>
-                            <p className="text-xs text-slate-500">{contact?.identificador_canal}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-4 max-w-sm">
                         <div className="flex flex-col gap-2">
-                          <p className="text-sm text-slate-600 truncate font-medium">
-                            {conv.resumen || <span className="italic opacity-60 font-normal">Sin resumen aún...</span>}
-                          </p>
-                          
+                          <div className="flex items-center gap-3">
+                            <div className="relative">
+                              <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold font-display">
+                                {contact?.nombre?.substring(0,2).toUpperCase() || 'US'}
+                              </div>
+                              <div className="absolute -bottom-1 -right-1 ring-2 ring-white rounded-full">
+                                {getCanalIcon(contact?.canal || conv.canal)}
+                              </div>
+                            </div>
+                            <div>
+                              <p className="font-semibold text-ink-900 group-hover:text-brand-600 transition">{contact?.nombre || 'Desconocido'}</p>
+                              <p className="text-xs text-slate-500">{contact?.identificador_canal}</p>
+                            </div>
+                          </div>
                           {casoAsociado && (
                             <div>
                               <button 
@@ -246,7 +298,7 @@ export default function ConversacionesPage() {
                                   e.stopPropagation();
                                   router.push(`/dashboard/casos/${casoAsociado.id}`);
                                 }}
-                                className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide transition hover:shadow-sm ${
+                                className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide transition hover:shadow-sm ${
                                   casoAsociado.estatus === 'pendiente' ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-200' :
                                   casoAsociado.estatus === 'atendiendo' ? 'bg-blue-100 text-blue-800 hover:bg-blue-200 border border-blue-200' :
                                   'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border border-emerald-200'
@@ -256,6 +308,13 @@ export default function ConversacionesPage() {
                               </button>
                             </div>
                           )}
+                        </div>
+                      </td>
+                      <td className="p-4 max-w-sm">
+                        <div className="flex flex-col gap-2">
+                          <p className="text-sm text-slate-600 truncate font-medium">
+                            {conv.resumen || <span className="italic opacity-60 font-normal">Sin resumen aún...</span>}
+                          </p>
 
                           <div className="flex gap-1 flex-wrap">
                             {conv.conversation_tags && conv.conversation_tags.length > 0 ? (

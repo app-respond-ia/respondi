@@ -25,14 +25,14 @@ export default function CasosPage() {
   const [dateRange, setDateRange] = useState({ from: '', to: '' })
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc')
   
-  const [isPopoverOpen, setIsPopoverOpen] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
   const [agentSearch, setAgentSearch] = useState('')
-  const popoverRef = useRef<HTMLDivElement>(null)
+  const filtersRef = useRef<HTMLDivElement>(null)
   
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
-        setIsPopoverOpen(false)
+      if (filtersRef.current && !filtersRef.current.contains(event.target as Node)) {
+        setShowFilters(false)
       }
     }
     document.addEventListener("mousedown", handleClickOutside)
@@ -41,9 +41,13 @@ export default function CasosPage() {
   
   const filteredAgentes = agentesOpciones.filter(ag => (ag.nombre || ag.email).toLowerCase().includes(agentSearch.toLowerCase()))
   
-  const getAgentFilterLabel = () => {
-    if (agentesFilter.length === 0) return 'Todos los agentes'
-    return `Agentes (${agentesFilter.length})`
+  const getActiveFiltersCount = () => {
+    let count = 0
+    if (canalFilter !== 'Todos') count++
+    if (dateRange.from || dateRange.to) count++
+    if (sortOrder !== 'desc') count++
+    if (agentesFilter.length > 0) count++
+    return count
   }
 
   const estados = ['Todos', 'Pendiente', 'Atendiendo', 'Resuelto']
@@ -158,13 +162,108 @@ export default function CasosPage() {
         <p className="text-ink-500 mt-1">Gestiona las conversaciones que requieren atención humana.</p>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mb-6">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mb-6 relative">
         <div className="flex flex-col md:flex-row gap-4 items-start md:items-center w-full">
-          <div className="relative flex-1 w-full">
-            <svg className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-            <input type="text" placeholder="Buscar caso o cliente..." 
-              value={search} onChange={e => setSearch(e.target.value)}
-              className="w-full h-10 pl-10 pr-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition outline-none" />
+          <div className="flex-1 flex gap-2 w-full">
+            <div className="relative flex-1">
+              <svg className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              <input type="text" placeholder="Buscar caso o cliente..." 
+                value={search} onChange={e => setSearch(e.target.value)}
+                className="w-full h-10 pl-10 pr-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition outline-none" />
+            </div>
+            
+            <div className="relative" ref={filtersRef}>
+              <button 
+                onClick={() => setShowFilters(!showFilters)}
+                className={`h-10 px-4 rounded-xl text-sm font-medium border flex items-center gap-2 transition ${getActiveFiltersCount() > 0 ? 'bg-brand-50 text-brand-700 border-brand-200' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}`}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+                Filtros
+                {getActiveFiltersCount() > 0 && (
+                  <span className="bg-brand-600 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold">{getActiveFiltersCount()}</span>
+                )}
+              </button>
+
+              {showFilters && (
+                <div className="absolute top-full right-0 mt-2 w-72 sm:w-80 bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden flex flex-col max-h-[80vh] overflow-y-auto">
+                  <div className="p-4 flex flex-col gap-5">
+                    
+                    <div>
+                      <span className="block text-sm font-semibold text-slate-700 mb-2">Canal</span>
+                      <div className="flex flex-wrap gap-2">
+                        {canales.map(can => (
+                          <button key={can} onClick={() => setCanalFilter(can)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${canalFilter === can ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                            {can}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="block text-sm font-semibold text-slate-700">Agentes</span>
+                        {agentesFilter.length > 0 && <span className="text-[10px] bg-brand-100 text-brand-700 px-1.5 py-0.5 rounded font-bold">{agentesFilter.length}</span>}
+                      </div>
+                      <div className="border border-slate-200 rounded-lg overflow-hidden">
+                        <div className="p-2 border-b border-slate-100 bg-slate-50">
+                          <input type="text" placeholder="Buscar agente..." value={agentSearch} onChange={e => setAgentSearch(e.target.value)} className="w-full px-2 py-1 text-xs rounded border border-slate-200 focus:outline-none focus:border-brand-500" />
+                        </div>
+                        <div className="max-h-40 overflow-y-auto p-1">
+                          <label className="flex items-center gap-2 p-1.5 hover:bg-slate-50 rounded-md cursor-pointer">
+                            <input type="checkbox" checked={agentesFilter.includes('unassigned')} onChange={() => {
+                              if (agentesFilter.includes('unassigned')) setAgentesFilter(agentesFilter.filter(id => id !== 'unassigned'))
+                              else setAgentesFilter([...agentesFilter, 'unassigned'])
+                            }} className="rounded border-slate-300 text-brand-600 focus:ring-brand-500" />
+                            <span className="text-xs text-slate-700">Sin asignar</span>
+                          </label>
+                          {filteredAgentes.map(ag => (
+                            <label key={ag.id} className="flex items-center gap-2 p-1.5 hover:bg-slate-50 rounded-md cursor-pointer">
+                              <input type="checkbox" checked={agentesFilter.includes(ag.id)} onChange={() => {
+                                if (agentesFilter.includes(ag.id)) setAgentesFilter(agentesFilter.filter(id => id !== ag.id))
+                                else setAgentesFilter([...agentesFilter, ag.id])
+                              }} className="rounded border-slate-300 text-brand-600 focus:ring-brand-500" />
+                              <span className="text-xs text-slate-700">{ag.nombre || ag.email}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="block text-sm font-semibold text-slate-700 mb-2">Fecha</span>
+                      <div className="flex items-center gap-2">
+                        <input type="date" value={dateRange.from} onChange={e => setDateRange({...dateRange, from: e.target.value})} className="flex-1 w-full px-2 py-1.5 rounded-lg text-sm border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-slate-700 bg-white" />
+                        <span className="text-slate-400">-</span>
+                        <input type="date" value={dateRange.to} onChange={e => setDateRange({...dateRange, to: e.target.value})} className="flex-1 w-full px-2 py-1.5 rounded-lg text-sm border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-slate-700 bg-white" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="block text-sm font-semibold text-slate-700 mb-2">Orden</span>
+                      <select value={sortOrder} onChange={e => setSortOrder(e.target.value as 'desc'|'asc')} className="w-full px-3 py-2 rounded-lg text-sm border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-slate-700 bg-white">
+                        <option value="desc">Más recientes primero</option>
+                        <option value="asc">Más antiguos primero</option>
+                      </select>
+                    </div>
+
+                  </div>
+                  
+                  {getActiveFiltersCount() > 0 && (
+                    <div className="p-3 border-t border-slate-100 bg-slate-50">
+                      <button onClick={() => {
+                        setCanalFilter('Todos')
+                        setDateRange({ from: '', to: '' })
+                        setSortOrder('desc')
+                        setAgentesFilter([])
+                      }} className="w-full text-sm text-brand-600 font-semibold py-1.5 hover:bg-brand-50 rounded-lg transition">
+                        Limpiar filtros
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
           
           <div className="flex bg-slate-100 p-1 rounded-xl shrink-0">
@@ -174,85 +273,6 @@ export default function CasosPage() {
                 {est}
               </button>
             ))}
-          </div>
-        </div>
-
-        <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap gap-4 items-center">
-          <div className="flex items-center">
-            <span className="text-sm font-medium text-slate-500 mr-2">Canal:</span>
-            <div className="flex bg-slate-100 p-1 rounded-lg">
-              {canales.map(can => (
-                <button key={can} onClick={() => setCanalFilter(can)}
-                  className={`px-3 h-7 rounded-md text-sm font-medium transition ${canalFilter === can ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>
-                  {can}
-                </button>
-              ))}
-            </div>
-          </div>
-          
-          <div className="h-5 w-px bg-slate-200 hidden sm:block"></div>
-          
-          <div className="flex items-center relative" ref={popoverRef}>
-            <span className="text-sm font-medium text-slate-500 mr-2">Agente:</span>
-            <button 
-              onClick={() => setIsPopoverOpen(!isPopoverOpen)}
-              className="h-9 px-3 rounded-lg text-sm font-medium border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-            >
-              {getAgentFilterLabel()}
-              <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/></svg>
-            </button>
-              
-              {isPopoverOpen && (
-                <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-slate-200 z-50 overflow-hidden flex flex-col">
-                  <div className="p-2 border-b border-slate-100">
-                    <input type="text" placeholder="Buscar agente..." value={agentSearch} onChange={e => setAgentSearch(e.target.value)} className="w-full px-3 py-1.5 text-sm rounded-lg border border-slate-200 focus:outline-none focus:border-brand-500" />
-                  </div>
-                  <div className="max-h-60 overflow-y-auto p-2">
-                    <label className="flex items-center gap-2 p-2 hover:bg-slate-50 rounded-lg cursor-pointer">
-                      <input type="checkbox" checked={agentesFilter.includes('unassigned')} onChange={() => {
-                        if (agentesFilter.includes('unassigned')) setAgentesFilter(agentesFilter.filter(id => id !== 'unassigned'))
-                        else setAgentesFilter([...agentesFilter, 'unassigned'])
-                      }} className="rounded border-slate-300 text-brand-600 focus:ring-brand-500" />
-                      <span className="text-sm text-slate-700">Sin asignar</span>
-                    </label>
-                    {filteredAgentes.map(ag => (
-                      <label key={ag.id} className="flex items-center gap-2 p-2 hover:bg-slate-50 rounded-lg cursor-pointer">
-                        <input type="checkbox" checked={agentesFilter.includes(ag.id)} onChange={() => {
-                          if (agentesFilter.includes(ag.id)) setAgentesFilter(agentesFilter.filter(id => id !== ag.id))
-                          else setAgentesFilter([...agentesFilter, ag.id])
-                        }} className="rounded border-slate-300 text-brand-600 focus:ring-brand-500" />
-                        <span className="text-sm text-slate-700">{ag.nombre || ag.email}</span>
-                      </label>
-                    ))}
-                  </div>
-                  {agentesFilter.length > 0 && (
-                    <div className="p-2 border-t border-slate-100 bg-slate-50">
-                      <button onClick={() => setAgentesFilter([])} className="w-full text-xs text-brand-600 font-semibold py-1">Limpiar selección</button>
-                    </div>
-                  )}
-                </div>
-              )}
-          </div>
-          
-          <div className="h-5 w-px bg-slate-200 hidden sm:block"></div>
-          
-          <div className="flex items-center">
-            <span className="text-sm font-medium text-slate-500 mr-2">Fecha:</span>
-            <div className="flex items-center gap-1">
-              <input type="date" value={dateRange.from} onChange={e => setDateRange({...dateRange, from: e.target.value})} className="h-9 px-2 rounded-lg text-sm border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-slate-700 bg-white" />
-              <span className="text-slate-400">-</span>
-              <input type="date" value={dateRange.to} onChange={e => setDateRange({...dateRange, to: e.target.value})} className="h-9 px-2 rounded-lg text-sm border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-slate-700 bg-white" />
-            </div>
-          </div>
-
-          <div className="h-5 w-px bg-slate-200 hidden md:block"></div>
-
-          <div className="flex items-center">
-            <span className="text-sm font-medium text-slate-500 mr-2">Orden:</span>
-            <select value={sortOrder} onChange={e => setSortOrder(e.target.value as 'desc'|'asc')} className="h-9 px-2 pr-8 rounded-lg text-sm border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-slate-700 bg-white">
-              <option value="desc">Más recientes primero</option>
-              <option value="asc">Más antiguos primero</option>
-            </select>
           </div>
         </div>
       </div>

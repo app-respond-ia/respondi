@@ -185,8 +185,8 @@ export default function CasosPage() {
               </button>
 
               {showFilters && (
-                <div className="absolute top-full right-0 mt-2 w-72 sm:w-80 bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden flex flex-col max-h-[80vh] overflow-y-auto">
-                  <div className="p-4 flex flex-col gap-5">
+                <div className="absolute top-full right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden flex flex-col max-h-[80vh] overflow-y-auto">
+                  <div className="p-6 flex flex-col gap-6">
                     
                     <div>
                       <span className="block text-sm font-semibold text-slate-700 mb-2">Canal</span>
@@ -209,7 +209,7 @@ export default function CasosPage() {
                         <div className="p-2 border-b border-slate-100 bg-slate-50">
                           <input type="text" placeholder="Buscar agente..." value={agentSearch} onChange={e => setAgentSearch(e.target.value)} className="w-full px-2 py-1 text-xs rounded border border-slate-200 focus:outline-none focus:border-brand-500" />
                         </div>
-                        <div className="max-h-40 overflow-y-auto p-1">
+                        <div className="max-h-[160px] overflow-y-auto p-1">
                           <label className="flex items-center gap-2 p-1.5 hover:bg-slate-50 rounded-md cursor-pointer">
                             <input type="checkbox" checked={agentesFilter.includes('unassigned')} onChange={() => {
                               if (agentesFilter.includes('unassigned')) setAgentesFilter(agentesFilter.filter(id => id !== 'unassigned'))

@@ -167,8 +167,8 @@ export default function ConversacionesPage() {
               </button>
 
               {showFilters && (
-                <div className="absolute top-full right-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden flex flex-col">
-                  <div className="p-4 flex flex-col gap-5">
+                <div className="absolute top-full right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden flex flex-col">
+                  <div className="p-6 flex flex-col gap-6">
                     
                     <div>
                       <span className="block text-sm font-semibold text-slate-700 mb-2">Canal</span>

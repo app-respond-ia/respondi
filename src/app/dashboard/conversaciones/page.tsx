@@ -260,12 +260,12 @@ export default function ConversacionesPage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500 font-semibold">
-                  <th className="p-4 pl-6 font-medium">Contacto</th>
-                  <th className="p-4 font-medium">Resumen / Etiquetas</th>
-                  <th className="p-4 font-medium text-center">IA</th>
-                  <th className="p-4 font-medium text-center">Estado</th>
-                  <th className="p-4 font-medium">Agente</th>
-                  <th className="p-4 pr-6 font-medium text-right">Último mensaje</th>
+                  <th className="px-3 py-3 pl-4 font-medium">Contacto</th>
+                  <th className="px-3 py-3 font-medium">Resumen / Etiquetas</th>
+                  <th className="px-3 py-3 font-medium text-center">IA</th>
+                  <th className="px-3 py-3 font-medium text-center">Estado</th>
+                  <th className="px-3 py-3 font-medium">Agente</th>
+                  <th className="px-3 py-3 pr-4 font-medium text-right">Último mensaje</th>
                 </tr>
               </thead>
               <tbody className={`divide-y divide-slate-100 transition-opacity duration-200 ${isFetching ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
@@ -283,7 +283,7 @@ export default function ConversacionesPage() {
                         ) : 'border-l-4 border-l-transparent'
                       }`}
                     >
-                      <td className="p-4 pl-6">
+                      <td className="px-3 py-3 pl-4">
                         <div className="flex flex-col gap-2">
                           <div className="flex items-center gap-3">
                             <div className="relative">
@@ -318,7 +318,7 @@ export default function ConversacionesPage() {
                           )}
                         </div>
                       </td>
-                      <td className="p-4 max-w-sm">
+                      <td className="px-3 py-3 max-w-[180px] 2xl:max-w-[280px]">
                         <div className="flex flex-col gap-2">
                           <p className="text-sm text-slate-600 truncate font-medium">
                             {conv.resumen || <span className="italic opacity-60 font-normal">Sin resumen aún...</span>}
@@ -347,32 +347,32 @@ export default function ConversacionesPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="p-4 text-center">
+                      <td className="px-3 py-3 text-center">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide ${
                           conv.ia_pausada ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                         }`}>
                           {conv.ia_pausada ? 'Pausada' : 'IA Activa'}
                         </span>
                       </td>
-                      <td className="p-4 text-center">
+                      <td className="px-3 py-3 text-center">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold capitalize ${
                           conv.estado === 'activa' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-600'
                         }`}>
                           {conv.estado === 'activa' ? 'Abierta' : 'Cerrada'}
                         </span>
                       </td>
-                      <td className="p-4">
+                      <td className="px-3 py-3">
                         {casoAsociado?.agente?.nombre ? (
                           <span className="text-sm text-slate-600 font-medium">{casoAsociado.agente.nombre}</span>
                         ) : casoAsociado ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ring-1 ring-inset bg-amber-50 text-amber-700 ring-amber-200">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ring-1 ring-inset bg-amber-50 text-amber-700 ring-amber-200 whitespace-nowrap">
                             Sin asignar
                           </span>
                         ) : (
                           <span className="text-sm text-slate-600">-</span>
                         )}
                       </td>
-                      <td className="p-4 pr-6 text-right">
+                      <td className="px-3 py-3 pr-4 text-right whitespace-nowrap">
                         <p className="text-sm font-semibold text-slate-700">
                           {formatFecha(conv.fecha_ultimo_mensaje || conv.fecha_inicio)}
                         </p>

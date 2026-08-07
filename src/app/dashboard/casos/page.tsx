@@ -327,20 +327,20 @@ export default function CasosPage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500 font-semibold">
-                  <th className="p-4 pl-6 font-medium">Contacto</th>
-                  <th className="p-4 font-medium">Caso</th>
-                  <th className="p-4 font-medium">Descripción</th>
-                  <th className="p-4 font-medium">Prioridad</th>
-                  <th className="p-4 font-medium">Estado</th>
-                  <th className="p-4 font-medium">Agente</th>
-                  <th className="p-4 font-medium text-right">Tiempo</th>
-                  <th className="p-4 pr-6 font-medium text-right">SLA</th>
+                  <th className="px-3 py-3 pl-4 font-medium">Contacto</th>
+                  <th className="px-3 py-3 font-medium">Caso</th>
+                  <th className="px-3 py-3 font-medium">Descripción</th>
+                  <th className="px-3 py-3 font-medium">Prioridad</th>
+                  <th className="px-3 py-3 font-medium">Estado</th>
+                  <th className="px-3 py-3 font-medium">Agente</th>
+                  <th className="px-3 py-3 font-medium text-right">Tiempo</th>
+                  <th className="px-3 py-3 pr-4 font-medium text-right">SLA</th>
                 </tr>
               </thead>
               <tbody className={`divide-y divide-slate-100 transition-opacity duration-200 ${isFetching ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
                 {casos.map(caso => (
                   <tr key={caso.id} onClick={() => router.push(`/dashboard/casos/${caso.id}`)} className="hover:bg-slate-100 transition group cursor-pointer">
-                    <td className="p-4 pl-6">
+                    <td className="px-3 py-3 pl-4">
                       <div className="flex items-center gap-3">
                         <div className="relative">
                           <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold font-display">
@@ -356,7 +356,7 @@ export default function CasosPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="p-4">
+                    <td className="px-3 py-3">
                       <span className="text-brand-600 font-medium group-hover:underline">
                         #{caso.id.substring(0,8).toUpperCase()}
                       </span>
@@ -376,32 +376,32 @@ export default function CasosPage() {
                         })}
                       </div>
                     </td>
-                    <td className="p-4 max-w-xs truncate text-slate-600 text-sm">
+                    <td className="px-3 py-3 max-w-[180px] 2xl:max-w-[240px] truncate text-slate-600 text-sm">
                       {caso.descripcion || 'Sin descripción...'}
                     </td>
-                    <td className="p-4">
+                    <td className="px-3 py-3">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ring-1 ring-inset ${getPrioridadStyle(caso.prioridad)}`}>
                         {caso.prioridad ? caso.prioridad.charAt(0).toUpperCase() + caso.prioridad.slice(1).toLowerCase() : 'Normal'}
                       </span>
                     </td>
-                    <td className="p-4">
+                    <td className="px-3 py-3">
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${getEstatusStyle(caso.estatus)}`}>
                         {caso.estatus}
                       </span>
                     </td>
-                    <td className="p-4">
+                    <td className="px-3 py-3">
                       {caso.agente?.nombre ? (
                         <span className="text-sm text-slate-600 font-medium">{caso.agente.nombre}</span>
                       ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ring-1 ring-inset bg-amber-50 text-amber-700 ring-amber-200">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ring-1 ring-inset bg-amber-50 text-amber-700 ring-amber-200 whitespace-nowrap">
                           Sin asignar
                         </span>
                       )}
                     </td>
-                    <td className="p-4 text-right">
+                    <td className="px-3 py-3 text-right whitespace-nowrap">
                       <p className="text-sm font-medium text-slate-700">{getTimeAgo(caso.fecha_apertura)}</p>
                     </td>
-                    <td className="p-4 pr-6 text-right">
+                    <td className="px-3 py-3 pr-4 text-right whitespace-nowrap">
                       {(() => {
                         const sla = getSlaStatus(caso.fecha_sla_asignado, caso.fecha_apertura, caso.sla_horas, caso.estatus)
                         if (!sla) return <span className="text-slate-400 text-sm">-</span>

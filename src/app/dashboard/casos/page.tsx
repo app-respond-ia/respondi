@@ -145,17 +145,24 @@ export default function CasosPage() {
     return `${Math.floor(hr / 24)} d`
   }
 
-  const getSlaStatus = (fechaApertura: string, slaHoras: number | null, estatus: string) => {
+  const getSlaStatus = (fechaSlaAsignado: string | null, fechaApertura: string, slaHoras: number | null, estatus: string) => {
     if (!slaHoras || estatus === 'resuelto' || estatus === 'cerrado') return null
-    const deadline = new Date(new Date(fechaApertura).getTime() + slaHoras * 3600000)
+    const baseDate = fechaSlaAsignado ? new Date(fechaSlaAsignado) : new Date(fechaApertura)
+    const deadline = new Date(baseDate.getTime() + slaHoras * 3600000)
     const now = new Date()
     const diffMs = deadline.getTime() - now.getTime()
     
     if (diffMs < 0) return { text: 'SLA vencido', color: 'text-red-600 bg-red-50' }
     
-    const diffHr = Math.floor(diffMs / 3600000)
-    if (diffHr < 24) return { text: `Vence en ${diffHr}h`, color: diffHr < 4 ? 'text-amber-600 bg-amber-50' : 'text-slate-600 bg-slate-50' }
-    return { text: `Vence en ${Math.floor(diffHr/24)}d`, color: 'text-slate-600 bg-slate-50' }
+    const diffMin = Math.floor(diffMs / 60000)
+    const hours = Math.floor(diffMin / 60)
+    const mins = diffMin % 60
+    
+    if (hours < 24) {
+      const text = hours > 0 ? `Vence en ${hours}h ${mins}m` : `Vence en ${mins}m`
+      return { text, color: hours < 4 ? 'text-amber-600 bg-amber-50' : 'text-slate-600 bg-slate-50' }
+    }
+    return { text: `Vence en ${Math.floor(hours/24)}d`, color: 'text-slate-600 bg-slate-50' }
   }
 
   const getPrioridadStyle = (prioridad: string | null) => {
@@ -180,7 +187,7 @@ export default function CasosPage() {
   }
 
   return (
-    <div className="p-6 sm:p-10 max-w-[1600px] mx-auto">
+    <div className="p-6 sm:p-10 max-w-[1600px] mx-auto w-full">
       <div className="mb-8">
         <div className="flex items-center gap-3">
           <h1 className="text-3xl font-bold text-ink-900 font-display">Casos</h1>
@@ -396,7 +403,7 @@ export default function CasosPage() {
                     </td>
                     <td className="p-4 pr-6 text-right">
                       {(() => {
-                        const sla = getSlaStatus(caso.fecha_apertura, caso.sla_horas, caso.estatus)
+                        const sla = getSlaStatus(caso.fecha_sla_asignado, caso.fecha_apertura, caso.sla_horas, caso.estatus)
                         if (!sla) return <span className="text-slate-400 text-sm">-</span>
                         return (
                           <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-semibold ${sla.color}`}>

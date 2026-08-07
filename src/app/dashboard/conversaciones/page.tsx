@@ -140,7 +140,7 @@ export default function ConversacionesPage() {
   }
 
   return (
-    <div className="p-6 sm:p-10 max-w-[1600px] mx-auto">
+    <div className="p-6 sm:p-10 max-w-[1600px] mx-auto w-full">
       <div className="mb-8">
         <div className="flex items-center gap-3">
           <h1 className="text-3xl font-bold text-ink-900 font-display">Conversaciones</h1>

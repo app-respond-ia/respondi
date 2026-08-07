@@ -22,6 +22,7 @@ export async function getCasos(filtros?: { estado?: string, canal?: string, sear
       estatus,
       fecha_apertura,
       sla_horas,
+      fecha_sla_asignado,
       contacts:contact_id (nombre, canal, identificador_canal),
       agente:agente_id (nombre),
       conversations:conversation_id (
@@ -108,6 +109,8 @@ export async function getCasoDetalle(casoId: string) {
       estatus,
       fecha_apertura,
       sla_horas,
+      fecha_sla_asignado,
+      prioridad,
       contacts:contact_id (nombre, canal, identificador_canal),
       agente_id,
       agente:agente_id (nombre),
@@ -370,7 +373,10 @@ export async function actualizarSLACaso(casoId: string, sla_horas: number | null
 
   const { error } = await supabase
     .from('cases')
-    .update({ sla_horas })
+    .update({ 
+      sla_horas,
+      fecha_sla_asignado: sla_horas ? new Date().toISOString() : null
+    })
     .eq('id', casoId)
     .eq('tenant_id', userData?.tenant_id)
 

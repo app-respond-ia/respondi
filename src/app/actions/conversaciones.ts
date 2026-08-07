@@ -26,13 +26,13 @@ export async function getConversaciones(filtros?: { estado?: string, canal?: str
       conversation_tags (
         message_categories (nombre, color)
       ),
-      cases (id, estatus)
+      cases (id, estatus, agente:agente_id(nombre))
     `)
     .eq('tenant_id', tenantId)
     .order('fecha_ultimo_mensaje', { ascending: filtros?.sort === 'asc', nullsFirst: false })
 
   if (filtros?.estado && filtros.estado !== 'Todas') {
-    const est = filtros.estado === 'Activas' ? 'activa' : filtros.estado === 'Cerradas' ? 'cerrada' : null
+    const est = filtros.estado === 'Abiertas' ? 'activa' : filtros.estado === 'Cerradas' ? 'cerrada' : null
     if (est) query = query.eq('estado', est)
   }
   

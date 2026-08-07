@@ -138,7 +138,7 @@ export default function ConversacionesPage() {
   }
 
   return (
-    <div className="p-6 sm:p-10 max-w-7xl mx-auto">
+    <div className="p-6 sm:p-10 max-w-[1600px] mx-auto">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-ink-900 font-display">Conversaciones</h1>
         <p className="text-ink-500 mt-1">Revisa el historial de interacciones con tus clientes.</p>
@@ -218,8 +218,8 @@ export default function ConversacionesPage() {
           </div>
           
           <div className="flex flex-wrap items-center gap-4 shrink-0">
-            <div className="flex bg-slate-100 p-1 rounded-xl">
-              {estados.map(est => (
+            <div className="flex bg-slate-100 p-1 rounded-xl shrink-0">
+              {['Todas', 'Abiertas', 'Cerradas'].map(est => (
                 <button key={est} onClick={() => setEstadoFilter(est)}
                   className={`px-4 h-8 rounded-lg text-sm font-medium transition ${estadoFilter === est ? 'bg-white text-ink-900 shadow-sm border border-slate-200' : 'text-slate-600 hover:text-ink-900'}`}>
                   {est}
@@ -257,6 +257,7 @@ export default function ConversacionesPage() {
                   <th className="p-4 font-medium">Resumen / Etiquetas</th>
                   <th className="p-4 font-medium text-center">IA</th>
                   <th className="p-4 font-medium text-center">Estado</th>
+                  <th className="p-4 font-medium">Agente</th>
                   <th className="p-4 pr-6 font-medium text-right">Último mensaje</th>
                 </tr>
               </thead>
@@ -343,14 +344,19 @@ export default function ConversacionesPage() {
                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide ${
                           conv.ia_pausada ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                         }`}>
-                          {conv.ia_pausada ? 'Pausada' : 'Activa'}
+                          {conv.ia_pausada ? 'Pausada' : 'IA Activa'}
                         </span>
                       </td>
                       <td className="p-4 text-center">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold capitalize ${
                           conv.estado === 'activa' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-600'
                         }`}>
-                          {conv.estado}
+                          {conv.estado === 'activa' ? 'Abierta' : 'Cerrada'}
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        <span className="text-sm text-slate-600">
+                          {casoAsociado?.agente?.nombre || '-'}
                         </span>
                       </td>
                       <td className="p-4 pr-6 text-right">

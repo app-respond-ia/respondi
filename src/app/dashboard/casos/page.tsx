@@ -143,6 +143,28 @@ export default function CasosPage() {
     return `${Math.floor(hr / 24)} d`
   }
 
+  const getSlaStatus = (fechaApertura: string, slaHoras: number | null, estatus: string) => {
+    if (!slaHoras || estatus === 'resuelto' || estatus === 'cerrado') return null
+    const deadline = new Date(new Date(fechaApertura).getTime() + slaHoras * 3600000)
+    const now = new Date()
+    const diffMs = deadline.getTime() - now.getTime()
+    
+    if (diffMs < 0) return { text: 'SLA vencido', color: 'text-red-600 bg-red-50' }
+    
+    const diffHr = Math.floor(diffMs / 3600000)
+    if (diffHr < 24) return { text: `Vence en ${diffHr}h`, color: diffHr < 4 ? 'text-amber-600 bg-amber-50' : 'text-slate-600 bg-slate-50' }
+    return { text: `Vence en ${Math.floor(diffHr/24)}d`, color: 'text-slate-600 bg-slate-50' }
+  }
+
+  const getPrioridadStyle = (prioridad: string | null) => {
+    switch (prioridad?.toLowerCase()) {
+      case 'alta': return 'bg-red-50 text-red-700 ring-red-200'
+      case 'baja': return 'bg-slate-50 text-slate-700 ring-slate-200'
+      case 'normal':
+      default: return 'bg-blue-50 text-blue-700 ring-blue-200'
+    }
+  }
+
   if (loading || nivelPermiso === null) {
     return <Loading />
   }
@@ -156,7 +178,7 @@ export default function CasosPage() {
   }
 
   return (
-    <div className="p-6 sm:p-10 max-w-7xl mx-auto">
+    <div className="p-6 sm:p-10 max-w-[1600px] mx-auto">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-ink-900 font-display">Casos</h1>
         <p className="text-ink-500 mt-1">Gestiona las conversaciones que requieren atención humana.</p>
@@ -294,8 +316,11 @@ export default function CasosPage() {
                   <th className="p-4 pl-6 font-medium">Contacto</th>
                   <th className="p-4 font-medium">Caso</th>
                   <th className="p-4 font-medium">Descripción</th>
+                  <th className="p-4 font-medium">Prioridad</th>
                   <th className="p-4 font-medium">Estado</th>
-                  <th className="p-4 pr-6 font-medium text-right">Tiempo</th>
+                  <th className="p-4 font-medium">Agente</th>
+                  <th className="p-4 font-medium text-right">Tiempo</th>
+                  <th className="p-4 pr-6 font-medium text-right">SLA</th>
                 </tr>
               </thead>
               <tbody className={`divide-y divide-slate-100 transition-opacity duration-200 ${isFetching ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
@@ -341,15 +366,33 @@ export default function CasosPage() {
                       {caso.descripcion || 'Sin descripción...'}
                     </td>
                     <td className="p-4">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ring-1 ring-inset ${getPrioridadStyle(caso.prioridad)}`}>
+                        {caso.prioridad ? caso.prioridad.charAt(0).toUpperCase() + caso.prioridad.slice(1).toLowerCase() : 'Normal'}
+                      </span>
+                    </td>
+                    <td className="p-4">
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${getEstatusStyle(caso.estatus)}`}>
                         {caso.estatus}
                       </span>
                     </td>
-                    <td className="p-4 pr-6 text-right">
+                    <td className="p-4">
+                      <span className="text-sm text-slate-600">
+                        {caso.agente?.nombre || 'Sin asignar'}
+                      </span>
+                    </td>
+                    <td className="p-4 text-right">
                       <p className="text-sm font-medium text-slate-700">{getTimeAgo(caso.fecha_apertura)}</p>
-                      {caso.sla_horas && (
-                        <p className="text-xs font-semibold text-amber-600 mt-1">SLA: {caso.sla_horas}h</p>
-                      )}
+                    </td>
+                    <td className="p-4 pr-6 text-right">
+                      {(() => {
+                        const sla = getSlaStatus(caso.fecha_apertura, caso.sla_horas, caso.estatus)
+                        if (!sla) return <span className="text-slate-400 text-sm">-</span>
+                        return (
+                          <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-semibold ${sla.color}`}>
+                            {sla.text}
+                          </span>
+                        )
+                      })()}
                     </td>
                   </tr>
                 ))}

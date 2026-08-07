@@ -17,6 +17,7 @@ export async function getCasos(filtros?: { estado?: string, canal?: string, sear
     .select(`
       id,
       tipo,
+      prioridad,
       descripcion,
       estatus,
       fecha_apertura,

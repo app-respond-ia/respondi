@@ -13,6 +13,7 @@ export default function CasosPage() {
   const [loading, setLoading] = useState(true)
   const isFirstMount = useRef(true)
   const [isFetching, setIsFetching] = useState(false)
+  const [showHelp, setShowHelp] = useState(false)
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
   
   const [agentesOpciones, setAgentesOpciones] = useState<any[]>([])
@@ -28,6 +29,7 @@ export default function CasosPage() {
   const [showFilters, setShowFilters] = useState(false)
   const [agentSearch, setAgentSearch] = useState('')
   const filtersRef = useRef<HTMLDivElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
   
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -180,7 +182,12 @@ export default function CasosPage() {
   return (
     <div className="p-6 sm:p-10 max-w-[1600px] mx-auto">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-ink-900 font-display">Casos</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-3xl font-bold text-ink-900 font-display">Casos</h1>
+          <button onClick={() => setShowHelp(true)} className="w-6 h-6 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 flex items-center justify-center text-xs font-bold transition">
+            ?
+          </button>
+        </div>
         <p className="text-ink-500 mt-1">Gestiona las conversaciones que requieren atención humana.</p>
       </div>
 
@@ -376,9 +383,13 @@ export default function CasosPage() {
                       </span>
                     </td>
                     <td className="p-4">
-                      <span className="text-sm text-slate-600">
-                        {caso.agente?.nombre || 'Sin asignar'}
-                      </span>
+                      {caso.agente?.nombre ? (
+                        <span className="text-sm text-slate-600 font-medium">{caso.agente.nombre}</span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ring-1 ring-inset bg-amber-50 text-amber-700 ring-amber-200">
+                          Sin asignar
+                        </span>
+                      )}
                     </td>
                     <td className="p-4 text-right">
                       <p className="text-sm font-medium text-slate-700">{getTimeAgo(caso.fecha_apertura)}</p>
@@ -398,6 +409,39 @@ export default function CasosPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+      {/* Help Modal */}
+      {showHelp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-ink-900/50 backdrop-blur-sm" onClick={() => setShowHelp(false)}></div>
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <h2 className="text-lg font-bold text-ink-900 font-display">Cómo funcionan los Casos</h2>
+              <button onClick={() => setShowHelp(false)} className="text-slate-400 hover:text-slate-600">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto text-sm text-slate-600 space-y-4">
+              <p><strong className="text-ink-900">¿Qué es un caso?</strong> Una conversación que ha sido escalada porque requiere atención humana (ya sea manual o por reglas de la IA).</p>
+              
+              <p><strong className="text-ink-900">Estados del caso:</strong></p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li><span className="font-semibold text-amber-700">Pendiente:</span> Nadie lo ha tomado aún.</li>
+                <li><span className="font-semibold text-blue-700">Atendiendo:</span> Un agente se lo ha asignado y está trabajando en él.</li>
+                <li><span className="font-semibold text-emerald-700">Resuelto / Cerrado:</span> El problema ya ha sido solucionado.</li>
+              </ul>
+              
+              <p><strong className="text-ink-900">Prioridad:</strong> (baja/normal/alta). Sirve para ordenar y destacar la urgencia. Puedes editarla manualmente entrando al detalle del caso.</p>
+              
+              <p><strong className="text-ink-900">SLA (Service Level Agreement):</strong> Es un plazo de compromiso en horas que os fijáis para resolver el caso, contado desde su apertura. Es opcional: si no se define, no aparece nada en esa columna. Cuando queda poco tiempo se muestra en ámbar, y en rojo si ya se pasó el plazo ("SLA vencido"). Sirve para priorizar visualmente qué casos necesitan atención urgente sin tener que abrir cada uno.</p>
+              
+              <p><strong className="text-ink-900">Gestión de agentes:</strong> Entrando al caso, puedes hacer clic en "Asignarme este caso", soltarlo, o transferirlo a otro compañero de tu equipo.</p>
+            </div>
+            <div className="p-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl flex justify-end">
+              <button onClick={() => setShowHelp(false)} className="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-xl transition">Entendido</button>
+            </div>
           </div>
         </div>
       )}

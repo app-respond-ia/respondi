@@ -11,6 +11,7 @@ export interface ReglaData {
   condicion?: string
   accion?: string
   activa: boolean
+  prioridad_default?: string
 }
 
 // Función auxiliar para obtener credenciales del usuario activo
@@ -76,7 +77,8 @@ export async function crearRegla(data: ReglaData) {
       descripcion_intencion: condicion,
       tipo_caso: accion,
       activa: data.activa,
-      es_plantilla: false
+      es_plantilla: false,
+      prioridad_default: data.prioridad_default || 'normal'
     }])
     .select()
     .single()
@@ -95,7 +97,7 @@ export async function crearRegla(data: ReglaData) {
   return { success: true, data: insertedData }
 }
 
-export async function actualizarRegla(id: string, data: Partial<{ nombre: string, descripcion_intencion: string, tipo_caso: string, activa: boolean }>) {
+export async function actualizarRegla(id: string, data: Partial<{ nombre: string, descripcion_intencion: string, tipo_caso: string, activa: boolean, prioridad_default: string }>) {
   const supabase = await createClient()
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
@@ -201,7 +203,8 @@ export async function crearReglasPlantilla() {
     {
       nombre: "Cliente molesto o agresivo",
       descripcion_intencion: "El tono del cliente es claramente molesto, agresivo, ofensivo, o muestra señales de mucha frustración.",
-      tipo_caso: "atencion_urgente"
+      tipo_caso: "atencion_urgente",
+      prioridad_default: "alta"
     }
   ]
 

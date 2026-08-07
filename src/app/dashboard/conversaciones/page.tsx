@@ -25,6 +25,8 @@ export default function ConversacionesPage() {
 
   const [showFilters, setShowFilters] = useState(false)
   const filtersRef = useRef<HTMLDivElement>(null)
+  const [showHelp, setShowHelp] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -140,7 +142,12 @@ export default function ConversacionesPage() {
   return (
     <div className="p-6 sm:p-10 max-w-[1600px] mx-auto">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-ink-900 font-display">Conversaciones</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-3xl font-bold text-ink-900 font-display">Conversaciones</h1>
+          <button onClick={() => setShowHelp(true)} className="w-6 h-6 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 flex items-center justify-center text-xs font-bold transition">
+            ?
+          </button>
+        </div>
         <p className="text-ink-500 mt-1">Revisa el historial de interacciones con tus clientes.</p>
       </div>
 
@@ -355,9 +362,15 @@ export default function ConversacionesPage() {
                         </span>
                       </td>
                       <td className="p-4">
-                        <span className="text-sm text-slate-600">
-                          {casoAsociado?.agente?.nombre || '-'}
-                        </span>
+                        {casoAsociado?.agente?.nombre ? (
+                          <span className="text-sm text-slate-600 font-medium">{casoAsociado.agente.nombre}</span>
+                        ) : casoAsociado ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ring-1 ring-inset bg-amber-50 text-amber-700 ring-amber-200">
+                            Sin asignar
+                          </span>
+                        ) : (
+                          <span className="text-sm text-slate-600">-</span>
+                        )}
                       </td>
                       <td className="p-4 pr-6 text-right">
                         <p className="text-sm font-semibold text-slate-700">
@@ -369,6 +382,38 @@ export default function ConversacionesPage() {
                 })}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+      {/* Help Modal */}
+      {showHelp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-ink-900/50 backdrop-blur-sm" onClick={() => setShowHelp(false)}></div>
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <h2 className="text-lg font-bold text-ink-900 font-display">Cómo funcionan las Conversaciones</h2>
+              <button onClick={() => setShowHelp(false)} className="text-slate-400 hover:text-slate-600">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto text-sm text-slate-600 space-y-4">
+              <p><strong className="text-ink-900">¿Qué es una conversación?</strong> Es el registro completo e historial de todos los mensajes intercambiados con un cliente.</p>
+              
+              <p><strong className="text-ink-900">IA Activa vs Conversación Abierta:</strong></p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li><span className="font-semibold text-ink-800">IA:</span> Puede estar <span className="text-emerald-700 font-medium">Activa</span> (respondiendo sola) o <span className="text-amber-700 font-medium">Pausada</span> (silenciada para que un humano hable).</li>
+                <li><span className="font-semibold text-ink-800">Estado:</span> <span className="text-blue-700 font-medium">Abierta</span> si hay actividad reciente, o Cerrada si el cliente lleva mucho tiempo sin hablar.</li>
+              </ul>
+              
+              <p><strong className="text-ink-900">Badge de "Caso":</strong> Cuando veas un pequeño botón de "Caso" junto al nombre del contacto, significa que la IA detectó una urgencia o el cliente pidió ayuda humana. Al pulsarlo irás directo a ese caso.</p>
+              
+              <p><strong className="text-ink-900">Atender un caso manualmente:</strong> Si lees algo que requiere tu atención y no se creó un caso, entra en la conversación y busca el panel derecho para crear uno, pausar la IA y asignártelo.</p>
+              
+              <p><strong className="text-ink-900">Para escribir al cliente:</strong> Esta página es solo de lectura/consulta. Si necesitas enviar mensajes al cliente, debes ir a la página de <strong>Chats</strong>.</p>
+            </div>
+            <div className="p-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl flex justify-end">
+              <button onClick={() => setShowHelp(false)} className="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-xl transition">Entendido</button>
+            </div>
           </div>
         </div>
       )}

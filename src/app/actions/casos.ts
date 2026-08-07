@@ -330,3 +330,60 @@ export async function getAgentesParaCasos() {
   return { success: true, data: agentesValidos }
 }
 
+export async function actualizarPrioridadCaso(casoId: string, prioridad: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'No autorizado' }
+
+  const { data: userData } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
+  
+  const { data: anterior } = await supabase.from('cases').select('prioridad').eq('id', casoId).single()
+
+  const { error } = await supabase
+    .from('cases')
+    .update({ prioridad })
+    .eq('id', casoId)
+    .eq('tenant_id', userData?.tenant_id)
+
+  if (!error) {
+    const { registrarAuditoria } = await import('@/lib/auditoria')
+    await registrarAuditoria({
+      tenant_id: userData?.tenant_id,
+      user_id: user.id,
+      accion: `cambió la prioridad del caso de ${anterior?.prioridad || 'normal'} a ${prioridad}`,
+      tabla_afectada: 'cases',
+      registro_id: casoId
+    })
+  }
+
+  return { success: !error, error: error?.message }
+}
+
+export async function actualizarSLACaso(casoId: string, sla_horas: number | null) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'No autorizado' }
+
+  const { data: userData } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
+
+  const { data: anterior } = await supabase.from('cases').select('sla_horas').eq('id', casoId).single()
+
+  const { error } = await supabase
+    .from('cases')
+    .update({ sla_horas })
+    .eq('id', casoId)
+    .eq('tenant_id', userData?.tenant_id)
+
+  if (!error) {
+    const { registrarAuditoria } = await import('@/lib/auditoria')
+    await registrarAuditoria({
+      tenant_id: userData?.tenant_id,
+      user_id: user.id,
+      accion: `cambió el SLA del caso de ${anterior?.sla_horas || 'ninguno'} a ${sla_horas || 'ninguno'}`,
+      tabla_afectada: 'cases',
+      registro_id: casoId
+    })
+  }
+
+  return { success: !error, error: error?.message }
+}

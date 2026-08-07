@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
-import { getCasoDetalle, tomarCaso, cerrarCaso, asignarCaso, soltarCaso, getAgentesParaCasos } from '@/app/actions/casos'
+import { getCasoDetalle, tomarCaso, cerrarCaso, asignarCaso, soltarCaso, getAgentesParaCasos, actualizarPrioridadCaso, actualizarSLACaso } from '@/app/actions/casos'
 
 export default function CasoDetallePage() {
   const params = useParams()
@@ -18,9 +18,13 @@ export default function CasoDetallePage() {
   const [procesando, setProcesando] = useState(false)
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
-    action: 'tomar' | 'cerrar' | 'asignar' | 'soltar' | 'transferir' | null;
+    action: 'tomar' | 'cerrar' | 'asignar' | 'soltar' | 'transferir' | 'prioridad' | 'sla' | null;
     targetId?: string;
+    value?: string | number | null;
   }>({ isOpen: false, action: null })
+  
+  const [slaInput, setSlaInput] = useState<string>('')
+  const [prioridadInput, setPrioridadInput] = useState<string>('')
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -73,6 +77,14 @@ export default function CasoDetallePage() {
           res = await asignarCaso(id, modalState.targetId)
         }
         break
+      case 'prioridad':
+        if (modalState.value) {
+          res = await actualizarPrioridadCaso(id, modalState.value as string)
+        }
+        break
+      case 'sla':
+        res = await actualizarSLACaso(id, modalState.value as number | null)
+        break
     }
 
     if (res?.success) {
@@ -82,9 +94,17 @@ export default function CasoDetallePage() {
     setProcesando(false)
   }
 
-  const openModal = (action: typeof modalState.action, targetId?: string) => {
-    setModalState({ isOpen: true, action, targetId })
+  const openModal = (action: typeof modalState.action, targetId?: string, value?: string | number | null) => {
+    setModalState({ isOpen: true, action, targetId, value })
   }
+
+  // Sincronizar inputs locales cuando se carga el caso
+  useEffect(() => {
+    if (caso) {
+      setPrioridadInput(caso.prioridad || 'normal')
+      setSlaInput(caso.sla_horas?.toString() || '')
+    }
+  }, [caso])
 
   if (loading) return <Loading />
   if (!caso) return null
@@ -199,8 +219,25 @@ export default function CasoDetallePage() {
             <div className="space-y-4">
               <div>
                 <p className="text-xs text-slate-500 font-medium mb-1">Motivo / Tipo</p>
-                <p className="font-medium text-ink-900 capitalize">{caso.tipo}</p>
-                <p className="text-sm text-slate-600 mt-1 bg-slate-50 p-2 rounded-lg border border-slate-100">{caso.descripcion}</p>
+                <p className="font-medium text-ink-900 capitalize mb-2">{caso.tipo}</p>
+                
+                <p className="text-xs text-slate-500 font-medium mb-1 mt-3">Prioridad</p>
+                <div className="flex gap-2 mb-3">
+                  <select 
+                    value={prioridadInput}
+                    onChange={(e) => {
+                      setPrioridadInput(e.target.value)
+                      openModal('prioridad', undefined, e.target.value)
+                    }}
+                    className="flex-1 h-9 px-3 rounded-lg border border-slate-200 bg-slate-50 text-sm font-medium text-ink-900 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 capitalize"
+                  >
+                    <option value="baja">Baja</option>
+                    <option value="normal">Normal</option>
+                    <option value="alta">Alta</option>
+                  </select>
+                </div>
+
+                <p className="text-sm text-slate-600 mt-2 bg-slate-50 p-2 rounded-lg border border-slate-100">{caso.descripcion}</p>
               </div>
               
               <div>
@@ -224,12 +261,29 @@ export default function CasoDetallePage() {
                 </p>
               </div>
 
-              {caso.sla_horas && (
-                <div>
-                  <p className="text-xs text-slate-500 font-medium mb-1">SLA Objetivo</p>
-                  <p className="text-sm font-bold text-amber-600">{caso.sla_horas} horas</p>
+              <div>
+                <p className="text-xs text-slate-500 font-medium mb-1">SLA Objetivo (Horas)</p>
+                <div className="flex gap-2">
+                  <input 
+                    type="number" 
+                    min="1"
+                    placeholder="Ej: 24"
+                    value={slaInput}
+                    onChange={(e) => setSlaInput(e.target.value)}
+                    className="w-20 h-9 px-3 rounded-lg border border-slate-200 bg-slate-50 text-sm text-ink-900 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                  />
+                  <button 
+                    onClick={() => openModal('sla', undefined, slaInput ? parseInt(slaInput) : null)}
+                    disabled={procesando || (slaInput === (caso.sla_horas?.toString() || ''))}
+                    className="px-3 h-9 bg-brand-50 hover:bg-brand-100 text-brand-700 text-xs font-semibold rounded-lg transition disabled:opacity-50"
+                  >
+                    Guardar SLA
+                  </button>
                 </div>
-              )}
+                {caso.sla_horas && (
+                  <p className="text-xs font-medium text-amber-600 mt-1">SLA actual: {caso.sla_horas}h</p>
+                )}
+              </div>
             </div>
           </div>
 
@@ -294,24 +348,35 @@ export default function CasoDetallePage() {
 
       <ConfirmModal
         isOpen={modalState.isOpen}
+        onClose={() => setModalState({ isOpen: false, action: null })}
+        onConfirm={handleConfirmAction}
         title={
-          modalState.action === 'tomar' ? 'Tomar caso' :
-          modalState.action === 'cerrar' ? 'Cerrar caso' :
-          modalState.action === 'asignar' ? 'Asignarme este caso' :
-          modalState.action === 'soltar' ? 'Soltar caso' :
-          'Transferir caso'
+          modalState.action === 'tomar' ? '¿Tomar este caso?' :
+          modalState.action === 'cerrar' ? '¿Cerrar este caso?' :
+          modalState.action === 'asignar' ? '¿Asignarte este caso?' :
+          modalState.action === 'soltar' ? '¿Soltar este caso?' :
+          modalState.action === 'transferir' ? '¿Transferir caso?' :
+          modalState.action === 'prioridad' ? '¿Actualizar prioridad?' :
+          modalState.action === 'sla' ? '¿Actualizar SLA?' : ''
         }
         message={
-          modalState.action === 'tomar' ? '¿Estás seguro de que deseas asignarte este caso y empezar a atenderlo?' :
-          modalState.action === 'cerrar' ? '¿Estás seguro de que deseas marcar este caso como resuelto/cerrado?' :
-          modalState.action === 'asignar' ? '¿Deseas tomar la propiedad de este caso?' :
-          modalState.action === 'soltar' ? '¿Estás seguro de que deseas soltar este caso? Quedará libre para que otro agente lo tome.' :
-          `¿Estás seguro de que deseas transferir este caso al agente seleccionado?`
+          modalState.action === 'tomar' ? 'Pasarás a ser el agente responsable de atender esta consulta.' :
+          modalState.action === 'cerrar' ? 'El caso quedará resuelto. Si el cliente vuelve a escribir, la IA lo atenderá normalmente.' :
+          modalState.action === 'asignar' ? 'Le quitarás el caso al agente actual para atenderlo tú.' :
+          modalState.action === 'soltar' ? 'El caso volverá a la cola de pendientes y dejarás de ser el responsable.' :
+          modalState.action === 'transferir' ? 'El caso se asignará al compañero seleccionado.' :
+          modalState.action === 'prioridad' ? `¿Estás seguro de cambiar la prioridad a ${modalState.value}?` :
+          modalState.action === 'sla' ? (modalState.value ? `¿Estás seguro de fijar un SLA de ${modalState.value} horas?` : '¿Estás seguro de eliminar el SLA objetivo?') : ''
         }
-        confirmText="Confirmar"
-        type={modalState.action === 'cerrar' ? 'success' : modalState.action === 'soltar' ? 'warning' : 'info'}
-        onConfirm={handleConfirmAction}
-        onClose={() => setModalState({ isOpen: false, action: null })}
+        confirmText={
+          modalState.action === 'tomar' ? 'Sí, tomar caso' :
+          modalState.action === 'cerrar' ? 'Sí, cerrar caso' :
+          modalState.action === 'asignar' ? 'Sí, asignármelo' :
+          modalState.action === 'soltar' ? 'Sí, soltarlo' :
+          modalState.action === 'transferir' ? 'Sí, transferir' :
+          modalState.action === 'prioridad' || modalState.action === 'sla' ? 'Guardar' : ''
+        }
+        type={modalState.action === 'cerrar' || modalState.action === 'soltar' ? 'danger' : 'info'}
         isLoading={procesando}
       />
     </div>

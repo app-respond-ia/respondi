@@ -239,6 +239,7 @@ create table case_rules (
   nombre                text not null,
   descripcion_intencion text,
   tipo_caso             text,
+  prioridad_default     text default 'normal',
   activa                boolean not null default true,
   es_plantilla          boolean not null default false,
   created_at            timestamptz not null default now()

@@ -30,7 +30,8 @@ export default function ReglasPage() {
     nombre: '',
     descripcion_intencion: '',
     tipo_caso: '',
-    activa: true
+    activa: true,
+    prioridad_default: 'normal'
   })
 
   const cargar = async () => {
@@ -64,7 +65,8 @@ export default function ReglasPage() {
       nombre: '',
       descripcion_intencion: '',
       tipo_caso: '',
-      activa: true
+      activa: true,
+      prioridad_default: 'normal'
     })
     setIsModalOpen(true)
   }
@@ -76,7 +78,8 @@ export default function ReglasPage() {
       nombre: item.nombre,
       descripcion_intencion: item.descripcion_intencion || '',
       tipo_caso: item.tipo_caso || '',
-      activa: item.activa
+      activa: item.activa,
+      prioridad_default: item.prioridad_default || 'normal'
     })
     setIsModalOpen(true)
   }
@@ -264,14 +267,25 @@ export default function ReglasPage() {
                 {item.descripcion_intencion && (
                   <p className="text-sm text-ink-500 line-clamp-2 pr-4 mb-2">{item.descripcion_intencion}</p>
                 )}
-                {item.tipo_caso && (
-                  <div className="flex items-center gap-1.5 text-xs text-ink-400">
-                    <span>Crea un caso:</span>
-                    <span className="bg-brand-50 text-brand-700 px-2 py-0.5 rounded-md font-500">
-                      {item.tipo_caso}
-                    </span>
+                  <div className="flex items-center gap-2 mt-1">
+                    {item.tipo_caso && (
+                      <div className="flex items-center gap-1.5 text-xs text-ink-400">
+                        <span>Crea un caso:</span>
+                        <span className="bg-brand-50 text-brand-700 px-2 py-0.5 rounded-md font-500">
+                          {item.tipo_caso}
+                        </span>
+                      </div>
+                    )}
+                    {item.prioridad_default && (
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide border ${
+                        item.prioridad_default === 'alta' ? 'bg-red-50 text-red-700 border-red-200' :
+                        item.prioridad_default === 'baja' ? 'bg-slate-50 text-slate-600 border-slate-200' :
+                        'bg-blue-50 text-blue-700 border-blue-200'
+                      }`}>
+                        Prioridad: {item.prioridad_default}
+                      </span>
+                    )}
                   </div>
-                )}
                 {item.created_at && (
                   <p className="text-[11px] text-ink-300 mt-1.5">
                     Creado el {new Date(item.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })} a las {new Date(item.created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
@@ -386,6 +400,22 @@ export default function ReglasPage() {
                     />
                     <p className="text-xs text-ink-400 mt-1.5">
                       Se escribe en mayúsculas para diferenciarlo de las etiquetas normales. Manténlo breve y conciso, ej. "RECLAMO" o "PEDIDO_URGENTE".
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-500 text-ink-700 mb-1.5">Prioridad por defecto</label>
+                    <select
+                      value={formData.prioridad_default}
+                      onChange={e => setFormData({...formData, prioridad_default: e.target.value})}
+                      className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition"
+                    >
+                      <option value="baja">Baja</option>
+                      <option value="normal">Normal</option>
+                      <option value="alta">Alta</option>
+                    </select>
+                    <p className="text-xs text-ink-400 mt-1.5">
+                      Prioridad que tendrá el caso al ser creado por esta regla.
                     </p>
                   </div>
         

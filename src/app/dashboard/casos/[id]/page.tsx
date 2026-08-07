@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { HelpPopover } from '@/components/ui/HelpPopover'
-import { getCasoDetalle, tomarCaso, cerrarCaso, asignarCaso, soltarCaso, getAgentesParaCasos, actualizarPrioridadCaso, actualizarSLACaso } from '@/app/actions/casos'
+import { getCasoDetalle, tomarCaso, cerrarCaso, reabrirCaso, asignarCaso, soltarCaso, getAgentesParaCasos, actualizarPrioridadCaso, actualizarSLACaso } from '@/app/actions/casos'
 
 export default function CasoDetallePage() {
   const params = useParams()
@@ -19,7 +19,7 @@ export default function CasoDetallePage() {
   const [procesando, setProcesando] = useState(false)
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
-    action: 'tomar' | 'cerrar' | 'asignar' | 'soltar' | 'transferir' | 'prioridad' | 'sla' | null;
+    action: 'tomar' | 'cerrar' | 'reabrir' | 'asignar' | 'soltar' | 'transferir' | 'prioridad' | 'sla' | null;
     targetId?: string;
     value?: string | number | null;
   }>({ isOpen: false, action: null })
@@ -80,6 +80,9 @@ export default function CasoDetallePage() {
         break
       case 'cerrar':
         res = await cerrarCaso(id)
+        break
+      case 'reabrir':
+        res = await reabrirCaso(id)
         break
       case 'asignar':
         res = await asignarCaso(id, caso.current_user_id)
@@ -157,6 +160,11 @@ export default function CasoDetallePage() {
             {esAtendiendo && (
               <button onClick={() => openModal('cerrar')} className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow-md shadow-emerald-600/20 transition">
                 Cerrar caso
+              </button>
+            )}
+            {esCerrado && (
+              <button onClick={() => openModal('reabrir')} className="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl border border-slate-200 transition">
+                Reabrir caso
               </button>
             )}
           </div>
@@ -425,6 +433,7 @@ export default function CasoDetallePage() {
         title={
           modalState.action === 'tomar' ? '¿Tomar este caso?' :
           modalState.action === 'cerrar' ? '¿Cerrar este caso?' :
+          modalState.action === 'reabrir' ? '¿Reabrir este caso?' :
           modalState.action === 'asignar' ? '¿Asignarte este caso?' :
           modalState.action === 'soltar' ? '¿Soltar este caso?' :
           modalState.action === 'transferir' ? '¿Transferir caso?' :
@@ -434,6 +443,7 @@ export default function CasoDetallePage() {
         message={
           modalState.action === 'tomar' ? 'Pasarás a ser el agente responsable de atender esta consulta.' :
           modalState.action === 'cerrar' ? 'El caso quedará resuelto. Si el cliente vuelve a escribir, la IA lo atenderá normalmente.' :
+          modalState.action === 'reabrir' ? 'El caso volverá a estar activo (se te asignará si ya lo tenías, o irá a la cola).' :
           modalState.action === 'asignar' ? 'Le quitarás el caso al agente actual para atenderlo tú.' :
           modalState.action === 'soltar' ? 'El caso volverá a la cola de pendientes y dejarás de ser el responsable.' :
           modalState.action === 'transferir' ? 'El caso se asignará al compañero seleccionado.' :
@@ -443,6 +453,7 @@ export default function CasoDetallePage() {
         confirmText={
           modalState.action === 'tomar' ? 'Sí, tomar caso' :
           modalState.action === 'cerrar' ? 'Sí, cerrar caso' :
+          modalState.action === 'reabrir' ? 'Sí, reabrir' :
           modalState.action === 'asignar' ? 'Sí, asignármelo' :
           modalState.action === 'soltar' ? 'Sí, soltarlo' :
           modalState.action === 'transferir' ? 'Sí, transferir' :

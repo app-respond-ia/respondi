@@ -165,12 +165,14 @@ export async function tomarCaso(casoId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: 'No autorizado' }
 
+  const { data: userData } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
   const { data: caso } = await supabase.from('cases').select('conversation_id').eq('id', casoId).single()
   
   const { error } = await supabase
     .from('cases')
     .update({ estatus: 'atendiendo', agente_id: user.id })
     .eq('id', casoId)
+    .eq('tenant_id', userData?.tenant_id)
 
   if (caso?.conversation_id) {
     await supabase
@@ -179,11 +181,26 @@ export async function tomarCaso(casoId: string) {
       .eq('id', caso.conversation_id)
   }
 
+  if (!error) {
+    const { registrarAuditoria } = await import('@/lib/auditoria')
+    await registrarAuditoria({
+      tenant_id: userData?.tenant_id,
+      user_id: user.id,
+      accion: 'tomó el caso',
+      tabla_afectada: 'cases',
+      registro_id: casoId
+    })
+  }
+
   return { success: !error, error: error?.message }
 }
 
 export async function cerrarCaso(casoId: string) {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'No autorizado' }
+
+  const { data: userData } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
   
   const { data: caso } = await supabase.from('cases').select('conversation_id').eq('id', casoId).single()
 
@@ -191,12 +208,24 @@ export async function cerrarCaso(casoId: string) {
     .from('cases')
     .update({ estatus: 'resuelto', fecha_cierre: new Date().toISOString() })
     .eq('id', casoId)
+    .eq('tenant_id', userData?.tenant_id)
 
   if (caso?.conversation_id) {
     await supabase
       .from('conversations')
       .update({ estado: 'cerrada' })
       .eq('id', caso.conversation_id)
+  }
+
+  if (!error) {
+    const { registrarAuditoria } = await import('@/lib/auditoria')
+    await registrarAuditoria({
+      tenant_id: userData?.tenant_id,
+      user_id: user.id,
+      accion: 'cerró el caso',
+      tabla_afectada: 'cases',
+      registro_id: casoId
+    })
   }
 
   return { success: !error, error: error?.message }
@@ -226,10 +255,27 @@ export async function reabrirCaso(casoId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: 'No autorizado' }
 
+  const { data: userData } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
+  const { data: caso } = await supabase.from('cases').select('agente_id').eq('id', casoId).single()
+  
+  const nuevoEstatus = caso?.agente_id ? 'atendiendo' : 'pendiente'
+
   const { error } = await supabase
     .from('cases')
-    .update({ estatus: 'pendiente', agente_id: null, fecha_cierre: null })
+    .update({ estatus: nuevoEstatus, fecha_cierre: null })
     .eq('id', casoId)
+    .eq('tenant_id', userData?.tenant_id)
+
+  if (!error) {
+    const { registrarAuditoria } = await import('@/lib/auditoria')
+    await registrarAuditoria({
+      tenant_id: userData?.tenant_id,
+      user_id: user.id,
+      accion: 'reabrió el caso',
+      tabla_afectada: 'cases',
+      registro_id: casoId
+    })
+  }
 
   return { success: !error, error: error?.message }
 }
@@ -272,12 +318,30 @@ export async function crearCasoDesdeConversacion(conversationId: string, agenteI
       conversation_id: conversationId,
       tipo: 'normal',
       descripcion: 'Caso creado manualmente desde la conversación',
-      estatus: 'pendiente',
+      estatus: agenteId ? 'atendiendo' : 'pendiente',
       agente_id: agenteId,
       fecha_apertura: new Date().toISOString()
     }])
     .select('id')
     .single()
+
+  if (!error) {
+    let accionMsg = 'creó el caso (en cola)'
+    if (agenteId === user.id) {
+      accionMsg = 'creó el caso (asignado a sí mismo)'
+    } else if (agenteId) {
+      const { data: targetUser } = await supabase.from('users').select('nombre, email').eq('id', agenteId).single()
+      accionMsg = `creó el caso (asignado a ${targetUser?.nombre || targetUser?.email || 'desconocido'})`
+    }
+    const { registrarAuditoria } = await import('@/lib/auditoria')
+    await registrarAuditoria({
+      tenant_id: userData?.tenant_id,
+      user_id: user.id,
+      accion: accionMsg,
+      tabla_afectada: 'cases',
+      registro_id: nuevoCaso.id
+    })
+  }
 
   if (error) return { success: false, error: error.message }
   return { success: true, data: nuevoCaso }
@@ -296,6 +360,22 @@ export async function asignarCaso(casoId: string, agenteId: string) {
     .eq('id', casoId)
     .eq('tenant_id', userData?.tenant_id)
 
+  if (!error) {
+    let accionMsg = 'se asignó el caso a sí mismo'
+    if (agenteId !== user.id) {
+      const { data: targetUser } = await supabase.from('users').select('nombre, email').eq('id', agenteId).single()
+      accionMsg = `asignó el caso a ${targetUser?.nombre || targetUser?.email || 'desconocido'}`
+    }
+    const { registrarAuditoria } = await import('@/lib/auditoria')
+    await registrarAuditoria({
+      tenant_id: userData?.tenant_id,
+      user_id: user.id,
+      accion: accionMsg,
+      tabla_afectada: 'cases',
+      registro_id: casoId
+    })
+  }
+
   return { success: !error, error: error?.message }
 }
 
@@ -311,6 +391,17 @@ export async function soltarCaso(casoId: string) {
     .update({ agente_id: null })
     .eq('id', casoId)
     .eq('tenant_id', userData?.tenant_id)
+
+  if (!error) {
+    const { registrarAuditoria } = await import('@/lib/auditoria')
+    await registrarAuditoria({
+      tenant_id: userData?.tenant_id,
+      user_id: user.id,
+      accion: 'soltó el caso',
+      tabla_afectada: 'cases',
+      registro_id: casoId
+    })
+  }
 
   return { success: !error, error: error?.message }
 }

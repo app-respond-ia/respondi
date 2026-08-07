@@ -127,21 +127,49 @@ export async function pausarIA(convId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: 'No autorizado' }
 
+  const { data: userData } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
+
   const { error } = await supabase
     .from('conversations')
     .update({ ia_pausada: true, atendida_por: user.id })
     .eq('id', convId)
+
+  if (!error) {
+    const { registrarAuditoria } = await import('@/lib/auditoria')
+    await registrarAuditoria({
+      tenant_id: userData?.tenant_id,
+      user_id: user.id,
+      accion: 'pausó la IA en la conversación',
+      tabla_afectada: 'conversations',
+      registro_id: convId
+    })
+  }
 
   return { success: !error, error: error?.message }
 }
 
 export async function reanudarIA(convId: string) {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'No autorizado' }
+
+  const { data: userData } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
   
   const { error } = await supabase
     .from('conversations')
     .update({ ia_pausada: false, atendida_por: null })
     .eq('id', convId)
+
+  if (!error) {
+    const { registrarAuditoria } = await import('@/lib/auditoria')
+    await registrarAuditoria({
+      tenant_id: userData?.tenant_id,
+      user_id: user.id,
+      accion: 'reanudó la IA en la conversación',
+      tabla_afectada: 'conversations',
+      registro_id: convId
+    })
+  }
 
   return { success: !error, error: error?.message }
 }

@@ -120,6 +120,17 @@ export async function toggleIAPausa(conversationId: string, pausada: boolean) {
     `)
     .single()
 
+  if (!error) {
+    const { registrarAuditoria } = await import('@/lib/auditoria')
+    await registrarAuditoria({
+      tenant_id: auth.tenant_id,
+      user_id: auth.user_id,
+      accion: pausada ? 'pausó la IA en la conversación' : 'reanudó la IA en la conversación',
+      tabla_afectada: 'conversations',
+      registro_id: conversationId
+    })
+  }
+
   if (error) return { success: false, error: error.message }
   return { success: true, data }
 }
@@ -146,6 +157,55 @@ export async function cerrarConversacion(conversationId: string) {
       )
     `)
     .single()
+
+  if (!error) {
+    const { registrarAuditoria } = await import('@/lib/auditoria')
+    await registrarAuditoria({
+      tenant_id: auth.tenant_id,
+      user_id: auth.user_id,
+      accion: 'cerró la conversación',
+      tabla_afectada: 'conversations',
+      registro_id: conversationId
+    })
+  }
+
+  if (error) return { success: false, error: error.message }
+  return { success: true, data }
+}
+
+export async function reabrirConversacion(conversationId: string) {
+  const supabase = await createClient()
+  const auth = await getAuthData(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+
+  const { data, error } = await supabase
+    .from('conversations')
+    .update({ 
+      estado: 'activa',
+      fecha_cierre: null
+    })
+    .eq('id', conversationId)
+    .eq('branch_id', auth.branch_id)
+    .select(`
+      *,
+      contacts (
+        nombre,
+        identificador_canal,
+        canal
+      )
+    `)
+    .single()
+
+  if (!error) {
+    const { registrarAuditoria } = await import('@/lib/auditoria')
+    await registrarAuditoria({
+      tenant_id: auth.tenant_id,
+      user_id: auth.user_id,
+      accion: 'reabrió la conversación',
+      tabla_afectada: 'conversations',
+      registro_id: conversationId
+    })
+  }
 
   if (error) return { success: false, error: error.message }
   return { success: true, data }

@@ -3,9 +3,11 @@ import Loading from '@/components/Loading'
 
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { getConversaciones, getMensajes, toggleIAPausa, cerrarConversacion } from '@/app/actions/chats'
+import { getConversaciones, getMensajes, toggleIAPausa, cerrarConversacion, reabrirConversacion } from '@/app/actions/chats'
 import { enviarMensajeAgenteConv } from '@/app/actions/conversaciones'
 import { getMisPermisos } from '@/app/actions/permisos'
+import { reabrirCaso } from '@/app/actions/casos'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 function ChatsContent() {
   const router = useRouter()
@@ -25,6 +27,12 @@ function ChatsContent() {
   
   const [mensajeText, setMensajeText] = useState('')
   const [enviando, setEnviando] = useState(false)
+  
+  const [procesando, setProcesando] = useState(false)
+  const [modalState, setModalState] = useState<{
+    isOpen: boolean;
+    action: 'reabrir_caso' | 'reabrir_conv' | null;
+  }>({ isOpen: false, action: null })
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -101,10 +109,44 @@ function ChatsContent() {
     if (confirm('¿Cerrar esta conversación?')) {
       const res = await cerrarConversacion(conv.id)
       if (res.success && res.data) {
-        setConversaciones(prev => prev.map(c => c.id === conv.id ? res.data : c))
-        setSelectedConvId(null)
+        setConversaciones(prev => prev.map(c => c.id === conv.id ? { ...c, estado: res.data.estado } : c))
       }
     }
+  }
+
+  const handleConfirmAction = async () => {
+    if (!selectedConvId) return
+    setProcesando(true)
+    let success = false
+
+    if (modalState.action === 'reabrir_conv') {
+      const res = await reabrirConversacion(selectedConvId)
+      if (res.success && res.data) {
+        setConversaciones(prev => prev.map(c => c.id === selectedConvId ? { ...c, estado: res.data.estado } : c))
+        success = true
+      }
+    } else if (modalState.action === 'reabrir_caso') {
+      const selectedConv = conversaciones.find(c => c.id === selectedConvId)
+      const casoId = selectedConv?.cases?.[0]?.id
+      if (casoId) {
+        const res = await reabrirCaso(casoId)
+        if (res.success) {
+          // Update local case status
+          setConversaciones(prev => prev.map(c => {
+            if (c.id === selectedConvId && c.cases?.[0]) {
+              return { ...c, cases: [{ ...c.cases[0], estatus: 'atendiendo' }] }
+            }
+            return c
+          }))
+          success = true
+        }
+      }
+    }
+
+    if (success) {
+      setModalState({ isOpen: false, action: null })
+    }
+    setProcesando(false)
   }
 
   const handleEnviar = async (e: React.FormEvent) => {
@@ -294,12 +336,27 @@ function ChatsContent() {
                   </>
                 )}
                 {selectedConv?.estado === 'cerrada' && (
-                  <span className="px-3 py-1.5 bg-slate-200 text-ink-600 rounded-lg text-xs font-600">
-                    Cerrada
-                  </span>
+                  <>
+                    <button onClick={() => setModalState({ isOpen: true, action: 'reabrir_conv' })} disabled={nivelPermiso !== 'escritura'} className="hidden sm:inline-flex px-3 py-1.5 bg-slate-100 text-ink-700 hover:bg-slate-200 rounded-lg text-xs font-600 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                      Reabrir conversación
+                    </button>
+                    <span className="px-3 py-1.5 bg-slate-200 text-ink-600 rounded-lg text-xs font-600">
+                      Cerrada
+                    </span>
+                  </>
                 )}
               </div>
             </div>
+
+            {/* Banner de Caso Cerrado */}
+            {selectedConv?.cases?.[0] && (selectedConv.cases[0].estatus === 'resuelto' || selectedConv.cases[0].estatus === 'cerrado') && (
+              <div className="bg-slate-100 border-b border-slate-200 p-3 shrink-0 flex items-center justify-between">
+                <p className="text-sm text-slate-700">Esta conversación está vinculada a un caso <strong>{selectedConv.cases[0].estatus}</strong>.</p>
+                <button onClick={() => setModalState({ isOpen: true, action: 'reabrir_caso' })} disabled={nivelPermiso !== 'escritura'} className="px-3 py-1.5 bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 rounded-lg text-xs font-600 transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                  Reabrir caso
+                </button>
+              </div>
+            )}
 
             {selectedConv?.ia_pausada && selectedConv?.estado === 'activa' && (
               <div className="px-4 py-2 bg-amber-50 border-b border-amber-200 flex items-center gap-2 shrink-0">
@@ -394,6 +451,23 @@ function ChatsContent() {
           </>
         )}
       </section>
+
+      <ConfirmModal
+        isOpen={modalState.isOpen}
+        onClose={() => setModalState({ isOpen: false, action: null })}
+        onConfirm={handleConfirmAction}
+        title={
+          modalState.action === 'reabrir_caso' ? '¿Reabrir este caso?' :
+          modalState.action === 'reabrir_conv' ? '¿Reabrir esta conversación?' : ''
+        }
+        message={
+          modalState.action === 'reabrir_caso' ? 'El caso asociado volverá a estar activo (se te asignará si ya lo tenías, o irá a la cola).' :
+          modalState.action === 'reabrir_conv' ? 'La conversación volverá a estar activa y podrás enviar mensajes.' : ''
+        }
+        confirmText="Sí, reabrir"
+        type="info"
+        isLoading={procesando}
+      />
     </div>
   )
 }

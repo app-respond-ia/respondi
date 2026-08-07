@@ -23,8 +23,22 @@ export default function ConversacionDetallePage() {
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
     action: 'asignar_mi' | 'asignar_otro' | 'cola' | null;
-    targetId?: string;
+    targetAgenteId?: string;
   }>({ isOpen: false, action: null })
+  
+  const [agentSearch, setAgentSearch] = useState('')
+  const [showAgentDropdown, setShowAgentDropdown] = useState(false)
+  const agentDropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (agentDropdownRef.current && !agentDropdownRef.current.contains(event.target as Node)) {
+        setShowAgentDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -71,7 +85,7 @@ export default function ConversacionDetallePage() {
     
     let targetAgenteId = null
     if (modalState.action === 'asignar_mi') targetAgenteId = conv?.current_user_id
-    if (modalState.action === 'asignar_otro' && modalState.targetId) targetAgenteId = modalState.targetId
+    if (modalState.action === 'asignar_otro' && modalState.targetAgenteId) targetAgenteId = modalState.targetAgenteId
 
     const res = await crearCasoDesdeConversacion(id, targetAgenteId)
     if (res.success) {
@@ -81,8 +95,8 @@ export default function ConversacionDetallePage() {
     setProcesandoCaso(false)
   }
 
-  const openModal = (action: typeof modalState.action, targetId?: string) => {
-    setModalState({ isOpen: true, action, targetId })
+  const openModal = (action: typeof modalState.action, targetAgenteId?: string) => {
+    setModalState({ isOpen: true, action, targetAgenteId })
   }
 
   if (loading) return <Loading />
@@ -220,24 +234,53 @@ export default function ConversacionDetallePage() {
                 >
                   Dejar en cola (sin asignar)
                 </button>
-                <div className="pt-3 border-t border-slate-100">
+                <div className="pt-3 border-t border-slate-100 relative" ref={agentDropdownRef}>
                   <p className="text-xs text-slate-500 font-medium mb-2">Asignar a...</p>
-                  <select 
-                    className="w-full h-10 px-3 border border-slate-200 rounded-xl bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-shadow disabled:opacity-50"
-                    onChange={(e) => {
-                      if (e.target.value) {
-                        openModal('asignar_otro', e.target.value)
-                        e.target.value = "" // Reset select
-                      }
-                    }}
-                    defaultValue=""
-                    disabled={procesandoCaso}
-                  >
-                    <option value="" disabled>Selecciona un agente</option>
-                    {agentes.map(a => (
-                      <option key={a.id} value={a.id}>{a.nombre || a.email}</option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <button 
+                      onClick={() => setShowAgentDropdown(!showAgentDropdown)}
+                      disabled={procesandoCaso}
+                      className="w-full h-10 px-3 border border-slate-200 rounded-xl bg-slate-50 text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-shadow disabled:opacity-50"
+                    >
+                      <span className="text-slate-500">Selecciona un agente...</span>
+                      <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+
+                    {showAgentDropdown && (
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden">
+                        <div className="p-2 border-b border-slate-100 bg-slate-50">
+                          <input 
+                            type="text" 
+                            placeholder="Buscar agente..." 
+                            value={agentSearch} 
+                            onChange={e => setAgentSearch(e.target.value)} 
+                            className="w-full px-2 py-1.5 text-sm rounded-lg border border-slate-200 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500" 
+                          />
+                        </div>
+                        <div className="max-h-[160px] overflow-y-auto p-1">
+                          {agentes.filter(a => 
+                            (a.nombre || '').toLowerCase().includes(agentSearch.toLowerCase()) || 
+                            (a.email || '').toLowerCase().includes(agentSearch.toLowerCase())
+                          ).map(a => (
+                            <button
+                              key={a.id}
+                              className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 rounded-lg transition text-ink-900 truncate"
+                              onClick={() => {
+                                setShowAgentDropdown(false)
+                                setAgentSearch('')
+                                openModal('asignar_otro', a.id)
+                              }}
+                            >
+                              {a.nombre || a.email}
+                            </button>
+                          ))}
+                          {agentes.length === 0 && (
+                            <div className="px-3 py-2 text-sm text-slate-500 text-center">No hay agentes disponibles</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -270,7 +313,15 @@ export default function ConversacionDetallePage() {
             <div className="flex flex-wrap gap-2">
               {conv.etiquetas && conv.etiquetas.length > 0 ? (
                 conv.etiquetas.map((t: any, i: number) => (
-                  <span key={i} className="text-xs font-semibold px-2.5 py-1 bg-slate-100 text-slate-700 rounded-md border border-slate-200">
+                  <span 
+                    key={i} 
+                    className="text-xs font-semibold px-2.5 py-1 rounded-md border"
+                    style={{
+                      backgroundColor: `${t.color}26`, // 15% opacity hex
+                      color: t.color,
+                      borderColor: t.color
+                    }}
+                  >
                     {t.nombre}
                   </span>
                 ))

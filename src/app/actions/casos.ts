@@ -98,8 +98,12 @@ export async function getCasoDetalle(casoId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: 'No autorizado' }
 
-  const { data: userData } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
+  const { data: userData } = await supabase.from('users').select('tenant_id, roles_personalizados(nivel, es_propietario)').eq('id', user.id).single()
   
+  const roleData = Array.isArray(userData?.roles_personalizados) ? userData?.roles_personalizados[0] : userData?.roles_personalizados
+  const current_user_level = roleData?.nivel ?? 5
+  const current_user_is_owner = roleData?.es_propietario ?? false
+
   const { data: caso, error } = await supabase
     .from('cases')
     .select(`
@@ -143,7 +147,17 @@ export async function getCasoDetalle(casoId: string) {
     etiquetas = tags?.map(t => t.message_categories) || []
   }
 
-  return { success: true, data: { ...caso, mensajes, etiquetas, current_user_id: user.id } }
+  return { 
+    success: true, 
+    data: { 
+      ...caso, 
+      mensajes, 
+      etiquetas, 
+      current_user_id: user.id,
+      current_user_level,
+      current_user_is_owner
+    } 
+  }
 }
 
 export async function tomarCaso(casoId: string) {

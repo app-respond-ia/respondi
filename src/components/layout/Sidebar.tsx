@@ -24,7 +24,10 @@ export default function Sidebar({ user, onCloseMobile, permisos, esAdmin, collap
   const [configColapsada, setConfigColapsada] = useState(false)
   const [organizacionColapsada, setOrganizacionColapsada] = useState(false)
 
-  const isActive = (path: string) => pathname === path
+  const isActive = (path: string) => {
+    if (path === '/dashboard') return pathname === path
+    return pathname === path || pathname.startsWith(path + '/')
+  }
 
   const navItemClass = (path: string) =>
     isActive(path)

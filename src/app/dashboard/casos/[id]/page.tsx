@@ -27,6 +27,20 @@ export default function CasoDetallePage() {
   const [slaInput, setSlaInput] = useState<string>('')
   const [prioridadInput, setPrioridadInput] = useState<string>('')
   
+  const [agentSearch, setAgentSearch] = useState('')
+  const [showAgentDropdown, setShowAgentDropdown] = useState(false)
+  const agentDropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (agentDropdownRef.current && !agentDropdownRef.current.contains(event.target as Node)) {
+        setShowAgentDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+  
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -318,7 +332,8 @@ export default function CasoDetallePage() {
                 >
                   Asignarme este caso
                 </button>
-              ) : (
+              ) : null}
+              {caso.agente_id && (caso.agente_id === caso.current_user_id || caso.current_user_level <= 2 || caso.current_user_is_owner) && (
                 <button 
                   onClick={() => openModal('soltar')} 
                   disabled={procesando}
@@ -328,24 +343,54 @@ export default function CasoDetallePage() {
                 </button>
               )}
               
-              <div className="pt-3 border-t border-slate-100">
+              <div className="pt-3 border-t border-slate-100 relative" ref={agentDropdownRef}>
                 <p className="text-xs text-slate-500 font-medium mb-2">Transferir a...</p>
-                <select 
-                  className="w-full h-10 px-3 border border-slate-200 rounded-xl bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-shadow disabled:opacity-50"
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      openModal('transferir', e.target.value)
-                      e.target.value = "" // Reset select
-                    }
-                  }}
-                  defaultValue=""
-                  disabled={procesando}
-                >
-                  <option value="" disabled>Selecciona un agente</option>
-                  {agentes.filter(a => a.id !== caso.agente_id).map(a => (
-                    <option key={a.id} value={a.id}>{a.nombre || a.email}</option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <button 
+                    onClick={() => setShowAgentDropdown(!showAgentDropdown)}
+                    disabled={procesando}
+                    className="w-full h-10 px-3 border border-slate-200 rounded-xl bg-slate-50 text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-shadow disabled:opacity-50"
+                  >
+                    <span className="text-slate-500">Selecciona un agente...</span>
+                    <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/></svg>
+                  </button>
+
+                  {showAgentDropdown && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden">
+                      <div className="p-2 border-b border-slate-100 bg-slate-50">
+                        <input 
+                          type="text" 
+                          placeholder="Buscar agente..." 
+                          value={agentSearch} 
+                          onChange={e => setAgentSearch(e.target.value)} 
+                          className="w-full px-2 py-1.5 text-sm rounded-lg border border-slate-200 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500" 
+                        />
+                      </div>
+                      <div className="max-h-[160px] overflow-y-auto p-1">
+                        {agentes.filter(a => 
+                          a.id !== caso.agente_id && 
+                          ((a.nombre || '').toLowerCase().includes(agentSearch.toLowerCase()) || 
+                           (a.email || '').toLowerCase().includes(agentSearch.toLowerCase()))
+                        ).map(a => (
+                          <button
+                            key={a.id}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 rounded-lg transition text-ink-900 truncate"
+                            onClick={() => {
+                              setShowAgentDropdown(false)
+                              setAgentSearch('')
+                              openModal('transferir', a.id)
+                            }}
+                          >
+                            {a.nombre || a.email}
+                          </button>
+                        ))}
+                        {agentes.filter(a => a.id !== caso.agente_id).length === 0 && (
+                          <div className="px-3 py-2 text-sm text-slate-500 text-center">No hay otros agentes disponibles</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -355,7 +400,15 @@ export default function CasoDetallePage() {
               <h3 className="font-semibold text-ink-900 mb-3 pb-2 border-b border-slate-100">Etiquetas de la charla</h3>
               <div className="flex flex-wrap gap-2">
                 {caso.etiquetas.map((t: any, i: number) => (
-                  <span key={i} className="text-xs font-medium px-2 py-1 bg-slate-100 text-slate-700 rounded-md border border-slate-200">
+                  <span 
+                    key={i} 
+                    className="text-xs font-medium px-2 py-1 rounded-md border"
+                    style={{
+                      backgroundColor: `${t.color}26`, // 15% opacity hex
+                      color: t.color,
+                      borderColor: t.color
+                    }}
+                  >
                     {t.nombre}
                   </span>
                 ))}

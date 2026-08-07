@@ -307,9 +307,9 @@ export default function ReglasPage() {
 
     if (res.success && res.data) {
       if (modalMode === 'añadir') {
-        setItems(prev => [...prev, res.data])
+        setItems(prev => [...prev, res.data].sort((a, b) => a.orden - b.orden))
       } else {
-        setItems(prev => prev.map(it => it.id === editingId ? { ...it, ...res.data } : it))
+        setItems(prev => prev.map(it => it.id === editingId ? { ...it, ...res.data } : it).sort((a, b) => a.orden - b.orden))
       }
       setIsModalOpen(false)
       setMensaje({ tipo: 'exito', texto: modalMode === 'añadir' ? 'Regla añadida correctamente ✓' : 'Regla actualizada correctamente ✓' })

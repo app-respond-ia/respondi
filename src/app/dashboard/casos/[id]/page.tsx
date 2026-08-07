@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
+import { HelpPopover } from '@/components/ui/HelpPopover'
 import { getCasoDetalle, tomarCaso, cerrarCaso, asignarCaso, soltarCaso, getAgentesParaCasos, actualizarPrioridadCaso, actualizarSLACaso } from '@/app/actions/casos'
 
 export default function CasoDetallePage() {
@@ -215,7 +216,16 @@ export default function CasoDetallePage() {
           </div>
 
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-            <h3 className="font-semibold text-ink-900 mb-4 pb-2 border-b border-slate-100">Detalles del Caso</h3>
+            <h3 className="font-semibold text-ink-900 mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+              Detalles del Caso
+              <HelpPopover content={
+                <div className="space-y-2">
+                  <p>Muestra información del caso: Motivo, descripción, agente y fecha de apertura.</p>
+                  <p><strong>Motivo/Tipo:</strong> La razón original por la que la IA lo escaló.</p>
+                  <p><strong>Prioridad:</strong> Nivel de urgencia actual (se puede editar manualmente).</p>
+                </div>
+              } />
+            </h3>
             <div className="space-y-4">
               <div>
                 <p className="text-xs text-slate-500 font-medium mb-1">Motivo / Tipo</p>
@@ -288,7 +298,16 @@ export default function CasoDetallePage() {
           </div>
 
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-            <h3 className="font-semibold text-ink-900 mb-4 pb-2 border-b border-slate-100">Gestión de Asignación</h3>
+            <h3 className="font-semibold text-ink-900 mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+              Gestión de Asignación
+              <HelpPopover content={
+                <ul className="space-y-1.5 list-disc pl-3">
+                  <li><strong>Asignarme:</strong> Te asignas a ti mismo.</li>
+                  <li><strong>Soltar:</strong> Quita al agente actual. No cambia el estado del caso.</li>
+                  <li><strong>Transferir:</strong> Lo asignas a otro agente.</li>
+                </ul>
+              } />
+            </h3>
             
             <div className="space-y-3">
               {caso.agente_id !== caso.current_user_id ? (

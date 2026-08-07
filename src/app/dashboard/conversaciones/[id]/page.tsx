@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
+import { HelpPopover } from '@/components/ui/HelpPopover'
 import { getConversacionDetalle, pausarIA, reanudarIA } from '@/app/actions/conversaciones'
 import { getAgentesParaCasos, crearCasoDesdeConversacion } from '@/app/actions/casos'
 
@@ -108,18 +109,21 @@ export default function ConversacionDetallePage() {
             </span>
           </h1>
           
-          <button 
-            disabled={cambiandoIA}
-            onClick={toggleIA}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition shadow-sm border ${
-              conv.ia_pausada 
-                ? 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200' 
-                : 'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200'
-            } disabled:opacity-50`}
-          >
-            <div className={`w-2.5 h-2.5 rounded-full shadow-inner ${conv.ia_pausada ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`}></div>
-            {conv.ia_pausada ? 'IA Pausada (Reanudar)' : 'IA Activa (Pausar)'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+              disabled={cambiandoIA}
+              onClick={toggleIA}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition shadow-sm border ${
+                conv.ia_pausada 
+                  ? 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200' 
+                  : 'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200'
+              } disabled:opacity-50`}
+            >
+              <div className={`w-2.5 h-2.5 rounded-full shadow-inner ${conv.ia_pausada ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`}></div>
+              {conv.ia_pausada ? 'IA Pausada (Reanudar)' : 'IA Activa (Pausar)'}
+            </button>
+            <HelpPopover content="Indica si la IA responde de forma autónoma o si está silenciada para intervención humana. Puedes cambiar el estado haciendo clic en el botón." />
+          </div>
         </div>
       </div>
 
@@ -259,7 +263,10 @@ export default function ConversacionDetallePage() {
           </div>
 
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-            <h3 className="font-semibold text-ink-900 mb-3 pb-2 border-b border-slate-100">Etiquetas aplicadas</h3>
+            <h3 className="font-semibold text-ink-900 mb-3 pb-2 border-b border-slate-100 flex items-center gap-2">
+              Etiquetas aplicadas
+              <HelpPopover content="Categorías aplicadas automáticamente por la IA o por un agente, útiles para filtrar y buscar conversaciones similares." />
+            </h3>
             <div className="flex flex-wrap gap-2">
               {conv.etiquetas && conv.etiquetas.length > 0 ? (
                 conv.etiquetas.map((t: any, i: number) => (

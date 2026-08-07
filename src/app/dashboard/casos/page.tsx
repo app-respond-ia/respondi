@@ -27,6 +27,17 @@ export default function CasosPage() {
   
   const [isPopoverOpen, setIsPopoverOpen] = useState(false)
   const [agentSearch, setAgentSearch] = useState('')
+  const popoverRef = useRef<HTMLDivElement>(null)
+  
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
+        setIsPopoverOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
   
   const filteredAgentes = agentesOpciones.filter(ag => (ag.nombre || ag.email).toLowerCase().includes(agentSearch.toLowerCase()))
   
@@ -148,47 +159,48 @@ export default function CasosPage() {
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mb-6">
-        <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-          <div className="relative w-full sm:w-96">
+        <div className="flex flex-col md:flex-row gap-4 items-start md:items-center w-full">
+          <div className="relative flex-1 w-full">
             <svg className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
             <input type="text" placeholder="Buscar caso o cliente..." 
               value={search} onChange={e => setSearch(e.target.value)}
-              className="w-full h-11 pl-10 pr-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition" />
+              className="w-full h-10 pl-10 pr-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition outline-none" />
           </div>
           
-          <div className="flex flex-wrap gap-2">
+          <div className="flex bg-slate-100 p-1 rounded-xl shrink-0">
             {estados.map(est => (
               <button key={est} onClick={() => setEstadoFilter(est)}
-                className={`px-4 h-10 rounded-full text-sm font-medium transition ${estadoFilter === est ? 'bg-brand-600 text-white shadow-md shadow-brand-600/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                className={`px-4 h-8 rounded-lg text-sm font-medium transition ${estadoFilter === est ? 'bg-white text-ink-900 shadow-sm border border-slate-200' : 'text-slate-600 hover:text-ink-900'}`}>
                 {est}
               </button>
             ))}
           </div>
         </div>
 
-        <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col md:flex-row gap-6">
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-slate-500">Canal:</span>
-            <div className="flex flex-wrap gap-2">
+        <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap gap-4 items-center">
+          <div className="flex items-center">
+            <span className="text-sm font-medium text-slate-500 mr-2">Canal:</span>
+            <div className="flex bg-slate-100 p-1 rounded-lg">
               {canales.map(can => (
                 <button key={can} onClick={() => setCanalFilter(can)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${canalFilter === can ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                  className={`px-3 h-7 rounded-md text-sm font-medium transition ${canalFilter === can ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>
                   {can}
                 </button>
               ))}
             </div>
           </div>
           
-          <div className="flex items-center gap-3 border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6">
-            <span className="text-sm font-medium text-slate-500">Agentes:</span>
-            <div className="relative">
-              <button 
-                onClick={() => setIsPopoverOpen(!isPopoverOpen)}
-                className="px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-              >
-                {getAgentFilterLabel()}
-                <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/></svg>
-              </button>
+          <div className="h-5 w-px bg-slate-200 hidden sm:block"></div>
+          
+          <div className="flex items-center relative" ref={popoverRef}>
+            <span className="text-sm font-medium text-slate-500 mr-2">Agente:</span>
+            <button 
+              onClick={() => setIsPopoverOpen(!isPopoverOpen)}
+              className="h-9 px-3 rounded-lg text-sm font-medium border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+            >
+              {getAgentFilterLabel()}
+              <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
               
               {isPopoverOpen && (
                 <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-slate-200 z-50 overflow-hidden flex flex-col">
@@ -220,21 +232,24 @@ export default function CasosPage() {
                   )}
                 </div>
               )}
-            </div>
           </div>
           
-          <div className="flex items-center gap-3 border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6">
-            <span className="text-sm font-medium text-slate-500">Fecha:</span>
-            <div className="flex items-center gap-2">
-              <input type="date" value={dateRange.from} onChange={e => setDateRange({...dateRange, from: e.target.value})} className="px-3 py-1.5 rounded-lg text-sm border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-slate-700" />
+          <div className="h-5 w-px bg-slate-200 hidden sm:block"></div>
+          
+          <div className="flex items-center">
+            <span className="text-sm font-medium text-slate-500 mr-2">Fecha:</span>
+            <div className="flex items-center gap-1">
+              <input type="date" value={dateRange.from} onChange={e => setDateRange({...dateRange, from: e.target.value})} className="h-9 px-2 rounded-lg text-sm border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-slate-700 bg-white" />
               <span className="text-slate-400">-</span>
-              <input type="date" value={dateRange.to} onChange={e => setDateRange({...dateRange, to: e.target.value})} className="px-3 py-1.5 rounded-lg text-sm border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-slate-700" />
+              <input type="date" value={dateRange.to} onChange={e => setDateRange({...dateRange, to: e.target.value})} className="h-9 px-2 rounded-lg text-sm border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-slate-700 bg-white" />
             </div>
           </div>
 
-          <div className="flex items-center gap-3 border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6">
-            <span className="text-sm font-medium text-slate-500">Orden:</span>
-            <select value={sortOrder} onChange={e => setSortOrder(e.target.value as 'desc'|'asc')} className="px-3 py-1.5 rounded-lg text-sm border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-slate-700 bg-white">
+          <div className="h-5 w-px bg-slate-200 hidden md:block"></div>
+
+          <div className="flex items-center">
+            <span className="text-sm font-medium text-slate-500 mr-2">Orden:</span>
+            <select value={sortOrder} onChange={e => setSortOrder(e.target.value as 'desc'|'asc')} className="h-9 px-2 pr-8 rounded-lg text-sm border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-slate-700 bg-white">
               <option value="desc">Más recientes primero</option>
               <option value="asc">Más antiguos primero</option>
             </select>
@@ -287,11 +302,19 @@ export default function CasosPage() {
                         #{caso.id.substring(0,8).toUpperCase()}
                       </span>
                       <div className="flex gap-1 mt-1 flex-wrap">
-                        {caso.conversations?.conversation_tags?.map((t:any, i:number) => (
-                          <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
-                            {t.message_categories?.nombre}
-                          </span>
-                        ))}
+                        {caso.conversations?.conversation_tags?.map((t:any, i:number) => {
+                          const color = t.message_categories?.color || '#94a3b8'; // default slate-400
+                          return (
+                            <span key={i} className="text-[10px] px-1.5 py-0.5 rounded font-medium border"
+                              style={{ 
+                                backgroundColor: `${color}15`, 
+                                color: color,
+                                borderColor: `${color}30`
+                              }}>
+                              {t.message_categories?.nombre}
+                            </span>
+                          )
+                        })}
                       </div>
                     </td>
                     <td className="p-4 max-w-xs truncate text-slate-600 text-sm">

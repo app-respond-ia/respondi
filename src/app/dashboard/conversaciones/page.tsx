@@ -124,60 +124,64 @@ export default function ConversacionesPage() {
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mb-6">
-        <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
-          <div className="relative w-full md:w-80 lg:w-96">
+        <div className="flex flex-col md:flex-row gap-4 items-start md:items-center w-full">
+          <div className="relative flex-1 w-full">
             <svg className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
             <input type="text" placeholder="Buscar por nombre, teléfono o contenido..." 
               value={search} onChange={e => setSearch(e.target.value)}
-              className="w-full h-11 pl-10 pr-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition" />
+              className="w-full h-10 pl-10 pr-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition outline-none" />
           </div>
           
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="flex gap-2 bg-slate-100 p-1 rounded-xl">
+          <div className="flex flex-wrap items-center gap-4 shrink-0">
+            <div className="flex bg-slate-100 p-1 rounded-xl">
               {estados.map(est => (
                 <button key={est} onClick={() => setEstadoFilter(est)}
-                  className={`px-4 h-9 rounded-lg text-sm font-medium transition ${estadoFilter === est ? 'bg-white text-ink-900 shadow-sm border border-slate-200' : 'text-slate-600 hover:text-ink-900'}`}>
+                  className={`px-4 h-8 rounded-lg text-sm font-medium transition ${estadoFilter === est ? 'bg-white text-ink-900 shadow-sm border border-slate-200' : 'text-slate-600 hover:text-ink-900'}`}>
                   {est}
                 </button>
               ))}
             </div>
 
-            <label className="flex items-center gap-2 cursor-pointer bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl hover:bg-slate-100 transition">
-              <div className="relative">
+            <label className="flex items-center gap-2 cursor-pointer bg-slate-50 border border-slate-200 px-3 h-10 rounded-xl hover:bg-slate-100 transition">
+              <div className="relative flex items-center">
                 <input type="checkbox" className="sr-only" checked={iaPausada} onChange={e => setIaPausada(e.target.checked)} />
                 <div className={`block w-10 h-6 rounded-full transition ${iaPausada ? 'bg-amber-500' : 'bg-slate-300'}`}></div>
-                <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition transform ${iaPausada ? 'translate-x-4' : ''}`}></div>
+                <div className={`absolute left-1 bg-white w-4 h-4 rounded-full transition transform ${iaPausada ? 'translate-x-4' : ''}`}></div>
               </div>
               <span className="text-sm font-medium text-slate-700 select-none">Solo IA pausada</span>
             </label>
           </div>
         </div>
 
-        <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col md:flex-row gap-6">
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-slate-500">Canal:</span>
-            <div className="flex flex-wrap gap-2">
+        <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap gap-4 items-center">
+          <div className="flex items-center">
+            <span className="text-sm font-medium text-slate-500 mr-2">Canal:</span>
+            <div className="flex bg-slate-100 p-1 rounded-lg">
               {canales.map(can => (
                 <button key={can} onClick={() => setCanalFilter(can)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${canalFilter === can ? 'bg-slate-800 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                  className={`px-3 h-7 rounded-md text-sm font-medium transition ${canalFilter === can ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>
                   {can}
                 </button>
               ))}
             </div>
           </div>
 
-          <div className="flex items-center gap-3 border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6">
-            <span className="text-sm font-medium text-slate-500">Fecha:</span>
-            <div className="flex items-center gap-2">
-              <input type="date" value={dateRange.from} onChange={e => setDateRange({...dateRange, from: e.target.value})} className="px-3 py-1.5 rounded-lg text-sm border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-slate-700" />
+          <div className="h-5 w-px bg-slate-200 hidden sm:block"></div>
+
+          <div className="flex items-center">
+            <span className="text-sm font-medium text-slate-500 mr-2">Fecha:</span>
+            <div className="flex items-center gap-1">
+              <input type="date" value={dateRange.from} onChange={e => setDateRange({...dateRange, from: e.target.value})} className="h-9 px-2 rounded-lg text-sm border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-slate-700 bg-white" />
               <span className="text-slate-400">-</span>
-              <input type="date" value={dateRange.to} onChange={e => setDateRange({...dateRange, to: e.target.value})} className="px-3 py-1.5 rounded-lg text-sm border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-slate-700" />
+              <input type="date" value={dateRange.to} onChange={e => setDateRange({...dateRange, to: e.target.value})} className="h-9 px-2 rounded-lg text-sm border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-slate-700 bg-white" />
             </div>
           </div>
 
-          <div className="flex items-center gap-3 border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6">
-            <span className="text-sm font-medium text-slate-500">Orden:</span>
-            <select value={sortOrder} onChange={e => setSortOrder(e.target.value as 'desc'|'asc')} className="px-3 py-1.5 rounded-lg text-sm border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-slate-700 bg-white">
+          <div className="h-5 w-px bg-slate-200 hidden md:block"></div>
+
+          <div className="flex items-center">
+            <span className="text-sm font-medium text-slate-500 mr-2">Orden:</span>
+            <select value={sortOrder} onChange={e => setSortOrder(e.target.value as 'desc'|'asc')} className="h-9 px-2 pr-8 rounded-lg text-sm border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-slate-700 bg-white">
               <option value="desc">Más recientes primero</option>
               <option value="asc">Más antiguos primero</option>
             </select>
@@ -230,36 +234,50 @@ export default function ConversacionesPage() {
                         </div>
                       </td>
                       <td className="p-4 max-w-sm">
-                        <p className="text-sm text-slate-600 truncate mb-1.5 font-medium">
-                          {conv.resumen || <span className="italic opacity-60 font-normal">Sin resumen aún...</span>}
-                        </p>
-                        <div className="flex gap-1 flex-wrap">
-                          {conv.conversation_tags && conv.conversation_tags.length > 0 ? (
-                            conv.conversation_tags.map((t:any, i:number) => (
-                              <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200 font-medium">
-                                {t.message_categories?.nombre}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-50 text-slate-400 border border-slate-200 font-medium italic">
-                              Descategorizado
-                            </span>
-                          )}
+                        <div className="flex flex-col gap-2">
+                          <p className="text-sm text-slate-600 truncate font-medium">
+                            {conv.resumen || <span className="italic opacity-60 font-normal">Sin resumen aún...</span>}
+                          </p>
+                          
                           {casoAsociado && (
-                            <button 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                router.push(`/dashboard/casos/${casoAsociado.id}`);
-                              }}
-                              className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide transition hover:shadow-sm ${
-                                casoAsociado.estatus === 'pendiente' ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-200' :
-                                casoAsociado.estatus === 'atendiendo' ? 'bg-blue-100 text-blue-800 hover:bg-blue-200 border border-blue-200' :
-                                'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border border-emerald-200'
-                              }`}
-                            >
-                              Caso {casoAsociado.estatus}
-                            </button>
+                            <div>
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  router.push(`/dashboard/casos/${casoAsociado.id}`);
+                                }}
+                                className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide transition hover:shadow-sm ${
+                                  casoAsociado.estatus === 'pendiente' ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-200' :
+                                  casoAsociado.estatus === 'atendiendo' ? 'bg-blue-100 text-blue-800 hover:bg-blue-200 border border-blue-200' :
+                                  'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border border-emerald-200'
+                                }`}
+                              >
+                                Caso {casoAsociado.estatus}
+                              </button>
+                            </div>
                           )}
+
+                          <div className="flex gap-1 flex-wrap">
+                            {conv.conversation_tags && conv.conversation_tags.length > 0 ? (
+                              conv.conversation_tags.map((t:any, i:number) => {
+                                const color = t.message_categories?.color || '#94a3b8'; // default slate-400
+                                return (
+                                  <span key={i} className="text-[10px] px-1.5 py-0.5 rounded font-medium border"
+                                    style={{ 
+                                      backgroundColor: `${color}15`, 
+                                      color: color,
+                                      borderColor: `${color}30`
+                                    }}>
+                                    {t.message_categories?.nombre}
+                                  </span>
+                                )
+                              })
+                            ) : (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-50 text-slate-400 border border-slate-200 font-medium italic">
+                                Descategorizado
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </td>
                       <td className="p-4 text-center">

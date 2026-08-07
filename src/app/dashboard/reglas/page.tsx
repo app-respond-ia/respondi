@@ -8,9 +8,164 @@ import {
   actualizarRegla,
   eliminarRegla,
   crearReglasPlantilla,
+  reordenarReglas,
   ReglaData
 } from '@/app/actions/reglas'
 import { getMisPermisos } from '@/app/actions/permisos'
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  DragOverlay,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+
+function ReglaRow({ item, onToggle, onEdit, onDelete, dragHandleProps, disableDrag, soloLectura }: {
+  item: any,
+  onToggle: (item: any) => void,
+  onEdit: (item: any) => void,
+  onDelete: (id: string) => void,
+  dragHandleProps?: any,
+  disableDrag?: boolean,
+  soloLectura?: boolean
+}) {
+  return (
+    <div className="p-4 sm:p-5 flex items-start gap-4 hover:bg-slate-50 transition-colors bg-white">
+      {/* Drag handle */}
+      <button 
+        {...(disableDrag ? {} : dragHandleProps)}
+        disabled={disableDrag}
+        className={`mt-2.5 p-1 -ml-2 text-slate-300 ${disableDrag ? 'opacity-30 cursor-not-allowed' : 'hover:text-slate-500 touch-none ' + (dragHandleProps?.className || 'cursor-grab active:cursor-grabbing')}`}
+        aria-label="Reordenar"
+      >
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+        </svg>
+      </button>
+
+      {/* Icono fijo */}
+      <div className="w-10 h-10 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center shrink-0 mt-0.5">
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+      </div>
+
+      {/* Info principal */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1 flex-wrap">
+          <span className="font-600 text-ink-900 text-sm sm:text-base">{item.nombre}</span>
+          {item.es_plantilla && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-500 bg-slate-100 text-slate-500">
+              Plantilla
+            </span>
+          )}
+        </div>
+        {item.descripcion_intencion && (
+          <p className="text-sm text-ink-500 line-clamp-2 pr-4 mb-2">{item.descripcion_intencion}</p>
+        )}
+          <div className="flex items-center gap-2 mt-1">
+            {item.tipo_caso && (
+              <div className="flex items-center gap-1.5 text-xs text-ink-400">
+                <span>Crea un caso:</span>
+                <span className="bg-brand-50 text-brand-700 px-2 py-0.5 rounded-md font-500">
+                  {item.tipo_caso}
+                </span>
+              </div>
+            )}
+            {item.prioridad_default && (
+              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide border ${
+                item.prioridad_default === 'alta' ? 'bg-red-50 text-red-700 border-red-200' :
+                item.prioridad_default === 'baja' ? 'bg-slate-50 text-slate-600 border-slate-200' :
+                'bg-blue-50 text-blue-700 border-blue-200'
+              }`}>
+                Prioridad: {item.prioridad_default}
+              </span>
+            )}
+          </div>
+        {item.created_at && (
+          <p className="text-[11px] text-ink-300 mt-1.5">
+            Creado el {new Date(item.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })} a las {new Date(item.created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+          </p>
+        )}
+      </div>
+
+      {/* Controles de la derecha */}
+      <div className="flex flex-col items-end gap-3 shrink-0 ml-1">
+        {/* Toggle */}
+        <button 
+          onClick={() => onToggle(item)} 
+          disabled={soloLectura}
+          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 ${item.activa ? 'bg-emerald-500' : 'bg-slate-200'} disabled:opacity-50 disabled:cursor-not-allowed`}
+          role="switch" 
+          aria-checked={item.activa}
+        >
+          <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${item.activa ? 'translate-x-5' : 'translate-x-0'}`} />
+        </button>
+        
+        {/* Botones editar / eliminar */}
+        <div className="flex items-center gap-1">
+          <button onClick={() => onEdit(item)} disabled={soloLectura} className="p-1.5 rounded-lg text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition disabled:opacity-50 disabled:cursor-not-allowed" aria-label="Editar">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+          </button>
+          <button onClick={() => onDelete(item.id)} disabled={soloLectura} className="p-1.5 rounded-lg text-ink-400 hover:text-red-500 hover:bg-red-50 transition disabled:opacity-50 disabled:cursor-not-allowed" aria-label="Eliminar">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SortableItem({ item, onToggle, onEdit, onDelete, disableDrag, soloLectura }: { 
+  item: any, 
+  onToggle: (item: any) => void,
+  onEdit: (item: any) => void,
+  onDelete: (id: string) => void,
+  disableDrag?: boolean,
+  soloLectura?: boolean
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id, disabled: disableDrag })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition: isDragging ? undefined : transition,
+    willChange: 'transform',
+    zIndex: isDragging ? 10 : 1,
+    position: 'relative' as const,
+    opacity: isDragging ? 0.3 : 1,
+  }
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <ReglaRow 
+        item={item} 
+        onToggle={onToggle} 
+        onEdit={onEdit} 
+        onDelete={onDelete} 
+        disableDrag={disableDrag}
+        dragHandleProps={{ ...attributes, ...listeners }} 
+        soloLectura={soloLectura}
+      />
+    </div>
+  )
+}
 
 export default function ReglasPage() {
   const [loading, setLoading] = useState(true)
@@ -25,6 +180,12 @@ export default function ReglasPage() {
   const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
   const [busqueda, setBusqueda] = useState('')
   const [filtro, setFiltro] = useState<'todas' | 'activas' | 'inactivas'>('todas')
+  const [activeId, setActiveId] = useState<string | null>(null)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } })
+  )
 
   const [formData, setFormData] = useState<ReglaData>({
     nombre: '',
@@ -110,6 +271,27 @@ export default function ReglasPage() {
     }
   }
 
+  const handleDragEnd = async (event: DragEndEvent) => {
+    setActiveId(null)
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const oldIndex = items.findIndex(it => it.id === active.id)
+    const newIndex = items.findIndex(it => it.id === over.id)
+
+    const newItems = arrayMove(items, oldIndex, newIndex)
+    const orderedItems = newItems.map((item, index) => ({ ...item, orden: index }))
+    setItems(orderedItems)
+
+    const ids = orderedItems.map(it => it.id)
+    const res = await reordenarReglas(ids)
+    if (!res.success) {
+      setItems(items) // Revert
+      setMensaje({ tipo: 'error', texto: res.error || 'Error al reordenar las reglas' })
+      setTimeout(() => setMensaje(null), 3000)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
@@ -180,6 +362,8 @@ export default function ReglasPage() {
     )
   }
 
+  const disableDrag = filtro !== 'todas' || nivelPermiso !== 'escritura'
+
   return (
     <div className="p-6 sm:p-10 max-w-4xl w-full mx-auto pb-20">
       
@@ -245,79 +429,44 @@ export default function ReglasPage() {
 
       {itemsFiltrados.length > 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col divide-y divide-slate-100 relative">
-          {itemsFiltrados.map((item) => (
-            <div key={item.id} className="p-4 sm:p-5 flex items-start gap-4 hover:bg-slate-50 transition-colors bg-white">
-              {/* Icono fijo */}
-              <div className="w-10 h-10 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center shrink-0 mt-0.5">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
+          <DndContext 
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={(e) => setActiveId(e.active.id as string)}
+            onDragEnd={handleDragEnd}
+            onDragCancel={() => setActiveId(null)}
+          >
+            <SortableContext 
+              items={itemsFiltrados.map(it => it.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              {itemsFiltrados.map((item) => (
+                <SortableItem 
+                  key={item.id} 
+                  item={item} 
+                  onToggle={handleToggleActiva}
+                  onEdit={openEditar}
+                  onDelete={handleDelete}
+                  disableDrag={disableDrag}
+                  soloLectura={nivelPermiso !== 'escritura'}
+                />
+              ))}
+            </SortableContext>
 
-              {/* Info principal */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <span className="font-600 text-ink-900 text-sm sm:text-base">{item.nombre}</span>
-                  {item.es_plantilla && (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-500 bg-slate-100 text-slate-500">
-                      Plantilla
-                    </span>
-                  )}
+            <DragOverlay>
+              {activeId ? (
+                <div className="shadow-2xl ring-1 ring-brand-500/20 bg-white opacity-100 scale-[1.02] cursor-grabbing rounded-xl overflow-hidden">
+                  <ReglaRow 
+                    item={items.find(i => i.id === activeId)}
+                    onToggle={() => {}}
+                    onEdit={() => {}}
+                    onDelete={() => {}}
+                    dragHandleProps={{ className: "cursor-grabbing touch-none text-slate-500" }}
+                  />
                 </div>
-                {item.descripcion_intencion && (
-                  <p className="text-sm text-ink-500 line-clamp-2 pr-4 mb-2">{item.descripcion_intencion}</p>
-                )}
-                  <div className="flex items-center gap-2 mt-1">
-                    {item.tipo_caso && (
-                      <div className="flex items-center gap-1.5 text-xs text-ink-400">
-                        <span>Crea un caso:</span>
-                        <span className="bg-brand-50 text-brand-700 px-2 py-0.5 rounded-md font-500">
-                          {item.tipo_caso}
-                        </span>
-                      </div>
-                    )}
-                    {item.prioridad_default && (
-                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide border ${
-                        item.prioridad_default === 'alta' ? 'bg-red-50 text-red-700 border-red-200' :
-                        item.prioridad_default === 'baja' ? 'bg-slate-50 text-slate-600 border-slate-200' :
-                        'bg-blue-50 text-blue-700 border-blue-200'
-                      }`}>
-                        Prioridad: {item.prioridad_default}
-                      </span>
-                    )}
-                  </div>
-                {item.created_at && (
-                  <p className="text-[11px] text-ink-300 mt-1.5">
-                    Creado el {new Date(item.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })} a las {new Date(item.created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                  </p>
-                )}
-              </div>
-
-              {/* Controles de la derecha */}
-              <div className="flex flex-col items-end gap-3 shrink-0 ml-1">
-                {/* Toggle */}
-                <button 
-                  onClick={() => handleToggleActiva(item)} 
-                  disabled={nivelPermiso !== 'escritura'}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 ${item.activa ? 'bg-emerald-500' : 'bg-slate-200'} disabled:opacity-50 disabled:cursor-not-allowed`}
-                  role="switch" 
-                  aria-checked={item.activa}
-                >
-                  <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${item.activa ? 'translate-x-5' : 'translate-x-0'}`} />
-                </button>
-                
-                {/* Botones editar / eliminar */}
-                <div className="flex items-center gap-1">
-                  <button onClick={() => openEditar(item)} disabled={nivelPermiso !== 'escritura'} className="p-1.5 rounded-lg text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition disabled:opacity-50 disabled:cursor-not-allowed" aria-label="Editar">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                  </button>
-                  <button onClick={() => handleDelete(item.id)} disabled={nivelPermiso !== 'escritura'} className="p-1.5 rounded-lg text-ink-400 hover:text-red-500 hover:bg-red-50 transition disabled:opacity-50 disabled:cursor-not-allowed" aria-label="Eliminar">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
+              ) : null}
+            </DragOverlay>
+          </DndContext>
         </div>
       ) : items.length > 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">

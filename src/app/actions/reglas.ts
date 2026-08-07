@@ -44,7 +44,7 @@ export async function getReglas() {
     .from('case_rules')
     .select('*')
     .eq('branch_id', auth.branch_id)
-    .order('created_at', { ascending: false })
+    .order('orden', { ascending: true })
 
   if (error) return { success: false, error: error.message }
   return { success: true, data }
@@ -68,6 +68,17 @@ export async function crearRegla(data: ReglaData) {
     return { success: false, error: 'La acción de la regla es obligatoria.' }
   }
 
+  const { data: currentRules, error: fetchError } = await supabase
+    .from('case_rules')
+    .select('orden')
+    .eq('branch_id', auth.branch_id)
+    .order('orden', { ascending: true })
+    .limit(1)
+
+  if (fetchError) return { success: false, error: fetchError.message }
+
+  const nuevoOrden = currentRules && currentRules.length > 0 ? currentRules[0].orden - 1 : 0
+
   const { data: insertedData, error } = await supabase
     .from('case_rules')
     .insert([{
@@ -78,7 +89,8 @@ export async function crearRegla(data: ReglaData) {
       tipo_caso: accion,
       activa: data.activa,
       es_plantilla: false,
-      prioridad_default: data.prioridad_default || 'normal'
+      prioridad_default: data.prioridad_default || 'normal',
+      orden: nuevoOrden
     }])
     .select()
     .single()
@@ -108,9 +120,19 @@ export async function actualizarRegla(id: string, data: Partial<{ nombre: string
     .eq('id', id)
     .single()
 
+  // Calculate new lowest order to place edited rule at the top
+  const { data: currentRules } = await supabase
+    .from('case_rules')
+    .select('orden')
+    .eq('branch_id', auth.branch_id)
+    .order('orden', { ascending: true })
+    .limit(1)
+
+  const nuevoOrden = currentRules && currentRules.length > 0 ? currentRules[0].orden - 1 : 0
+
   const { data: updatedData, error } = await supabase
     .from('case_rules')
-    .update(data)
+    .update({ ...data, orden: nuevoOrden })
     .eq('id', id)
     .eq('branch_id', auth.branch_id)
     .select()
@@ -158,6 +180,25 @@ export async function eliminarRegla(id: string) {
     registro_id: id,
     valor_anterior: anterior
   })
+
+  return { success: true }
+}
+
+export async function reordenarReglas(ids: string[]) {
+  const supabase = await createClient()
+  const auth = await getAuthData(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+
+  for (let i = 0; i < ids.length; i++) {
+    const id = ids[i]
+    const { error } = await supabase
+      .from('case_rules')
+      .update({ orden: i })
+      .eq('id', id)
+      .eq('branch_id', auth.branch_id)
+    
+    if (error) return { success: false, error: error.message }
+  }
 
   return { success: true }
 }

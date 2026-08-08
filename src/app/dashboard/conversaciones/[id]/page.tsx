@@ -6,25 +6,13 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { HelpPopover } from '@/components/ui/HelpPopover'
+import { MessageBubble } from '@/components/ui/MessageBubble'
+import { ActivityLog } from '@/components/ui/ActivityLog'
+import { AIToggle } from '@/components/ui/AIToggle'
 import { getConversacionDetalle, pausarIA, reanudarIA } from '@/app/actions/conversaciones'
 import { getAgentesParaCasos, crearCasoDesdeConversacion } from '@/app/actions/casos'
 import { getLogsAuditoria } from '@/app/actions/audit-log'
 
-function getRelativeTime(dateString: string) {
-  const d = new Date(dateString)
-  const now = new Date()
-  const diffMs = now.getTime() - d.getTime()
-  const diffSecs = Math.floor(diffMs / 1000)
-  const diffMins = Math.floor(diffSecs / 60)
-  const diffHours = Math.floor(diffMins / 60)
-  const diffDays = Math.floor(diffHours / 24)
-
-  if (diffSecs < 60) return 'hace un momento'
-  if (diffMins < 60) return `hace ${diffMins} min`
-  if (diffHours < 24) return `hace ${diffHours} h`
-  if (diffDays === 1) return 'hace 1 día'
-  return `hace ${diffDays} días`
-}
 
 export default function ConversacionDetallePage() {
   const params = useParams()
@@ -95,16 +83,22 @@ export default function ConversacionDetallePage() {
     setLoading(false)
   }
 
-  const toggleIA = async () => {
-    if (!conv) return
-    setCambiandoIA(true)
-    if (conv.ia_pausada) {
-      await reanudarIA(id)
-    } else {
-      await pausarIA(id)
+  const handleToggleIA = async (newPausedState: boolean) => {
+    try {
+      setCambiandoIA(true)
+      if (!newPausedState) {
+        await reanudarIA(id)
+      } else {
+        await pausarIA(id)
+      }
+      await cargarDatos()
+      setCambiandoIA(false)
+      return true
+    } catch (e) {
+      alert('Error al modificar estado de la IA')
+      setCambiandoIA(false)
+      return false
     }
-    await cargarDatos()
-    setCambiandoIA(false)
   }
 
   const handleConfirmCaso = async () => {
@@ -153,19 +147,11 @@ export default function ConversacionDetallePage() {
           </h1>
           
           <div className="flex items-center gap-2">
-            <button 
-              disabled={cambiandoIA}
-              onClick={toggleIA}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition shadow-sm border ${
-                conv.ia_pausada 
-                  ? 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200' 
-                  : 'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200'
-              } disabled:opacity-50`}
-            >
-              <div className={`w-2.5 h-2.5 rounded-full shadow-inner ${conv.ia_pausada ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`}></div>
-              {conv.ia_pausada ? 'IA Pausada (Reanudar)' : 'IA Activa (Pausar)'}
-            </button>
-            <HelpPopover content="Indica si la IA responde de forma autónoma o si está silenciada para intervención humana. Puedes cambiar el estado haciendo clic en el botón." />
+            <AIToggle 
+              isPaused={conv.ia_pausada} 
+              onToggleConfirm={handleToggleIA} 
+              disabled={cambiandoIA} 
+            />
           </div>
         </div>
       </div>
@@ -181,27 +167,14 @@ export default function ConversacionDetallePage() {
           </div>
           
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-slate-50/50">
-            {conv.mensajes.map((m: any) => {
-              const isCliente = m.remitente === 'cliente'
-              const isIA = m.remitente === 'ia'
-              return (
-                <div key={m.id} className={`flex ${isCliente ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 shadow-sm ${
-                    isCliente ? 'bg-white border border-slate-200 rounded-br-none text-ink-900' : 
-                    isIA ? 'bg-purple-100 border border-purple-200 rounded-bl-none text-purple-900' : 
-                    'bg-emerald-100 border border-emerald-200 rounded-bl-none text-emerald-900'
-                  }`}>
-                    <div className="text-[10px] font-bold uppercase tracking-wider mb-1 opacity-60">
-                      {isIA ? 'IA' : isCliente ? 'Cliente' : (m.users?.nombre || 'Agente')}
-                    </div>
-                    <p className="text-sm whitespace-pre-wrap leading-relaxed">{m.contenido}</p>
-                    <div className="text-[10px] opacity-50 mt-1 text-right font-medium">
-                      {new Date(m.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
+            {conv.mensajes.map((m: any) => (
+              <MessageBubble 
+                key={m.id} 
+                msg={m} 
+                contactName={contact?.nombre} 
+                channelId={contact?.identificador_canal} 
+              />
+            ))}
             {conv.mensajes.length === 0 && (
               <p className="text-center text-slate-400 mt-10 font-medium">No hay mensajes registrados.</p>
             )}
@@ -363,28 +336,7 @@ export default function ConversacionDetallePage() {
           </div>
 
           {hasLogPerm && logs.length > 0 && (
-            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-              <h3 className="font-semibold text-ink-900 mb-3 pb-2 border-b border-slate-100">Registro de actividad</h3>
-              <div className="max-h-64 overflow-y-auto pr-2 space-y-3">
-                {logs.map((log: any) => {
-                  const author = log.users?.nombre || log.users?.email || 'Sistema'
-                  const isCaso = log.tabla_afectada === 'cases'
-                  return (
-                    <div key={log.id} className="text-sm">
-                      <p className="text-ink-900 leading-snug flex flex-wrap items-center gap-1.5">
-                        <span><span className="font-semibold">{author}</span> {log.accion}</span>
-                        {isCaso ? (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-purple-100 text-purple-700">Caso</span>
-                        ) : (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-500">Conversación</span>
-                        )}
-                      </p>
-                      <p className="text-[11px] text-ink-400 mt-0.5">{getRelativeTime(log.timestamp)}</p>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
+            <ActivityLog logs={logs} />
           )}
         </div>
       </div>

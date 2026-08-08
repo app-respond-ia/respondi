@@ -6,24 +6,11 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { HelpPopover } from '@/components/ui/HelpPopover'
+import { MessageBubble } from '@/components/ui/MessageBubble'
+import { ActivityLog } from '@/components/ui/ActivityLog'
 import { getCasoDetalle, tomarCaso, cerrarCaso, reabrirCaso, asignarCaso, soltarCaso, getAgentesParaCasos, actualizarPrioridadCaso, actualizarSLACaso } from '@/app/actions/casos'
 import { getLogsAuditoria } from '@/app/actions/audit-log'
 
-function getRelativeTime(dateString: string) {
-  const d = new Date(dateString)
-  const now = new Date()
-  const diffMs = now.getTime() - d.getTime()
-  const diffSecs = Math.floor(diffMs / 1000)
-  const diffMins = Math.floor(diffSecs / 60)
-  const diffHours = Math.floor(diffMins / 60)
-  const diffDays = Math.floor(diffHours / 24)
-
-  if (diffSecs < 60) return 'hace un momento'
-  if (diffMins < 60) return `hace ${diffMins} min`
-  if (diffHours < 24) return `hace ${diffHours} h`
-  if (diffDays === 1) return 'hace 1 día'
-  return `hace ${diffDays} días`
-}
 
 export default function CasoDetallePage() {
   const params = useParams()
@@ -208,27 +195,14 @@ export default function CasoDetallePage() {
           </div>
           
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-slate-50/50">
-            {caso.mensajes.map((m: any) => {
-              const isCliente = m.remitente === 'cliente'
-              const isIA = m.remitente === 'ia'
-              return (
-                <div key={m.id} className={`flex ${isCliente ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 shadow-sm ${
-                    isCliente ? 'bg-white border border-slate-200 rounded-br-none text-ink-900' : 
-                    isIA ? 'bg-purple-100 border border-purple-200 rounded-bl-none text-purple-900' : 
-                    'bg-emerald-100 border border-emerald-200 rounded-bl-none text-emerald-900'
-                  }`}>
-                    <div className="text-[10px] font-bold uppercase tracking-wider mb-1 opacity-60">
-                      {isIA ? 'IA' : isCliente ? 'Cliente' : (m.users?.nombre || 'Agente')}
-                    </div>
-                    <p className="text-sm whitespace-pre-wrap leading-relaxed">{m.contenido}</p>
-                    <div className="text-[10px] opacity-50 mt-1 text-right">
-                      {new Date(m.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
+            {caso.mensajes.map((m: any) => (
+              <MessageBubble 
+                key={m.id} 
+                msg={m} 
+                contactName={caso.contacts?.nombre} 
+                channelId={caso.contacts?.identificador_canal} 
+              />
+            ))}
             <div ref={messagesEndRef} />
           </div>
 
@@ -454,22 +428,7 @@ export default function CasoDetallePage() {
           )}
 
           {hasLogPerm && logs.length > 0 && (
-            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-              <h3 className="font-semibold text-ink-900 mb-3 pb-2 border-b border-slate-100">Registro de actividad</h3>
-              <div className="max-h-64 overflow-y-auto pr-2 space-y-3">
-                {logs.map((log: any) => {
-                  const author = log.users?.nombre || log.users?.email || 'Sistema'
-                  return (
-                    <div key={log.id} className="text-sm">
-                      <p className="text-ink-900 leading-snug">
-                        <span className="font-semibold">{author}</span> {log.accion}
-                      </p>
-                      <p className="text-[11px] text-ink-400 mt-0.5">{getRelativeTime(log.timestamp)}</p>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
+            <ActivityLog logs={logs} />
           )}
         </div>
       </div>

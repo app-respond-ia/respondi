@@ -10,6 +10,9 @@ import { reabrirCaso, getAgentesParaCasos, crearCasoDesdeConversacion, asignarCa
 import { getLogsAuditoria } from '@/app/actions/audit-log'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { HelpPopover } from '@/components/ui/HelpPopover'
+import { MessageBubble } from '@/components/ui/MessageBubble'
+import { ActivityLog } from '@/components/ui/ActivityLog'
+import { AIToggle } from '@/components/ui/AIToggle'
 import Link from 'next/link'
 
 function ChatsContent() {
@@ -41,7 +44,7 @@ function ChatsContent() {
   const [procesando, setProcesando] = useState(false)
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
-    action: 'reabrir_caso' | 'reabrir_conv' | 'asignar_mi' | 'asignar_otro' | 'cola' | 'asignar_mi_existente' | 'asignar_otro_existente' | 'soltar_existente' | 'pausar_ia' | 'reanudar_ia' | null;
+    action: 'reabrir_caso' | 'reabrir_conv' | 'asignar_mi' | 'asignar_otro' | 'cola' | 'asignar_mi_existente' | 'asignar_otro_existente' | 'soltar_existente' | null;
     targetAgenteId?: string;
   }>({ isOpen: false, action: null })
   
@@ -243,25 +246,25 @@ function ChatsContent() {
           alert(res?.error || 'Error al actualizar el caso')
         }
       }
-    } else if (modalState.action === 'pausar_ia' || modalState.action === 'reanudar_ia') {
-      const conv = conversaciones.find(c => c.id === selectedConvId)
-      if (conv) {
-        const newVal = modalState.action === 'pausar_ia'
-        const res = await toggleIAPausa(conv.id, newVal)
-        if (res.success && res.data) {
-          setConversaciones(prev => prev.map(c => c.id === conv.id ? { ...c, ia_pausada: newVal } : c))
-          cargarContexto(conv.id)
-          success = true
-        } else {
-          alert(res?.error || 'Error al modificar estado de la IA')
-        }
-      }
     }
 
     if (success) {
       setModalState({ isOpen: false, action: null })
     }
     setProcesando(false)
+  }
+
+  const handleToggleIA = async (newPausedState: boolean) => {
+    if (!selectedConvId) return false
+    const res = await toggleIAPausa(selectedConvId, newPausedState)
+    if (res.success && res.data) {
+      setConversaciones(prev => prev.map(c => c.id === selectedConvId ? { ...c, ia_pausada: newPausedState } : c))
+      cargarContexto(selectedConvId)
+      return true
+    } else {
+      alert(res?.error || 'Error al modificar estado de la IA')
+      return false
+    }
   }
 
   const handleEnviar = async (e: React.FormEvent) => {
@@ -434,19 +437,11 @@ function ChatsContent() {
                 {selectedConv?.estado === 'activa' && (
                   <>
                     {/* Toggle IA */}
-                    <div className="flex items-center gap-2">
-                      <div className="hidden sm:block text-right">
-                        <div className="flex items-center gap-1.5 justify-end">
-                          <p className="text-xs font-600 text-ink-900 leading-tight">
-                            {selectedConv.ia_pausada ? 'IA en pausa' : 'IA activa'}
-                          </p>
-                          <HelpPopover content="Indica si la IA responde automáticamente al cliente (Activa) o si está silenciada para que un humano intervenga manualmente (Pausada)." />
-                        </div>
-                      </div>
-                      <button onClick={() => setModalState({ isOpen: true, action: selectedConv.ia_pausada ? 'reanudar_ia' : 'pausar_ia' })} disabled={nivelPermiso !== 'escritura'} className={`relative w-11 h-6 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed ${selectedConv.ia_pausada ? 'bg-amber-500' : 'bg-brand-600'}`}>
-                        <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${selectedConv.ia_pausada ? 'translate-x-0' : 'translate-x-5'}`}></span>
-                      </button>
-                    </div>
+                    <AIToggle 
+                      isPaused={selectedConv.ia_pausada} 
+                      onToggleConfirm={handleToggleIA} 
+                      disabled={nivelPermiso !== 'escritura'} 
+                    />
                     {/* Botón cerrar */}
                     <button onClick={() => handleCerrar(selectedConv)} disabled={nivelPermiso !== 'escritura'} className="hidden sm:inline-flex px-3 py-1.5 bg-slate-100 text-ink-700 hover:bg-slate-200 rounded-lg text-xs font-600 transition disabled:opacity-50 disabled:cursor-not-allowed">
                       Cerrar
@@ -489,45 +484,14 @@ function ChatsContent() {
               ) : mensajes.length === 0 ? (
                 <div className="text-center text-sm text-ink-400">No hay mensajes en esta conversación.</div>
               ) : (
-                mensajes.map(msg => {
-                  const isCliente = msg.remitente === 'cliente'
-                  const isIA = msg.remitente === 'ia'
-                  const isAgente = msg.remitente === 'agente'
-
-                  if (isCliente) {
-                    return (
-                      <div key={msg.id} className="flex gap-2.5">
-                        <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-700 text-xs font-600 shrink-0">
-                          {getInitials(selectedConv?.contacts?.nombre || selectedConv?.contacts?.identificador_canal)}
-                        </div>
-                        <div className="max-w-[75%]">
-                          <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-sm px-4 py-2.5">
-                            <p className="text-sm text-ink-900 whitespace-pre-wrap break-words">{msg.contenido}</p>
-                          </div>
-                          <p className="text-[11px] text-ink-400 mt-1 ml-1">{formatTime(msg.timestamp)}</p>
-                        </div>
-                      </div>
-                    )
-                  } else {
-                    const bgClass = isIA ? 'bg-brand-100 text-brand-900' : 'bg-emerald-100 text-emerald-900'
-                    const labelColor = isIA ? 'text-brand-600' : 'text-emerald-700'
-                    return (
-                      <div key={msg.id} className="flex gap-2.5 justify-end">
-                        <div className="max-w-[75%]">
-                          <div className={`${bgClass} rounded-2xl rounded-tr-sm px-4 py-2.5`}>
-                            <p className="text-sm whitespace-pre-wrap break-words">{msg.contenido}</p>
-                          </div>
-                          <div className="flex items-center justify-end gap-1.5 mt-1 mr-1">
-                            <span className={`inline-flex items-center gap-1 text-[10px] font-600 ${labelColor}`}>
-                              {isIA ? 'IA' : (msg.users?.nombre || 'Agente')}
-                            </span>
-                            <span className="text-[11px] text-ink-400">{formatTime(msg.timestamp)}</span>
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  }
-                })
+                mensajes.map(msg => (
+                  <MessageBubble 
+                    key={msg.id} 
+                    msg={msg} 
+                    contactName={selectedConv?.contacts?.nombre} 
+                    channelId={selectedConv?.contacts?.identificador_canal} 
+                  />
+                ))
               )}
               <div ref={messagesEndRef} />
             </div>
@@ -763,40 +727,7 @@ function ChatsContent() {
 
               {/* Registro de actividad */}
               {hasLogPerm && (
-                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-                  <h3 className="font-semibold text-ink-900 mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
-                    Actividad
-                    <HelpPopover content="Registro interno de acciones para trazabilidad. Solo visible para admins o usuarios con permisos de auditoría." />
-                  </h3>
-                  <div className="space-y-4 max-h-[22rem] overflow-y-auto pr-1">
-                    {logs.length > 0 ? logs.map((log: any) => {
-                      const esCaso = log.tabla_afectada === 'cases'
-                      return (
-                        <div key={log.id} className="flex gap-3">
-                          <div className="w-1.5 rounded-full shrink-0 bg-slate-200 mt-1.5 mb-1"></div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-0.5">
-                              <p className="text-xs font-semibold text-ink-900 truncate">
-                                {log.users?.nombre || 'Sistema'}
-                              </p>
-                              {esCaso && (
-                                <span className="text-[9px] font-bold tracking-wider uppercase px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded-sm">Caso</span>
-                              )}
-                            </div>
-                            <p className="text-sm text-slate-600 leading-snug">
-                              {log.accion}
-                            </p>
-                            <p className="text-[10px] text-slate-400 mt-1">
-                              {new Date(log.timestamp).toLocaleDateString()} a las {new Date(log.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
-                            </p>
-                          </div>
-                        </div>
-                      )
-                    }) : (
-                      <p className="text-sm text-slate-500">No hay actividad reciente registrada.</p>
-                    )}
-                  </div>
-                </div>
+                <ActivityLog logs={logs} />
               )}
               
             </div>
@@ -804,40 +735,34 @@ function ChatsContent() {
         </section>
       )}
 
-      <ConfirmModal
-        isOpen={modalState.isOpen}
-        onClose={() => setModalState({ isOpen: false, action: null })}
-        onConfirm={handleConfirmAction}
-        title={
-          modalState.action === 'reabrir_caso' ? '¿Reabrir este caso?' :
-          modalState.action === 'reabrir_conv' ? '¿Reabrir esta conversación?' : 
-          modalState.action === 'asignar_mi' ? '¿Crear caso y asignártelo?' :
-          modalState.action === 'asignar_otro' ? '¿Crear caso y asignar a otro?' :
-          modalState.action === 'asignar_mi_existente' ? '¿Asignarte este caso?' :
-          modalState.action === 'asignar_otro_existente' ? '¿Transferir este caso?' :
-          modalState.action === 'soltar_existente' ? '¿Soltar este caso?' :
-          modalState.action === 'pausar_ia' ? '¿Pausar la IA?' :
-          modalState.action === 'reanudar_ia' ? '¿Reanudar la IA?' :
-          'Confirmar acción'
-        }
-        message={
-          modalState.action === 'reabrir_caso' ? 'El caso asociado volverá a estar activo (se te asignará si ya lo tenías, o irá a la cola).' :
-          modalState.action === 'reabrir_conv' ? 'La conversación volverá a estar activa y podrás enviar mensajes.' : 
-          modalState.action === 'asignar_mi' ? 'Se creará un nuevo caso para esta conversación y quedarás como el agente responsable.' :
-          modalState.action === 'asignar_otro' ? 'Se creará un nuevo caso para esta conversación y será asignado al agente seleccionado.' :
-          modalState.action === 'asignar_mi_existente' ? 'Pasarás a ser el agente responsable de este caso.' :
-          modalState.action === 'asignar_otro_existente' ? 'El caso será transferido al agente seleccionado.' :
-          modalState.action === 'soltar_existente' ? 'El caso quedará sin agente asignado y disponible en la cola.' :
-          modalState.action === 'pausar_ia' ? 'La IA dejará de responder automáticamente a este cliente, permitiéndote tomar el control manual de la conversación.' :
-          modalState.action === 'reanudar_ia' ? 'La IA volverá a analizar y responder automáticamente los próximos mensajes de este cliente.' :
-          '¿Estás seguro?'
-        }
-        confirmText={
-          modalState.action === 'reabrir_caso' || modalState.action === 'reabrir_conv' ? 'Sí, reabrir' :
-          modalState.action === 'pausar_ia' ? 'Sí, pausar IA' :
-          modalState.action === 'reanudar_ia' ? 'Sí, reanudar IA' :
-          'Sí, confirmar'
-        }
+        <ConfirmModal
+          isOpen={modalState.isOpen}
+          onClose={() => setModalState({ isOpen: false, action: null })}
+          onConfirm={handleConfirmAction}
+          title={
+            modalState.action === 'reabrir_caso' ? '¿Reabrir este caso?' :
+            modalState.action === 'reabrir_conv' ? '¿Reabrir esta conversación?' : 
+            modalState.action === 'asignar_mi' ? '¿Crear caso y asignártelo?' :
+            modalState.action === 'asignar_otro' ? '¿Crear caso y asignar a otro?' :
+            modalState.action === 'asignar_mi_existente' ? '¿Asignarte este caso?' :
+            modalState.action === 'asignar_otro_existente' ? '¿Transferir este caso?' :
+            modalState.action === 'soltar_existente' ? '¿Soltar este caso?' :
+            'Confirmar acción'
+          }
+          message={
+            modalState.action === 'reabrir_caso' ? 'El caso asociado volverá a estar activo (se te asignará si ya lo tenías, o irá a la cola).' :
+            modalState.action === 'reabrir_conv' ? 'La conversación volverá a estar activa y podrás enviar mensajes.' : 
+            modalState.action === 'asignar_mi' ? 'Se creará un nuevo caso para esta conversación y quedarás como el agente responsable.' :
+            modalState.action === 'asignar_otro' ? 'Se creará un nuevo caso para esta conversación y será asignado al agente seleccionado.' :
+            modalState.action === 'asignar_mi_existente' ? 'Pasarás a ser el agente responsable de este caso.' :
+            modalState.action === 'asignar_otro_existente' ? 'El caso será transferido al agente seleccionado.' :
+            modalState.action === 'soltar_existente' ? 'El caso quedará sin agente asignado y disponible en la cola.' :
+            '¿Estás seguro?'
+          }
+          confirmText={
+            modalState.action === 'reabrir_caso' || modalState.action === 'reabrir_conv' ? 'Sí, reabrir' :
+            'Sí, confirmar'
+          }
         type="info"
         isLoading={procesando}
       />

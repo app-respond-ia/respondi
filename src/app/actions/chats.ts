@@ -72,7 +72,7 @@ export async function getMensajes(conversationId: string) {
 
   const { data: mensajes, error } = await supabase
     .from('messages')
-    .select('*')
+    .select('*, users(nombre)')
     .eq('conversation_id', conversationId)
     .order('timestamp', { ascending: true })
 

@@ -82,7 +82,7 @@ export async function getCasoDetalle(caseId: string) {
   if (casoData.conversation_id) {
     const { data: messagesData, error: messagesError } = await supabase
       .from('messages')
-      .select('*')
+      .select('*, users(nombre)')
       .eq('conversation_id', casoData.conversation_id)
       .order('timestamp', { ascending: true })
 
@@ -213,7 +213,8 @@ export async function enviarMensaje(conversationId: string, contenido: string) {
       remitente: 'agente',
       contenido: contenido.trim(),
       timestamp: timestamp,
-      entregado: false
+      entregado: false,
+      agente_id: auth.user_id
     })
     .select()
     .single()

@@ -401,7 +401,7 @@ function ChatsContent() {
                           </div>
                           <div className="flex items-center justify-end gap-1.5 mt-1 mr-1">
                             <span className={`inline-flex items-center gap-1 text-[10px] font-600 ${labelColor}`}>
-                              {isIA ? 'IA' : 'Agente'}
+                              {isIA ? 'IA' : (msg.users?.nombre || 'Agente')}
                             </span>
                             <span className="text-[11px] text-ink-400">{formatTime(msg.timestamp)}</span>
                           </div>

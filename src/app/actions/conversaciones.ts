@@ -103,18 +103,17 @@ export async function getConversacionDetalle(convId: string) {
 
   if (error || !conv) return { success: false, error: error?.message || 'Conversación no encontrada' }
 
-  const { data: msgs } = await supabase
+  const { data: messages, error: errorMsgs } = await supabase
     .from('messages')
-    .select('id, remitente, contenido, timestamp')
+    .select('*, users(nombre)')
     .eq('conversation_id', convId)
-    .eq('tenant_id', tenantId)
     .order('timestamp', { ascending: true })
 
   return { 
     success: true, 
     data: { 
       ...conv, 
-      mensajes: msgs || [],
+      mensajes: messages || [],
       etiquetas: conv.conversation_tags?.map((t: any) => t.message_categories) || [],
       caso_asociado_id: conv.cases && conv.cases.length > 0 ? conv.cases[0].id : null,
       current_user_id: user.id
@@ -187,7 +186,8 @@ export async function enviarMensajeAgenteConv(convId: string, contenido: string)
       tenant_id: userData?.tenant_id,
       conversation_id: convId,
       remitente: 'agente',
-      contenido: contenido
+      contenido: contenido,
+      agente_id: user.id
     })
 
   // Actualizar la fecha del último mensaje

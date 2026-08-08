@@ -3,7 +3,7 @@ const fs = require('fs');
 
 const env = fs.readFileSync('.env.local', 'utf8').split('\n').reduce((acc, line) => {
   const [k, ...v] = line.split('=');
-  if (k) acc[k.trim()] = v.join('=').trim();
+  if (k && !k.startsWith('#')) acc[k.trim()] = v.join('=').trim();
   return acc;
 }, {});
 
@@ -13,20 +13,14 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function test() {
   const { data, error } = await supabase
-    .from('conversations')
-    .select(`
-      id,
-      messages (
-        texto
-      )
-    `)
-    .order('timestamp', { foreignTable: 'messages', ascending: false })
-    .limit(1, { foreignTable: 'messages' });
+    .from('messages')
+    .select('*')
+    .limit(1);
 
   if (error) {
     console.error('Error:', error.message);
   } else {
-    console.log('Success:', data.length);
+    console.log('Columns:', Object.keys(data[0] || {}));
   }
 }
 test();

@@ -219,7 +219,7 @@ export default function CasoDetallePage() {
                     'bg-emerald-100 border border-emerald-200 rounded-bl-none text-emerald-900'
                   }`}>
                     <div className="text-[10px] font-bold uppercase tracking-wider mb-1 opacity-60">
-                      {m.remitente}
+                      {isIA ? 'IA' : isCliente ? 'Cliente' : (m.users?.nombre || 'Agente')}
                     </div>
                     <p className="text-sm whitespace-pre-wrap leading-relaxed">{m.contenido}</p>
                     <div className="text-[10px] opacity-50 mt-1 text-right">

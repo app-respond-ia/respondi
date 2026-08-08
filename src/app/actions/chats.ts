@@ -85,25 +85,33 @@ export async function toggleIAPausa(conversationId: string, pausada: boolean) {
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
-  const { data: conversacion } = await supabase
+  const { data: conversacion, error: errConv } = await supabase
     .from('conversations')
-    .select('channel_id')
+    .select('canal')
     .eq('id', conversationId)
     .eq('branch_id', auth.branch_id)
     .single()
 
+  if (errConv) {
+    return { success: false, error: errConv.message }
+  }
   if (!conversacion) {
     return { success: false, error: 'Conversación no encontrada.' }
   }
 
   // Verificar que el canal está activo
-  const { data: canal } = await supabase
+  const { data: canales, error: errCanales } = await supabase
     .from('channels')
-    .select('activo')
-    .eq('id', conversacion.channel_id)
-    .single()
+    .select('estado')
+    .eq('tipo', conversacion.canal)
+    .eq('branch_id', auth.branch_id)
+    .limit(1)
 
-  if (!canal?.activo) {
+  const canal = canales?.[0]
+  if (errCanales) {
+    return { success: false, error: errCanales.message }
+  }
+  if (!canal || canal.estado !== 'activo') {
     return { success: false, error: 'El canal de esta conversación no está activo.' }
   }
 

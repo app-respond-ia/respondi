@@ -6,7 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { getConversaciones, getMensajes, toggleIAPausa, cerrarConversacion, reabrirConversacion, getContextoChat } from '@/app/actions/chats'
 import { enviarMensajeAgenteConv } from '@/app/actions/conversaciones'
 import { getMisPermisos } from '@/app/actions/permisos'
-import { reabrirCaso, getAgentesParaCasos, crearCasoDesdeConversacion } from '@/app/actions/casos'
+import { reabrirCaso, getAgentesParaCasos, crearCasoDesdeConversacion, asignarCaso, soltarCaso } from '@/app/actions/casos'
 import { getLogsAuditoria } from '@/app/actions/audit-log'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { HelpPopover } from '@/components/ui/HelpPopover'
@@ -41,7 +41,7 @@ function ChatsContent() {
   const [procesando, setProcesando] = useState(false)
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
-    action: 'reabrir_caso' | 'reabrir_conv' | 'asignar_mi' | 'asignar_otro' | 'cola' | null;
+    action: 'reabrir_caso' | 'reabrir_conv' | 'asignar_mi' | 'asignar_otro' | 'cola' | 'asignar_mi_existente' | 'asignar_otro_existente' | 'soltar_existente' | null;
     targetAgenteId?: string;
   }>({ isOpen: false, action: null })
   
@@ -89,9 +89,11 @@ function ChatsContent() {
     if (permisosRes.success) {
       if ((permisosRes as any).esAdmin) {
         setNivelPermiso('escritura')
+        setHasLogPerm(true)
       } else {
         const p = (permisosRes.data || []).find((p: any) => p.seccion === 'chats')
         setNivelPermiso(p?.nivel || 'ninguno')
+        setHasLogPerm((permisosRes.data || []).some((p: any) => p.seccion === 'audit_logs'))
       }
     }
     
@@ -217,11 +219,35 @@ function ChatsContent() {
       }
       const res = await crearCasoDesdeConversacion(selectedConvId, targetAgenteId)
       if (res.success) {
-        // Refresh context
         cargarContexto(selectedConvId)
         success = true
       } else {
         alert(res.error || 'Error al generar el caso')
+      }
+    } else if (modalState.action === 'asignar_mi_existente' || modalState.action === 'asignar_otro_existente' || modalState.action === 'soltar_existente') {
+      const casoId = contexto?.caso_asociado?.id
+      if (casoId) {
+        let res
+        if (modalState.action === 'soltar_existente') {
+          res = await soltarCaso(casoId)
+        } else {
+          let targetAgenteId = null
+          if (modalState.action === 'asignar_mi_existente') {
+            const perms = await getMisPermisos()
+            targetAgenteId = perms.data?.userId
+          } else if (modalState.action === 'asignar_otro_existente') {
+            targetAgenteId = modalState.targetAgenteId
+          }
+          if (targetAgenteId) {
+            res = await asignarCaso(casoId, targetAgenteId)
+          }
+        }
+        if (res && res.success) {
+          cargarContexto(selectedConvId)
+          success = true
+        } else {
+          alert(res?.error || 'Error al actualizar el caso')
+        }
       }
     }
 
@@ -622,9 +648,51 @@ function ChatsContent() {
                     {contexto.caso_asociado.estatus !== 'resuelto' && contexto.caso_asociado.estatus !== 'cerrado' ? (
                       <div className="pt-2 mt-2 border-t border-slate-100 flex flex-col gap-2">
                         {nivelPermiso === 'escritura' && contexto.caso_asociado.agente?.id !== (contexto as any).current_user_id && (
-                          <button onClick={() => setModalState({ isOpen: true, action: 'asignar_mi' })} className="w-full py-1.5 text-xs font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 rounded-lg transition">
+                          <button onClick={() => setModalState({ isOpen: true, action: 'asignar_mi_existente' })} className="w-full py-1.5 text-xs font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 rounded-lg transition">
                             Asignarme el caso
                           </button>
+                        )}
+                        {nivelPermiso === 'escritura' && contexto.caso_asociado.agente?.id && (
+                          <button onClick={() => setModalState({ isOpen: true, action: 'soltar_existente' })} className="w-full py-1.5 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition">
+                            Soltar caso
+                          </button>
+                        )}
+                        {nivelPermiso === 'escritura' && (
+                          <div className="relative mt-1" ref={agentDropdownRef}>
+                            <p className="text-[10px] text-slate-500 font-medium mb-1.5">Transferir a...</p>
+                            <button onClick={() => setShowAgentDropdown(!showAgentDropdown)} className="w-full h-8 px-2 border border-slate-200 rounded-lg bg-slate-50 text-xs text-left flex items-center justify-between focus:outline-none focus:border-brand-500 transition-shadow">
+                              <span className="text-slate-500">Selecciona un agente...</span>
+                              <svg className="w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/></svg>
+                            </button>
+                            {showAgentDropdown && (
+                              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 py-2">
+                                <div className="px-2 pb-2 mb-2 border-b border-slate-100">
+                                  <input 
+                                    type="text" 
+                                    value={agentSearch}
+                                    onChange={e => setAgentSearch(e.target.value)}
+                                    placeholder="Buscar agente..." 
+                                    className="w-full text-xs px-2 py-1.5 bg-slate-50 border border-slate-200 rounded outline-none focus:border-brand-500"
+                                  />
+                                </div>
+                                <div className="max-h-40 overflow-y-auto">
+                                  {agentes.filter(a => (a.nombre || a.email).toLowerCase().includes(agentSearch.toLowerCase())).map(a => (
+                                    <button 
+                                      key={a.id}
+                                      onClick={() => {
+                                        setModalState({ isOpen: true, action: 'asignar_otro_existente', targetAgenteId: a.id })
+                                        setShowAgentDropdown(false)
+                                      }}
+                                      className="w-full text-left px-3 py-1.5 text-xs hover:bg-slate-50 truncate"
+                                    >
+                                      <div className="font-semibold">{a.nombre || 'Sin nombre'}</div>
+                                      <div className="text-[10px] text-slate-500">{a.email}</div>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
                     ) : (
@@ -747,6 +815,9 @@ function ChatsContent() {
           modalState.action === 'reabrir_conv' ? '¿Reabrir esta conversación?' : 
           modalState.action === 'asignar_mi' ? '¿Crear caso y asignártelo?' :
           modalState.action === 'asignar_otro' ? '¿Crear caso y asignar a otro?' :
+          modalState.action === 'asignar_mi_existente' ? '¿Asignarte este caso?' :
+          modalState.action === 'asignar_otro_existente' ? '¿Transferir este caso?' :
+          modalState.action === 'soltar_existente' ? '¿Soltar este caso?' :
           'Confirmar acción'
         }
         message={
@@ -754,6 +825,9 @@ function ChatsContent() {
           modalState.action === 'reabrir_conv' ? 'La conversación volverá a estar activa y podrás enviar mensajes.' : 
           modalState.action === 'asignar_mi' ? 'Se creará un nuevo caso para esta conversación y quedarás como el agente responsable.' :
           modalState.action === 'asignar_otro' ? 'Se creará un nuevo caso para esta conversación y será asignado al agente seleccionado.' :
+          modalState.action === 'asignar_mi_existente' ? 'Pasarás a ser el agente responsable de este caso.' :
+          modalState.action === 'asignar_otro_existente' ? 'El caso será transferido al agente seleccionado.' :
+          modalState.action === 'soltar_existente' ? 'El caso quedará sin agente asignado y disponible en la cola.' :
           '¿Estás seguro?'
         }
         confirmText={

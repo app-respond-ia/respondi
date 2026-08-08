@@ -249,9 +249,11 @@ function ChatsContent() {
         const newVal = modalState.action === 'pausar_ia'
         const res = await toggleIAPausa(conv.id, newVal)
         if (res.success && res.data) {
-          setConversaciones(prev => prev.map(c => c.id === conv.id ? res.data : c))
+          setConversaciones(prev => prev.map(c => c.id === conv.id ? { ...c, ia_pausada: newVal } : c))
           cargarContexto(conv.id)
           success = true
+        } else {
+          alert(res?.error || 'Error al modificar estado de la IA')
         }
       }
     }
@@ -581,7 +583,7 @@ function ChatsContent() {
                 <h3 className="font-semibold text-ink-900 mb-3 pb-2 border-b border-slate-100 flex justify-between items-center">
                   Cliente
                   <Link href={`/dashboard/conversaciones/${selectedConvId}`} className="text-brand-600 hover:text-brand-700 text-xs font-semibold">
-                    Ver ficha
+                    Ver conversación
                   </Link>
                 </h3>
                 <div className="space-y-3">
@@ -766,7 +768,7 @@ function ChatsContent() {
                     Actividad
                     <HelpPopover content="Registro interno de acciones para trazabilidad. Solo visible para admins o usuarios con permisos de auditoría." />
                   </h3>
-                  <div className="space-y-4">
+                  <div className="space-y-4 max-h-[22rem] overflow-y-auto pr-1">
                     {logs.length > 0 ? logs.map((log: any) => {
                       const esCaso = log.tabla_afectada === 'cases'
                       return (

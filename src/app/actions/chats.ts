@@ -43,7 +43,7 @@ export async function getConversaciones() {
         agente_id
       ),
       messages (
-        texto
+        contenido
       )
     `)
     .eq('branch_id', auth.branch_id)

@@ -682,6 +682,19 @@ function ChatsContent() {
                 )}
               </div>
 
+              {/* Control de IA */}
+              {contexto.estado === 'activa' && (
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-ink-900 text-sm">Control de IA</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">{contexto.ia_pausada ? 'Respuestas pausadas' : 'IA respondiendo'}</p>
+                  </div>
+                  <button onClick={() => handleTogglePausa(contexto)} disabled={nivelPermiso !== 'escritura'} className={`relative w-11 h-6 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed shrink-0 ${contexto.ia_pausada ? 'bg-amber-500' : 'bg-brand-600'}`}>
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${contexto.ia_pausada ? 'translate-x-0' : 'translate-x-5'}`}></span>
+                  </button>
+                </div>
+              )}
+
               {/* Registro de actividad */}
               {hasLogPerm && (
                 <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
@@ -731,13 +744,22 @@ function ChatsContent() {
         onConfirm={handleConfirmAction}
         title={
           modalState.action === 'reabrir_caso' ? '¿Reabrir este caso?' :
-          modalState.action === 'reabrir_conv' ? '¿Reabrir esta conversación?' : ''
+          modalState.action === 'reabrir_conv' ? '¿Reabrir esta conversación?' : 
+          modalState.action === 'asignar_mi' ? '¿Crear caso y asignártelo?' :
+          modalState.action === 'asignar_otro' ? '¿Crear caso y asignar a otro?' :
+          'Confirmar acción'
         }
         message={
           modalState.action === 'reabrir_caso' ? 'El caso asociado volverá a estar activo (se te asignará si ya lo tenías, o irá a la cola).' :
-          modalState.action === 'reabrir_conv' ? 'La conversación volverá a estar activa y podrás enviar mensajes.' : ''
+          modalState.action === 'reabrir_conv' ? 'La conversación volverá a estar activa y podrás enviar mensajes.' : 
+          modalState.action === 'asignar_mi' ? 'Se creará un nuevo caso para esta conversación y quedarás como el agente responsable.' :
+          modalState.action === 'asignar_otro' ? 'Se creará un nuevo caso para esta conversación y será asignado al agente seleccionado.' :
+          '¿Estás seguro?'
         }
-        confirmText="Sí, reabrir"
+        confirmText={
+          modalState.action === 'reabrir_caso' || modalState.action === 'reabrir_conv' ? 'Sí, reabrir' :
+          'Sí, confirmar'
+        }
         type="info"
         isLoading={procesando}
       />

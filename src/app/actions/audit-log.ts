@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
+import { getMisPermisos } from '@/app/actions/permisos'
 
 async function getAuthData(supabase: any) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -61,4 +62,44 @@ export async function getAuditLog(filtros?: { userId?: string, tabla?: string, b
       usuarios_disponibles 
     } 
   }
+}
+
+export async function getLogsAuditoria(tablaAfectada: 'cases' | 'conversations', registroId: string) {
+  const supabase = await createClient()
+  const auth = await getAuthData(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+
+  const permisosRes = await getMisPermisos()
+  if (!permisosRes.success) return { success: false, error: permisosRes.error }
+
+  let hasLogsPerm = false
+  if ((permisosRes as any).esAdmin) {
+    hasLogsPerm = true
+  } else {
+    const p = (permisosRes.data || []).find((p: any) => p.seccion === 'audit_log')
+    if (p && p.nivel !== 'ninguno') hasLogsPerm = true
+  }
+
+  if (!hasLogsPerm) return { success: true, data: [], hasPermission: false }
+
+  const { data, error } = await supabase
+    .from('audit_log')
+    .select(`
+      id,
+      accion,
+      timestamp,
+      users (
+        nombre,
+        email
+      )
+    `)
+    .eq('tenant_id', auth.tenant_id)
+    .eq('tabla_afectada', tablaAfectada)
+    .eq('registro_id', registroId)
+    .order('timestamp', { ascending: false })
+    .limit(15)
+
+  if (error) return { success: false, error: error.message }
+
+  return { success: true, data: data || [], hasPermission: true }
 }

@@ -7,6 +7,23 @@ import Link from 'next/link'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { HelpPopover } from '@/components/ui/HelpPopover'
 import { getCasoDetalle, tomarCaso, cerrarCaso, reabrirCaso, asignarCaso, soltarCaso, getAgentesParaCasos, actualizarPrioridadCaso, actualizarSLACaso } from '@/app/actions/casos'
+import { getLogsAuditoria } from '@/app/actions/audit-log'
+
+function getRelativeTime(dateString: string) {
+  const d = new Date(dateString)
+  const now = new Date()
+  const diffMs = now.getTime() - d.getTime()
+  const diffSecs = Math.floor(diffMs / 1000)
+  const diffMins = Math.floor(diffSecs / 60)
+  const diffHours = Math.floor(diffMins / 60)
+  const diffDays = Math.floor(diffHours / 24)
+
+  if (diffSecs < 60) return 'hace un momento'
+  if (diffMins < 60) return `hace ${diffMins} min`
+  if (diffHours < 24) return `hace ${diffHours} h`
+  if (diffDays === 1) return 'hace 1 día'
+  return `hace ${diffDays} días`
+}
 
 export default function CasoDetallePage() {
   const params = useParams()
@@ -17,6 +34,8 @@ export default function CasoDetallePage() {
   const [loading, setLoading] = useState(true)
   const [agentes, setAgentes] = useState<any[]>([])
   const [procesando, setProcesando] = useState(false)
+  const [logs, setLogs] = useState<any[]>([])
+  const [hasLogPerm, setHasLogPerm] = useState(false)
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
     action: 'tomar' | 'cerrar' | 'reabrir' | 'asignar' | 'soltar' | 'transferir' | 'prioridad' | 'sla' | null;
@@ -46,7 +65,16 @@ export default function CasoDetallePage() {
   useEffect(() => {
     cargarDatos()
     cargarAgentes()
+    cargarLogs()
   }, [id])
+
+  const cargarLogs = async () => {
+    const res = await getLogsAuditoria('cases', id)
+    if (res.success) {
+      setHasLogPerm(res.hasPermission || false)
+      setLogs(res.data || [])
+    }
+  }
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -108,6 +136,7 @@ export default function CasoDetallePage() {
     if (res?.success) {
       setModalState({ isOpen: false, action: null })
       await cargarDatos()
+      if (hasLogPerm) await cargarLogs()
     }
     setProcesando(false)
   }
@@ -412,7 +441,7 @@ export default function CasoDetallePage() {
                     key={i} 
                     className="text-xs font-medium px-2 py-1 rounded-md border"
                     style={{
-                      backgroundColor: `${t.color}26`, // 15% opacity hex
+                      backgroundColor: `${t.color}26`,
                       color: t.color,
                       borderColor: t.color
                     }}
@@ -420,6 +449,25 @@ export default function CasoDetallePage() {
                     {t.nombre}
                   </span>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {hasLogPerm && logs.length > 0 && (
+            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+              <h3 className="font-semibold text-ink-900 mb-3 pb-2 border-b border-slate-100">Registro de actividad</h3>
+              <div className="max-h-64 overflow-y-auto pr-2 space-y-3">
+                {logs.map((log: any) => {
+                  const author = log.users?.nombre || log.users?.email || 'Sistema'
+                  return (
+                    <div key={log.id} className="text-sm">
+                      <p className="text-ink-900 leading-snug">
+                        <span className="font-semibold">{author}</span> {log.accion}
+                      </p>
+                      <p className="text-[11px] text-ink-400 mt-0.5">{getRelativeTime(log.timestamp)}</p>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )}

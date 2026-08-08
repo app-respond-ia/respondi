@@ -368,10 +368,16 @@ export default function ConversacionDetallePage() {
               <div className="max-h-64 overflow-y-auto pr-2 space-y-3">
                 {logs.map((log: any) => {
                   const author = log.users?.nombre || log.users?.email || 'Sistema'
+                  const isCaso = log.tabla_afectada === 'cases'
                   return (
                     <div key={log.id} className="text-sm">
-                      <p className="text-ink-900 leading-snug">
-                        <span className="font-semibold">{author}</span> {log.accion}
+                      <p className="text-ink-900 leading-snug flex flex-wrap items-center gap-1.5">
+                        <span><span className="font-semibold">{author}</span> {log.accion}</span>
+                        {isCaso ? (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-purple-100 text-purple-700">Caso</span>
+                        ) : (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-500">Conversación</span>
+                        )}
                       </p>
                       <p className="text-[11px] text-ink-400 mt-0.5">{getRelativeTime(log.timestamp)}</p>
                     </div>

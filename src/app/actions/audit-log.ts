@@ -82,22 +82,40 @@ export async function getLogsAuditoria(tablaAfectada: 'cases' | 'conversations',
 
   if (!hasLogsPerm) return { success: true, data: [], hasPermission: false }
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('audit_log')
     .select(`
       id,
       accion,
       timestamp,
+      tabla_afectada,
       users (
         nombre,
         email
       )
     `)
     .eq('tenant_id', auth.tenant_id)
-    .eq('tabla_afectada', tablaAfectada)
-    .eq('registro_id', registroId)
-    .order('timestamp', { ascending: false })
-    .limit(15)
+
+  if (tablaAfectada === 'conversations') {
+    const { data: caso } = await supabase
+      .from('cases')
+      .select('id')
+      .eq('conversation_id', registroId)
+      .eq('tenant_id', auth.tenant_id)
+      .single()
+
+    if (caso?.id) {
+      query = query.or(`and(tabla_afectada.eq.conversations,registro_id.eq.${registroId}),and(tabla_afectada.eq.cases,registro_id.eq.${caso.id})`)
+    } else {
+      query = query.eq('tabla_afectada', 'conversations').eq('registro_id', registroId)
+    }
+  } else {
+    query = query.eq('tabla_afectada', tablaAfectada).eq('registro_id', registroId)
+  }
+
+  query = query.order('timestamp', { ascending: false }).limit(15)
+
+  const { data, error } = await query
 
   if (error) return { success: false, error: error.message }
 

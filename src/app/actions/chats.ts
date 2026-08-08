@@ -248,7 +248,7 @@ export async function getContextoChat(conversationId: string) {
         id,
         estatus,
         prioridad,
-        fecha_creacion,
+        fecha_apertura,
         agente:agente_id (
           id,
           nombre,

@@ -294,7 +294,7 @@ function ChatsContent() {
   }
 
   return (
-    <div className="h-screen flex lg:flex-row overflow-hidden bg-white">
+    <div className="flex-1 -mx-4 sm:-mx-6 lg:-mx-8 -my-6 flex lg:flex-row overflow-hidden bg-white border-t border-slate-200">
       {/* PANEL IZQUIERDO */}
       <section className={`flex flex-col w-full lg:w-[320px] xl:w-96 lg:shrink-0 border-r border-slate-200 bg-white h-full ${selectedConvId ? 'hidden lg:flex' : 'flex'}`}>
         <div className="px-4 h-20 flex items-center gap-3 border-b border-slate-200 shrink-0">

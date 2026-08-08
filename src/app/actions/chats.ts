@@ -249,7 +249,7 @@ export async function getContextoChat(conversationId: string) {
         estatus,
         prioridad,
         fecha_creacion,
-        users (
+        agente:agente_id (
           id,
           nombre,
           avatar_url
@@ -268,7 +268,7 @@ export async function getContextoChat(conversationId: string) {
     etiquetas: data.conversation_tags?.map((t: any) => t.message_categories) || [],
     caso_asociado: data.cases && data.cases.length > 0 ? {
       ...data.cases[0],
-      agente: data.cases[0].users
+      agente: data.cases[0].agente
     } : null
   }
   

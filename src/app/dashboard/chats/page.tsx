@@ -466,7 +466,7 @@ function ChatsContent() {
                         </div>
                         <div className="max-w-[75%]">
                           <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-sm px-4 py-2.5">
-                            <p className="text-sm text-ink-900 whitespace-pre-wrap">{msg.contenido}</p>
+                            <p className="text-sm text-ink-900 whitespace-pre-wrap break-words">{msg.contenido}</p>
                           </div>
                           <p className="text-[11px] text-ink-400 mt-1 ml-1">{formatTime(msg.timestamp)}</p>
                         </div>
@@ -479,7 +479,7 @@ function ChatsContent() {
                       <div key={msg.id} className="flex gap-2.5 justify-end">
                         <div className="max-w-[75%]">
                           <div className={`${bgClass} rounded-2xl rounded-tr-sm px-4 py-2.5`}>
-                            <p className="text-sm whitespace-pre-wrap">{msg.contenido}</p>
+                            <p className="text-sm whitespace-pre-wrap break-words">{msg.contenido}</p>
                           </div>
                           <div className="flex items-center justify-end gap-1.5 mt-1 mr-1">
                             <span className={`inline-flex items-center gap-1 text-[10px] font-600 ${labelColor}`}>

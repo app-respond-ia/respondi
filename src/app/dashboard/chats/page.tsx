@@ -41,7 +41,7 @@ function ChatsContent() {
   const [procesando, setProcesando] = useState(false)
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
-    action: 'reabrir_caso' | 'reabrir_conv' | 'asignar_mi' | 'asignar_otro' | 'cola' | 'asignar_mi_existente' | 'asignar_otro_existente' | 'soltar_existente' | null;
+    action: 'reabrir_caso' | 'reabrir_conv' | 'asignar_mi' | 'asignar_otro' | 'cola' | 'asignar_mi_existente' | 'asignar_otro_existente' | 'soltar_existente' | 'pausar_ia' | 'reanudar_ia' | null;
     targetAgenteId?: string;
   }>({ isOpen: false, action: null })
   
@@ -164,13 +164,7 @@ function ChatsContent() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [mensajes])
 
-  const handleTogglePausa = async (conv: any) => {
-    const newVal = !conv.ia_pausada
-    const res = await toggleIAPausa(conv.id, newVal)
-    if (res.success && res.data) {
-      setConversaciones(prev => prev.map(c => c.id === conv.id ? res.data : c))
-    }
-  }
+
 
   const handleCerrar = async (conv: any) => {
     if (confirm('¿Cerrar esta conversación?')) {
@@ -247,6 +241,17 @@ function ChatsContent() {
           success = true
         } else {
           alert(res?.error || 'Error al actualizar el caso')
+        }
+      }
+    } else if (modalState.action === 'pausar_ia' || modalState.action === 'reanudar_ia') {
+      const conv = conversaciones.find(c => c.id === selectedConvId)
+      if (conv) {
+        const newVal = modalState.action === 'pausar_ia'
+        const res = await toggleIAPausa(conv.id, newVal)
+        if (res.success && res.data) {
+          setConversaciones(prev => prev.map(c => c.id === conv.id ? res.data : c))
+          cargarContexto(conv.id)
+          success = true
         }
       }
     }
@@ -429,11 +434,14 @@ function ChatsContent() {
                     {/* Toggle IA */}
                     <div className="flex items-center gap-2">
                       <div className="hidden sm:block text-right">
-                        <p className="text-xs font-600 text-ink-900 leading-tight">
-                          {selectedConv.ia_pausada ? 'IA en pausa' : 'IA activa'}
-                        </p>
+                        <div className="flex items-center gap-1.5 justify-end">
+                          <p className="text-xs font-600 text-ink-900 leading-tight">
+                            {selectedConv.ia_pausada ? 'IA en pausa' : 'IA activa'}
+                          </p>
+                          <HelpPopover content="Indica si la IA responde automáticamente al cliente (Activa) o si está silenciada para que un humano intervenga manualmente (Pausada)." />
+                        </div>
                       </div>
-                      <button onClick={() => handleTogglePausa(selectedConv)} disabled={nivelPermiso !== 'escritura'} className={`relative w-11 h-6 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed ${selectedConv.ia_pausada ? 'bg-amber-500' : 'bg-brand-600'}`}>
+                      <button onClick={() => setModalState({ isOpen: true, action: selectedConv.ia_pausada ? 'reanudar_ia' : 'pausar_ia' })} disabled={nivelPermiso !== 'escritura'} className={`relative w-11 h-6 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed ${selectedConv.ia_pausada ? 'bg-amber-500' : 'bg-brand-600'}`}>
                         <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${selectedConv.ia_pausada ? 'translate-x-0' : 'translate-x-5'}`}></span>
                       </button>
                     </div>
@@ -750,18 +758,6 @@ function ChatsContent() {
                 )}
               </div>
 
-              {/* Control de IA */}
-              {contexto.estado === 'activa' && (
-                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-center justify-between">
-                  <div>
-                    <h3 className="font-semibold text-ink-900 text-sm">Control de IA</h3>
-                    <p className="text-xs text-slate-500 mt-0.5">{contexto.ia_pausada ? 'Respuestas pausadas' : 'IA respondiendo'}</p>
-                  </div>
-                  <button onClick={() => handleTogglePausa(contexto)} disabled={nivelPermiso !== 'escritura'} className={`relative w-11 h-6 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed shrink-0 ${contexto.ia_pausada ? 'bg-amber-500' : 'bg-brand-600'}`}>
-                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${contexto.ia_pausada ? 'translate-x-0' : 'translate-x-5'}`}></span>
-                  </button>
-                </div>
-              )}
 
               {/* Registro de actividad */}
               {hasLogPerm && (
@@ -818,6 +814,8 @@ function ChatsContent() {
           modalState.action === 'asignar_mi_existente' ? '¿Asignarte este caso?' :
           modalState.action === 'asignar_otro_existente' ? '¿Transferir este caso?' :
           modalState.action === 'soltar_existente' ? '¿Soltar este caso?' :
+          modalState.action === 'pausar_ia' ? '¿Pausar la IA?' :
+          modalState.action === 'reanudar_ia' ? '¿Reanudar la IA?' :
           'Confirmar acción'
         }
         message={
@@ -828,10 +826,14 @@ function ChatsContent() {
           modalState.action === 'asignar_mi_existente' ? 'Pasarás a ser el agente responsable de este caso.' :
           modalState.action === 'asignar_otro_existente' ? 'El caso será transferido al agente seleccionado.' :
           modalState.action === 'soltar_existente' ? 'El caso quedará sin agente asignado y disponible en la cola.' :
+          modalState.action === 'pausar_ia' ? 'La IA dejará de responder automáticamente a este cliente, permitiéndote tomar el control manual de la conversación.' :
+          modalState.action === 'reanudar_ia' ? 'La IA volverá a analizar y responder automáticamente los próximos mensajes de este cliente.' :
           '¿Estás seguro?'
         }
         confirmText={
           modalState.action === 'reabrir_caso' || modalState.action === 'reabrir_conv' ? 'Sí, reabrir' :
+          modalState.action === 'pausar_ia' ? 'Sí, pausar IA' :
+          modalState.action === 'reanudar_ia' ? 'Sí, reanudar IA' :
           'Sí, confirmar'
         }
         type="info"

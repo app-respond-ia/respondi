@@ -256,7 +256,7 @@ export async function reabrirCaso(casoId: string) {
   if (!user) return { success: false, error: 'No autorizado' }
 
   const { data: userData } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
-  const { data: caso } = await supabase.from('cases').select('agente_id').eq('id', casoId).single()
+  const { data: caso } = await supabase.from('cases').select('agente_id, conversation_id').eq('id', casoId).single()
   
   const nuevoEstatus = caso?.agente_id ? 'atendiendo' : 'pendiente'
 
@@ -265,6 +265,13 @@ export async function reabrirCaso(casoId: string) {
     .update({ estatus: nuevoEstatus, fecha_cierre: null })
     .eq('id', casoId)
     .eq('tenant_id', userData?.tenant_id)
+
+  if (caso?.conversation_id) {
+    await supabase
+      .from('conversations')
+      .update({ ia_pausada: true })
+      .eq('id', caso.conversation_id)
+  }
 
   if (!error) {
     const { registrarAuditoria } = await import('@/lib/auditoria')

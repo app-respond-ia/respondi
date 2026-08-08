@@ -187,7 +187,8 @@ export async function reabrirConversacion(conversationId: string) {
     .from('conversations')
     .update({ 
       estado: 'activa',
-      fecha_cierre: null
+      fecha_cierre: null,
+      ia_pausada: false
     })
     .eq('id', conversationId)
     .eq('branch_id', auth.branch_id)

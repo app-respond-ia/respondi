@@ -23,12 +23,23 @@ async function getAuthData(supabase: any) {
   return { tenant_id: userData.tenant_id, branch_id: branchId, user_id: user.id }
 }
 
-export async function getConversaciones() {
+export async function getConversaciones(filtros?: { 
+  estado?: string, 
+  canal?: string, 
+  search?: string, 
+  iaPausada?: string, 
+  tieneCaso?: string, 
+  asignadosAMi?: boolean, 
+  agentesIds?: string[], 
+  etiquetasIds?: string[], 
+  dateRange?: { from: string, to: string }, 
+  sort?: 'asc' | 'desc' 
+}) {
   const supabase = await createClient()
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
-  const { data: conversaciones, error } = await supabase
+  let query = supabase
     .from('conversations')
     .select(`
       *,
@@ -40,19 +51,109 @@ export async function getConversaciones() {
       cases (
         id,
         estatus,
-        agente_id
+        agente_id,
+        agente:agente_id (nombre)
       ),
       messages (
         contenido
+      ),
+      conversation_tags (
+        message_categories (id, nombre, color)
       )
     `)
     .eq('branch_id', auth.branch_id)
     .order('timestamp', { foreignTable: 'messages', ascending: false })
     .limit(1, { foreignTable: 'messages' })
-    .order('fecha_ultimo_mensaje', { ascending: false, nullsFirst: false })
+    .order('fecha_ultimo_mensaje', { ascending: filtros?.sort === 'asc', nullsFirst: false })
+
+  if (filtros?.estado && filtros.estado !== 'Todas') {
+    const est = filtros.estado === 'Activas' ? 'activa' : filtros.estado === 'Cerradas' ? 'cerrada' : null
+    if (est) query = query.eq('estado', est)
+  }
+
+  if (filtros?.canal && filtros.canal !== 'Todos') {
+    query = query.eq('canal', filtros.canal.toLowerCase())
+  }
+
+  if (filtros?.iaPausada && filtros.iaPausada !== 'Todas') {
+    query = query.eq('ia_pausada', filtros.iaPausada === 'Pausada')
+  }
+
+  if (filtros?.dateRange?.from) {
+    query = query.gte('fecha_ultimo_mensaje', filtros.dateRange.from)
+  }
+  if (filtros?.dateRange?.to) {
+    query = query.lte('fecha_ultimo_mensaje', filtros.dateRange.to + 'T23:59:59.999Z')
+  }
+
+  const { data: rawData, error } = await query
 
   if (error) return { success: false, error: error.message }
-  return { success: true, data: { conversaciones } }
+  
+  let result = rawData || []
+
+  // Memory filtering for complex joins
+  if (filtros?.tieneCaso && filtros.tieneCaso !== 'Todas') {
+    result = result.filter(c => {
+      const hasCase = c.cases && c.cases.length > 0
+      return filtros.tieneCaso === 'Con caso' ? hasCase : !hasCase
+    })
+  }
+
+  if (filtros?.asignadosAMi) {
+    result = result.filter(c => {
+      const isAgent = c.cases?.some((cas: any) => cas.agente_id === auth.user_id)
+      return isAgent
+    })
+  }
+
+  if (filtros?.agentesIds && filtros.agentesIds.length > 0) {
+    result = result.filter(c => {
+      const cas = c.cases && c.cases.length > 0 ? c.cases[0] : null
+      if (!cas) return false // Filter only applies to those with a case
+      if (!cas.agente_id) return filtros.agentesIds!.includes('unassigned')
+      return filtros.agentesIds!.includes(cas.agente_id)
+    })
+  }
+
+  if (filtros?.etiquetasIds && filtros.etiquetasIds.length > 0) {
+    result = result.filter(c => {
+      if (!c.conversation_tags || c.conversation_tags.length === 0) return false
+      return c.conversation_tags.some((t: any) => 
+        t.message_categories && filtros.etiquetasIds!.includes(t.message_categories.id)
+      )
+    })
+  }
+
+  if (filtros?.search) {
+    const s = filtros.search.toLowerCase()
+    result = result.filter(c => {
+      const contact = Array.isArray(c.contacts) ? c.contacts[0] : c.contacts
+      return (
+        c.id.toLowerCase().includes(s) ||
+        (contact?.nombre && contact.nombre.toLowerCase().includes(s)) ||
+        (contact?.identificador_canal && contact.identificador_canal.toLowerCase().includes(s)) ||
+        (contact?.canal && contact.canal.toLowerCase().includes(s))
+      )
+    })
+  }
+
+  return { success: true, data: { conversaciones: result } }
+}
+
+export async function getEtiquetasTenant() {
+  const supabase = await createClient()
+  const auth = await getAuthData(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+
+  const { data, error } = await supabase
+    .from('message_categories')
+    .select('id, nombre, color')
+    .eq('tenant_id', auth.tenant_id)
+    .order('nombre')
+
+  if (error) return { success: false, error: error.message }
+  return { success: true, data }
 }
 
 export async function getMensajes(conversationId: string) {

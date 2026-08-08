@@ -3,7 +3,7 @@ import Loading from '@/components/Loading'
 
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { getConversaciones, getMensajes, toggleIAPausa, cerrarConversacion, reabrirConversacion, getContextoChat } from '@/app/actions/chats'
+import { getConversaciones, getMensajes, toggleIAPausa, cerrarConversacion, reabrirConversacion, getContextoChat, getEtiquetasTenant } from '@/app/actions/chats'
 import { enviarMensajeAgenteConv } from '@/app/actions/conversaciones'
 import { getMisPermisos } from '@/app/actions/permisos'
 import { reabrirCaso, getAgentesParaCasos, crearCasoDesdeConversacion, asignarCaso, soltarCaso } from '@/app/actions/casos'
@@ -23,8 +23,27 @@ function ChatsContent() {
   const [conversaciones, setConversaciones] = useState<any[]>([])
   const [mensajes, setMensajes] = useState<any[]>([])
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null)
-  const [filtroActivo, setFiltroActivo] = useState<'todas' | 'activas' | 'cerradas'>('todas')
+  const [isFetching, setIsFetching] = useState(false)
+  const isFirstMount = useRef(true)
+  
   const [busqueda, setBusqueda] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [filtroActivo, setFiltroActivo] = useState<'Todas' | 'Activas' | 'Cerradas'>('Todas')
+  const [asignadosAMi, setAsignadosAMi] = useState(false)
+  
+  const [canalFilter, setCanalFilter] = useState('Todos')
+  const [iaFilter, setIaFilter] = useState('Todas') 
+  const [casoFilter, setCasoFilter] = useState('Todas') 
+  const [agentesIds, setAgentesIds] = useState<string[]>([])
+  const [etiquetasIds, setEtiquetasIds] = useState<string[]>([])
+  const [dateRange, setDateRange] = useState({ from: '', to: '' })
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc')
+  
+  const [showFilters, setShowFilters] = useState(false)
+  const filtersRef = useRef<HTMLDivElement>(null)
+  
+  const [etiquetasTenant, setEtiquetasTenant] = useState<any[]>([])
+  const [agentFilterSearch, setAgentFilterSearch] = useState('')
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
   
   // Contexto adicional
@@ -53,8 +72,6 @@ function ChatsContent() {
   const agentDropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    // Check logs perm (from audit-log) or just use getMisPermisos data if needed.
-    // For now we do a simple check.
     const checkLogs = async () => {
       const perms = await getMisPermisos()
       if (perms.success && perms.data) {
@@ -65,7 +82,14 @@ function ChatsContent() {
     }
     checkLogs()
     
+    getEtiquetasTenant().then(res => {
+      if (res.success && res.data) setEtiquetasTenant(res.data)
+    })
+    
     function handleClickOutside(event: MouseEvent) {
+      if (filtersRef.current && !filtersRef.current.contains(event.target as Node)) {
+        setShowFilters(false)
+      }
       if (agentDropdownRef.current && !agentDropdownRef.current.contains(event.target as Node)) {
         setShowAgentDropdown(false)
       }
@@ -74,12 +98,46 @@ function ChatsContent() {
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(busqueda)
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [busqueda])
+
+  const getActiveFiltersCount = () => {
+    let count = 0
+    if (canalFilter !== 'Todos') count++
+    if (iaFilter !== 'Todas') count++
+    if (casoFilter !== 'Todas') count++
+    if (agentesIds.length > 0) count++
+    if (etiquetasIds.length > 0) count++
+    if (dateRange.from || dateRange.to) count++
+    if (sortOrder !== 'desc') count++
+    return count
+  }
+
+  const canales = ['Todos', 'Instagram', 'WhatsApp', 'Facebook']
+
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const cargarConversaciones = async () => {
-    setLoadingChats(true)
+    if (isFirstMount.current) setLoadingChats(true)
+    setIsFetching(true)
+    
     const [res, permisosRes] = await Promise.all([
-      getConversaciones(),
+      getConversaciones({
+        estado: filtroActivo,
+        search: debouncedSearch,
+        canal: canalFilter,
+        iaPausada: iaFilter,
+        tieneCaso: casoFilter,
+        asignadosAMi: asignadosAMi,
+        agentesIds: agentesIds,
+        etiquetasIds: etiquetasIds,
+        dateRange: dateRange.from || dateRange.to ? dateRange : undefined,
+        sort: sortOrder
+      }),
       getMisPermisos()
     ])
 
@@ -100,22 +158,24 @@ function ChatsContent() {
       }
     }
     
-    // Set initial chat from URL if provided and exists
-    if (initialChatId && res.success && res.data) {
+    if (initialChatId && res.success && res.data && isFirstMount.current) {
       const exists = (res.data.conversaciones || []).find((c: any) => c.id === initialChatId)
       if (exists) {
         setSelectedConvId(initialChatId)
-        // Clean URL to avoid sticking to this chat on refresh without intent
         router.replace('/dashboard/chats', { scroll: false })
       }
     }
 
-    setLoadingChats(false)
+    if (isFirstMount.current) {
+      setLoadingChats(false)
+      isFirstMount.current = false
+    }
+    setIsFetching(false)
   }
 
   useEffect(() => {
     cargarConversaciones()
-  }, [])
+  }, [filtroActivo, debouncedSearch, canalFilter, iaFilter, casoFilter, asignadosAMi, agentesIds, etiquetasIds, dateRange, sortOrder])
 
   useEffect(() => {
     if (selectedConvId) {
@@ -295,26 +355,6 @@ function ChatsContent() {
     return d.toLocaleDateString([], { day: '2-digit', month: '2-digit' })
   }
 
-  const filteredConversaciones = conversaciones.filter(c => {
-    const matchFiltro = 
-      filtroActivo === 'todas' ? true :
-      filtroActivo === 'activas' ? c.estado === 'activa' :
-      c.estado === 'cerrada'
-    
-    if (!busqueda) return matchFiltro
-    
-    const q = busqueda.toLowerCase()
-    const nombre = (c.contacts?.nombre || '').toLowerCase()
-    const identificador = (c.contacts?.identificador_canal || '').toLowerCase()
-    const resumen = (c.resumen || '').toLowerCase()
-    
-    return matchFiltro && (
-      nombre.includes(q) ||
-      identificador.includes(q) ||
-      resumen.includes(q)
-    )
-  })
-
   const selectedConv = conversaciones.find(c => c.id === selectedConvId)
 
   if (loadingChats || nivelPermiso === null) {
@@ -340,30 +380,181 @@ function ChatsContent() {
           </span>
         </div>
 
-        <div className="p-3 space-y-2 border-b border-slate-200 shrink-0">
-          {/* Buscador */}
-          <div className="relative">
-            <svg className="w-4 h-4 text-ink-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-            <input
-              type="text"
-              placeholder="Buscar cliente, número..."
-              value={busqueda}
-              onChange={e => setBusqueda(e.target.value)}
-              className="w-full h-9 pl-9 pr-3 rounded-lg border border-slate-200 bg-slate-50 text-sm placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:bg-white transition"
-            />
+        <div className="p-3 space-y-2 border-b border-slate-200 shrink-0 relative z-40">
+          {/* Fila 1: Buscador y Filtros */}
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <svg className="w-4 h-4 text-ink-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              <input
+                type="text"
+                placeholder="Buscar cliente..."
+                value={busqueda}
+                onChange={e => setBusqueda(e.target.value)}
+                className="w-full h-9 pl-9 pr-3 rounded-lg border border-slate-200 bg-slate-50 text-sm placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:bg-white transition"
+              />
+            </div>
+            
+            <div className="relative" ref={filtersRef}>
+              <button 
+                onClick={() => setShowFilters(!showFilters)}
+                className={`h-9 px-3 rounded-lg text-sm font-medium border flex items-center gap-2 transition ${getActiveFiltersCount() > 0 ? 'bg-brand-50 text-brand-700 border-brand-200' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}`}
+              >
+                Filtros
+                {getActiveFiltersCount() > 0 && (
+                  <span className="bg-brand-600 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">{getActiveFiltersCount()}</span>
+                )}
+              </button>
+              
+              {showFilters && (
+                <div className="absolute top-full left-0 md:left-auto md:right-0 mt-2 w-[300px] bg-white rounded-xl shadow-xl border border-slate-200 z-50 flex flex-col max-h-[70vh] overflow-hidden">
+                  <div className="p-4 flex flex-col gap-4 overflow-y-auto">
+                    
+                    <div>
+                      <span className="block text-xs font-semibold text-slate-700 mb-1.5">Canal</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {canales.map(can => (
+                          <button key={can} onClick={() => setCanalFilter(can)}
+                            className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition ${canalFilter === can ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                            {can}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="block text-xs font-semibold text-slate-700 mb-1.5">IA</span>
+                      <div className="flex bg-slate-100 p-1 rounded-lg">
+                        {['Todas', 'Activa', 'Pausada'].map(opt => (
+                          <button key={opt} onClick={() => setIaFilter(opt)}
+                            className={`flex-1 py-1 text-[11px] font-medium rounded-md transition ${iaFilter === opt ? 'bg-white shadow-sm text-ink-900' : 'text-slate-500 hover:text-ink-700'}`}>
+                            {opt}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="block text-xs font-semibold text-slate-700 mb-1.5">Tiene caso</span>
+                      <select value={casoFilter} onChange={e => setCasoFilter(e.target.value)} className="w-full text-xs p-2 rounded-lg border border-slate-200 bg-slate-50 outline-none focus:border-brand-500">
+                        <option value="Todas">Todas</option>
+                        <option value="Con caso">Con caso</option>
+                        <option value="Sin caso">Sin caso</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-semibold text-slate-700">Agentes del caso</span>
+                        {agentesIds.length > 0 && <span className="text-[9px] bg-brand-100 text-brand-700 px-1 rounded font-bold">{agentesIds.length}</span>}
+                      </div>
+                      <div className="border border-slate-200 rounded-lg overflow-hidden flex flex-col max-h-32">
+                        <input type="text" placeholder="Buscar agente..." value={agentFilterSearch} onChange={e => setAgentFilterSearch(e.target.value)} className="px-2 py-1.5 text-[11px] border-b border-slate-100 bg-slate-50 outline-none w-full" />
+                        <div className="overflow-y-auto p-1 flex-1">
+                          <label className="flex items-center gap-2 p-1.5 hover:bg-slate-50 rounded cursor-pointer">
+                            <input type="checkbox" checked={agentesIds.includes('unassigned')} onChange={() => {
+                              if (agentesIds.includes('unassigned')) setAgentesIds(prev => prev.filter(id => id !== 'unassigned'))
+                              else setAgentesIds(prev => [...prev, 'unassigned'])
+                            }} className="rounded text-brand-600 focus:ring-brand-500 w-3 h-3" />
+                            <span className="text-[11px] text-slate-700 font-medium italic">Sin asignar</span>
+                          </label>
+                          {agentes.filter(a => (a.nombre || a.email).toLowerCase().includes(agentFilterSearch.toLowerCase())).map(a => (
+                            <label key={a.id} className="flex items-center gap-2 p-1.5 hover:bg-slate-50 rounded cursor-pointer">
+                              <input type="checkbox" checked={agentesIds.includes(a.id)} onChange={() => {
+                                if (agentesIds.includes(a.id)) setAgentesIds(prev => prev.filter(id => id !== a.id))
+                                else setAgentesIds(prev => [...prev, a.id])
+                              }} className="rounded text-brand-600 focus:ring-brand-500 w-3 h-3" />
+                              <span className="text-[11px] text-slate-700 truncate">{a.nombre || a.email}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-semibold text-slate-700">Etiquetas</span>
+                        {etiquetasIds.length > 0 && <span className="text-[9px] bg-brand-100 text-brand-700 px-1 rounded font-bold">{etiquetasIds.length}</span>}
+                      </div>
+                      <div className="border border-slate-200 rounded-lg max-h-24 overflow-y-auto p-1">
+                        {etiquetasTenant.map(t => (
+                          <label key={t.id} className="flex items-center gap-2 p-1.5 hover:bg-slate-50 rounded cursor-pointer">
+                            <input type="checkbox" checked={etiquetasIds.includes(t.id)} onChange={() => {
+                              if (etiquetasIds.includes(t.id)) setEtiquetasIds(prev => prev.filter(id => id !== t.id))
+                              else setEtiquetasIds(prev => [...prev, t.id])
+                            }} className="rounded text-brand-600 focus:ring-brand-500 w-3 h-3" />
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: t.color }}></div>
+                              <span className="text-[11px] text-slate-700 truncate">{t.nombre}</span>
+                            </div>
+                          </label>
+                        ))}
+                        {etiquetasTenant.length === 0 && <span className="text-[10px] text-slate-400 p-1">No hay etiquetas creadas</span>}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="block text-xs font-semibold text-slate-700 mb-1.5">Fecha (último mensaje)</span>
+                      <div className="flex items-center gap-1.5">
+                        <input type="date" value={dateRange.from} onChange={e => setDateRange({...dateRange, from: e.target.value})} className="flex-1 w-full px-2 py-1 rounded text-[11px] border border-slate-200 outline-none text-slate-700 bg-slate-50" />
+                        <span className="text-slate-400 text-xs">-</span>
+                        <input type="date" value={dateRange.to} onChange={e => setDateRange({...dateRange, to: e.target.value})} className="flex-1 w-full px-2 py-1 rounded text-[11px] border border-slate-200 outline-none text-slate-700 bg-slate-50" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="block text-xs font-semibold text-slate-700 mb-1.5">Orden</span>
+                      <select value={sortOrder} onChange={e => setSortOrder(e.target.value as 'desc'|'asc')} className="w-full text-xs p-2 rounded-lg border border-slate-200 bg-slate-50 outline-none focus:border-brand-500">
+                        <option value="desc">Más recientes primero</option>
+                        <option value="asc">Más antiguos primero</option>
+                      </select>
+                    </div>
+
+                  </div>
+                  
+                  {getActiveFiltersCount() > 0 && (
+                    <div className="p-2 border-t border-slate-100 bg-slate-50">
+                      <button onClick={() => {
+                        setCanalFilter('Todos')
+                        setIaFilter('Todas')
+                        setCasoFilter('Todas')
+                        setAgentesIds([])
+                        setEtiquetasIds([])
+                        setDateRange({ from: '', to: '' })
+                        setSortOrder('desc')
+                      }} className="w-full text-xs text-brand-600 font-semibold py-1.5 hover:bg-brand-50 rounded-lg transition">
+                        Limpiar todos los filtros
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-            <button onClick={() => setFiltroActivo('todas')} className={`shrink-0 px-2.5 py-1 rounded-lg text-xs font-600 transition ${filtroActivo === 'todas' ? 'bg-brand-600 text-white' : 'bg-slate-100 text-ink-600'}`}>Todas</button>
-            <button onClick={() => setFiltroActivo('activas')} className={`shrink-0 px-2.5 py-1 rounded-lg text-xs font-600 transition ${filtroActivo === 'activas' ? 'bg-brand-600 text-white' : 'bg-slate-100 text-ink-600'}`}>Activas</button>
-            <button onClick={() => setFiltroActivo('cerradas')} className={`shrink-0 px-2.5 py-1 rounded-lg text-xs font-600 transition ${filtroActivo === 'cerradas' ? 'bg-brand-600 text-white' : 'bg-slate-100 text-ink-600'}`}>Cerradas</button>
+          
+          {/* Fila 2: Estados y Asignados a mi */}
+          <div className="flex items-center justify-between pt-1">
+            <div className="flex items-center gap-1 overflow-x-auto pb-1">
+              <button onClick={() => setFiltroActivo('Todas')} className={`shrink-0 px-2 py-1 rounded text-[11px] font-600 transition ${filtroActivo === 'Todas' ? 'bg-brand-600 text-white' : 'bg-slate-100 text-ink-600'}`}>Todas</button>
+              <button onClick={() => setFiltroActivo('Activas')} className={`shrink-0 px-2 py-1 rounded text-[11px] font-600 transition ${filtroActivo === 'Activas' ? 'bg-brand-600 text-white' : 'bg-slate-100 text-ink-600'}`}>Activas</button>
+              <button onClick={() => setFiltroActivo('Cerradas')} className={`shrink-0 px-2 py-1 rounded text-[11px] font-600 transition ${filtroActivo === 'Cerradas' ? 'bg-brand-600 text-white' : 'bg-slate-100 text-ink-600'}`}>Cerradas</button>
+            </div>
+            
+            <label className="flex items-center gap-1.5 cursor-pointer shrink-0 ml-1 bg-slate-50 px-2 py-1 rounded border border-slate-200 hover:bg-slate-100 transition">
+              <div className="relative flex items-center">
+                <input type="checkbox" className="sr-only" checked={asignadosAMi} onChange={e => setAsignadosAMi(e.target.checked)} />
+                <div className={`block w-5 h-3 rounded-full transition ${asignadosAMi ? 'bg-brand-500' : 'bg-slate-300'}`}></div>
+                <div className={`absolute left-[1px] bg-white w-[10px] h-[10px] rounded-full transition transform ${asignadosAMi ? 'translate-x-[10px]' : ''}`}></div>
+              </div>
+              <span className="text-[10px] font-semibold text-slate-600">Asignados a mí</span>
+            </label>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
-          {filteredConversaciones.length === 0 ? (
+        <div className={`flex-1 overflow-y-auto divide-y divide-slate-100 transition-opacity duration-200 ${isFetching ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
+          {conversaciones.length === 0 ? (
             <div className="p-4 text-center text-sm text-ink-500">No hay conversaciones en esta vista.</div>
           ) : (
-            filteredConversaciones.map(conv => {
+            conversaciones.map(conv => {
               const contactName = conv.contacts?.nombre || conv.contacts?.identificador_canal || 'Desconocido'
               const bgAvatar = 'bg-slate-200 text-slate-700' // could be randomized
               const isSelected = selectedConvId === conv.id

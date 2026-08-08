@@ -41,9 +41,14 @@ export async function getConversaciones() {
         id,
         estatus,
         agente_id
+      ),
+      messages (
+        texto
       )
     `)
     .eq('branch_id', auth.branch_id)
+    .order('timestamp', { foreignTable: 'messages', ascending: false })
+    .limit(1, { foreignTable: 'messages' })
     .order('fecha_ultimo_mensaje', { ascending: false, nullsFirst: false })
 
   if (error) return { success: false, error: error.message }

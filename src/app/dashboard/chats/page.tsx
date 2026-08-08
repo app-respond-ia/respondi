@@ -281,7 +281,7 @@ function ChatsContent() {
                       <span className="text-[11px] text-ink-400 shrink-0">{formatTime(conv.fecha_ultimo_mensaje || conv.fecha_inicio)}</span>
                     </div>
                     <p className={`text-xs line-clamp-1 mt-0.5 ${conv.estado === 'cerrada' ? 'italic text-ink-400' : 'text-ink-500'}`}>
-                      {conv.resumen || 'Sin mensajes aún'}
+                      {conv.messages?.[0]?.texto || conv.resumen || 'Sin mensajes aún'}
                     </p>
                     {isPausada && conv.estado === 'activa' && (
                       <span className="inline-block mt-1 text-[10px] font-600 bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">IA pausada</span>

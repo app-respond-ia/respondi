@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { HelpPopover } from '@/components/ui/HelpPopover'
 import { MessageBubble } from '@/components/ui/MessageBubble'
+import { NotesSection } from '@/components/ui/NotesSection'
 import { ActivityLog } from '@/components/ui/ActivityLog'
 import { getCasoDetalle, tomarCaso, cerrarCaso, reabrirCaso, asignarCaso, soltarCaso, getAgentesParaCasos, actualizarPrioridadCaso, actualizarSLACaso } from '@/app/actions/casos'
 import { getLogsAuditoria } from '@/app/actions/audit-log'
@@ -424,6 +425,15 @@ export default function CasoDetallePage() {
                   </span>
                 ))}
               </div>
+            </div>
+          )}
+
+          {caso.conversation_id && (
+            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm">
+              <NotesSection 
+                conversationId={caso.conversation_id} 
+                canDelete={caso.current_user_is_owner || caso.current_user_level <= 2} 
+              />
             </div>
           )}
 

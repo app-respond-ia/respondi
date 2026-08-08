@@ -7,11 +7,13 @@ import Link from 'next/link'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { HelpPopover } from '@/components/ui/HelpPopover'
 import { MessageBubble } from '@/components/ui/MessageBubble'
+import { NotesSection } from '@/components/ui/NotesSection'
 import { ActivityLog } from '@/components/ui/ActivityLog'
 import { AIToggle } from '@/components/ui/AIToggle'
 import { getConversacionDetalle, pausarIA, reanudarIA } from '@/app/actions/conversaciones'
 import { getAgentesParaCasos, crearCasoDesdeConversacion } from '@/app/actions/casos'
 import { getLogsAuditoria } from '@/app/actions/audit-log'
+import { getMisPermisos } from '@/app/actions/permisos'
 
 
 export default function ConversacionDetallePage() {
@@ -26,6 +28,7 @@ export default function ConversacionDetallePage() {
   const [procesandoCaso, setProcesandoCaso] = useState(false)
   const [logs, setLogs] = useState<any[]>([])
   const [hasLogPerm, setHasLogPerm] = useState(false)
+  const [canDeleteNotes, setCanDeleteNotes] = useState(false)
   
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
@@ -74,12 +77,19 @@ export default function ConversacionDetallePage() {
 
   const cargarDatos = async () => {
     setLoading(true)
-    const res = await getConversacionDetalle(id)
+    const [res, permisosRes] = await Promise.all([
+      getConversacionDetalle(id),
+      getMisPermisos()
+    ])
     if (!res.success || !res.data) {
       router.replace('/dashboard/conversaciones')
       return
     }
     setConv(res.data)
+    
+    if (permisosRes.success) {
+      setCanDeleteNotes(((permisosRes as any).esAdmin) || ((permisosRes as any).userLevel || 5) <= 2)
+    }
     setLoading(false)
   }
 
@@ -333,6 +343,11 @@ export default function ConversacionDetallePage() {
                 </span>
               )}
             </div>
+          </div>
+
+          {/* Notas Internas */}
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm">
+            <NotesSection conversationId={id} canDelete={canDeleteNotes} />
           </div>
 
           {hasLogPerm && logs.length > 0 && (

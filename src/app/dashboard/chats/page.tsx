@@ -12,6 +12,7 @@ import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { HelpPopover } from '@/components/ui/HelpPopover'
 import { MessageBubble } from '@/components/ui/MessageBubble'
 import { ActivityLog } from '@/components/ui/ActivityLog'
+import { NotesSection } from '@/components/ui/NotesSection'
 import { AIToggle } from '@/components/ui/AIToggle'
 import Link from 'next/link'
 
@@ -69,6 +70,7 @@ function ChatsContent() {
   
   const [agentSearch, setAgentSearch] = useState('')
   const [showAgentDropdown, setShowAgentDropdown] = useState(false)
+  const [canDeleteNotes, setCanDeleteNotes] = useState(false)
   const agentDropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -151,10 +153,12 @@ function ChatsContent() {
       if ((permisosRes as any).esAdmin) {
         setNivelPermiso('escritura')
         setHasLogPerm(true)
+        setCanDeleteNotes(true)
       } else {
         const p = (permisosRes.data || []).find((p: any) => p.seccion === 'chats')
         setNivelPermiso(p?.nivel || 'ninguno')
         setHasLogPerm((permisosRes.data || []).some((p: any) => p.seccion === 'audit_logs'))
+        setCanDeleteNotes(((permisosRes as any).userLevel || 5) <= 2)
       }
     }
     
@@ -752,6 +756,11 @@ function ChatsContent() {
                     <p className="text-xs text-slate-600 mt-0.5">{contexto.contacts?.identificador_canal}</p>
                   </div>
                 </div>
+              </div>
+
+              {/* Notas Internas */}
+              <div className="bg-white border border-slate-200 rounded-2xl shadow-sm">
+                <NotesSection conversationId={selectedConvId} canDelete={canDeleteNotes} />
               </div>
 
               {/* Etiquetas */}

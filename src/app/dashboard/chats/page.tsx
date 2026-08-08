@@ -3,11 +3,14 @@ import Loading from '@/components/Loading'
 
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { getConversaciones, getMensajes, toggleIAPausa, cerrarConversacion, reabrirConversacion } from '@/app/actions/chats'
+import { getConversaciones, getMensajes, toggleIAPausa, cerrarConversacion, reabrirConversacion, getContextoChat } from '@/app/actions/chats'
 import { enviarMensajeAgenteConv } from '@/app/actions/conversaciones'
 import { getMisPermisos } from '@/app/actions/permisos'
-import { reabrirCaso } from '@/app/actions/casos'
+import { reabrirCaso, getAgentesParaCasos, crearCasoDesdeConversacion } from '@/app/actions/casos'
+import { getLogsAuditoria } from '@/app/actions/audit-log'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
+import { HelpPopover } from '@/components/ui/HelpPopover'
+import Link from 'next/link'
 
 function ChatsContent() {
   const router = useRouter()
@@ -21,6 +24,13 @@ function ChatsContent() {
   const [busqueda, setBusqueda] = useState('')
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
   
+  // Contexto adicional
+  const [contexto, setContexto] = useState<any>(null)
+  const [logs, setLogs] = useState<any[]>([])
+  const [agentes, setAgentes] = useState<any[]>([])
+  const [hasLogPerm, setHasLogPerm] = useState(false)
+  const [loadingContext, setLoadingContext] = useState(false)
+  
   const [loadingChats, setLoadingChats] = useState(true)
   const [loadingMsgs, setLoadingMsgs] = useState(false)
   const [mensajeGlobal, setMensajeGlobal] = useState<{tipo: string, texto: string} | null>(null)
@@ -31,8 +41,35 @@ function ChatsContent() {
   const [procesando, setProcesando] = useState(false)
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
-    action: 'reabrir_caso' | 'reabrir_conv' | null;
+    action: 'reabrir_caso' | 'reabrir_conv' | 'asignar_mi' | 'asignar_otro' | 'cola' | null;
+    targetAgenteId?: string;
   }>({ isOpen: false, action: null })
+  
+  const [agentSearch, setAgentSearch] = useState('')
+  const [showAgentDropdown, setShowAgentDropdown] = useState(false)
+  const agentDropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    // Check logs perm (from audit-log) or just use getMisPermisos data if needed.
+    // For now we do a simple check.
+    const checkLogs = async () => {
+      const perms = await getMisPermisos()
+      if (perms.success && perms.data) {
+        const isAdmin = perms.data.role === 'admin' || perms.data.role === 'owner'
+        const hasAudit = perms.data.permissions.includes('view_audit_log')
+        setHasLogPerm(isAdmin || hasAudit)
+      }
+    }
+    checkLogs()
+    
+    function handleClickOutside(event: MouseEvent) {
+      if (agentDropdownRef.current && !agentDropdownRef.current.contains(event.target as Node)) {
+        setShowAgentDropdown(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -78,8 +115,36 @@ function ChatsContent() {
   useEffect(() => {
     if (selectedConvId) {
       cargarMensajes(selectedConvId)
+      cargarContexto(selectedConvId)
+    } else {
+      setContexto(null)
+      setLogs([])
     }
   }, [selectedConvId])
+
+  const cargarContexto = async (id: string) => {
+    setLoadingContext(true)
+    try {
+      const [ctxRes, agRes, logRes] = await Promise.all([
+        getContextoChat(id),
+        getAgentesParaCasos(),
+        hasLogPerm ? getLogsAuditoria('conversations', id) : Promise.resolve({ success: true, data: [] })
+      ])
+      
+      if (ctxRes.success && ctxRes.data) {
+        setContexto(ctxRes.data)
+      }
+      if (agRes.success && agRes.data) {
+        setAgentes(agRes.data)
+      }
+      if (logRes.success && logRes.data) {
+        setLogs(logRes.data)
+      }
+    } catch (error) {
+      console.error(error)
+    }
+    setLoadingContext(false)
+  }
 
   const cargarMensajes = async (id: string) => {
     setLoadingMsgs(true)
@@ -140,6 +205,23 @@ function ChatsContent() {
           }))
           success = true
         }
+      }
+    } else if (modalState.action === 'asignar_mi' || modalState.action === 'asignar_otro' || modalState.action === 'cola') {
+      let targetAgenteId = null
+      if (modalState.action === 'asignar_mi') {
+        const perms = await getMisPermisos()
+        targetAgenteId = perms.data?.userId
+      }
+      if (modalState.action === 'asignar_otro' && modalState.targetAgenteId) {
+        targetAgenteId = modalState.targetAgenteId
+      }
+      const res = await crearCasoDesdeConversacion(selectedConvId, targetAgenteId)
+      if (res.success) {
+        // Refresh context
+        cargarContexto(selectedConvId)
+        success = true
+      } else {
+        alert(res.error || 'Error al generar el caso')
       }
     }
 
@@ -214,7 +296,7 @@ function ChatsContent() {
   return (
     <div className="h-screen flex lg:flex-row overflow-hidden bg-white">
       {/* PANEL IZQUIERDO */}
-      <section className={`flex flex-col w-full lg:w-96 lg:shrink-0 border-r border-slate-200 bg-white h-full ${selectedConvId ? 'hidden lg:flex' : 'flex'}`}>
+      <section className={`flex flex-col w-full lg:w-[320px] xl:w-96 lg:shrink-0 border-r border-slate-200 bg-white h-full ${selectedConvId ? 'hidden lg:flex' : 'flex'}`}>
         <div className="px-4 h-20 flex items-center gap-3 border-b border-slate-200 shrink-0">
           <h1 className="font-display font-700 text-xl text-ink-900">Chats</h1>
           <span className="text-xs font-600 px-2 py-0.5 rounded-md bg-brand-100 text-brand-700">
@@ -451,6 +533,197 @@ function ChatsContent() {
           </>
         )}
       </section>
+
+      {/* PANEL DERECHO: CONTEXTO */}
+      {selectedConvId && (
+        <section className="hidden xl:flex flex-col w-80 shrink-0 border-l border-slate-200 bg-slate-50 h-full overflow-y-auto">
+          {loadingContext ? (
+            <div className="p-6 text-center text-sm text-slate-500">Cargando contexto...</div>
+          ) : contexto ? (
+            <div className="p-5 flex flex-col gap-6">
+              
+              {/* Información del Cliente */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                <h3 className="font-semibold text-ink-900 mb-3 pb-2 border-b border-slate-100 flex justify-between items-center">
+                  Cliente
+                  <Link href={`/dashboard/conversaciones/${selectedConvId}`} className="text-brand-600 hover:text-brand-700 text-xs font-semibold">
+                    Ver ficha
+                  </Link>
+                </h3>
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-[11px] text-slate-500 font-medium mb-0.5 uppercase tracking-wider">Nombre</p>
+                    <p className="font-semibold text-ink-900 text-sm">{contexto.contacts?.nombre || 'Desconocido'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-slate-500 font-medium mb-0.5 uppercase tracking-wider">Canal</p>
+                    <p className="font-semibold capitalize text-sm">{contexto.contacts?.canal}</p>
+                    <p className="text-xs text-slate-600 mt-0.5">{contexto.contacts?.identificador_canal}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Etiquetas */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                <h3 className="font-semibold text-ink-900 mb-3 pb-2 border-b border-slate-100">Etiquetas aplicadas</h3>
+                {contexto.etiquetas && contexto.etiquetas.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {contexto.etiquetas.map((t: any) => (
+                      <span 
+                        key={t.id} 
+                        className="px-2.5 py-1 text-xs font-medium rounded-md border"
+                        style={{
+                          backgroundColor: `${t.color}15`,
+                          color: t.color,
+                          borderColor: `${t.color}30`
+                        }}
+                      >
+                        {t.nombre}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-500">Ninguna etiqueta aplicada.</p>
+                )}
+              </div>
+
+              {/* Caso / Acciones */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                <h3 className="font-semibold text-ink-900 mb-3 pb-2 border-b border-slate-100 flex justify-between items-center">
+                  Caso asociado
+                  {contexto.caso_asociado?.id && (
+                    <Link href={`/dashboard/casos/${contexto.caso_asociado.id}`} className="text-brand-600 hover:text-brand-700 text-xs font-semibold">
+                      Abrir caso
+                    </Link>
+                  )}
+                </h3>
+                
+                {contexto.caso_asociado ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-slate-500">Estado</span>
+                      <span className={`px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wider ${
+                        contexto.caso_asociado.estatus === 'pendiente' ? 'bg-amber-100 text-amber-700' :
+                        contexto.caso_asociado.estatus === 'atendiendo' ? 'bg-brand-100 text-brand-700' :
+                        'bg-slate-100 text-slate-700'
+                      }`}>
+                        {contexto.caso_asociado.estatus}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-slate-500">Prioridad</span>
+                      <span className="text-xs font-semibold capitalize">{contexto.caso_asociado.prioridad}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-slate-500">Agente</span>
+                      <span className="text-xs font-semibold truncate max-w-[120px]">{contexto.caso_asociado.agente?.nombre || 'Ninguno'}</span>
+                    </div>
+                    
+                    {contexto.caso_asociado.estatus !== 'resuelto' && contexto.caso_asociado.estatus !== 'cerrado' ? (
+                      <div className="pt-2 mt-2 border-t border-slate-100 flex flex-col gap-2">
+                        {nivelPermiso === 'escritura' && contexto.caso_asociado.agente?.id !== (contexto as any).current_user_id && (
+                          <button onClick={() => setModalState({ isOpen: true, action: 'asignar_mi' })} className="w-full py-1.5 text-xs font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 rounded-lg transition">
+                            Asignarme el caso
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="pt-2 mt-2 border-t border-slate-100">
+                        <button onClick={() => setModalState({ isOpen: true, action: 'reabrir_caso' })} disabled={nivelPermiso !== 'escritura'} className="w-full py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition disabled:opacity-50">
+                          Reabrir caso
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-sm text-slate-500 mb-1">Esta conversación no tiene un caso de soporte activo.</p>
+                    {nivelPermiso === 'escritura' && (
+                      <>
+                        <button onClick={() => setModalState({ isOpen: true, action: 'asignar_mi' })} className="w-full py-2 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition">
+                          Crear caso y asignarme
+                        </button>
+                        <div className="relative" ref={agentDropdownRef}>
+                          <button onClick={() => setShowAgentDropdown(!showAgentDropdown)} className="w-full py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition">
+                            Asignar a otro agente...
+                          </button>
+                          {showAgentDropdown && (
+                            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-20 py-2">
+                              <div className="px-2 pb-2 mb-2 border-b border-slate-100">
+                                <input 
+                                  type="text" 
+                                  value={agentSearch}
+                                  onChange={e => setAgentSearch(e.target.value)}
+                                  placeholder="Buscar agente..." 
+                                  className="w-full text-xs px-2 py-1.5 bg-slate-50 border border-slate-200 rounded outline-none focus:border-brand-500"
+                                />
+                              </div>
+                              <div className="max-h-40 overflow-y-auto">
+                                {agentes.filter(a => (a.nombre || a.email).toLowerCase().includes(agentSearch.toLowerCase())).map(a => (
+                                  <button 
+                                    key={a.id}
+                                    onClick={() => {
+                                      setModalState({ isOpen: true, action: 'asignar_otro', targetAgenteId: a.id })
+                                      setShowAgentDropdown(false)
+                                    }}
+                                    className="w-full text-left px-3 py-1.5 text-xs hover:bg-slate-50 truncate"
+                                  >
+                                    <div className="font-semibold">{a.nombre || 'Sin nombre'}</div>
+                                    <div className="text-[10px] text-slate-500">{a.email}</div>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Registro de actividad */}
+              {hasLogPerm && (
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                  <h3 className="font-semibold text-ink-900 mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+                    Actividad
+                    <HelpPopover content="Registro interno de acciones para trazabilidad. Solo visible para admins o usuarios con permisos de auditoría." />
+                  </h3>
+                  <div className="space-y-4">
+                    {logs.length > 0 ? logs.map((log: any) => {
+                      const esCaso = log.tabla_afectada === 'cases'
+                      return (
+                        <div key={log.id} className="flex gap-3">
+                          <div className="w-1.5 rounded-full shrink-0 bg-slate-200 mt-1.5 mb-1"></div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <p className="text-xs font-semibold text-ink-900 truncate">
+                                {log.users?.nombre || 'Sistema'}
+                              </p>
+                              {esCaso && (
+                                <span className="text-[9px] font-bold tracking-wider uppercase px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded-sm">Caso</span>
+                              )}
+                            </div>
+                            <p className="text-sm text-slate-600 leading-snug">
+                              {log.accion}
+                            </p>
+                            <p className="text-[10px] text-slate-400 mt-1">
+                              {new Date(log.timestamp).toLocaleDateString()} a las {new Date(log.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                            </p>
+                          </div>
+                        </div>
+                      )
+                    }) : (
+                      <p className="text-sm text-slate-500">No hay actividad reciente registrada.</p>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+            </div>
+          ) : null}
+        </section>
+      )}
 
       <ConfirmModal
         isOpen={modalState.isOpen}

@@ -215,3 +215,62 @@ export async function reabrirConversacion(conversationId: string) {
   if (error) return { success: false, error: error.message }
   return { success: true, data }
 }
+
+export async function getContextoChat(conversationId: string) {
+  const supabase = await createClient()
+  const auth = await getAuthData(supabase)
+  
+  if (auth.error) {
+    return { success: false, error: auth.error }
+  }
+
+  const { data, error } = await supabase
+    .from('conversations')
+    .select(`
+      id,
+      estado,
+      canal,
+      ia_pausada,
+      contacts (
+        id,
+        nombre,
+        canal,
+        identificador_canal
+      ),
+      conversation_tags (
+        message_categories (
+          id,
+          nombre,
+          color
+        )
+      ),
+      cases (
+        id,
+        estatus,
+        prioridad,
+        fecha_creacion,
+        users (
+          id,
+          nombre,
+          avatar_url
+        )
+      )
+    `)
+    .eq('id', conversationId)
+    .eq('tenant_id', auth.tenant_id)
+    .single()
+
+  if (error) return { success: false, error: error.message }
+  
+  // Format the output specifically for the frontend
+  const contexto = {
+    ...data,
+    etiquetas: data.conversation_tags?.map((t: any) => t.message_categories) || [],
+    caso_asociado: data.cases && data.cases.length > 0 ? {
+      ...data.cases[0],
+      agente: data.cases[0].users
+    } : null
+  }
+  
+  return { success: true, data: contexto }
+}

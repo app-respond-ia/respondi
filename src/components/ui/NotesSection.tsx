@@ -157,7 +157,7 @@ export function NotesSection({ conversationId, canDelete }: NotesSectionProps) {
                   {formatTimeRelativo(nota.created_at)}
                 </span>
               </div>
-              <p className="text-sm text-amber-900/80 whitespace-pre-wrap">{nota.contenido}</p>
+              <p className="text-sm text-amber-900/80 whitespace-pre-wrap break-words">{nota.contenido}</p>
               
               {canDelete && (
                 <button

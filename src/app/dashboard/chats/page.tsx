@@ -374,9 +374,9 @@ function ChatsContent() {
   }
 
   return (
-    <div className="flex-1 -mx-4 sm:-mx-6 lg:-mx-8 -my-6 flex lg:flex-row overflow-hidden bg-white border-t border-slate-200">
+    <div className="flex-1 -mx-4 sm:-mx-6 lg:-mx-8 -my-6 flex flex-col lg:flex-row lg:overflow-hidden bg-white border-t border-slate-200">
       {/* PANEL IZQUIERDO */}
-      <section className={`flex flex-col w-full lg:w-[320px] xl:w-96 lg:shrink-0 border-r border-slate-200 bg-white h-full ${selectedConvId ? 'hidden lg:flex' : 'flex'}`}>
+      <section className={`flex flex-col w-full lg:w-[320px] xl:w-96 lg:shrink-0 border-r border-slate-200 bg-white lg:h-full ${selectedConvId ? 'hidden lg:flex' : 'flex'}`}>
         <div className="px-4 h-20 flex items-center gap-3 border-b border-slate-200 shrink-0">
           <h1 className="font-display font-700 text-xl text-ink-900">Chats</h1>
           <span className="text-xs font-600 px-2 py-0.5 rounded-md bg-brand-100 text-brand-700">
@@ -608,7 +608,7 @@ function ChatsContent() {
       </section>
 
       {/* PANEL DERECHO */}
-      <section className={`flex flex-col flex-1 min-w-0 bg-slate-50 h-full ${!selectedConvId ? 'hidden lg:flex items-center justify-center' : 'flex'}`}>
+      <section className={`flex flex-col flex-1 min-w-0 bg-slate-50 lg:h-full ${!selectedConvId ? 'hidden lg:flex items-center justify-center' : 'flex'}`}>
         {!selectedConvId ? (
           <div className="text-center text-ink-500">Selecciona una conversación para ver el hilo</div>
         ) : (
@@ -731,7 +731,7 @@ function ChatsContent() {
 
       {/* PANEL DERECHO: CONTEXTO */}
       {selectedConvId && (
-        <section className="hidden xl:flex flex-col w-80 shrink-0 border-l border-slate-200 bg-slate-50 h-full overflow-y-auto">
+        <section className="hidden xl:flex flex-col w-80 shrink-0 border-l border-slate-200 bg-slate-50 lg:h-full overflow-y-auto">
           {loadingContext ? (
             <div className="p-6 text-center text-sm text-slate-500">Cargando contexto...</div>
           ) : contexto ? (

@@ -71,14 +71,15 @@ function ChatsContent() {
   const [agentSearch, setAgentSearch] = useState('')
   const [showAgentDropdown, setShowAgentDropdown] = useState(false)
   const [canDeleteNotes, setCanDeleteNotes] = useState(false)
+  const [showMobileContext, setShowMobileContext] = useState(false)
   const agentDropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const checkLogs = async () => {
       const perms = await getMisPermisos()
       if (perms.success && perms.data) {
-        const isAdmin = perms.data.role === 'admin' || perms.data.role === 'owner'
-        const hasAudit = perms.data.permissions.includes('view_audit_log')
+        const isAdmin = perms.esAdmin
+        const hasAudit = Array.isArray(perms.data) ? perms.data.some((p: any) => p.seccion === 'audit_log' && p.nivel !== 'ninguno') : false
         setHasLogPerm(isAdmin || hasAudit)
       }
     }
@@ -373,6 +374,206 @@ function ChatsContent() {
     )
   }
 
+
+  const renderContextContent = () => (
+    <div className="p-5 flex flex-col gap-6">
+              
+              {/* Información del Cliente */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                <h3 className="font-semibold text-ink-900 mb-3 pb-2 border-b border-slate-100 flex justify-between items-center">
+                  Cliente
+                  <Link href={`/dashboard/conversaciones/${selectedConvId}`} className="text-brand-600 hover:text-brand-700 text-xs font-semibold">
+                    Ver conversación
+                  </Link>
+                </h3>
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-[11px] text-slate-500 font-medium mb-0.5 uppercase tracking-wider">Nombre</p>
+                    <p className="font-semibold text-ink-900 text-sm">{contexto.contacts?.nombre || 'Desconocido'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-slate-500 font-medium mb-0.5 uppercase tracking-wider">Canal</p>
+                    <p className="font-semibold capitalize text-sm">{contexto.contacts?.canal}</p>
+                    <p className="text-xs text-slate-600 mt-0.5">{contexto.contacts?.identificador_canal}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Notas Internas */}
+              <div className="bg-white border border-slate-200 rounded-2xl shadow-sm">
+                <NotesSection conversationId={selectedConvId!} canDelete={canDeleteNotes} />
+              </div>
+
+              {/* Etiquetas */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                <h3 className="font-semibold text-ink-900 mb-3 pb-2 border-b border-slate-100">Etiquetas aplicadas</h3>
+                {contexto.etiquetas && contexto.etiquetas.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {contexto.etiquetas.map((t: any) => (
+                      <span 
+                        key={t.id} 
+                        className="px-2.5 py-1 text-xs font-medium rounded-md border"
+                        style={{
+                          backgroundColor: `${t.color}15`,
+                          color: t.color,
+                          borderColor: `${t.color}30`
+                        }}
+                      >
+                        {t.nombre}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-500">Ninguna etiqueta aplicada.</p>
+                )}
+              </div>
+
+              {/* Caso / Acciones */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                <h3 className="font-semibold text-ink-900 mb-3 pb-2 border-b border-slate-100 flex justify-between items-center">
+                  Caso asociado
+                  {contexto.caso_asociado?.id && (
+                    <Link href={`/dashboard/casos/${contexto.caso_asociado.id}`} className="text-brand-600 hover:text-brand-700 text-xs font-semibold">
+                      Abrir caso
+                    </Link>
+                  )}
+                </h3>
+                
+                {contexto.caso_asociado ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-slate-500">Estado</span>
+                      <span className={`px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wider ${
+                        contexto.caso_asociado.estatus === 'pendiente' ? 'bg-amber-100 text-amber-700' :
+                        contexto.caso_asociado.estatus === 'atendiendo' ? 'bg-brand-100 text-brand-700' :
+                        'bg-slate-100 text-slate-700'
+                      }`}>
+                        {contexto.caso_asociado.estatus}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-slate-500">Prioridad</span>
+                      <span className="text-xs font-semibold capitalize">{contexto.caso_asociado.prioridad}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-slate-500">Agente</span>
+                      <span className="text-xs font-semibold truncate max-w-[120px]">{contexto.caso_asociado.agente?.nombre || 'Ninguno'}</span>
+                    </div>
+                    
+                    {contexto.caso_asociado.estatus !== 'resuelto' && contexto.caso_asociado.estatus !== 'cerrado' ? (
+                      <div className="pt-2 mt-2 border-t border-slate-100 flex flex-col gap-2">
+                        {nivelPermiso === 'escritura' && contexto.caso_asociado.agente?.id !== (contexto as any).current_user_id && (
+                          <button onClick={() => setModalState({ isOpen: true, action: 'asignar_mi_existente' })} className="w-full py-1.5 text-xs font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 rounded-lg transition">
+                            Asignarme el caso
+                          </button>
+                        )}
+                        {nivelPermiso === 'escritura' && contexto.caso_asociado.agente?.id && (
+                          <button onClick={() => setModalState({ isOpen: true, action: 'soltar_existente' })} className="w-full py-1.5 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition">
+                            Soltar caso
+                          </button>
+                        )}
+                        {nivelPermiso === 'escritura' && (
+                          <div className="relative mt-1" ref={agentDropdownRef}>
+                            <p className="text-[10px] text-slate-500 font-medium mb-1.5">Transferir a...</p>
+                            <button onClick={() => setShowAgentDropdown(!showAgentDropdown)} className="w-full h-8 px-2 border border-slate-200 rounded-lg bg-slate-50 text-xs text-left flex items-center justify-between focus:outline-none focus:border-brand-500 transition-shadow">
+                              <span className="text-slate-500">Selecciona un agente...</span>
+                              <svg className="w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/></svg>
+                            </button>
+                            {showAgentDropdown && (
+                              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 py-2">
+                                <div className="px-2 pb-2 mb-2 border-b border-slate-100">
+                                  <input 
+                                    type="text" 
+                                    value={agentSearch}
+                                    onChange={e => setAgentSearch(e.target.value)}
+                                    placeholder="Buscar agente..." 
+                                    className="w-full text-xs px-2 py-1.5 bg-slate-50 border border-slate-200 rounded outline-none focus:border-brand-500"
+                                  />
+                                </div>
+                                <div className="max-h-40 overflow-y-auto">
+                                  {agentes.filter(a => (a.nombre || a.email).toLowerCase().includes(agentSearch.toLowerCase())).map(a => (
+                                    <button 
+                                      key={a.id}
+                                      onClick={() => {
+                                        setModalState({ isOpen: true, action: 'asignar_otro_existente', targetAgenteId: a.id })
+                                        setShowAgentDropdown(false)
+                                      }}
+                                      className="w-full text-left px-3 py-1.5 text-xs hover:bg-slate-50 truncate"
+                                    >
+                                      <div className="font-semibold">{a.nombre || 'Sin nombre'}</div>
+                                      <div className="text-[10px] text-slate-500">{a.email}</div>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="pt-2 mt-2 border-t border-slate-100">
+                        <button onClick={() => setModalState({ isOpen: true, action: 'reabrir_caso' })} disabled={nivelPermiso !== 'escritura'} className="w-full py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition disabled:opacity-50">
+                          Reabrir caso
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-sm text-slate-500 mb-1">Esta conversación no tiene un caso de soporte activo.</p>
+                    {nivelPermiso === 'escritura' && (
+                      <>
+                        <button onClick={() => setModalState({ isOpen: true, action: 'asignar_mi' })} className="w-full py-2 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition">
+                          Crear caso y asignarme
+                        </button>
+                        <div className="relative" ref={agentDropdownRef}>
+                          <button onClick={() => setShowAgentDropdown(!showAgentDropdown)} className="w-full py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition">
+                            Asignar a otro agente...
+                          </button>
+                          {showAgentDropdown && (
+                            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-20 py-2">
+                              <div className="px-2 pb-2 mb-2 border-b border-slate-100">
+                                <input 
+                                  type="text" 
+                                  value={agentSearch}
+                                  onChange={e => setAgentSearch(e.target.value)}
+                                  placeholder="Buscar agente..." 
+                                  className="w-full text-xs px-2 py-1.5 bg-slate-50 border border-slate-200 rounded outline-none focus:border-brand-500"
+                                />
+                              </div>
+                              <div className="max-h-40 overflow-y-auto">
+                                {agentes.filter(a => (a.nombre || a.email).toLowerCase().includes(agentSearch.toLowerCase())).map(a => (
+                                  <button 
+                                    key={a.id}
+                                    onClick={() => {
+                                      setModalState({ isOpen: true, action: 'asignar_otro', targetAgenteId: a.id })
+                                      setShowAgentDropdown(false)
+                                    }}
+                                    className="w-full text-left px-3 py-1.5 text-xs hover:bg-slate-50 truncate"
+                                  >
+                                    <div className="font-semibold">{a.nombre || 'Sin nombre'}</div>
+                                    <div className="text-[10px] text-slate-500">{a.email}</div>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+
+              {/* Registro de actividad */}
+              {hasLogPerm && (
+                <ActivityLog logs={logs} />
+              )}
+              
+            </div>
+  )
+
   return (
     <div className="flex-1 -mx-4 sm:-mx-6 lg:-mx-8 -my-6 flex flex-col lg:flex-row lg:overflow-hidden bg-white border-t border-slate-200">
       {/* PANEL IZQUIERDO */}
@@ -629,6 +830,11 @@ function ChatsContent() {
               </div>
               
               <div className="flex items-center gap-3 shrink-0">
+                <button onClick={() => setShowMobileContext(true)} className="xl:hidden p-2 -mr-1 rounded-lg text-ink-500 hover:bg-slate-100 transition" aria-label="Ver contexto">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </button>
                 {selectedConv?.estado === 'activa' && (
                   <>
                     {/* Toggle IA */}
@@ -735,202 +941,7 @@ function ChatsContent() {
           {loadingContext ? (
             <div className="p-6 text-center text-sm text-slate-500">Cargando contexto...</div>
           ) : contexto ? (
-            <div className="p-5 flex flex-col gap-6">
-              
-              {/* Información del Cliente */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-                <h3 className="font-semibold text-ink-900 mb-3 pb-2 border-b border-slate-100 flex justify-between items-center">
-                  Cliente
-                  <Link href={`/dashboard/conversaciones/${selectedConvId}`} className="text-brand-600 hover:text-brand-700 text-xs font-semibold">
-                    Ver conversación
-                  </Link>
-                </h3>
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-[11px] text-slate-500 font-medium mb-0.5 uppercase tracking-wider">Nombre</p>
-                    <p className="font-semibold text-ink-900 text-sm">{contexto.contacts?.nombre || 'Desconocido'}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] text-slate-500 font-medium mb-0.5 uppercase tracking-wider">Canal</p>
-                    <p className="font-semibold capitalize text-sm">{contexto.contacts?.canal}</p>
-                    <p className="text-xs text-slate-600 mt-0.5">{contexto.contacts?.identificador_canal}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Notas Internas */}
-              <div className="bg-white border border-slate-200 rounded-2xl shadow-sm">
-                <NotesSection conversationId={selectedConvId} canDelete={canDeleteNotes} />
-              </div>
-
-              {/* Etiquetas */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-                <h3 className="font-semibold text-ink-900 mb-3 pb-2 border-b border-slate-100">Etiquetas aplicadas</h3>
-                {contexto.etiquetas && contexto.etiquetas.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {contexto.etiquetas.map((t: any) => (
-                      <span 
-                        key={t.id} 
-                        className="px-2.5 py-1 text-xs font-medium rounded-md border"
-                        style={{
-                          backgroundColor: `${t.color}15`,
-                          color: t.color,
-                          borderColor: `${t.color}30`
-                        }}
-                      >
-                        {t.nombre}
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-slate-500">Ninguna etiqueta aplicada.</p>
-                )}
-              </div>
-
-              {/* Caso / Acciones */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-                <h3 className="font-semibold text-ink-900 mb-3 pb-2 border-b border-slate-100 flex justify-between items-center">
-                  Caso asociado
-                  {contexto.caso_asociado?.id && (
-                    <Link href={`/dashboard/casos/${contexto.caso_asociado.id}`} className="text-brand-600 hover:text-brand-700 text-xs font-semibold">
-                      Abrir caso
-                    </Link>
-                  )}
-                </h3>
-                
-                {contexto.caso_asociado ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-slate-500">Estado</span>
-                      <span className={`px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wider ${
-                        contexto.caso_asociado.estatus === 'pendiente' ? 'bg-amber-100 text-amber-700' :
-                        contexto.caso_asociado.estatus === 'atendiendo' ? 'bg-brand-100 text-brand-700' :
-                        'bg-slate-100 text-slate-700'
-                      }`}>
-                        {contexto.caso_asociado.estatus}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-slate-500">Prioridad</span>
-                      <span className="text-xs font-semibold capitalize">{contexto.caso_asociado.prioridad}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-slate-500">Agente</span>
-                      <span className="text-xs font-semibold truncate max-w-[120px]">{contexto.caso_asociado.agente?.nombre || 'Ninguno'}</span>
-                    </div>
-                    
-                    {contexto.caso_asociado.estatus !== 'resuelto' && contexto.caso_asociado.estatus !== 'cerrado' ? (
-                      <div className="pt-2 mt-2 border-t border-slate-100 flex flex-col gap-2">
-                        {nivelPermiso === 'escritura' && contexto.caso_asociado.agente?.id !== (contexto as any).current_user_id && (
-                          <button onClick={() => setModalState({ isOpen: true, action: 'asignar_mi_existente' })} className="w-full py-1.5 text-xs font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 rounded-lg transition">
-                            Asignarme el caso
-                          </button>
-                        )}
-                        {nivelPermiso === 'escritura' && contexto.caso_asociado.agente?.id && (
-                          <button onClick={() => setModalState({ isOpen: true, action: 'soltar_existente' })} className="w-full py-1.5 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition">
-                            Soltar caso
-                          </button>
-                        )}
-                        {nivelPermiso === 'escritura' && (
-                          <div className="relative mt-1" ref={agentDropdownRef}>
-                            <p className="text-[10px] text-slate-500 font-medium mb-1.5">Transferir a...</p>
-                            <button onClick={() => setShowAgentDropdown(!showAgentDropdown)} className="w-full h-8 px-2 border border-slate-200 rounded-lg bg-slate-50 text-xs text-left flex items-center justify-between focus:outline-none focus:border-brand-500 transition-shadow">
-                              <span className="text-slate-500">Selecciona un agente...</span>
-                              <svg className="w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/></svg>
-                            </button>
-                            {showAgentDropdown && (
-                              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 py-2">
-                                <div className="px-2 pb-2 mb-2 border-b border-slate-100">
-                                  <input 
-                                    type="text" 
-                                    value={agentSearch}
-                                    onChange={e => setAgentSearch(e.target.value)}
-                                    placeholder="Buscar agente..." 
-                                    className="w-full text-xs px-2 py-1.5 bg-slate-50 border border-slate-200 rounded outline-none focus:border-brand-500"
-                                  />
-                                </div>
-                                <div className="max-h-40 overflow-y-auto">
-                                  {agentes.filter(a => (a.nombre || a.email).toLowerCase().includes(agentSearch.toLowerCase())).map(a => (
-                                    <button 
-                                      key={a.id}
-                                      onClick={() => {
-                                        setModalState({ isOpen: true, action: 'asignar_otro_existente', targetAgenteId: a.id })
-                                        setShowAgentDropdown(false)
-                                      }}
-                                      className="w-full text-left px-3 py-1.5 text-xs hover:bg-slate-50 truncate"
-                                    >
-                                      <div className="font-semibold">{a.nombre || 'Sin nombre'}</div>
-                                      <div className="text-[10px] text-slate-500">{a.email}</div>
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="pt-2 mt-2 border-t border-slate-100">
-                        <button onClick={() => setModalState({ isOpen: true, action: 'reabrir_caso' })} disabled={nivelPermiso !== 'escritura'} className="w-full py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition disabled:opacity-50">
-                          Reabrir caso
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-2">
-                    <p className="text-sm text-slate-500 mb-1">Esta conversación no tiene un caso de soporte activo.</p>
-                    {nivelPermiso === 'escritura' && (
-                      <>
-                        <button onClick={() => setModalState({ isOpen: true, action: 'asignar_mi' })} className="w-full py-2 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition">
-                          Crear caso y asignarme
-                        </button>
-                        <div className="relative" ref={agentDropdownRef}>
-                          <button onClick={() => setShowAgentDropdown(!showAgentDropdown)} className="w-full py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition">
-                            Asignar a otro agente...
-                          </button>
-                          {showAgentDropdown && (
-                            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-20 py-2">
-                              <div className="px-2 pb-2 mb-2 border-b border-slate-100">
-                                <input 
-                                  type="text" 
-                                  value={agentSearch}
-                                  onChange={e => setAgentSearch(e.target.value)}
-                                  placeholder="Buscar agente..." 
-                                  className="w-full text-xs px-2 py-1.5 bg-slate-50 border border-slate-200 rounded outline-none focus:border-brand-500"
-                                />
-                              </div>
-                              <div className="max-h-40 overflow-y-auto">
-                                {agentes.filter(a => (a.nombre || a.email).toLowerCase().includes(agentSearch.toLowerCase())).map(a => (
-                                  <button 
-                                    key={a.id}
-                                    onClick={() => {
-                                      setModalState({ isOpen: true, action: 'asignar_otro', targetAgenteId: a.id })
-                                      setShowAgentDropdown(false)
-                                    }}
-                                    className="w-full text-left px-3 py-1.5 text-xs hover:bg-slate-50 truncate"
-                                  >
-                                    <div className="font-semibold">{a.nombre || 'Sin nombre'}</div>
-                                    <div className="text-[10px] text-slate-500">{a.email}</div>
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-
-
-              {/* Registro de actividad */}
-              {hasLogPerm && (
-                <ActivityLog logs={logs} />
-              )}
-              
-            </div>
+            renderContextContent()
           ) : null}
         </section>
       )}
@@ -966,9 +977,28 @@ function ChatsContent() {
         type="info"
         isLoading={procesando}
       />
+
+      {/* Drawer Contexto Móvil */}
+      {showMobileContext && (
+        <div className="fixed inset-0 z-50 flex justify-end xl:hidden">
+          <div className="absolute inset-0 bg-ink-900/50 transition-opacity" onClick={() => setShowMobileContext(false)}></div>
+          <div className="relative w-80 max-w-[85vw] bg-slate-50 h-full flex flex-col overflow-y-auto animate-slide-left shadow-2xl">
+            <div className="px-4 h-14 border-b border-slate-200 bg-white flex justify-between items-center sticky top-0 z-10 shrink-0">
+              <h2 className="font-semibold text-ink-900">Contexto</h2>
+              <button onClick={() => setShowMobileContext(false)} className="p-2 -mr-2 text-ink-500 hover:bg-slate-100 rounded-lg transition">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {renderContextContent()}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
+
 
 export default function ChatsPage() {
   return (

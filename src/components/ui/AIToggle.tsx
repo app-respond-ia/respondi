@@ -24,12 +24,15 @@ export function AIToggle({ isPaused, onToggleConfirm, disabled }: AIToggleProps)
 
   return (
     <div className="flex items-center gap-2">
-      <div className="hidden sm:block text-right">
+      <div className="text-right">
         <div className="flex items-center gap-1.5 justify-end">
-          <p className="text-xs font-600 text-ink-900 leading-tight">
-            {isPaused ? 'IA en pausa' : 'IA activa'}
+          <p className="text-[11px] sm:text-xs font-600 text-ink-900 leading-tight">
+            <span className="sm:hidden">{isPaused ? 'Pausada' : 'Activa'}</span>
+            <span className="hidden sm:inline">{isPaused ? 'IA en pausa' : 'IA activa'}</span>
           </p>
-          <HelpPopover content="Indica si la IA responde automáticamente al cliente (Activa) o si está silenciada para que un humano intervenga manualmente (Pausada)." />
+          <div className="hidden sm:block">
+            <HelpPopover content="Indica si la IA responde automáticamente al cliente (Activa) o si está silenciada para que un humano intervenga manualmente (Pausada)." />
+          </div>
         </div>
       </div>
       <button 

@@ -663,11 +663,11 @@ function ChatsContent() {
                             <span className="text-[11px] text-slate-700 font-medium italic">Sin asignar</span>
                           </label>
                           {agentes.filter(a => (a.nombre || a.email).toLowerCase().includes(agentFilterSearch.toLowerCase())).map(a => (
-                            <label key={a.id} className="flex items-center gap-2 p-1.5 hover:bg-slate-50 rounded cursor-pointer">
+                            <label key={a.id} className="flex items-center gap-2 p-1.5 hover:bg-slate-50 rounded cursor-pointer min-w-0">
                               <input type="checkbox" checked={agentesIds.includes(a.id)} onChange={() => {
                                 if (agentesIds.includes(a.id)) setAgentesIds(prev => prev.filter(id => id !== a.id))
                                 else setAgentesIds(prev => [...prev, a.id])
-                              }} className="rounded text-brand-600 focus:ring-brand-500 w-3 h-3" />
+                              }} className="rounded text-brand-600 focus:ring-brand-500 w-3 h-3 shrink-0" />
                               <span className="text-[11px] text-slate-700 truncate">{a.nombre || a.email}</span>
                             </label>
                           ))}
@@ -699,9 +699,9 @@ function ChatsContent() {
 
                     <div>
                       <span className="block text-xs font-semibold text-slate-700 mb-1.5">Fecha (último mensaje)</span>
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-1.5">
                         <input type="date" value={dateRange.from} onChange={e => setDateRange({...dateRange, from: e.target.value})} className="flex-1 w-full px-2 py-1 rounded text-[11px] border border-slate-200 outline-none text-slate-700 bg-slate-50" />
-                        <span className="text-slate-400 text-xs">-</span>
+                        <span className="text-slate-400 text-xs hidden sm:block">-</span>
                         <input type="date" value={dateRange.to} onChange={e => setDateRange({...dateRange, to: e.target.value})} className="flex-1 w-full px-2 py-1 rounded text-[11px] border border-slate-200 outline-none text-slate-700 bg-slate-50" />
                       </div>
                     </div>

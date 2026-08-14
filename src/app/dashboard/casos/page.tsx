@@ -221,7 +221,7 @@ export default function CasosPage() {
               </button>
 
               {showFilters && (
-                <div className="absolute top-full right-0 mt-2 w-[calc(100vw-2rem)] max-w-[320px] sm:w-96 sm:max-w-none bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden flex flex-col max-h-[80vh] overflow-y-auto origin-top-right">
+                <div className="absolute top-full right-0 mt-2 w-[calc(100vw-2rem)] max-w-[300px] sm:w-96 sm:max-w-none bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden flex flex-col max-h-[80vh] overflow-y-auto origin-top-right">
                   <div className="p-6 flex flex-col gap-6">
                     
                     <div>
@@ -254,12 +254,12 @@ export default function CasosPage() {
                             <span className="text-xs text-slate-700">Sin asignar</span>
                           </label>
                           {filteredAgentes.map(ag => (
-                            <label key={ag.id} className="flex items-center gap-2 p-1.5 hover:bg-slate-50 rounded-md cursor-pointer">
+                            <label key={ag.id} className="flex items-center gap-2 p-1.5 hover:bg-slate-50 rounded-md cursor-pointer min-w-0">
                               <input type="checkbox" checked={agentesFilter.includes(ag.id)} onChange={() => {
                                 if (agentesFilter.includes(ag.id)) setAgentesFilter(agentesFilter.filter(id => id !== ag.id))
                                 else setAgentesFilter([...agentesFilter, ag.id])
-                              }} className="rounded border-slate-300 text-brand-600 focus:ring-brand-500" />
-                              <span className="text-xs text-slate-700">{ag.nombre || ag.email}</span>
+                              }} className="rounded border-slate-300 text-brand-600 focus:ring-brand-500 shrink-0" />
+                              <span className="text-xs text-slate-700 truncate">{ag.nombre || ag.email}</span>
                             </label>
                           ))}
                         </div>
@@ -268,9 +268,9 @@ export default function CasosPage() {
 
                     <div>
                       <span className="block text-sm font-semibold text-slate-700 mb-2">Fecha</span>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                         <input type="date" value={dateRange.from} onChange={e => setDateRange({...dateRange, from: e.target.value})} className="flex-1 w-full px-2 py-1.5 rounded-lg text-sm border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-slate-700 bg-white" />
-                        <span className="text-slate-400">-</span>
+                        <span className="text-slate-400 hidden sm:block">-</span>
                         <input type="date" value={dateRange.to} onChange={e => setDateRange({...dateRange, to: e.target.value})} className="flex-1 w-full px-2 py-1.5 rounded-lg text-sm border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none text-slate-700 bg-white" />
                       </div>
                     </div>

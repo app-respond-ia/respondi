@@ -611,7 +611,7 @@ function ChatsContent() {
               </button>
               
               {showFilters && (
-                <div className="absolute top-full left-0 md:left-auto md:right-0 mt-2 w-[300px] bg-white rounded-xl shadow-xl border border-slate-200 z-50 flex flex-col max-h-[70vh] overflow-hidden">
+                <div className="absolute top-full right-0 mt-2 w-[calc(100vw-2rem)] max-w-[300px] sm:w-[300px] sm:max-w-none bg-white rounded-xl shadow-xl border border-slate-200 z-50 flex flex-col max-h-[70vh] overflow-hidden origin-top-right">
                   <div className="p-4 flex flex-col gap-4 overflow-y-auto">
                     
                     <div>

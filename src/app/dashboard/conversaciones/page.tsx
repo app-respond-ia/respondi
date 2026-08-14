@@ -174,7 +174,7 @@ export default function ConversacionesPage() {
               </button>
 
               {showFilters && (
-                <div className="absolute top-full right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden flex flex-col">
+                <div className="absolute top-full right-0 mt-2 w-[calc(100vw-2rem)] max-w-[320px] sm:w-96 sm:max-w-none bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden flex flex-col origin-top-right">
                   <div className="p-6 flex flex-col gap-6">
                     
                     <div>

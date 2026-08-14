@@ -12,7 +12,8 @@ const AVAILABLE_ICONS = [
   'campana', 'reloj', 'caja', 'estrella', 'calendario', 'informacion',
   'megafono', 'etiqueta', 'camion', 'candado', 'check', 'alerta', 
   'corazon', 'fuego', 'regalo', 'ubicacion', 'telefono', 'email', 
-  'rayo', 'usuario', 'billete'
+  'rayo', 'usuario', 'billete', 'bolsa', 'check-calendario', 'moneda',
+  'herramienta', 'chat', 'nube', 'sol', 'luna'
 ]
 
 const DIAS_SEMANA = [
@@ -578,7 +579,7 @@ export default function PerfilSucursalPage() {
         </section>
 
         {/* SECCIÓN: TIPOS DE NOVEDADES */}
-        <section id="tipos-novedad" className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8">
+        <section id="tipos-novedad" className="scroll-mt-32 bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8">
           <h2 className="text-xl font-bold text-ink-900 mb-6 border-b border-slate-100 pb-3">Tipos de Novedades</h2>
           <p className="text-sm text-ink-500 mb-5">Crea y gestiona las categorías de las novedades del día (ej. Ofertas, Horarios, Stock).</p>
           
@@ -660,9 +661,12 @@ export default function PerfilSucursalPage() {
 
                 <label className="block text-sm font-medium text-ink-700 mb-1.5">Color</label>
                 <div className="flex flex-wrap gap-2 mb-6">
-                  {['blue', 'amber', 'purple', 'pink', 'emerald', 'slate'].map(col => (
+                  {['blue', 'amber', 'purple', 'pink', 'emerald', 'slate', 'rose', 'orange', 'yellow', 'green', 'teal', 'cyan', 'sky', 'indigo', 'violet', 'fuchsia', 'red', 'lime'].map(col => (
                     <button key={col} type="button" onClick={() => setTipoFormData({...tipoFormData, color: col})}
-                      className={`w-8 h-8 rounded-full border-2 transition-all bg-${col}-500 ${tipoFormData.color === col ? 'border-ink-900 ring-2 ring-offset-2 ring-' + col + '-200' : 'border-transparent opacity-80 hover:opacity-100'}`} />
+                      className={`w-8 h-8 rounded-full border-2 transition-all ${tipoFormData.color === col ? 'border-brand-600 scale-110' : 'border-transparent hover:scale-110'}`}
+                      style={{ padding: '2px' }}>
+                      <div className={`w-full h-full rounded-full bg-${col}-500`}></div>
+                    </button>
                   ))}
                 </div>
 

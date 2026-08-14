@@ -123,7 +123,7 @@ export default function AuditLogPage() {
     if (t.includes('canal') || t.includes('channel')) return 'bg-emerald-100 text-emerald-700'
     if (t.includes('regla') || t.includes('rule')) return 'bg-indigo-100 text-indigo-700'
     if (t.includes('etiqueta') || t.includes('tag')) return 'bg-pink-100 text-pink-700'
-    if (t.includes('blacklist')) return 'bg-rose-100 text-rose-700'
+    if (t.includes('contacto')) return 'bg-rose-100 text-rose-700'
     if (t.includes('conver')) return 'bg-purple-100 text-purple-700'
     return 'bg-slate-100 text-slate-700'
   }
@@ -255,7 +255,7 @@ export default function AuditLogPage() {
           <option value="horarios">Horarios</option>
           <option value="perfil">Perfil</option>
           <option value="novedades">Novedades</option>
-          <option value="blacklist">Blacklist</option>
+          <option value="contactos">Contactos</option>
           <option value="conversations">Conversaciones / Chats</option>
           <option value="sucursales">Sucursales</option>
         </select>

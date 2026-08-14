@@ -4,16 +4,17 @@ import { createClient } from '@/utils/supabase/server'
 import { resolveBranchId } from '@/lib/active-branch'
 import { registrarAuditoria } from '@/lib/auditoria'
 
-export interface BlacklistConfigData {
-  blacklist_modo: 'ignorar' | 'respuesta_automatica' | 'derivar'
-  blacklist_respuesta_auto: string | null
+export interface ContactosConfigData {
+  trato_contactos_modo: 'ignorar' | 'respuesta_automatica' | 'derivar'
+  trato_contactos_respuesta_auto: string | null
 }
 
-export interface BloquearContactoData {
+export interface ActualizarTratoContactoData {
   canal: 'instagram' | 'whatsapp' | 'facebook'
   identificador_canal: string
   nombre: string | null
-  blacklist_razon: string
+  trato: 'normal' | 'sin_ia' | 'bloqueado'
+  nota: string
 }
 
 // Función auxiliar para obtener credenciales del usuario activo
@@ -37,14 +38,14 @@ async function getAuthData(supabase: any) {
   return { tenant_id: userData.tenant_id, branch_id: branchId, user_id: user.id }
 }
 
-export async function getBlacklistConfig() {
+export async function getContactosConfig() {
   const supabase = await createClient()
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   const { data, error } = await supabase
     .from('sucursales')
-    .select('blacklist_modo, blacklist_respuesta_auto')
+    .select('trato_contactos_modo, trato_contactos_respuesta_auto')
     .eq('id', auth.branch_id)
     .single()
 
@@ -52,25 +53,25 @@ export async function getBlacklistConfig() {
   return { success: true, data }
 }
 
-export async function actualizarBlacklistConfig(data: BlacklistConfigData) {
+export async function actualizarContactosConfig(data: ContactosConfigData) {
   const supabase = await createClient()
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   const { data: anterior } = await supabase
     .from('sucursales')
-    .select('blacklist_modo, blacklist_respuesta_auto')
+    .select('trato_contactos_modo, trato_contactos_respuesta_auto')
     .eq('id', auth.branch_id)
     .single()
 
   const { data: updatedData, error } = await supabase
     .from('sucursales')
     .update({
-      blacklist_modo: data.blacklist_modo,
-      blacklist_respuesta_auto: data.blacklist_respuesta_auto
+      trato_contactos_modo: data.trato_contactos_modo,
+      trato_contactos_respuesta_auto: data.trato_contactos_respuesta_auto
     })
     .eq('id', auth.branch_id)
-    .select('blacklist_modo, blacklist_respuesta_auto')
+    .select('trato_contactos_modo, trato_contactos_respuesta_auto')
     .single()
 
   if (error) return { success: false, error: error.message }
@@ -78,8 +79,8 @@ export async function actualizarBlacklistConfig(data: BlacklistConfigData) {
   await registrarAuditoria({
     tenant_id: auth.tenant_id,
     user_id: auth.user_id,
-    accion: 'actualizó la configuración de blacklist',
-    tabla_afectada: 'blacklist',
+    accion: 'actualizó la configuración de contactos',
+    tabla_afectada: 'contactos',
     registro_id: auth.branch_id,
     valor_anterior: anterior,
     valor_nuevo: updatedData
@@ -88,23 +89,25 @@ export async function actualizarBlacklistConfig(data: BlacklistConfigData) {
   return { success: true, data: updatedData }
 }
 
-export async function getContactosBloqueados() {
+export async function getContactos() {
   const supabase = await createClient()
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
+  // Obtenemos solo los contactos que tengan algún trato especial para no saturar la tabla
+  // Si se requiere ver todos, se podría quitar el .neq
   const { data, error } = await supabase
     .from('contacts')
     .select('*')
     .eq('tenant_id', auth.tenant_id)
-    .eq('blacklist', true)
-    .order('fecha_blacklist', { ascending: false })
+    .neq('trato', 'normal')
+    .order('fecha_actualizacion', { ascending: false })
 
   if (error) return { success: false, error: error.message }
   return { success: true, data }
 }
 
-export async function bloquearContacto(data: BloquearContactoData) {
+export async function actualizarTratoContacto(data: ActualizarTratoContactoData) {
   const supabase = await createClient()
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
@@ -120,18 +123,14 @@ export async function bloquearContacto(data: BloquearContactoData) {
 
   if (searchError) return { success: false, error: searchError.message }
 
-  if (existing?.blacklist) {
-    return { success: false, error: 'Este contacto ya está en la lista negra.' }
-  }
-
   const ahora = new Date().toISOString()
 
   if (existing) {
     // 2. Si existe, actualizar
     const updatePayload: any = {
-      blacklist: true,
-      blacklist_razon: data.blacklist_razon,
-      fecha_blacklist: ahora
+      trato: data.trato,
+      nota: data.nota,
+      fecha_actualizacion: ahora
     }
 
     if (data.nombre) {
@@ -150,8 +149,8 @@ export async function bloquearContacto(data: BloquearContactoData) {
     await registrarAuditoria({
       tenant_id: auth.tenant_id,
       user_id: auth.user_id,
-      accion: `bloqueó el contacto "${updated.nombre || updated.identificador_canal}"`,
-      tabla_afectada: 'blacklist',
+      accion: `actualizó el trato del contacto "${updated.nombre || updated.identificador_canal}" a ${data.trato}`,
+      tabla_afectada: 'contactos',
       registro_id: updated.id,
       valor_anterior: existing,
       valor_nuevo: updated
@@ -167,9 +166,9 @@ export async function bloquearContacto(data: BloquearContactoData) {
         canal: data.canal,
         identificador_canal: data.identificador_canal,
         nombre: data.nombre || null,
-        blacklist: true,
-        blacklist_razon: data.blacklist_razon,
-        fecha_blacklist: ahora
+        trato: data.trato,
+        nota: data.nota,
+        fecha_actualizacion: ahora
       }])
       .select('*')
       .single()
@@ -179,40 +178,12 @@ export async function bloquearContacto(data: BloquearContactoData) {
     await registrarAuditoria({
       tenant_id: auth.tenant_id,
       user_id: auth.user_id,
-      accion: `bloqueó el contacto "${inserted.nombre || inserted.identificador_canal}"`,
-      tabla_afectada: 'blacklist',
+      accion: `creó y asignó trato ${data.trato} al contacto "${inserted.nombre || inserted.identificador_canal}"`,
+      tabla_afectada: 'contactos',
       registro_id: inserted.id,
       valor_nuevo: inserted
     })
 
     return { success: true, data: inserted }
   }
-}
-
-export async function desbloquearContacto(id: string) {
-  const supabase = await createClient()
-  const auth = await getAuthData(supabase)
-  if (auth.error) return { success: false, error: auth.error }
-
-  const { data, error } = await supabase
-    .from('contacts')
-    .update({ blacklist: false })
-    .eq('id', id)
-    .eq('tenant_id', auth.tenant_id)
-    .select('*')
-    .single()
-
-  if (error) return { success: false, error: error.message }
-
-  await registrarAuditoria({
-    tenant_id: auth.tenant_id,
-    user_id: auth.user_id,
-    accion: `desbloqueó el contacto "${data.nombre || data.identificador_canal}"`,
-    tabla_afectada: 'blacklist',
-    registro_id: id,
-    valor_anterior: { blacklist: true },
-    valor_nuevo: { blacklist: false }
-  })
-
-  return { success: true, data }
 }

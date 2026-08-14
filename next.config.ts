@@ -2,6 +2,15 @@ import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
   experimental: {},
+  async redirects() {
+    return [
+      {
+        source: '/dashboard/blacklist',
+        destination: '/dashboard/contactos',
+        permanent: true,
+      },
+    ]
+  },
   async headers() {
     return [
       {

@@ -3,15 +3,15 @@ import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
 import {
-  getBlacklistConfig,
-  actualizarBlacklistConfig,
-  getContactosBloqueados,
-  bloquearContacto,
-  desbloquearContacto,
-  BlacklistConfigData,
-  BloquearContactoData
-} from '@/app/actions/blacklist'
+  getContactosConfig,
+  actualizarContactosConfig,
+  getContactos,
+  actualizarTratoContacto,
+  ContactosConfigData,
+  ActualizarTratoContactoData
+} from '@/app/actions/contactos'
 import { getMisPermisos } from '@/app/actions/permisos'
+import { formatChannelId } from '@/lib/formatters'
 
 const CANAL_CONFIG = {
   instagram: {
@@ -44,7 +44,8 @@ const CANAL_CONFIG = {
 } as const
 
 type CanalConfigKey = keyof typeof CANAL_CONFIG
-type BlacklistModo = 'ignorar' | 'respuesta_automatica' | 'derivar'
+type ModoContacto = 'ignorar' | 'respuesta_automatica' | 'derivar'
+type TratoContacto = 'normal' | 'sin_ia' | 'bloqueado'
 
 function formatDate(isoStr: string) {
   const d = new Date(isoStr)
@@ -54,14 +55,14 @@ function formatDate(isoStr: string) {
   return `${dd}/${mm}/${yyyy}`
 }
 
-export default function BlacklistPage() {
+export default function ContactosPage() {
   const [loading, setLoading] = useState(true)
   const [contactos, setContactos] = useState<any[]>([])
   const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
   
   // Config state
-  const [modo, setModo] = useState<BlacklistModo>('ignorar')
+  const [modo, setModo] = useState<ModoContacto>('ignorar')
   const [respuestaAuto, setRespuestaAuto] = useState('')
   const [savingConfig, setSavingConfig] = useState(false)
 
@@ -69,28 +70,31 @@ export default function BlacklistPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [savingContacto, setSavingContacto] = useState(false)
   const [modalFormData, setModalFormData] = useState<{
+    id?: string
     canal: CanalConfigKey
     identificador_canal: string
     nombre: string
-    blacklist_razon: string
+    trato: TratoContacto
+    nota: string
   }>({
-    canal: 'instagram',
+    canal: 'whatsapp',
     identificador_canal: '',
     nombre: '',
-    blacklist_razon: ''
+    trato: 'bloqueado',
+    nota: ''
   })
 
   const cargar = async () => {
     setLoading(true)
     const [configRes, contactosRes, permisosRes] = await Promise.all([
-      getBlacklistConfig(),
-      getContactosBloqueados(),
+      getContactosConfig(),
+      getContactos(),
       getMisPermisos()
     ])
 
     if (configRes.success && configRes.data) {
-      setModo(configRes.data.blacklist_modo as BlacklistModo || 'ignorar')
-      setRespuestaAuto(configRes.data.blacklist_respuesta_auto || '')
+      setModo(configRes.data.trato_contactos_modo as ModoContacto || 'ignorar')
+      setRespuestaAuto(configRes.data.trato_contactos_respuesta_auto || '')
     }
 
     if (contactosRes.success && contactosRes.data) {
@@ -101,7 +105,7 @@ export default function BlacklistPage() {
       if ((permisosRes as any).esAdmin) {
         setNivelPermiso('escritura')
       } else {
-        const p = (permisosRes.data || []).find((p: any) => p.seccion === 'blacklist')
+        const p = (permisosRes.data || []).find((p: any) => p.seccion === 'contactos')
         setNivelPermiso(p?.nivel || 'ninguno')
       }
     }
@@ -115,12 +119,12 @@ export default function BlacklistPage() {
 
   const handleSaveConfig = async () => {
     setSavingConfig(true)
-    const payload: BlacklistConfigData = {
-      blacklist_modo: modo,
-      blacklist_respuesta_auto: modo === 'respuesta_automatica' ? respuestaAuto : null
+    const payload: ContactosConfigData = {
+      trato_contactos_modo: modo,
+      trato_contactos_respuesta_auto: modo === 'respuesta_automatica' ? respuestaAuto : null
     }
 
-    const res = await actualizarBlacklistConfig(payload)
+    const res = await actualizarContactosConfig(payload)
     if (res.success) {
       setMensaje({ tipo: 'exito', texto: 'Configuración guardada correctamente ✓' })
     } else {
@@ -132,46 +136,73 @@ export default function BlacklistPage() {
 
   const openAñadir = () => {
     setModalFormData({
-      canal: 'instagram',
+      canal: 'whatsapp',
       identificador_canal: '',
       nombre: '',
-      blacklist_razon: ''
+      trato: 'bloqueado',
+      nota: ''
     })
     setIsModalOpen(true)
   }
 
-  const handleBloquear = async (e: React.FormEvent) => {
+  const openEditar = (contacto: any) => {
+    setModalFormData({
+      id: contacto.id,
+      canal: contacto.canal,
+      identificador_canal: contacto.identificador_canal,
+      nombre: contacto.nombre || '',
+      trato: contacto.trato,
+      nota: contacto.nota || ''
+    })
+    setIsModalOpen(true)
+  }
+
+  const handleGuardarContacto = async (e: React.FormEvent) => {
     e.preventDefault()
     setSavingContacto(true)
 
-    const res = await bloquearContacto({
+    const identificadorFormateado = formatChannelId(modalFormData.canal, modalFormData.identificador_canal)
+
+    const res = await actualizarTratoContacto({
       canal: modalFormData.canal,
-      identificador_canal: modalFormData.identificador_canal,
+      identificador_canal: identificadorFormateado,
       nombre: modalFormData.nombre || null,
-      blacklist_razon: modalFormData.blacklist_razon
+      trato: modalFormData.trato,
+      nota: modalFormData.nota
     })
 
     if (res.success && res.data) {
-      // Remove possible existing from list first
-      setContactos(prev => [res.data, ...prev.filter(c => c.id !== res.data.id)])
+      if (res.data.trato === 'normal') {
+        // Si lo pasaron a normal, lo sacamos de la lista principal
+        setContactos(prev => prev.filter(c => c.id !== res.data.id))
+      } else {
+        setContactos(prev => [res.data, ...prev.filter(c => c.id !== res.data.id)])
+      }
       setIsModalOpen(false)
-      setMensaje({ tipo: 'exito', texto: 'Contacto bloqueado correctamente ✓' })
+      setMensaje({ tipo: 'exito', texto: 'Contacto guardado correctamente ✓' })
     } else {
-      setMensaje({ tipo: 'error', texto: 'Error al bloquear contacto: ' + res.error })
+      setMensaje({ tipo: 'error', texto: 'Error al guardar contacto: ' + res.error })
     }
     setTimeout(() => setMensaje(null), 3000)
     setSavingContacto(false)
   }
 
-  const handleDesbloquear = async (id: string) => {
-    if (!window.confirm('¿Quitar este contacto de la blacklist?')) return
+  const handleDesbloquear = async (contacto: any) => {
+    if (!window.confirm('¿Cambiar el trato de este contacto a Normal? La IA volverá a responderle.')) return
 
-    const res = await desbloquearContacto(id)
+    const res = await actualizarTratoContacto({
+      canal: contacto.canal,
+      identificador_canal: contacto.identificador_canal,
+      nombre: contacto.nombre || null,
+      trato: 'normal',
+      nota: 'Restaurado a normal'
+    })
+    
     if (res.success) {
-      setContactos(prev => prev.filter(c => c.id !== id))
-      setMensaje({ tipo: 'exito', texto: 'Contacto desbloqueado correctamente ✓' })
+      setContactos(prev => prev.filter(c => c.id !== contacto.id))
+      setMensaje({ tipo: 'exito', texto: 'Contacto restaurado a estado normal ✓' })
     } else {
-      setMensaje({ tipo: 'error', texto: 'Error al desbloquear contacto: ' + res.error })
+      setMensaje({ tipo: 'error', texto: 'Error al actualizar contacto: ' + res.error })
     }
     setTimeout(() => setMensaje(null), 3000)
   }
@@ -203,20 +234,20 @@ export default function BlacklistPage() {
       {/* Encabezado + acciones */}
       <div className="flex items-start justify-between gap-4 flex-wrap mb-8">
         <div>
-          <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Blacklist</h1>
-          <p className="text-ink-500 mt-1 max-w-xl">Contactos bloqueados. La IA detecta abusos y los sugiere, tú decides.</p>
+          <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Contactos</h1>
+          <p className="text-ink-500 mt-1 max-w-xl">Gestiona el trato especial para contactos (bloqueados o sin IA).</p>
         </div>
         <button onClick={openAñadir} disabled={nivelPermiso !== 'escritura'} className="inline-flex items-center gap-2 px-4 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition disabled:opacity-50 disabled:cursor-not-allowed">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
-          Bloquear contacto
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
+          Nuevo trato de contacto
         </button>
       </div>
 
       {/* ====== CONFIGURACIÓN DE MODO ====== */}
       <section className="mb-10">
         <div className="mb-4">
-          <h2 className="font-display font-600 text-lg text-ink-900">Qué hacer cuando un contacto está bloqueado</h2>
-          <p className="text-sm text-ink-500 mt-0.5">Aplica a todos los contactos de la blacklist.</p>
+          <h2 className="font-display font-600 text-lg text-ink-900">Configuración global de Bloqueos</h2>
+          <p className="text-sm text-ink-500 mt-0.5">Define qué sucederá cuando un contacto tenga estado "Bloqueado".</p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -285,17 +316,17 @@ export default function BlacklistPage() {
         </div>
       </section>
 
-      {/* ====== LISTA DE CONTACTOS BLOQUEADOS ====== */}
+      {/* ====== LISTA DE CONTACTOS CON TRATO ESPECIAL ====== */}
       <section>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-display font-600 text-lg text-ink-900">Contactos bloqueados</h2>
+          <h2 className="font-display font-600 text-lg text-ink-900">Contactos con trato especial</h2>
           <span className="text-sm font-500 text-ink-500 px-3 py-1 bg-slate-100 rounded-full">{contactos.length} contactos</span>
         </div>
 
         {contactos.length === 0 ? (
           <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
-            <p className="font-semibold text-ink-900 text-lg mb-2">No tienes contactos bloqueados.</p>
-            <p className="text-ink-500 text-sm">Cuando bloquees a alguien, aparecerá aquí.</p>
+            <p className="font-semibold text-ink-900 text-lg mb-2">No tienes contactos especiales.</p>
+            <p className="text-ink-500 text-sm">Cuando asignes un trato distinto a 'Normal', aparecerán aquí.</p>
           </div>
         ) : (
           <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col divide-y divide-slate-100 relative">
@@ -317,20 +348,30 @@ export default function BlacklistPage() {
                         <span className="text-sm text-ink-600">({contacto.nombre})</span>
                       )}
                       <span className="text-xs text-ink-400 mt-0.5">{conf?.label || contacto.canal}</span>
+                      
+                      {contacto.trato === 'bloqueado' && (
+                        <span className="ml-2 px-2 py-0.5 bg-red-100 text-red-700 text-xs font-600 rounded">Bloqueado</span>
+                      )}
+                      {contacto.trato === 'sin_ia' && (
+                        <span className="ml-2 px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-600 rounded">Sin IA</span>
+                      )}
                     </div>
                     
-                    <p className="text-sm text-ink-500 mb-2 line-clamp-2">{contacto.blacklist_razon}</p>
+                    <p className="text-sm text-ink-500 mb-2 line-clamp-2">{contacto.nota}</p>
                     
                     {/* Pie */}
                     <p className="text-xs text-ink-400">
-                      Bloqueado el {contacto.fecha_blacklist ? formatDate(contacto.fecha_blacklist) : 'desconocido'}
+                      Actualizado el {contacto.fecha_actualizacion ? formatDate(contacto.fecha_actualizacion) : 'desconocido'}
                     </p>
                   </div>
 
                   {/* Controles */}
-                  <div className="flex items-center shrink-0 ml-2">
-                    <button onClick={() => handleDesbloquear(contacto.id)} disabled={nivelPermiso !== 'escritura'} className="px-3 h-9 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-600 text-ink-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
-                      Desbloquear
+                  <div className="flex items-center shrink-0 ml-2 gap-2">
+                    <button onClick={() => openEditar(contacto)} disabled={nivelPermiso !== 'escritura'} className="px-3 h-9 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-600 text-ink-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                      Editar
+                    </button>
+                    <button onClick={() => handleDesbloquear(contacto)} disabled={nivelPermiso !== 'escritura'} className="px-3 h-9 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-600 text-ink-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                      Hacer normal
                     </button>
                   </div>
                 </div>
@@ -341,7 +382,7 @@ export default function BlacklistPage() {
       </section>
 
       {/* =========================================================
-           POPUP · Bloquear contacto
+           POPUP · Guardar contacto
            ========================================================= */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50">
@@ -350,24 +391,38 @@ export default function BlacklistPage() {
           <div className="relative min-h-full flex items-center justify-center p-4 pointer-events-none">
             <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl pointer-events-auto flex flex-col">
               
-              <form onSubmit={handleBloquear} className="flex flex-col h-full">
+              <form onSubmit={handleGuardarContacto} className="flex flex-col h-full">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
-                  <h2 className="font-display font-700 text-lg text-ink-900">Bloquear contacto</h2>
+                  <h2 className="font-display font-700 text-lg text-ink-900">{modalFormData.id ? 'Editar contacto' : 'Nuevo contacto especial'}</h2>
                   <button type="button" onClick={() => !savingContacto && setIsModalOpen(false)} className="p-1.5 rounded-lg text-ink-400 hover:text-ink-700 hover:bg-slate-100 transition" aria-label="Cerrar">
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                   </button>
                 </div>
         
                 <div className="px-6 py-5 space-y-4">
+                  {/* Trato */}
+                  <div>
+                    <label className="block text-sm font-500 text-ink-700 mb-1.5">Trato del contacto</label>
+                    <select required
+                      value={modalFormData.trato}
+                      onChange={e => setModalFormData({...modalFormData, trato: e.target.value as TratoContacto})}
+                      className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm">
+                      <option value="normal">Normal (Responde IA)</option>
+                      <option value="sin_ia">Sin IA (Pausada siempre)</option>
+                      <option value="bloqueado">Bloqueado</option>
+                    </select>
+                  </div>
+
                   {/* Canal */}
                   <div>
                     <label className="block text-sm font-500 text-ink-700 mb-1.5">Canal</label>
                     <select required
+                      disabled={!!modalFormData.id}
                       value={modalFormData.canal}
                       onChange={e => setModalFormData({...modalFormData, canal: e.target.value as CanalConfigKey})}
-                      className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm">
-                      <option value="instagram">Instagram</option>
+                      className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm disabled:bg-slate-50 disabled:opacity-75">
                       <option value="whatsapp">WhatsApp</option>
+                      <option value="instagram">Instagram</option>
                       <option value="facebook">Facebook</option>
                     </select>
                   </div>
@@ -375,10 +430,14 @@ export default function BlacklistPage() {
                   {/* Identificador */}
                   <div>
                     <label className="block text-sm font-500 text-ink-700 mb-1.5">Identificador del contacto</label>
-                    <input type="text" placeholder="Ej. @usuario o +58 414 555 0000" required
+                    <input type="text" placeholder={modalFormData.canal === 'whatsapp' ? 'Ej. +58 414 555 0000' : 'Ej. @usuario'} required
+                      disabled={!!modalFormData.id}
                       value={modalFormData.identificador_canal}
                       onChange={e => setModalFormData({...modalFormData, identificador_canal: e.target.value})}
-                      className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm" />
+                      className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm disabled:bg-slate-50 disabled:opacity-75" />
+                    {!modalFormData.id && (
+                      <p className="text-xs text-ink-500 mt-1">Se formateará automáticamente al guardar.</p>
+                    )}
                   </div>
 
                   {/* Nombre */}
@@ -390,12 +449,12 @@ export default function BlacklistPage() {
                       className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm" />
                   </div>
 
-                  {/* Razón */}
+                  {/* Nota */}
                   <div>
-                    <label className="block text-sm font-500 text-ink-700 mb-1.5">Razón del bloqueo</label>
-                    <textarea rows={3} placeholder="Ej. Insultos repetidos, spam, lenguaje ofensivo..." required
-                      value={modalFormData.blacklist_razon}
-                      onChange={e => setModalFormData({...modalFormData, blacklist_razon: e.target.value})}
+                    <label className="block text-sm font-500 text-ink-700 mb-1.5">Nota / Razón</label>
+                    <textarea rows={3} placeholder="Ej. Insultos repetidos, cliente que prefiere humano..." required
+                      value={modalFormData.nota}
+                      onChange={e => setModalFormData({...modalFormData, nota: e.target.value})}
                       className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white resize-none placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm"></textarea>
                   </div>
                 </div>
@@ -404,8 +463,8 @@ export default function BlacklistPage() {
                   <button type="button" disabled={savingContacto} onClick={() => setIsModalOpen(false)} className="px-5 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition disabled:opacity-50">
                     Cancelar
                   </button>
-                  <button type="submit" disabled={savingContacto} className="px-5 h-11 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-600 shadow-lg shadow-red-600/30 transition flex items-center gap-2 disabled:bg-red-400">
-                    {savingContacto ? 'Bloqueando...' : 'Bloquear'}
+                  <button type="submit" disabled={savingContacto} className="px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition flex items-center gap-2 disabled:bg-brand-400">
+                    {savingContacto ? 'Guardando...' : 'Guardar'}
                   </button>
                 </div>
               </form>

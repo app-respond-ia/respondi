@@ -184,21 +184,21 @@ export default function Sidebar({ user, onCloseMobile, permisos, esAdmin, collap
           )
         })()}
         {(() => {
-          const nivel = getNivel('blacklist')
-          const cls = navItemWithPermClass('/dashboard/blacklist', 'blacklist')
+          const nivel = getNivel('contactos')
+          const cls = navItemWithPermClass('/dashboard/contactos', 'contactos')
           return nivel === 'ninguno' ? (
             <span title="Sin acceso" className={cls}>
               <span className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
-                <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+                <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
               </span>
-              {!collapsed && <span className="truncate">Blacklist</span>}
+              {!collapsed && <span className="truncate">Contactos</span>}
             </span>
           ) : (
-            <Link href="/dashboard/blacklist" onClick={onCloseMobile} className={cls} title={collapsed ? 'Blacklist' : undefined}>
+            <Link href="/dashboard/contactos" onClick={onCloseMobile} className={cls} title={collapsed ? 'Contactos' : undefined}>
               <span className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
-                <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+                <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
               </span>
-              {!collapsed && <span className="truncate">Blacklist</span>}
+              {!collapsed && <span className="truncate">Contactos</span>}
             </Link>
           )
         })()}

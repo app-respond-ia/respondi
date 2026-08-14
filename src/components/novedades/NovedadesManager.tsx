@@ -1,89 +1,30 @@
 'use client'
 import Loading from '@/components/Loading'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 import { useState, useEffect } from 'react'
 import {
   getNovedades,
   crearNovedad,
   actualizarNovedad,
+  eliminarNovedad,
   NovedadData
 } from '@/app/actions/novedades'
+import { getTiposNovedad, TipoNovedadData } from '@/app/actions/tipos-novedad'
 import { getMisPermisos } from '@/app/actions/permisos'
 
-const TIPO_CONFIG = {
-  horario: {
-    label: 'HORARIO',
-    icon: (
-      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    ),
-    iconBg: 'bg-blue-100',
-    iconText: 'text-blue-600',
-    badge: 'bg-blue-100 text-blue-700',
-    selected: 'border-blue-500 bg-blue-50/40 ring-4 ring-blue-50',
-    selectedIconText: 'text-blue-600',
-    selectedLabelText: 'text-blue-700',
-  },
-  stock: {
-    label: 'STOCK',
-    icon: (
-      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-      </svg>
-    ),
-    iconBg: 'bg-amber-100',
-    iconText: 'text-amber-600',
-    badge: 'bg-amber-100 text-amber-700',
-    selected: 'border-amber-500 bg-amber-50/40 ring-4 ring-amber-50',
-    selectedIconText: 'text-amber-600',
-    selectedLabelText: 'text-amber-700',
-  },
-  promo: {
-    label: 'PROMOCIÓN',
-    icon: (
-      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.99 1.99 0 013 12V7a4 4 0 014-4z" />
-      </svg>
-    ),
-    iconBg: 'bg-purple-100',
-    iconText: 'text-purple-600',
-    badge: 'bg-purple-100 text-purple-700',
-    selected: 'border-purple-500 bg-purple-50/40 ring-4 ring-purple-50',
-    selectedIconText: 'text-purple-600',
-    selectedLabelText: 'text-purple-700',
-  },
-  evento: {
-    label: 'EVENTO',
-    icon: (
-      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-      </svg>
-    ),
-    iconBg: 'bg-pink-100',
-    iconText: 'text-pink-600',
-    badge: 'bg-pink-100 text-pink-700',
-    selected: 'border-pink-500 bg-pink-50/40 ring-4 ring-pink-50',
-    selectedIconText: 'text-pink-600',
-    selectedLabelText: 'text-pink-700',
-  },
-  otro: {
-    label: 'OTRO',
-    icon: (
-      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
-      </svg>
-    ),
-    iconBg: 'bg-slate-100',
-    iconText: 'text-slate-600',
-    badge: 'bg-slate-100 text-slate-700',
-    selected: 'border-slate-500 bg-slate-50/40 ring-4 ring-slate-50',
-    selectedIconText: 'text-slate-600',
-    selectedLabelText: 'text-slate-700',
+function getIconSvg(icono: string, className = "w-6 h-6") {
+  switch (icono) {
+    case 'reloj': return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+    case 'caja': return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+    case 'estrella': return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>
+    case 'calendario': return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+    case 'informacion': return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+    case 'campana':
+    default:
+      return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
   }
-} as const
-
-type TipoNovedad = keyof typeof TIPO_CONFIG
+}
 
 function formatDate(isoStr: string | null) {
   if (!isoStr) return 'sin fecha límite'
@@ -110,6 +51,7 @@ function fromDatetimeLocal(dtLocal: string) {
 export default function NovedadesManager() {
   const [loading, setLoading] = useState(true)
   const [items, setItems] = useState<any[]>([])
+  const [tipos, setTipos] = useState<TipoNovedadData[]>([])
   const [filtro, setFiltro] = useState<'vigentes' | 'expiradas' | 'todas'>('vigentes')
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
   
@@ -120,13 +62,17 @@ export default function NovedadesManager() {
   const [saving, setSaving] = useState(false)
   const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
 
+  // Confirm delete modal state
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
   const [formData, setFormData] = useState<{
-    tipo: TipoNovedad
+    tipo_id: string
     descripcion: string
     fecha_vigencia_inicio: string
     fecha_vigencia_fin: string
   }>({
-    tipo: 'stock',
+    tipo_id: '',
     descripcion: '',
     fecha_vigencia_inicio: '',
     fecha_vigencia_fin: ''
@@ -134,12 +80,21 @@ export default function NovedadesManager() {
 
   const cargar = async () => {
     setLoading(true)
-    const res = await getNovedades()
-    if (res.success && res.data) {
-      setItems(res.data)
+    
+    const [resNovedades, resTipos, permisosRes] = await Promise.all([
+      getNovedades(),
+      getTiposNovedad(),
+      getMisPermisos()
+    ])
+
+    if (resTipos.success && resTipos.data) {
+      setTipos(resTipos.data)
     }
 
-    const permisosRes = await getMisPermisos()
+    if (resNovedades.success && resNovedades.data) {
+      setItems(resNovedades.data)
+    }
+
     if (permisosRes.success) {
       if ((permisosRes as any).esAdmin) {
         setNivelPermiso('escritura')
@@ -157,13 +112,19 @@ export default function NovedadesManager() {
   }, [])
 
   const openAñadir = () => {
+    if (tipos.length === 0) {
+      setMensaje({ tipo: 'error', texto: 'Debes configurar al menos un Tipo de Novedad en el Perfil de Sucursal antes de añadir novedades.' })
+      setTimeout(() => setMensaje(null), 4000)
+      return
+    }
+
     setModalMode('añadir')
     setEditingId(null)
     const now = new Date()
     now.setMinutes(now.getMinutes() - now.getTimezoneOffset())
     
     setFormData({
-      tipo: 'stock',
+      tipo_id: tipos[0].id!,
       descripcion: '',
       fecha_vigencia_inicio: now.toISOString().slice(0, 16),
       fecha_vigencia_fin: ''
@@ -175,7 +136,7 @@ export default function NovedadesManager() {
     setModalMode('editar')
     setEditingId(item.id)
     setFormData({
-      tipo: item.tipo as TipoNovedad,
+      tipo_id: item.tipo_id || (tipos.length > 0 ? tipos[0].id! : ''),
       descripcion: item.descripcion || '',
       fecha_vigencia_inicio: toDatetimeLocal(item.fecha_vigencia_inicio),
       fecha_vigencia_fin: toDatetimeLocal(item.fecha_vigencia_fin)
@@ -183,15 +144,47 @@ export default function NovedadesManager() {
     setIsModalOpen(true)
   }
 
+  const openEliminar = (id: string) => {
+    setDeletingId(id)
+    setIsDeleteModalOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingId) return
+    setIsDeleteModalOpen(false)
+    setLoading(true)
+    
+    const res = await eliminarNovedad(deletingId)
+    if (res.success) {
+      setItems(prev => prev.filter(i => i.id !== deletingId))
+      setMensaje({ tipo: 'exito', texto: 'Novedad eliminada correctamente ✓' })
+    } else {
+      setMensaje({ tipo: 'error', texto: res.error || 'Error al eliminar la novedad' })
+    }
+    setTimeout(() => setMensaje(null), 3000)
+    setLoading(false)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
     
-    const dataToSave = { 
-      tipo: formData.tipo,
-      descripcion: formData.descripcion,
-      fecha_vigencia_inicio: fromDatetimeLocal(formData.fecha_vigencia_inicio)!,
-      fecha_vigencia_fin: fromDatetimeLocal(formData.fecha_vigencia_fin)
+    // Si estamos editando, NO mandamos las fechas, usamos las que ya tenía la novedad.
+    // Solo permitimos editar tipo y descripción.
+    let dataToSave: Partial<NovedadData & { activo: boolean }> = {}
+    
+    if (modalMode === 'añadir') {
+      dataToSave = { 
+        tipo_id: formData.tipo_id,
+        descripcion: formData.descripcion,
+        fecha_vigencia_inicio: fromDatetimeLocal(formData.fecha_vigencia_inicio)!,
+        fecha_vigencia_fin: fromDatetimeLocal(formData.fecha_vigencia_fin)
+      }
+    } else {
+      dataToSave = {
+        tipo_id: formData.tipo_id,
+        descripcion: formData.descripcion
+      }
     }
 
     let res
@@ -263,22 +256,22 @@ export default function NovedadesManager() {
       {items.length > 0 ? (
         <>
           {/* Pestañas de filtrado */}
-          <div className="flex gap-2 p-1 bg-slate-100 rounded-xl mb-6 w-fit">
+          <div className="flex gap-2 p-1 bg-slate-100 rounded-xl mb-6 w-fit overflow-x-auto max-w-full">
             <button
               onClick={() => setFiltro('vigentes')}
-              className={`px-4 py-2 text-sm font-600 rounded-lg transition-all ${filtro === 'vigentes' ? 'bg-white text-ink-900 shadow-sm' : 'text-slate-500 hover:text-ink-700 hover:bg-slate-200/50'}`}
+              className={`px-4 py-2 text-sm font-600 rounded-lg transition-all whitespace-nowrap ${filtro === 'vigentes' ? 'bg-white text-ink-900 shadow-sm' : 'text-slate-500 hover:text-ink-700 hover:bg-slate-200/50'}`}
             >
               Vigentes ({countVigentes})
             </button>
             <button
               onClick={() => setFiltro('expiradas')}
-              className={`px-4 py-2 text-sm font-600 rounded-lg transition-all ${filtro === 'expiradas' ? 'bg-white text-ink-900 shadow-sm' : 'text-slate-500 hover:text-ink-700 hover:bg-slate-200/50'}`}
+              className={`px-4 py-2 text-sm font-600 rounded-lg transition-all whitespace-nowrap ${filtro === 'expiradas' ? 'bg-white text-ink-900 shadow-sm' : 'text-slate-500 hover:text-ink-700 hover:bg-slate-200/50'}`}
             >
               Expiradas ({countExpiradas})
             </button>
             <button
               onClick={() => setFiltro('todas')}
-              className={`px-4 py-2 text-sm font-600 rounded-lg transition-all ${filtro === 'todas' ? 'bg-white text-ink-900 shadow-sm' : 'text-slate-500 hover:text-ink-700 hover:bg-slate-200/50'}`}
+              className={`px-4 py-2 text-sm font-600 rounded-lg transition-all whitespace-nowrap ${filtro === 'todas' ? 'bg-white text-ink-900 shadow-sm' : 'text-slate-500 hover:text-ink-700 hover:bg-slate-200/50'}`}
             >
               Todas ({countTodas})
             </button>
@@ -292,19 +285,20 @@ export default function NovedadesManager() {
           ) : (
             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col divide-y divide-slate-100 relative">
               {filteredItems.map((item) => {
-                const conf = TIPO_CONFIG[item.tipo as TipoNovedad] || TIPO_CONFIG.otro
+                const tipo = tipos.find(t => t.id === item.tipo_id) || { nombre: 'Desconocido', icono: 'informacion', color: 'slate' }
+                
                 return (
                   <div key={item.id} className="p-4 sm:p-5 flex items-start gap-4 hover:bg-slate-50 transition-colors bg-white">
                     {/* Icono fijo */}
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${conf.iconBg} ${conf.iconText}`}>
-                      {conf.icon}
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 mt-0.5 bg-${tipo.color}-100 text-${tipo.color}-600`}>
+                      {getIconSvg(tipo.icono)}
                     </div>
 
                     {/* Info principal */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3 mb-2 flex-wrap">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-700 ${conf.badge}`}>
-                          {conf.label}
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-700 bg-${tipo.color}-100 text-${tipo.color}-700 uppercase`}>
+                          {tipo.nombre}
                         </span>
                         
                         {/* Estado */}
@@ -325,9 +319,12 @@ export default function NovedadesManager() {
                     </div>
 
                     {/* Controles */}
-                    <div className="flex items-center shrink-0 ml-2">
+                    <div className="flex flex-col items-center shrink-0 ml-2 gap-2">
                       <button onClick={() => openEditar(item)} disabled={nivelPermiso !== 'escritura'} className="p-2 rounded-lg text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition disabled:opacity-50 disabled:cursor-not-allowed" aria-label="Editar">
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                      </button>
+                      <button onClick={() => openEliminar(item.id)} disabled={nivelPermiso !== 'escritura'} className="p-2 rounded-lg text-ink-400 hover:text-red-600 hover:bg-red-50 transition disabled:opacity-50 disabled:cursor-not-allowed" aria-label="Eliminar">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                       </button>
                     </div>
                   </div>
@@ -364,7 +361,7 @@ export default function NovedadesManager() {
           <svg className="w-5 h-5 text-slate-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <p>La IA solo usa las novedades vigentes para responder. Las novedades caducadas se archivan automáticamente cada 15 minutos.</p>
+          <p>La IA solo usa las novedades vigentes para responder. Las novedades caducadas se archivan automáticamente cuando superan la fecha establecida.</p>
         </div>
       )}
 
@@ -391,20 +388,20 @@ export default function NovedadesManager() {
                   <div>
                     <label className="block text-sm font-500 text-ink-700 mb-2">Tipo de novedad</label>
                     <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
-                      {(Object.entries(TIPO_CONFIG) as [TipoNovedad, typeof TIPO_CONFIG[TipoNovedad]][]).map(([key, conf]) => {
-                        const isSelected = formData.tipo === key
+                      {tipos.map((tipo) => {
+                        const isSelected = formData.tipo_id === tipo.id
                         return (
                           <button
-                            key={key}
+                            key={tipo.id}
                             type="button"
-                            onClick={() => setFormData({...formData, tipo: key})}
-                            className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${isSelected ? conf.selected : 'border-slate-200 bg-white hover:border-slate-300'}`}
+                            onClick={() => setFormData({...formData, tipo_id: tipo.id!})}
+                            className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${isSelected ? 'border-' + tipo.color + '-500 bg-' + tipo.color + '-50/40 ring-4 ring-' + tipo.color + '-50' : 'border-slate-200 bg-white hover:border-slate-300'}`}
                           >
-                            <div className={`${isSelected ? conf.selectedIconText : 'text-slate-400'}`}>
-                              {conf.icon}
+                            <div className={`${isSelected ? 'text-' + tipo.color + '-600' : 'text-slate-400'}`}>
+                              {getIconSvg(tipo.icono, 'w-6 h-6')}
                             </div>
-                            <span className={`text-[10px] font-700 ${isSelected ? conf.selectedLabelText : 'text-slate-500'}`}>
-                              {conf.label}
+                            <span className={`text-[10px] font-700 ${isSelected ? 'text-' + tipo.color + '-700' : 'text-slate-500'} uppercase text-center line-clamp-1`}>
+                              {tipo.nombre}
                             </span>
                           </button>
                         )
@@ -425,34 +422,46 @@ export default function NovedadesManager() {
                   </div>
 
                   {/* Vigencia */}
-                  <div>
-                    <label className="block text-sm font-500 text-ink-700 mb-2">Vigencia</label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-500 text-slate-500 mb-1">Desde</label>
-                        <input type="datetime-local" required
-                          value={formData.fecha_vigencia_inicio}
-                          onChange={e => setFormData({...formData, fecha_vigencia_inicio: e.target.value})}
-                          className="w-full h-11 px-3 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm" 
-                        />
+                  {modalMode === 'añadir' ? (
+                    <div>
+                      <label className="block text-sm font-500 text-ink-700 mb-2">Vigencia</label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-500 text-slate-500 mb-1">Desde</label>
+                          <input type="datetime-local" required
+                            value={formData.fecha_vigencia_inicio}
+                            onChange={e => setFormData({...formData, fecha_vigencia_inicio: e.target.value})}
+                            className="w-full h-11 px-3 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm" 
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-500 text-slate-500 mb-1">Hasta (opcional)</label>
+                          <input type="datetime-local"
+                            value={formData.fecha_vigencia_fin}
+                            onChange={e => setFormData({...formData, fecha_vigencia_fin: e.target.value})}
+                            className="w-full h-11 px-3 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm" 
+                          />
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-xs font-500 text-slate-500 mb-1">Hasta (opcional)</label>
-                        <input type="datetime-local"
-                          value={formData.fecha_vigencia_fin}
-                          onChange={e => setFormData({...formData, fecha_vigencia_fin: e.target.value})}
-                          className="w-full h-11 px-3 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm" 
-                        />
+                      <p className="text-xs text-ink-400 mt-2">
+                        Pasada la fecha de "Hasta", la novedad se archiva y deja de afectar a la IA.
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                        <p className="text-sm font-500 text-slate-700 flex items-center gap-2">
+                          <svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                          Las fechas de una novedad no se pueden editar.
+                        </p>
+                        <p className="text-xs text-slate-500 mt-1">Si necesitas cambiar la vigencia, elimina esta novedad y crea una nueva.</p>
                       </div>
                     </div>
-                    <p className="text-xs text-ink-400 mt-2">
-                      Pasada la fecha de "Hasta", la novedad se archiva y deja de afectar a la IA.
-                    </p>
-                  </div>
+                  )}
         
                 </div>
         
-                <div className="flex justify-end gap-3 px-6 pt-5 pb-6 border-t border-slate-100 shrink-0">
+                <div className="flex justify-end gap-3 px-6 pt-5 pb-6 border-t border-slate-100 shrink-0 bg-white">
                   <button type="button" disabled={saving} onClick={() => setIsModalOpen(false)} className="px-5 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition disabled:opacity-50">
                     Cancelar
                   </button>
@@ -474,6 +483,16 @@ export default function NovedadesManager() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleDeleteConfirm}
+        title="Eliminar novedad"
+        message="¿Estás seguro de que deseas eliminar esta novedad de forma permanente? La IA dejará de usar esta información inmediatamente."
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+      />
     </div>
   )
 }

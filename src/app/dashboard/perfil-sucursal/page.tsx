@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { getPerfilSucursal, savePerfilSucursal } from '@/app/actions/perfil'
 import { getHorarios, saveHorarios } from '@/app/actions/horarios'
 import { getMisPermisos } from '@/app/actions/permisos'
+import { getTiposNovedad, crearTipoNovedad, actualizarTipoNovedad, eliminarTipoNovedad, TipoNovedadData } from '@/app/actions/tipos-novedad'
 
 const DIAS_SEMANA = [
   { id: 1, label: 'Lunes' },
@@ -57,6 +58,13 @@ export default function PerfilSucursalPage() {
 
   const [copyPopoverOpen, setCopyPopoverOpen] = useState<number | null>(null)
   const [copyTargets, setCopyTargets] = useState<number[]>([])
+
+  // Tipos de novedad
+  const [tiposNovedad, setTiposNovedad] = useState<TipoNovedadData[]>([])
+  const [tipoModalOpen, setTipoModalOpen] = useState(false)
+  const [tipoEditItem, setTipoEditItem] = useState<TipoNovedadData | null>(null)
+  const [tipoFormData, setTipoFormData] = useState({ nombre: '', icono: 'campana', color: 'slate' })
+  const [savingTipo, setSavingTipo] = useState(false)
 
   const [politicaModalOpen, setPoliticaModalOpen] = useState(false)
   const [politicaEditIndex, setPoliticaEditIndex] = useState<number | null>(null)
@@ -136,6 +144,12 @@ export default function PerfilSucursalPage() {
         })
         setHorarios(ordenados)
       }
+
+      const resTipos = await getTiposNovedad()
+      if (resTipos.success && resTipos.data) {
+        setTiposNovedad(resTipos.data)
+      }
+
       setLoading(false)
     }
     cargar()
@@ -190,6 +204,55 @@ export default function PerfilSucursalPage() {
     }))
     setCopyPopoverOpen(null)
     setCopyTargets([])
+  }
+
+  // Manejo de Tipos de Novedad
+  const openNewTipo = () => {
+    setTipoEditItem(null)
+    setTipoFormData({ nombre: '', icono: 'campana', color: 'slate' })
+    setTipoModalOpen(true)
+  }
+
+  const openEditTipo = (item: TipoNovedadData) => {
+    setTipoEditItem(item)
+    setTipoFormData({ nombre: item.nombre, icono: item.icono, color: item.color })
+    setTipoModalOpen(true)
+  }
+
+  const handleSaveTipo = async () => {
+    if (!tipoFormData.nombre.trim()) return
+    setSavingTipo(true)
+    
+    let res
+    if (tipoEditItem?.id) {
+      res = await actualizarTipoNovedad(tipoEditItem.id, tipoFormData)
+    } else {
+      res = await crearTipoNovedad(tipoFormData)
+    }
+
+    if (res.success && res.data) {
+      if (tipoEditItem?.id) {
+        setTiposNovedad(prev => prev.map(t => t.id === tipoEditItem.id ? res.data : t))
+      } else {
+        setTiposNovedad(prev => [...prev, res.data])
+      }
+      setTipoModalOpen(false)
+    } else {
+      setMensaje({ tipo: 'error', texto: res.error || 'Error al guardar tipo' })
+      setTimeout(() => setMensaje(null), 3000)
+    }
+    setSavingTipo(false)
+  }
+
+  const handleDeleteTipo = async (id: string) => {
+    if (!confirm('¿Estás seguro? Las novedades asociadas a este tipo también se eliminarán.')) return
+    const res = await eliminarTipoNovedad(id)
+    if (res.success) {
+      setTiposNovedad(prev => prev.filter(t => t.id !== id))
+    } else {
+      setMensaje({ tipo: 'error', texto: res.error || 'Error al eliminar tipo' })
+      setTimeout(() => setMensaje(null), 3000)
+    }
   }
 
   const normalizeTime = (timeValue: string | null | undefined) => {
@@ -503,6 +566,97 @@ export default function PerfilSucursalPage() {
               )
             })}
           </div>
+        </section>
+
+        {/* SECCIÓN: TIPOS DE NOVEDADES */}
+        <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8">
+          <h2 className="text-xl font-bold text-ink-900 mb-6 border-b border-slate-100 pb-3">Tipos de Novedades</h2>
+          <p className="text-sm text-ink-500 mb-5">Crea y gestiona las categorías de las novedades del día (ej. Ofertas, Horarios, Stock).</p>
+          
+          {tiposNovedad.length > 0 && (
+            <div className="flex flex-col gap-3 mb-5">
+              {tiposNovedad.map((t) => (
+                <div key={t.id} className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center bg-${t.color}-100 text-${t.color}-600`}>
+                      {t.icono === 'campana' && <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>}
+                      {t.icono === 'reloj' && <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+                      {t.icono === 'caja' && <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>}
+                      {t.icono === 'estrella' && <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>}
+                      {t.icono === 'calendario' && <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>}
+                      {t.icono === 'informacion' && <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+                    </div>
+                    <span className="font-600 text-sm text-ink-900">{t.nombre}</span>
+                  </div>
+                  {nivelPermiso === 'escritura' && (
+                    <div className="flex items-center gap-1">
+                      <button type="button" onClick={() => openEditTipo(t)} className="p-1.5 text-slate-400 hover:text-brand-600 transition">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                      </button>
+                      <button type="button" onClick={() => handleDeleteTipo(t.id!)} className="p-1.5 text-slate-400 hover:text-red-600 transition">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {nivelPermiso === 'escritura' && (
+            <button type="button" onClick={openNewTipo}
+              className="px-4 h-11 rounded-xl border border-dashed border-slate-300 hover:border-brand-400 hover:bg-brand-50 text-sm font-600 text-ink-600 hover:text-brand-700 transition w-full">
+              + Añadir tipo de novedad
+            </button>
+          )}
+
+          {tipoModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40" onClick={() => setTipoModalOpen(false)}>
+              <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+                <h3 className="font-display font-700 text-lg text-ink-900 mb-4">
+                  {tipoEditItem ? 'Editar tipo de novedad' : 'Nuevo tipo de novedad'}
+                </h3>
+
+                <label className="block text-sm font-medium text-ink-700 mb-1.5">Nombre</label>
+                <input type="text" value={tipoFormData.nombre} onChange={e => setTipoFormData({...tipoFormData, nombre: e.target.value})}
+                  placeholder="Ej. Ofertas" className="w-full h-11 px-4 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition mb-4" />
+
+                <label className="block text-sm font-medium text-ink-700 mb-1.5">Icono</label>
+                <div className="grid grid-cols-6 gap-2 mb-4">
+                  {['campana', 'reloj', 'caja', 'estrella', 'calendario', 'informacion'].map(ico => (
+                    <button key={ico} type="button" onClick={() => setTipoFormData({...tipoFormData, icono: ico})}
+                      className={`h-10 rounded-lg border flex items-center justify-center transition-all ${tipoFormData.icono === ico ? 'border-brand-600 bg-brand-50 text-brand-600 ring-2 ring-brand-100' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}>
+                      {ico === 'campana' && <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>}
+                      {ico === 'reloj' && <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+                      {ico === 'caja' && <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>}
+                      {ico === 'estrella' && <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>}
+                      {ico === 'calendario' && <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>}
+                      {ico === 'informacion' && <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+                    </button>
+                  ))}
+                </div>
+
+                <label className="block text-sm font-medium text-ink-700 mb-1.5">Color</label>
+                <div className="flex flex-wrap gap-2 mb-6">
+                  {['blue', 'amber', 'purple', 'pink', 'emerald', 'slate'].map(col => (
+                    <button key={col} type="button" onClick={() => setTipoFormData({...tipoFormData, color: col})}
+                      className={`w-8 h-8 rounded-full border-2 transition-all bg-${col}-500 ${tipoFormData.color === col ? 'border-ink-900 ring-2 ring-offset-2 ring-' + col + '-200' : 'border-transparent opacity-80 hover:opacity-100'}`} />
+                  ))}
+                </div>
+
+                <div className="flex gap-3 justify-end">
+                  <button type="button" onClick={() => setTipoModalOpen(false)} disabled={savingTipo}
+                    className="px-4 h-10 rounded-xl text-sm font-600 text-ink-600 hover:bg-slate-100 transition disabled:opacity-50">
+                    Cancelar
+                  </button>
+                  <button type="button" onClick={handleSaveTipo} disabled={savingTipo || !tipoFormData.nombre.trim()}
+                    className="px-4 h-10 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white text-sm font-600 transition">
+                    {savingTipo ? 'Guardando...' : 'Guardar'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </section>
 
         {/* SECCIÓN: CONFIGURACIÓN DEL AGENTE IA */}

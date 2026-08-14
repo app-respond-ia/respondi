@@ -316,6 +316,13 @@ export async function getDatosSucursalParaCopiar(branchIdOrigen: string) {
     .eq('branch_id', branchIdOrigen)
     .eq('activo', true)
 
+  // Tipos de novedad
+  const { data: tiposNovedad } = await supabase
+    .from('tipos_novedad')
+    .select('nombre, icono, color')
+    .eq('branch_id', branchIdOrigen)
+    .eq('tenant_id', userData.tenant_id)
+
   // Business profile (servicios, políticas, configuración IA)
   const { data: businessProfile } = await supabase
     .from('business_profiles')
@@ -332,6 +339,7 @@ export async function getDatosSucursalParaCopiar(branchIdOrigen: string) {
       precios: precios || [],
       etiquetas: etiquetas || [],
       reglas: reglas || [],
+      tipos_novedad: tiposNovedad || [],
       servicios: businessProfile?.servicios ?? null,
       politicas: businessProfile?.politicas ?? null,
       msg_fuera_horario: businessProfile?.msg_fuera_horario ?? null,
@@ -359,6 +367,7 @@ export async function crearSucursalConDatos(data: {
   precios?: { nombre: string, tipo: string, precio: number | null, precio_tipo: string, descripcion?: string }[]
   etiquetas?: { nombre: string, descripcion_intencion?: string | null, color: string, activa: boolean, es_plantilla: boolean, orden: number }[]
   reglas?: { nombre: string, descripcion_intencion?: string | null, tipo_caso: string, activa: boolean, es_plantilla: boolean }[]
+  tipos_novedad?: { nombre: string, icono: string, color: string }[]
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -464,6 +473,17 @@ export async function crearSucursalConDatos(data: {
     await supabase.from('case_rules').insert(
       data.reglas!.map(r => ({
         ...r,
+        branch_id: newBranch.id,
+        tenant_id: userData!.tenant_id
+      }))
+    )
+  }
+
+  // Tipos de novedad
+  if (data.tipos_novedad && data.tipos_novedad!.length > 0) {
+    await supabase.from('tipos_novedad').insert(
+      data.tipos_novedad!.map(t => ({
+        ...t,
         branch_id: newBranch.id,
         tenant_id: userData!.tenant_id
       }))

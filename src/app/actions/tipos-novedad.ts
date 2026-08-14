@@ -4,14 +4,13 @@ import { createClient } from '@/utils/supabase/server'
 import { resolveBranchId } from '@/lib/active-branch'
 import { registrarAuditoria } from '@/lib/auditoria'
 
-export interface NovedadData {
-  tipo_id: string
-  descripcion: string
-  fecha_vigencia_inicio: string
-  fecha_vigencia_fin: string | null
+export interface TipoNovedadData {
+  id?: string
+  nombre: string
+  icono: string
+  color: string
 }
 
-// Función auxiliar para obtener credenciales del usuario activo
 async function getAuthData(supabase: any) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'No autorizado', user_id: null }
@@ -32,59 +31,36 @@ async function getAuthData(supabase: any) {
   return { tenant_id: userData.tenant_id, branch_id: branchId, user_id: user.id }
 }
 
-export async function getNovedades() {
+export async function getTiposNovedad() {
   const supabase = await createClient()
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   const { data, error } = await supabase
-    .from('daily_updates')
-    .select('*, users (nombre, email)')
+    .from('tipos_novedad')
+    .select('*')
     .eq('branch_id', auth.branch_id)
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: true })
 
   if (error) return { success: false, error: error.message }
   return { success: true, data }
 }
 
-export async function crearNovedad(data: NovedadData) {
+export async function crearTipoNovedad(data: TipoNovedadData) {
   const supabase = await createClient()
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
-  // Verificar límite diario de novedades
-  const hoy = new Date()
-  hoy.setHours(0, 0, 0, 0)
-  const { count } = await supabase
-    .from('daily_updates')
-    .select('*', { count: 'exact', head: true })
-    .eq('branch_id', auth.branch_id)
-    .gte('created_at', hoy.toISOString())
-
-  if (count && count >= 20) {
-    return { success: false, error: 'Has alcanzado el límite de 20 novedades por día.' }
-  }
-
-  let isActivo = true
-  if (data.fecha_vigencia_fin !== null) {
-    const fin = new Date(data.fecha_vigencia_fin).getTime()
-    const ahora = new Date().getTime()
-    isActivo = fin >= ahora
-  }
-
   const { data: insertedData, error } = await supabase
-    .from('daily_updates')
+    .from('tipos_novedad')
     .insert([{
       tenant_id: auth.tenant_id,
       branch_id: auth.branch_id,
-      user_id: auth.user_id,
-      tipo_id: data.tipo_id,
-      descripcion: data.descripcion,
-      fecha_vigencia_inicio: data.fecha_vigencia_inicio,
-      fecha_vigencia_fin: data.fecha_vigencia_fin,
-      activo: isActivo
+      nombre: data.nombre,
+      icono: data.icono,
+      color: data.color
     }])
-    .select('*, users (nombre, email)')
+    .select()
     .single()
 
   if (error) return { success: false, error: error.message }
@@ -92,8 +68,8 @@ export async function crearNovedad(data: NovedadData) {
   await registrarAuditoria({
     tenant_id: auth.tenant_id,
     user_id: auth.user_id,
-    accion: `publicó una novedad del día`,
-    tabla_afectada: 'novedades',
+    accion: `creó un nuevo tipo de novedad: ${data.nombre}`,
+    tabla_afectada: 'tipos_novedad',
     registro_id: insertedData.id,
     valor_nuevo: insertedData
   })
@@ -101,33 +77,27 @@ export async function crearNovedad(data: NovedadData) {
   return { success: true, data: insertedData }
 }
 
-export async function actualizarNovedad(id: string, data: Partial<NovedadData & { activo: boolean }>) {
+export async function actualizarTipoNovedad(id: string, data: TipoNovedadData) {
   const supabase = await createClient()
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   const { data: anterior } = await supabase
-    .from('daily_updates')
+    .from('tipos_novedad')
     .select('*')
     .eq('id', id)
     .single()
 
-  if ('fecha_vigencia_fin' in data) {
-    if (data.fecha_vigencia_fin === null) {
-      data.activo = true
-    } else {
-      const fin = new Date(data.fecha_vigencia_fin!).getTime()
-      const ahora = new Date().getTime()
-      data.activo = fin >= ahora
-    }
-  }
-
   const { data: updatedData, error } = await supabase
-    .from('daily_updates')
-    .update(data)
+    .from('tipos_novedad')
+    .update({
+      nombre: data.nombre,
+      icono: data.icono,
+      color: data.color
+    })
     .eq('id', id)
     .eq('branch_id', auth.branch_id)
-    .select('*, users (nombre, email)')
+    .select()
     .single()
 
   if (error) return { success: false, error: error.message }
@@ -135,8 +105,8 @@ export async function actualizarNovedad(id: string, data: Partial<NovedadData & 
   await registrarAuditoria({
     tenant_id: auth.tenant_id,
     user_id: auth.user_id,
-    accion: 'editó una novedad del día',
-    tabla_afectada: 'novedades',
+    accion: `editó el tipo de novedad: ${data.nombre}`,
+    tabla_afectada: 'tipos_novedad',
     registro_id: id,
     valor_anterior: anterior,
     valor_nuevo: updatedData
@@ -145,19 +115,19 @@ export async function actualizarNovedad(id: string, data: Partial<NovedadData & 
   return { success: true, data: updatedData }
 }
 
-export async function eliminarNovedad(id: string) {
+export async function eliminarTipoNovedad(id: string) {
   const supabase = await createClient()
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   const { data: anterior } = await supabase
-    .from('daily_updates')
+    .from('tipos_novedad')
     .select('*')
     .eq('id', id)
     .single()
 
   const { error } = await supabase
-    .from('daily_updates')
+    .from('tipos_novedad')
     .delete()
     .eq('id', id)
     .eq('branch_id', auth.branch_id)
@@ -167,8 +137,8 @@ export async function eliminarNovedad(id: string) {
   await registrarAuditoria({
     tenant_id: auth.tenant_id,
     user_id: auth.user_id,
-    accion: 'eliminó una novedad del día',
-    tabla_afectada: 'novedades',
+    accion: `eliminó el tipo de novedad: ${anterior?.nombre || 'desconocido'}`,
+    tabla_afectada: 'tipos_novedad',
     registro_id: id,
     valor_anterior: anterior
   })

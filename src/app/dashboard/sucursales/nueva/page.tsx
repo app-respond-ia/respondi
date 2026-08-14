@@ -34,6 +34,7 @@ const MODULOS = [
   { id: 'configuracion_ia', label: 'Configuración del agente IA' },
   { id: 'servicios', label: 'Servicios' },
   { id: 'politicas', label: 'Políticas' },
+  { id: 'tipos_novedad', label: 'Tipos de novedades' },
 ]
 
 // CAMBIO 4: Días ordenados igual que el onboarding principal
@@ -72,7 +73,7 @@ export default function NuevaSucursalPage() {
   const [copiaAvanzada, setCopiaAvanzada] = useState(false)
   const [copiaModulos, setCopiaModulos] = useState<Record<string, string>>({
     horarios: '', skills: '', precios: '', etiquetas: '', reglas: '',
-    roles: '', configuracion_ia: '', servicios: '', politicas: ''
+    roles: '', configuracion_ia: '', servicios: '', politicas: '', tipos_novedad: ''
   })
   const [loadingCopia, setLoadingCopia] = useState(false)
   // CAMBIO 2: Estado para la vista previa de datos a copiar
@@ -110,6 +111,7 @@ export default function NuevaSucursalPage() {
   const [precios, setPrecios] = useState<any[]>([])
   const [etiquetas, setEtiquetas] = useState<any[]>([])
   const [reglas, setReglas] = useState<any[]>([])
+  const [tiposNovedad, setTiposNovedad] = useState<any[]>([])
   const [onbStep, setOnbStep] = useState(1)
   const [prodNombre, setProdNombre] = useState('')
   const [prodPrecio, setProdPrecio] = useState('')
@@ -164,6 +166,9 @@ export default function NuevaSucursalPage() {
       }
       if (!modulo || modulo === 'reglas') {
         if (d.reglas && d.reglas.length > 0) setReglas(d.reglas)
+      }
+      if (!modulo || modulo === 'tipos_novedad') {
+        if (d.tipos_novedad && d.tipos_novedad.length > 0) setTiposNovedad(d.tipos_novedad)
       }
       if (!modulo || modulo === 'servicios') {
         if (d.servicios) setServicios(d.servicios)
@@ -261,7 +266,8 @@ export default function NuevaSucursalPage() {
       skills: skills.map(s => ({ idName: s.idName, nombre: s.nombre, activo: s.activo })),
       precios,
       etiquetas,
-      reglas
+      reglas,
+      tipos_novedad: tiposNovedad
     })
     if (res.success) {
       // CAMBIO 5: router.push + router.refresh() para actualizar el selector de sucursal en el header
@@ -361,6 +367,7 @@ export default function NuevaSucursalPage() {
                       { label: 'Precios', value: previewData.precios?.length > 0 ? `${previewData.precios.length} productos` : 'Sin precios' },
                       { label: 'Etiquetas', value: previewData.etiquetas?.length > 0 ? `${previewData.etiquetas.length} etiquetas` : 'Sin etiquetas' },
                       { label: 'Reglas', value: previewData.reglas?.length > 0 ? `${previewData.reglas.length} reglas` : 'Sin reglas' },
+                      { label: 'Tipos de Novedades', value: previewData.tipos_novedad?.length > 0 ? `${previewData.tipos_novedad.length} tipos` : 'Sin tipos custom' },
                     ].map(item => (
                       <div key={item.label} className="flex items-center justify-between text-sm">
                         <span className="font-500 text-brand-800">{item.label}</span>

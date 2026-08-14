@@ -16,6 +16,19 @@ const AVAILABLE_ICONS = [
   'herramienta', 'chat', 'nube', 'sol', 'luna'
 ]
 
+// Forzamos a Tailwind a compilar estas clases dinámicas agregándolas aquí
+const TAILWIND_SAFELIST = [
+  'bg-blue-500 bg-blue-100 text-blue-600', 'bg-amber-500 bg-amber-100 text-amber-600',
+  'bg-purple-500 bg-purple-100 text-purple-600', 'bg-pink-500 bg-pink-100 text-pink-600',
+  'bg-emerald-500 bg-emerald-100 text-emerald-600', 'bg-slate-500 bg-slate-100 text-slate-600',
+  'bg-rose-500 bg-rose-100 text-rose-600', 'bg-orange-500 bg-orange-100 text-orange-600',
+  'bg-yellow-500 bg-yellow-100 text-yellow-600', 'bg-green-500 bg-green-100 text-green-600',
+  'bg-teal-500 bg-teal-100 text-teal-600', 'bg-cyan-500 bg-cyan-100 text-cyan-600',
+  'bg-sky-500 bg-sky-100 text-sky-600', 'bg-indigo-500 bg-indigo-100 text-indigo-600',
+  'bg-violet-500 bg-violet-100 text-violet-600', 'bg-fuchsia-500 bg-fuchsia-100 text-fuchsia-600',
+  'bg-red-500 bg-red-100 text-red-600', 'bg-lime-500 bg-lime-100 text-lime-600'
+]
+
 const DIAS_SEMANA = [
   { id: 1, label: 'Lunes' },
   { id: 2, label: 'Martes' },
@@ -113,6 +126,16 @@ export default function PerfilSucursalPage() {
   const removePolitica = (idx: number) => {
     setFormData(prev => ({ ...prev, politicas: prev.politicas.filter((_, i) => i !== idx) }))
   }
+
+  useEffect(() => {
+    // Si venimos de un enlace con ancla (ej: /dashboard/perfil-sucursal#tipos-novedad)
+    if (window.location.hash === '#tipos-novedad') {
+      setTimeout(() => {
+        const el = document.getElementById('tipos-novedad')
+        if (el) el.scrollIntoView({ behavior: 'smooth' })
+      }, 300) // Retraso para asegurar que la vista esté montada y el layout ajustado
+    }
+  }, [])
 
   useEffect(() => {
     const cargar = async () => {
@@ -660,7 +683,7 @@ export default function PerfilSucursalPage() {
                 </div>
 
                 <label className="block text-sm font-medium text-ink-700 mb-1.5">Color</label>
-                <div className="flex flex-wrap gap-2 mb-6">
+                <div className="grid grid-cols-6 sm:grid-cols-9 gap-2 mb-6">
                   {['blue', 'amber', 'purple', 'pink', 'emerald', 'slate', 'rose', 'orange', 'yellow', 'green', 'teal', 'cyan', 'sky', 'indigo', 'violet', 'fuchsia', 'red', 'lime'].map(col => (
                     <button key={col} type="button" onClick={() => setTipoFormData({...tipoFormData, color: col})}
                       className={`w-8 h-8 rounded-full border-2 transition-all ${tipoFormData.color === col ? 'border-brand-600 scale-110' : 'border-transparent hover:scale-110'}`}

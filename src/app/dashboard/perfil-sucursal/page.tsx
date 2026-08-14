@@ -6,6 +6,14 @@ import { getPerfilSucursal, savePerfilSucursal } from '@/app/actions/perfil'
 import { getHorarios, saveHorarios } from '@/app/actions/horarios'
 import { getMisPermisos } from '@/app/actions/permisos'
 import { getTiposNovedad, crearTipoNovedad, actualizarTipoNovedad, eliminarTipoNovedad, TipoNovedadData } from '@/app/actions/tipos-novedad'
+import { getIconSvg } from '@/components/novedades/NovedadesManager'
+
+const AVAILABLE_ICONS = [
+  'campana', 'reloj', 'caja', 'estrella', 'calendario', 'informacion',
+  'megafono', 'etiqueta', 'camion', 'candado', 'check', 'alerta', 
+  'corazon', 'fuego', 'regalo', 'ubicacion', 'telefono', 'email', 
+  'rayo', 'usuario', 'billete'
+]
 
 const DIAS_SEMANA = [
   { id: 1, label: 'Lunes' },
@@ -64,6 +72,7 @@ export default function PerfilSucursalPage() {
   const [tipoModalOpen, setTipoModalOpen] = useState(false)
   const [tipoEditItem, setTipoEditItem] = useState<TipoNovedadData | null>(null)
   const [tipoFormData, setTipoFormData] = useState({ nombre: '', icono: 'campana', color: 'slate' })
+  const [isIconSelectorOpen, setIsIconSelectorOpen] = useState(false)
   const [savingTipo, setSavingTipo] = useState(false)
 
   const [politicaModalOpen, setPoliticaModalOpen] = useState(false)
@@ -569,7 +578,7 @@ export default function PerfilSucursalPage() {
         </section>
 
         {/* SECCIÓN: TIPOS DE NOVEDADES */}
-        <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8">
+        <section id="tipos-novedad" className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8">
           <h2 className="text-xl font-bold text-ink-900 mb-6 border-b border-slate-100 pb-3">Tipos de Novedades</h2>
           <p className="text-sm text-ink-500 mb-5">Crea y gestiona las categorías de las novedades del día (ej. Ofertas, Horarios, Stock).</p>
           
@@ -579,12 +588,7 @@ export default function PerfilSucursalPage() {
                 <div key={t.id} className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50">
                   <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center bg-${t.color}-100 text-${t.color}-600`}>
-                      {t.icono === 'campana' && <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>}
-                      {t.icono === 'reloj' && <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-                      {t.icono === 'caja' && <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>}
-                      {t.icono === 'estrella' && <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>}
-                      {t.icono === 'calendario' && <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>}
-                      {t.icono === 'informacion' && <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+                      {getIconSvg(t.icono, 'w-4 h-4')}
                     </div>
                     <span className="font-600 text-sm text-ink-900">{t.nombre}</span>
                   </div>
@@ -622,18 +626,36 @@ export default function PerfilSucursalPage() {
                   placeholder="Ej. Ofertas" className="w-full h-11 px-4 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition mb-4" />
 
                 <label className="block text-sm font-medium text-ink-700 mb-1.5">Icono</label>
-                <div className="grid grid-cols-6 gap-2 mb-4">
-                  {['campana', 'reloj', 'caja', 'estrella', 'calendario', 'informacion'].map(ico => (
-                    <button key={ico} type="button" onClick={() => setTipoFormData({...tipoFormData, icono: ico})}
-                      className={`h-10 rounded-lg border flex items-center justify-center transition-all ${tipoFormData.icono === ico ? 'border-brand-600 bg-brand-50 text-brand-600 ring-2 ring-brand-100' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}>
-                      {ico === 'campana' && <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>}
-                      {ico === 'reloj' && <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-                      {ico === 'caja' && <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>}
-                      {ico === 'estrella' && <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>}
-                      {ico === 'calendario' && <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>}
-                      {ico === 'informacion' && <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-                    </button>
-                  ))}
+                <div className="relative mb-4">
+                  <button 
+                    type="button" 
+                    onClick={() => setIsIconSelectorOpen(!isIconSelectorOpen)}
+                    className="w-full h-11 px-4 rounded-xl border border-slate-300 bg-white text-sm flex items-center justify-between hover:border-brand-500 transition focus:outline-none focus:ring-4 focus:ring-brand-100"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="text-slate-500">
+                        {getIconSvg(tipoFormData.icono, 'w-5 h-5')}
+                      </div>
+                      <span className="text-ink-700 capitalize">{tipoFormData.icono}</span>
+                    </div>
+                    <svg className={`w-4 h-4 text-slate-400 transition-transform ${isIconSelectorOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                  </button>
+
+                  {isIconSelectorOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setIsIconSelectorOpen(false)}></div>
+                      <div className="absolute top-full left-0 right-0 mt-2 p-3 bg-white border border-slate-200 rounded-xl shadow-xl z-50 max-h-60 overflow-y-auto grid grid-cols-5 gap-2">
+                        {AVAILABLE_ICONS.map(ico => (
+                          <button key={ico} type="button" onClick={() => { setTipoFormData({...tipoFormData, icono: ico}); setIsIconSelectorOpen(false); }}
+                            className={`h-10 rounded-lg border flex items-center justify-center transition-all ${tipoFormData.icono === ico ? 'border-brand-600 bg-brand-50 text-brand-600 ring-2 ring-brand-100' : 'border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'}`}
+                            title={ico}
+                          >
+                            {getIconSvg(ico, 'w-5 h-5')}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 <label className="block text-sm font-medium text-ink-700 mb-1.5">Color</label>

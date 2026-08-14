@@ -128,23 +128,24 @@ export default function PerfilSucursalPage() {
   }
 
   useEffect(() => {
-    // Si venimos de un enlace con ancla (ej: /dashboard/perfil-sucursal#tipos-novedad)
-    if (window.location.hash === '#tipos-novedad') {
+    // Si venimos de un enlace con ancla y ya terminamos de cargar
+    if (!loading && typeof window !== 'undefined' && window.location.hash === '#tipos-novedad') {
       setTimeout(() => {
         const el = document.getElementById('tipos-novedad')
         if (el) el.scrollIntoView({ behavior: 'smooth' })
-      }, 300) // Retraso para asegurar que la vista esté montada y el layout ajustado
+      }, 50) // Pequeño delay de 1 frame para asegurar que el DOM terminó de pintarse
     }
-  }, [])
+  }, [loading])
 
   useEffect(() => {
     const cargar = async () => {
       setLoading(true)
-      const [resPerfil, resHorarios, permisosRes] = await Promise.all([
-        getPerfilSucursal(),
-        getHorarios(),
-        getMisPermisos()
-      ])
+      try {
+        const [resPerfil, resHorarios, permisosRes] = await Promise.all([
+          getPerfilSucursal(),
+          getHorarios(),
+          getMisPermisos()
+        ])
       
       if (permisosRes.success) {
         if ((permisosRes as any).esAdmin) {
@@ -182,8 +183,11 @@ export default function PerfilSucursalPage() {
       if (resTipos.success && resTipos.data) {
         setTiposNovedad(resTipos.data)
       }
-
-      setLoading(false)
+      } catch (error) {
+        console.error("Error al cargar datos del perfil:", error)
+      } finally {
+        setLoading(false)
+      }
     }
     cargar()
   }, [])

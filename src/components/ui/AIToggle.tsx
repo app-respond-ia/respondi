@@ -30,7 +30,7 @@ export function AIToggle({ isPaused, onToggleConfirm, disabled }: AIToggleProps)
             <span className="sm:hidden">{isPaused ? 'Pausada' : 'Activa'}</span>
             <span className="hidden sm:inline">{isPaused ? 'IA en pausa' : 'IA activa'}</span>
           </p>
-          <div className="hidden sm:block">
+          <div>
             <HelpPopover content="Indica si la IA responde automáticamente al cliente (Activa) o si está silenciada para que un humano intervenga manualmente (Pausada)." />
           </div>
         </div>

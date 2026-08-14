@@ -575,7 +575,7 @@ function ChatsContent() {
   )
 
   return (
-    <div className="flex-1 -mx-4 sm:-mx-6 lg:-mx-8 -my-6 flex flex-col lg:flex-row h-[calc(100dvh-128px)] lg:h-auto lg:overflow-hidden bg-white border-t border-slate-200">
+    <div className="fixed inset-x-0 top-20 bottom-0 z-10 flex flex-col bg-white lg:static lg:flex-1 lg:flex-row lg:z-auto lg:overflow-hidden lg:-mx-8 lg:-my-6 lg:border-t lg:border-slate-200">
       {/* PANEL IZQUIERDO */}
       <section className={`flex flex-col w-full lg:w-[320px] xl:w-96 lg:shrink-0 border-r border-slate-200 bg-white lg:h-full ${selectedConvId ? 'hidden lg:flex' : 'flex'}`}>
         <div className="px-4 h-20 flex items-center gap-3 border-b border-slate-200 shrink-0">
@@ -809,7 +809,7 @@ function ChatsContent() {
       </section>
 
       {/* PANEL DERECHO */}
-      <section className={`flex flex-col flex-1 min-w-0 bg-slate-50 lg:h-full ${!selectedConvId ? 'hidden lg:flex items-center justify-center' : 'flex'}`}>
+      <section className={`flex flex-col flex-1 min-w-0 min-h-0 bg-slate-50 lg:h-full ${!selectedConvId ? 'hidden lg:flex items-center justify-center' : 'flex'}`}>
         {!selectedConvId ? (
           <div className="text-center text-ink-500">Selecciona una conversación para ver el hilo</div>
         ) : (

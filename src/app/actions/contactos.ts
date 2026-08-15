@@ -10,11 +10,12 @@ export interface ContactosConfigData {
 }
 
 export interface ActualizarTratoContactoData {
-  canal: 'instagram' | 'whatsapp' | 'facebook'
+  canal: string
   identificador_canal: string
-  nombre: string | null
+  nombre?: string | null
   trato: 'normal' | 'sin_ia' | 'bloqueado'
-  nota: string
+  nota?: string
+  modo?: 'ignorar' | 'respuesta_automatica' | 'derivar' | null
 }
 
 // Función auxiliar para obtener credenciales del usuario activo
@@ -94,13 +95,11 @@ export async function getContactos() {
   const auth = await getAuthData(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
-  // Obtenemos solo los contactos que tengan algún trato especial para no saturar la tabla
-  // Si se requiere ver todos, se podría quitar el .neq
+  // Obtenemos todos los contactos para permitir filtrar en UI
   const { data, error } = await supabase
     .from('contacts')
     .select('*')
     .eq('tenant_id', auth.tenant_id)
-    .neq('trato', 'normal')
     .order('fecha_actualizacion', { ascending: false })
 
   if (error) return { success: false, error: error.message }
@@ -129,6 +128,7 @@ export async function actualizarTratoContacto(data: ActualizarTratoContactoData)
     // 2. Si existe, actualizar
     const updatePayload: any = {
       trato: data.trato,
+      modo: data.trato === 'normal' ? null : (data.modo || null),
       nota: data.nota,
       fecha_actualizacion: ahora
     }
@@ -167,6 +167,7 @@ export async function actualizarTratoContacto(data: ActualizarTratoContactoData)
         identificador_canal: data.identificador_canal,
         nombre: data.nombre || null,
         trato: data.trato,
+        modo: data.trato === 'normal' ? null : (data.modo || null),
         nota: data.nota,
         fecha_actualizacion: ahora
       }])

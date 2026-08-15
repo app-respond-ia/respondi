@@ -58,6 +58,7 @@ function formatDate(isoStr: string) {
 export default function ContactosPage() {
   const [loading, setLoading] = useState(true)
   const [contactos, setContactos] = useState<any[]>([])
+  const [filtroTrato, setFiltroTrato] = useState<'todos' | 'normal' | 'sin_ia' | 'bloqueado'>('todos')
   const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
   
@@ -73,14 +74,20 @@ export default function ContactosPage() {
     id?: string
     canal: CanalConfigKey
     identificador_canal: string
+    prefijo_whatsapp: string
+    numero_whatsapp: string
     nombre: string
     trato: TratoContacto
+    modo_contacto: ModoContacto | null
     nota: string
   }>({
     canal: 'whatsapp',
     identificador_canal: '',
+    prefijo_whatsapp: '+34',
+    numero_whatsapp: '',
     nombre: '',
     trato: 'bloqueado',
+    modo_contacto: 'ignorar',
     nota: ''
   })
 
@@ -138,20 +145,39 @@ export default function ContactosPage() {
     setModalFormData({
       canal: 'whatsapp',
       identificador_canal: '',
+      prefijo_whatsapp: '+34',
+      numero_whatsapp: '',
       nombre: '',
       trato: 'bloqueado',
+      modo_contacto: modo,
       nota: ''
     })
     setIsModalOpen(true)
   }
 
   const openEditar = (contacto: any) => {
+    let prefijo = '+34'
+    let numero = ''
+    
+    if (contacto.canal === 'whatsapp') {
+      const match = contacto.identificador_canal.match(/^(\+\d{1,4})(.*)$/)
+      if (match) {
+        prefijo = match[1]
+        numero = match[2]
+      } else {
+        numero = contacto.identificador_canal.replace(/^\+/, '')
+      }
+    }
+
     setModalFormData({
       id: contacto.id,
       canal: contacto.canal,
-      identificador_canal: contacto.identificador_canal,
+      identificador_canal: contacto.canal !== 'whatsapp' ? contacto.identificador_canal : '',
+      prefijo_whatsapp: prefijo,
+      numero_whatsapp: numero,
       nombre: contacto.nombre || '',
       trato: contacto.trato,
+      modo_contacto: contacto.modo || modo,
       nota: contacto.nota || ''
     })
     setIsModalOpen(true)
@@ -161,23 +187,23 @@ export default function ContactosPage() {
     e.preventDefault()
     setSavingContacto(true)
 
-    const identificadorFormateado = formatChannelId(modalFormData.canal, modalFormData.identificador_canal)
+    const identificadorRaw = modalFormData.canal === 'whatsapp'
+      ? `${modalFormData.prefijo_whatsapp}${modalFormData.numero_whatsapp}`
+      : modalFormData.identificador_canal
+
+    const identificadorFormateado = formatChannelId(modalFormData.canal, identificadorRaw)
 
     const res = await actualizarTratoContacto({
       canal: modalFormData.canal,
       identificador_canal: identificadorFormateado,
       nombre: modalFormData.nombre || null,
       trato: modalFormData.trato,
+      modo: modalFormData.trato === 'normal' ? null : modalFormData.modo_contacto,
       nota: modalFormData.nota
     })
 
     if (res.success && res.data) {
-      if (res.data.trato === 'normal') {
-        // Si lo pasaron a normal, lo sacamos de la lista principal
-        setContactos(prev => prev.filter(c => c.id !== res.data.id))
-      } else {
-        setContactos(prev => [res.data, ...prev.filter(c => c.id !== res.data.id)])
-      }
+      setContactos(prev => [res.data, ...prev.filter(c => c.id !== res.data.id)])
       setIsModalOpen(false)
       setMensaje({ tipo: 'exito', texto: 'Contacto guardado correctamente ✓' })
     } else {
@@ -198,14 +224,16 @@ export default function ContactosPage() {
       nota: 'Restaurado a normal'
     })
     
-    if (res.success) {
-      setContactos(prev => prev.filter(c => c.id !== contacto.id))
+    if (res.success && res.data) {
+      setContactos(prev => [res.data, ...prev.filter(c => c.id !== contacto.id)])
       setMensaje({ tipo: 'exito', texto: 'Contacto restaurado a estado normal ✓' })
     } else {
       setMensaje({ tipo: 'error', texto: 'Error al actualizar contacto: ' + res.error })
     }
     setTimeout(() => setMensaje(null), 3000)
   }
+
+  const contactosFiltrados = contactos.filter(c => filtroTrato === 'todos' || c.trato === filtroTrato)
 
   if (loading || nivelPermiso === null) {
     return <Loading />
@@ -316,21 +344,32 @@ export default function ContactosPage() {
         </div>
       </section>
 
-      {/* ====== LISTA DE CONTACTOS CON TRATO ESPECIAL ====== */}
+      {/* ====== LISTA DE CONTACTOS GESTIONADOS ====== */}
       <section>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-display font-600 text-lg text-ink-900">Contactos con trato especial</h2>
-          <span className="text-sm font-500 text-ink-500 px-3 py-1 bg-slate-100 rounded-full">{contactos.length} contactos</span>
+        <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
+          <h2 className="font-display font-600 text-lg text-ink-900">Contactos gestionados</h2>
+          
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
+            {(['todos', 'normal', 'sin_ia', 'bloqueado'] as const).map(f => (
+              <button
+                key={f}
+                onClick={() => setFiltroTrato(f)}
+                className={`px-3 py-1.5 text-xs font-600 rounded-md transition ${filtroTrato === f ? 'bg-white shadow-sm text-ink-900' : 'text-ink-500 hover:text-ink-700'}`}
+              >
+                {f === 'todos' ? 'Todos' : f === 'normal' ? 'Normales' : f === 'sin_ia' ? 'Sin IA' : 'Bloqueados'}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {contactos.length === 0 ? (
+        {contactosFiltrados.length === 0 ? (
           <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
-            <p className="font-semibold text-ink-900 text-lg mb-2">No tienes contactos especiales.</p>
-            <p className="text-ink-500 text-sm">Cuando asignes un trato distinto a 'Normal', aparecerán aquí.</p>
+            <p className="font-semibold text-ink-900 text-lg mb-2">No hay contactos en esta vista.</p>
+            <p className="text-ink-500 text-sm">Cambia el filtro o añade un nuevo trato especial.</p>
           </div>
         ) : (
           <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col divide-y divide-slate-100 relative">
-            {contactos.map((contacto) => {
+            {contactosFiltrados.map((contacto) => {
               const conf = CANAL_CONFIG[contacto.canal as CanalConfigKey]
               return (
                 <div key={contacto.id} className="p-4 sm:p-5 flex items-start gap-4 hover:bg-slate-50 transition-colors bg-white">
@@ -355,6 +394,9 @@ export default function ContactosPage() {
                       {contacto.trato === 'sin_ia' && (
                         <span className="ml-2 px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-600 rounded">Sin IA</span>
                       )}
+                      {contacto.trato === 'normal' && (
+                        <span className="ml-2 px-2 py-0.5 bg-slate-100 text-slate-600 text-xs font-600 rounded">Normal</span>
+                      )}
                     </div>
                     
                     <p className="text-sm text-ink-500 mb-2 line-clamp-2">{contacto.nota}</p>
@@ -370,9 +412,11 @@ export default function ContactosPage() {
                     <button onClick={() => openEditar(contacto)} disabled={nivelPermiso !== 'escritura'} className="px-3 h-9 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-600 text-ink-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
                       Editar
                     </button>
-                    <button onClick={() => handleDesbloquear(contacto)} disabled={nivelPermiso !== 'escritura'} className="px-3 h-9 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-600 text-ink-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
-                      Hacer normal
-                    </button>
+                    {contacto.trato !== 'normal' && (
+                      <button onClick={() => handleDesbloquear(contacto)} disabled={nivelPermiso !== 'escritura'} className="px-3 h-9 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-600 text-ink-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                        Hacer normal
+                      </button>
+                    )}
                   </div>
                 </div>
               )
@@ -393,7 +437,7 @@ export default function ContactosPage() {
               
               <form onSubmit={handleGuardarContacto} className="flex flex-col h-full">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
-                  <h2 className="font-display font-700 text-lg text-ink-900">{modalFormData.id ? 'Editar contacto' : 'Nuevo contacto especial'}</h2>
+                  <h2 className="font-display font-700 text-lg text-ink-900">{modalFormData.id ? 'Editar contacto' : 'Nuevo contacto'}</h2>
                   <button type="button" onClick={() => !savingContacto && setIsModalOpen(false)} className="p-1.5 rounded-lg text-ink-400 hover:text-ink-700 hover:bg-slate-100 transition" aria-label="Cerrar">
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                   </button>
@@ -413,6 +457,21 @@ export default function ContactosPage() {
                     </select>
                   </div>
 
+                  {/* Modo (Solo si no es normal) */}
+                  {modalFormData.trato !== 'normal' && (
+                    <div>
+                      <label className="block text-sm font-500 text-ink-700 mb-1.5">Acción a realizar</label>
+                      <select required
+                        value={modalFormData.modo_contacto || 'ignorar'}
+                        onChange={e => setModalFormData({...modalFormData, modo_contacto: e.target.value as ModoContacto})}
+                        className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm">
+                        <option value="ignorar">Ignorar en silencio</option>
+                        <option value="respuesta_automatica">Respuesta automática (Mensaje global)</option>
+                        <option value="derivar">Derivar a un agente (Caso)</option>
+                      </select>
+                    </div>
+                  )}
+
                   {/* Canal */}
                   <div>
                     <label className="block text-sm font-500 text-ink-700 mb-1.5">Canal</label>
@@ -430,11 +489,45 @@ export default function ContactosPage() {
                   {/* Identificador */}
                   <div>
                     <label className="block text-sm font-500 text-ink-700 mb-1.5">Identificador del contacto</label>
-                    <input type="text" placeholder={modalFormData.canal === 'whatsapp' ? 'Ej. +58 414 555 0000' : 'Ej. @usuario'} required
-                      disabled={!!modalFormData.id}
-                      value={modalFormData.identificador_canal}
-                      onChange={e => setModalFormData({...modalFormData, identificador_canal: e.target.value})}
-                      className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm disabled:bg-slate-50 disabled:opacity-75" />
+                    {modalFormData.canal === 'whatsapp' ? (
+                      <div className="flex gap-2">
+                        <select 
+                          disabled={!!modalFormData.id}
+                          value={modalFormData.prefijo_whatsapp}
+                          onChange={e => setModalFormData({...modalFormData, prefijo_whatsapp: e.target.value})}
+                          className="w-28 shrink-0 h-12 px-2 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm disabled:bg-slate-50 disabled:opacity-75">
+                          <option value="+34">🇪🇸 +34</option>
+                          <option value="+52">🇲🇽 +52</option>
+                          <option value="+54">🇦🇷 +54</option>
+                          <option value="+57">🇨🇴 +57</option>
+                          <option value="+51">🇵🇪 +51</option>
+                          <option value="+56">🇨🇱 +56</option>
+                          <option value="+598">🇺🇾 +598</option>
+                          <option value="+595">🇵🇾 +595</option>
+                          <option value="+58">🇻🇪 +58</option>
+                          <option value="+593">🇪🇨 +593</option>
+                          <option value="+591">🇧🇴 +591</option>
+                          <option value="+502">🇬🇹 +502</option>
+                          <option value="+503">🇸🇻 +503</option>
+                          <option value="+504">🇭🇳 +504</option>
+                          <option value="+505">🇳🇮 +505</option>
+                          <option value="+506">🇨🇷 +506</option>
+                          <option value="+507">🇵🇦 +507</option>
+                          <option value="+1">🇺🇸 +1</option>
+                        </select>
+                        <input type="text" placeholder="Ej. 414 555 0000" required
+                          disabled={!!modalFormData.id}
+                          value={modalFormData.numero_whatsapp}
+                          onChange={e => setModalFormData({...modalFormData, numero_whatsapp: e.target.value.replace(/\D/g, '')})}
+                          className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm disabled:bg-slate-50 disabled:opacity-75" />
+                      </div>
+                    ) : (
+                      <input type="text" placeholder="Ej. @usuario" required
+                        disabled={!!modalFormData.id}
+                        value={modalFormData.identificador_canal}
+                        onChange={e => setModalFormData({...modalFormData, identificador_canal: e.target.value.replace(/[^a-zA-Z0-9._@]/g, '')})}
+                        className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm disabled:bg-slate-50 disabled:opacity-75" />
+                    )}
                     {!modalFormData.id && (
                       <p className="text-xs text-ink-500 mt-1">Se formateará automáticamente al guardar.</p>
                     )}

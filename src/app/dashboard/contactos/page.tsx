@@ -7,8 +7,7 @@ import {
   actualizarContactosConfig,
   getContactos,
   actualizarTratoContacto,
-  ContactosConfigData,
-  ActualizarTratoContactoData
+  ContactosConfigData
 } from '@/app/actions/contactos'
 import { getMisPermisos } from '@/app/actions/permisos'
 import { formatChannelId } from '@/lib/formatters'
@@ -43,6 +42,24 @@ const CANAL_CONFIG = {
   },
 } as const
 
+const MODO_UI_CONFIG = {
+  ignorar: {
+    label: 'Ignorar en silencio',
+    badgeColor: 'bg-slate-100 text-slate-700',
+    icon: <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
+  },
+  respuesta_automatica: {
+    label: 'Respuesta automática',
+    badgeColor: 'bg-brand-100 text-brand-700',
+    icon: <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+  },
+  derivar: {
+    label: 'Derivar a un agente',
+    badgeColor: 'bg-orange-100 text-orange-700',
+    icon: <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-6a4 4 0 11-8 0 4 4 0 018 0zm6 3a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+  }
+} as const
+
 type CanalConfigKey = keyof typeof CANAL_CONFIG
 type ModoContacto = 'ignorar' | 'respuesta_automatica' | 'derivar'
 type TratoContacto = 'normal' | 'sin_ia' | 'bloqueado'
@@ -58,16 +75,21 @@ function formatDate(isoStr: string) {
 export default function ContactosPage() {
   const [loading, setLoading] = useState(true)
   const [contactos, setContactos] = useState<any[]>([])
+  
+  // Filtros
   const [filtroTrato, setFiltroTrato] = useState<'todos' | 'normal' | 'sin_ia' | 'bloqueado'>('todos')
+  const [filtroModo, setFiltroModo] = useState<'todos' | ModoContacto>('todos')
+  
   const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
   
-  // Config state
+  // Config state (Global settings)
   const [modo, setModo] = useState<ModoContacto>('ignorar')
   const [respuestaAuto, setRespuestaAuto] = useState('')
   const [savingConfig, setSavingConfig] = useState(false)
+  const [isConfigModalOpen, setIsConfigModalOpen] = useState(false)
 
-  // Modal state
+  // Modal state (Contact)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [savingContacto, setSavingContacto] = useState(false)
   const [modalFormData, setModalFormData] = useState<{
@@ -124,7 +146,15 @@ export default function ContactosPage() {
     cargar()
   }, [])
 
-  const handleSaveConfig = async () => {
+  // Limpiar filtro modo si se selecciona 'normales'
+  useEffect(() => {
+    if (filtroTrato === 'normal') {
+      setFiltroModo('todos')
+    }
+  }, [filtroTrato])
+
+  const handleSaveConfig = async (e: React.FormEvent) => {
+    e.preventDefault()
     setSavingConfig(true)
     const payload: ContactosConfigData = {
       trato_contactos_modo: modo,
@@ -134,6 +164,7 @@ export default function ContactosPage() {
     const res = await actualizarContactosConfig(payload)
     if (res.success) {
       setMensaje({ tipo: 'exito', texto: 'Configuración guardada correctamente ✓' })
+      setIsConfigModalOpen(false)
     } else {
       setMensaje({ tipo: 'error', texto: res.error || 'Error al guardar la configuración' })
     }
@@ -233,7 +264,11 @@ export default function ContactosPage() {
     setTimeout(() => setMensaje(null), 3000)
   }
 
-  const contactosFiltrados = contactos.filter(c => filtroTrato === 'todos' || c.trato === filtroTrato)
+  const contactosFiltrados = contactos.filter(c => {
+    const pasaTrato = filtroTrato === 'todos' || c.trato === filtroTrato
+    const pasaModo = filtroModo === 'todos' || c.modo === filtroModo
+    return pasaTrato && pasaModo
+  })
 
   if (loading || nivelPermiso === null) {
     return <Loading />
@@ -265,100 +300,50 @@ export default function ContactosPage() {
           <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Contactos</h1>
           <p className="text-ink-500 mt-1 max-w-xl">Gestiona el trato especial para contactos (bloqueados o sin IA).</p>
         </div>
-        <button onClick={openAñadir} disabled={nivelPermiso !== 'escritura'} className="inline-flex items-center gap-2 px-4 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition disabled:opacity-50 disabled:cursor-not-allowed">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
-          Nuevo trato de contacto
-        </button>
-      </div>
-
-      {/* ====== CONFIGURACIÓN DE MODO ====== */}
-      <section className="mb-10">
-        <div className="mb-4">
-          <h2 className="font-display font-600 text-lg text-ink-900">Configuración global de Bloqueos</h2>
-          <p className="text-sm text-ink-500 mt-0.5">Define qué sucederá cuando un contacto tenga estado "Bloqueado".</p>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {/* Modo 1: ignorar */}
-          <label className={`relative rounded-2xl border-2 p-4 cursor-pointer transition ${nivelPermiso !== 'escritura' ? 'pointer-events-none opacity-50' : ''} ${modo === 'ignorar' ? 'border-brand-500 bg-brand-50/50 ring-4 ring-brand-100' : 'border-slate-200 bg-white hover:border-brand-300'}`}>
-            <input type="radio" name="modo" value="ignorar" checked={modo === 'ignorar'} onChange={() => setModo('ignorar')} disabled={nivelPermiso !== 'escritura'} className="sr-only" />
-            {modo === 'ignorar' && (
-              <span className="absolute top-3 right-3 w-5 h-5 rounded-full bg-brand-600 flex items-center justify-center">
-                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
-              </span>
-            )}
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${modo === 'ignorar' ? 'bg-brand-100 text-brand-700' : 'bg-slate-100 text-slate-600'}`}>
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
-            </div>
-            <p className="font-600 text-sm text-ink-900">Ignorar en silencio</p>
-            <p className="text-xs text-ink-500 mt-1 leading-relaxed">no responde, no avisa</p>
-          </label>
-
-          {/* Modo 2: respuesta_automatica */}
-          <label className={`relative rounded-2xl border-2 p-4 cursor-pointer transition ${nivelPermiso !== 'escritura' ? 'pointer-events-none opacity-50' : ''} ${modo === 'respuesta_automatica' ? 'border-brand-500 bg-brand-50/50 ring-4 ring-brand-100' : 'border-slate-200 bg-white hover:border-brand-300'}`}>
-            <input type="radio" name="modo" value="respuesta_automatica" checked={modo === 'respuesta_automatica'} onChange={() => setModo('respuesta_automatica')} disabled={nivelPermiso !== 'escritura'} className="sr-only" />
-            {modo === 'respuesta_automatica' && (
-              <span className="absolute top-3 right-3 w-5 h-5 rounded-full bg-brand-600 flex items-center justify-center">
-                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
-              </span>
-            )}
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${modo === 'respuesta_automatica' ? 'bg-brand-100 text-brand-700' : 'bg-slate-100 text-slate-600'}`}>
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
-            </div>
-            <p className="font-600 text-sm text-ink-900">Respuesta automática</p>
-            <p className="text-xs text-ink-500 mt-1 leading-relaxed">envía un mensaje fijo, la IA no se activa</p>
-          </label>
-
-          {/* Modo 3: derivar */}
-          <label className={`relative rounded-2xl border-2 p-4 cursor-pointer transition ${nivelPermiso !== 'escritura' ? 'pointer-events-none opacity-50' : ''} ${modo === 'derivar' ? 'border-brand-500 bg-brand-50/50 ring-4 ring-brand-100' : 'border-slate-200 bg-white hover:border-brand-300'}`}>
-            <input type="radio" name="modo" value="derivar" checked={modo === 'derivar'} onChange={() => setModo('derivar')} disabled={nivelPermiso !== 'escritura'} className="sr-only" />
-            {modo === 'derivar' && (
-              <span className="absolute top-3 right-3 w-5 h-5 rounded-full bg-brand-600 flex items-center justify-center">
-                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
-              </span>
-            )}
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${modo === 'derivar' ? 'bg-brand-100 text-brand-700' : 'bg-slate-100 text-slate-600'}`}>
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-6a4 4 0 11-8 0 4 4 0 018 0zm6 3a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-            </div>
-            <p className="font-600 text-sm text-ink-900">Derivar a un agente</p>
-            <p className="text-xs text-ink-500 mt-1 leading-relaxed">abre un caso para que un humano gestione cada mensaje</p>
-          </label>
-        </div>
-
-        {modo === 'respuesta_automatica' && (
-          <div className="mt-4 p-4 rounded-2xl bg-white border border-slate-200">
-            <label className="block text-sm font-500 text-ink-700 mb-1.5">Mensaje que se enviará</label>
-            <textarea rows={2} 
-              value={respuestaAuto}
-              onChange={e => setRespuestaAuto(e.target.value)}
-              disabled={nivelPermiso !== 'escritura'}
-              placeholder="Lo sentimos, no podemos atender tu mensaje en este momento. Para cualquier consulta urgente, contáctanos por otro canal."
-              className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white resize-none placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition disabled:opacity-50 disabled:bg-slate-50"></textarea>
-          </div>
-        )}
-
-        <div className="mt-4 flex items-center gap-4">
-          <button onClick={handleSaveConfig} disabled={savingConfig || nivelPermiso !== 'escritura'} className="px-5 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
-            {savingConfig ? 'Guardando...' : 'Guardar configuración'}
+        <div className="flex items-center gap-3">
+          <button onClick={() => setIsConfigModalOpen(true)} disabled={nivelPermiso !== 'escritura'} className="inline-flex items-center gap-2 px-4 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            Ajustes globales
+          </button>
+          <button onClick={openAñadir} disabled={nivelPermiso !== 'escritura'} className="inline-flex items-center gap-2 px-4 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition disabled:opacity-50 disabled:cursor-not-allowed">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
+            Nuevo trato de contacto
           </button>
         </div>
-      </section>
+      </div>
 
       {/* ====== LISTA DE CONTACTOS GESTIONADOS ====== */}
       <section>
         <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
           <h2 className="font-display font-600 text-lg text-ink-900">Contactos gestionados</h2>
           
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
-            {(['todos', 'normal', 'sin_ia', 'bloqueado'] as const).map(f => (
-              <button
-                key={f}
-                onClick={() => setFiltroTrato(f)}
-                className={`px-3 py-1.5 text-xs font-600 rounded-md transition ${filtroTrato === f ? 'bg-white shadow-sm text-ink-900' : 'text-ink-500 hover:text-ink-700'}`}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Filtro principal (Trato) */}
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
+              {(['todos', 'normal', 'sin_ia', 'bloqueado'] as const).map(f => (
+                <button
+                  key={f}
+                  onClick={() => setFiltroTrato(f)}
+                  className={`px-3 py-1.5 text-xs font-600 rounded-md transition ${filtroTrato === f ? 'bg-white shadow-sm text-ink-900' : 'text-ink-500 hover:text-ink-700'}`}
+                >
+                  {f === 'todos' ? 'Todos' : f === 'normal' ? 'Normales' : f === 'sin_ia' ? 'Sin IA' : 'Bloqueados'}
+                </button>
+              ))}
+            </div>
+
+            {/* Filtro secundario (Modo) */}
+            {filtroTrato !== 'normal' && (
+              <select
+                value={filtroModo}
+                onChange={e => setFiltroModo(e.target.value as any)}
+                className="h-[32px] px-3 rounded-lg border border-slate-300 bg-white text-xs font-500 text-ink-700 focus:outline-none focus:border-brand-500 transition"
               >
-                {f === 'todos' ? 'Todos' : f === 'normal' ? 'Normales' : f === 'sin_ia' ? 'Sin IA' : 'Bloqueados'}
-              </button>
-            ))}
+                <option value="todos">Cualquier modo</option>
+                <option value="ignorar">Ignorar en silencio</option>
+                <option value="respuesta_automatica">Respuesta automática</option>
+                <option value="derivar">Derivar a un agente</option>
+              </select>
+            )}
           </div>
         </div>
 
@@ -371,6 +356,8 @@ export default function ContactosPage() {
           <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col divide-y divide-slate-100 relative">
             {contactosFiltrados.map((contacto) => {
               const conf = CANAL_CONFIG[contacto.canal as CanalConfigKey]
+              const modoInfo = contacto.modo && contacto.trato !== 'normal' ? MODO_UI_CONFIG[contacto.modo as ModoContacto] : null
+              
               return (
                 <div key={contacto.id} className="p-4 sm:p-5 flex items-start gap-4 hover:bg-slate-50 transition-colors bg-white">
                   
@@ -396,6 +383,14 @@ export default function ContactosPage() {
                       )}
                       {contacto.trato === 'normal' && (
                         <span className="ml-2 px-2 py-0.5 bg-slate-100 text-slate-600 text-xs font-600 rounded">Normal</span>
+                      )}
+                      
+                      {/* Badge de modo */}
+                      {modoInfo && (
+                        <span className={`flex items-center gap-1 px-2 py-0.5 text-xs font-600 rounded ${modoInfo.badgeColor}`}>
+                          {modoInfo.icon}
+                          {modoInfo.label}
+                        </span>
                       )}
                     </div>
                     
@@ -424,6 +419,103 @@ export default function ContactosPage() {
           </div>
         )}
       </section>
+
+      {/* =========================================================
+           MODAL · Configuración Global
+           ========================================================= */}
+      {isConfigModalOpen && (
+        <div className="fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-ink-900/50 backdrop-blur-sm" onClick={() => !savingConfig && setIsConfigModalOpen(false)}></div>
+        
+          <div className="relative min-h-full flex items-center justify-center p-4 pointer-events-none">
+            <div className="w-full max-w-3xl bg-white rounded-2xl shadow-2xl pointer-events-auto flex flex-col max-h-[90vh]">
+              
+              <form onSubmit={handleSaveConfig} className="flex flex-col h-full">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
+                  <div>
+                    <h2 className="font-display font-700 text-lg text-ink-900">Ajustes globales de bloqueos</h2>
+                    <p className="text-sm text-ink-500 mt-0.5">Define qué sucederá por defecto cuando un contacto tenga estado "Bloqueado".</p>
+                  </div>
+                  <button type="button" onClick={() => !savingConfig && setIsConfigModalOpen(false)} className="p-1.5 rounded-lg text-ink-400 hover:text-ink-700 hover:bg-slate-100 transition" aria-label="Cerrar">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                  </button>
+                </div>
+        
+                <div className="px-6 py-5 overflow-y-auto">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {/* Modo 1: ignorar */}
+                    <label className={`relative rounded-2xl border-2 p-4 cursor-pointer transition ${nivelPermiso !== 'escritura' ? 'pointer-events-none opacity-50' : ''} ${modo === 'ignorar' ? 'border-brand-500 bg-brand-50/50 ring-4 ring-brand-100' : 'border-slate-200 bg-white hover:border-brand-300'}`}>
+                      <input type="radio" name="modo_global" value="ignorar" checked={modo === 'ignorar'} onChange={() => setModo('ignorar')} disabled={nivelPermiso !== 'escritura'} className="sr-only" />
+                      {modo === 'ignorar' && (
+                        <span className="absolute top-3 right-3 w-5 h-5 rounded-full bg-brand-600 flex items-center justify-center">
+                          <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+                        </span>
+                      )}
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${modo === 'ignorar' ? 'bg-brand-100 text-brand-700' : 'bg-slate-100 text-slate-600'}`}>
+                        {MODO_UI_CONFIG.ignorar.icon}
+                      </div>
+                      <p className="font-600 text-sm text-ink-900">Ignorar en silencio</p>
+                      <p className="text-xs text-ink-500 mt-1 leading-relaxed">no responde, no avisa</p>
+                    </label>
+
+                    {/* Modo 2: respuesta_automatica */}
+                    <label className={`relative rounded-2xl border-2 p-4 cursor-pointer transition ${nivelPermiso !== 'escritura' ? 'pointer-events-none opacity-50' : ''} ${modo === 'respuesta_automatica' ? 'border-brand-500 bg-brand-50/50 ring-4 ring-brand-100' : 'border-slate-200 bg-white hover:border-brand-300'}`}>
+                      <input type="radio" name="modo_global" value="respuesta_automatica" checked={modo === 'respuesta_automatica'} onChange={() => setModo('respuesta_automatica')} disabled={nivelPermiso !== 'escritura'} className="sr-only" />
+                      {modo === 'respuesta_automatica' && (
+                        <span className="absolute top-3 right-3 w-5 h-5 rounded-full bg-brand-600 flex items-center justify-center">
+                          <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+                        </span>
+                      )}
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${modo === 'respuesta_automatica' ? 'bg-brand-100 text-brand-700' : 'bg-slate-100 text-slate-600'}`}>
+                        {MODO_UI_CONFIG.respuesta_automatica.icon}
+                      </div>
+                      <p className="font-600 text-sm text-ink-900">Respuesta automática</p>
+                      <p className="text-xs text-ink-500 mt-1 leading-relaxed">envía un mensaje fijo, la IA no se activa</p>
+                    </label>
+
+                    {/* Modo 3: derivar */}
+                    <label className={`relative rounded-2xl border-2 p-4 cursor-pointer transition ${nivelPermiso !== 'escritura' ? 'pointer-events-none opacity-50' : ''} ${modo === 'derivar' ? 'border-brand-500 bg-brand-50/50 ring-4 ring-brand-100' : 'border-slate-200 bg-white hover:border-brand-300'}`}>
+                      <input type="radio" name="modo_global" value="derivar" checked={modo === 'derivar'} onChange={() => setModo('derivar')} disabled={nivelPermiso !== 'escritura'} className="sr-only" />
+                      {modo === 'derivar' && (
+                        <span className="absolute top-3 right-3 w-5 h-5 rounded-full bg-brand-600 flex items-center justify-center">
+                          <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+                        </span>
+                      )}
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${modo === 'derivar' ? 'bg-brand-100 text-brand-700' : 'bg-slate-100 text-slate-600'}`}>
+                        {MODO_UI_CONFIG.derivar.icon}
+                      </div>
+                      <p className="font-600 text-sm text-ink-900">Derivar a un agente</p>
+                      <p className="text-xs text-ink-500 mt-1 leading-relaxed">abre un caso para que un humano gestione cada mensaje</p>
+                    </label>
+                  </div>
+
+                  {modo === 'respuesta_automatica' && (
+                    <div className="mt-4 p-4 rounded-2xl bg-white border border-slate-200">
+                      <label className="block text-sm font-500 text-ink-700 mb-1.5">Mensaje que se enviará</label>
+                      <textarea rows={2} 
+                        value={respuestaAuto}
+                        onChange={e => setRespuestaAuto(e.target.value)}
+                        disabled={nivelPermiso !== 'escritura'}
+                        placeholder="Lo sentimos, no podemos atender tu mensaje en este momento. Para cualquier consulta urgente, contáctanos por otro canal."
+                        className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white resize-none placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition disabled:opacity-50 disabled:bg-slate-50"></textarea>
+                    </div>
+                  )}
+                </div>
+        
+                <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100 shrink-0">
+                  <button type="button" disabled={savingConfig} onClick={() => setIsConfigModalOpen(false)} className="px-5 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition disabled:opacity-50">
+                    Cancelar
+                  </button>
+                  <button type="submit" disabled={savingConfig || nivelPermiso !== 'escritura'} className="px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition flex items-center gap-2 disabled:bg-brand-400 disabled:shadow-none">
+                    {savingConfig ? 'Guardando...' : 'Guardar configuración'}
+                  </button>
+                </div>
+              </form>
+        
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* =========================================================
            POPUP · Guardar contacto

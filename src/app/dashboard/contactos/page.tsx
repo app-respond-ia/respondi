@@ -3,11 +3,8 @@ import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
 import {
-  getContactosConfig,
-  actualizarContactosConfig,
   getContactos,
-  actualizarTratoContacto,
-  ContactosConfigData
+  actualizarTratoContacto
 } from '@/app/actions/contactos'
 import { getMisPermisos } from '@/app/actions/permisos'
 import { formatChannelId } from '@/lib/formatters'
@@ -83,14 +80,8 @@ export default function ContactosPage() {
   const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
   
-  // Config state (Global settings)
-  const [modo, setModo] = useState<ModoContacto>('ignorar')
-  const [respuestaAuto, setRespuestaAuto] = useState('')
-  const [savingConfig, setSavingConfig] = useState(false)
-
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [modalActiveTab, setModalActiveTab] = useState<'contacto' | 'global'>('contacto')
   const [savingContacto, setSavingContacto] = useState(false)
   
   const [modalFormData, setModalFormData] = useState<{
@@ -116,16 +107,10 @@ export default function ContactosPage() {
 
   const cargar = async () => {
     setLoading(true)
-    const [configRes, contactosRes, permisosRes] = await Promise.all([
-      getContactosConfig(),
+    const [contactosRes, permisosRes] = await Promise.all([
       getContactos(),
       getMisPermisos()
     ])
-
-    if (configRes.success && configRes.data) {
-      setModo(configRes.data.trato_contactos_modo as ModoContacto || 'ignorar')
-      setRespuestaAuto(configRes.data.trato_contactos_respuesta_auto || '')
-    }
 
     if (contactosRes.success && contactosRes.data) {
       setContactos(contactosRes.data)
@@ -154,27 +139,7 @@ export default function ContactosPage() {
     }
   }, [filtroTrato])
 
-  const handleSaveConfig = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSavingConfig(true)
-    const payload: ContactosConfigData = {
-      trato_contactos_modo: modo,
-      trato_contactos_respuesta_auto: modo === 'respuesta_automatica' ? respuestaAuto : null
-    }
-
-    const res = await actualizarContactosConfig(payload)
-    if (res.success) {
-      setMensaje({ tipo: 'exito', texto: 'Configuración guardada correctamente ✓' })
-      setIsModalOpen(false)
-    } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al guardar la configuración' })
-    }
-    setTimeout(() => setMensaje(null), 3000)
-    setSavingConfig(false)
-  }
-
   const openAñadir = () => {
-    setModalActiveTab('contacto')
     setModalFormData({
       canal: 'whatsapp',
       identificador_canal: '',
@@ -182,7 +147,7 @@ export default function ContactosPage() {
       numero_whatsapp: '',
       nombre: '',
       trato: 'bloqueado',
-      modo_contacto: modo,
+      modo_contacto: 'ignorar',
       nota: ''
     })
     setIsModalOpen(true)
@@ -202,7 +167,6 @@ export default function ContactosPage() {
       }
     }
 
-    setModalActiveTab('contacto')
     setModalFormData({
       id: contacto.id,
       canal: contacto.canal,
@@ -211,7 +175,7 @@ export default function ContactosPage() {
       numero_whatsapp: numero,
       nombre: contacto.nombre || '',
       trato: contacto.trato,
-      modo_contacto: contacto.modo || modo,
+      modo_contacto: contacto.modo || 'ignorar',
       nota: contacto.nota || ''
     })
     setIsModalOpen(true)
@@ -419,238 +383,141 @@ export default function ContactosPage() {
       </section>
 
       {/* =========================================================
-           POPUP · Guardar contacto / Ajustes Globales
+           POPUP · Guardar contacto
            ========================================================= */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50">
-          <div className="absolute inset-0 bg-ink-900/50 backdrop-blur-sm" onClick={() => !savingContacto && !savingConfig && setIsModalOpen(false)}></div>
+          <div className="absolute inset-0 bg-ink-900/50 backdrop-blur-sm" onClick={() => !savingContacto && setIsModalOpen(false)}></div>
         
           <div className="relative min-h-full flex items-center justify-center p-4 pointer-events-none">
             <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl pointer-events-auto flex flex-col max-h-[90vh]">
               
               <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
                 <h2 className="font-display font-700 text-lg text-ink-900">{modalFormData.id ? 'Editar contacto' : 'Nuevo trato especial'}</h2>
-                <button type="button" onClick={() => !savingContacto && !savingConfig && setIsModalOpen(false)} className="p-1.5 rounded-lg text-ink-400 hover:text-ink-700 hover:bg-slate-100 transition" aria-label="Cerrar">
+                <button type="button" onClick={() => !savingContacto && setIsModalOpen(false)} className="p-1.5 rounded-lg text-ink-400 hover:text-ink-700 hover:bg-slate-100 transition" aria-label="Cerrar">
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
               </div>
 
-              {!modalFormData.id && (
-                <div className="px-6 pt-4 shrink-0">
-                  <div className="flex p-1 bg-slate-100 rounded-xl">
-                    <button type="button" onClick={() => setModalActiveTab('contacto')} className={`flex-1 py-2 text-sm font-600 rounded-lg transition ${modalActiveTab === 'contacto' ? 'bg-white shadow-sm text-ink-900' : 'text-ink-500 hover:text-ink-700'}`}>Contacto individual</button>
-                    <button type="button" onClick={() => setModalActiveTab('global')} className={`flex-1 py-2 text-sm font-600 rounded-lg transition ${modalActiveTab === 'global' ? 'bg-white shadow-sm text-ink-900' : 'text-ink-500 hover:text-ink-700'}`}>Ajustes globales</button>
+              <form onSubmit={handleGuardarContacto} className="flex flex-col flex-1 min-h-0">
+                <div className="px-6 py-5 space-y-4 overflow-y-auto">
+                  {/* Trato */}
+                  <div>
+                    <label className="block text-sm font-500 text-ink-700 mb-1.5">Trato del contacto</label>
+                    <select required
+                      value={modalFormData.trato}
+                      onChange={e => setModalFormData({...modalFormData, trato: e.target.value as TratoContacto})}
+                      className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm">
+                      <option value="normal">Normal (Responde IA)</option>
+                      <option value="sin_ia">Sin IA (Pausada siempre)</option>
+                      <option value="bloqueado">Bloqueado</option>
+                    </select>
+                  </div>
+
+                  {/* Modo (Solo si no es normal) */}
+                  {modalFormData.trato !== 'normal' && (
+                    <div>
+                      <label className="block text-sm font-500 text-ink-700 mb-1.5">Acción a realizar</label>
+                      <select required
+                        value={modalFormData.modo_contacto || 'ignorar'}
+                        onChange={e => setModalFormData({...modalFormData, modo_contacto: e.target.value as ModoContacto})}
+                        className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm">
+                        <option value="ignorar">Ignorar en silencio</option>
+                        <option value="respuesta_automatica">Respuesta automática (Mensaje global)</option>
+                        <option value="derivar">Derivar a un agente (Caso)</option>
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Canal */}
+                  <div>
+                    <label className="block text-sm font-500 text-ink-700 mb-1.5">Canal</label>
+                    <select required
+                      disabled={!!modalFormData.id}
+                      value={modalFormData.canal}
+                      onChange={e => setModalFormData({...modalFormData, canal: e.target.value as CanalConfigKey})}
+                      className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm disabled:bg-slate-50 disabled:opacity-75">
+                      <option value="whatsapp">WhatsApp</option>
+                      <option value="instagram">Instagram</option>
+                      <option value="facebook">Facebook</option>
+                    </select>
+                  </div>
+
+                  {/* Identificador */}
+                  <div>
+                    <label className="block text-sm font-500 text-ink-700 mb-1.5">Identificador del contacto</label>
+                    {modalFormData.canal === 'whatsapp' ? (
+                      <div className="flex gap-2">
+                        <select 
+                          disabled={!!modalFormData.id}
+                          value={modalFormData.prefijo_whatsapp}
+                          onChange={e => setModalFormData({...modalFormData, prefijo_whatsapp: e.target.value})}
+                          className="w-28 shrink-0 h-12 px-2 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm disabled:bg-slate-50 disabled:opacity-75">
+                          <option value="+34">🇪🇸 +34</option>
+                          <option value="+52">🇲🇽 +52</option>
+                          <option value="+54">🇦🇷 +54</option>
+                          <option value="+57">🇨🇴 +57</option>
+                          <option value="+51">🇵🇪 +51</option>
+                          <option value="+56">🇨🇱 +56</option>
+                          <option value="+598">🇺🇾 +598</option>
+                          <option value="+595">🇵🇾 +595</option>
+                          <option value="+58">🇻🇪 +58</option>
+                          <option value="+593">🇪🇨 +593</option>
+                          <option value="+591">🇧🇴 +591</option>
+                          <option value="+502">🇬🇹 +502</option>
+                          <option value="+503">🇸🇻 +503</option>
+                          <option value="+504">🇭🇳 +504</option>
+                          <option value="+505">🇳🇮 +505</option>
+                          <option value="+506">🇨🇷 +506</option>
+                          <option value="+507">🇵🇦 +507</option>
+                          <option value="+1">🇺🇸 +1</option>
+                        </select>
+                        <input type="text" placeholder="Ej. 414 555 0000" required
+                          disabled={!!modalFormData.id}
+                          value={modalFormData.numero_whatsapp}
+                          onChange={e => setModalFormData({...modalFormData, numero_whatsapp: e.target.value.replace(/\D/g, '')})}
+                          className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm disabled:bg-slate-50 disabled:opacity-75" />
+                      </div>
+                    ) : (
+                      <input type="text" placeholder="Ej. @usuario" required
+                        disabled={!!modalFormData.id}
+                        value={modalFormData.identificador_canal}
+                        onChange={e => setModalFormData({...modalFormData, identificador_canal: e.target.value.replace(/[^a-zA-Z0-9._@]/g, '')})}
+                        className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm disabled:bg-slate-50 disabled:opacity-75" />
+                    )}
+                    {!modalFormData.id && (
+                      <p className="text-xs text-ink-500 mt-1">Se formateará automáticamente al guardar.</p>
+                    )}
+                  </div>
+
+                  {/* Nombre */}
+                  <div>
+                    <label className="block text-sm font-500 text-ink-700 mb-1.5">Nombre <span className="text-ink-400 font-400">· opcional</span></label>
+                    <input type="text" placeholder="Nombre del contacto si lo conoces"
+                      value={modalFormData.nombre}
+                      onChange={e => setModalFormData({...modalFormData, nombre: e.target.value})}
+                      className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm" />
+                  </div>
+
+                  {/* Nota */}
+                  <div>
+                    <label className="block text-sm font-500 text-ink-700 mb-1.5">Nota / Razón</label>
+                    <textarea rows={3} placeholder="Ej. Insultos repetidos, cliente que prefiere humano..." required
+                      value={modalFormData.nota}
+                      onChange={e => setModalFormData({...modalFormData, nota: e.target.value})}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white resize-none placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm"></textarea>
                   </div>
                 </div>
-              )}
-
-              {modalActiveTab === 'contacto' || modalFormData.id ? (
-                <form onSubmit={handleGuardarContacto} className="flex flex-col flex-1 min-h-0">
-                  <div className="px-6 py-5 space-y-4 overflow-y-auto">
-                    {/* Trato */}
-                    <div>
-                      <label className="block text-sm font-500 text-ink-700 mb-1.5">Trato del contacto</label>
-                      <select required
-                        value={modalFormData.trato}
-                        onChange={e => setModalFormData({...modalFormData, trato: e.target.value as TratoContacto})}
-                        className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm">
-                        <option value="normal">Normal (Responde IA)</option>
-                        <option value="sin_ia">Sin IA (Pausada siempre)</option>
-                        <option value="bloqueado">Bloqueado</option>
-                      </select>
-                    </div>
-
-                    {/* Modo (Solo si no es normal) */}
-                    {modalFormData.trato !== 'normal' && (
-                      <div>
-                        <label className="block text-sm font-500 text-ink-700 mb-1.5">Acción a realizar</label>
-                        <select required
-                          value={modalFormData.modo_contacto || 'ignorar'}
-                          onChange={e => setModalFormData({...modalFormData, modo_contacto: e.target.value as ModoContacto})}
-                          className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm">
-                          <option value="ignorar">Ignorar en silencio</option>
-                          <option value="respuesta_automatica">Respuesta automática (Mensaje global)</option>
-                          <option value="derivar">Derivar a un agente (Caso)</option>
-                        </select>
-                      </div>
-                    )}
-
-                    {/* Canal */}
-                    <div>
-                      <label className="block text-sm font-500 text-ink-700 mb-1.5">Canal</label>
-                      <select required
-                        disabled={!!modalFormData.id}
-                        value={modalFormData.canal}
-                        onChange={e => setModalFormData({...modalFormData, canal: e.target.value as CanalConfigKey})}
-                        className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm disabled:bg-slate-50 disabled:opacity-75">
-                        <option value="whatsapp">WhatsApp</option>
-                        <option value="instagram">Instagram</option>
-                        <option value="facebook">Facebook</option>
-                      </select>
-                    </div>
-
-                    {/* Identificador */}
-                    <div>
-                      <label className="block text-sm font-500 text-ink-700 mb-1.5">Identificador del contacto</label>
-                      {modalFormData.canal === 'whatsapp' ? (
-                        <div className="flex gap-2">
-                          <select 
-                            disabled={!!modalFormData.id}
-                            value={modalFormData.prefijo_whatsapp}
-                            onChange={e => setModalFormData({...modalFormData, prefijo_whatsapp: e.target.value})}
-                            className="w-28 shrink-0 h-12 px-2 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm disabled:bg-slate-50 disabled:opacity-75">
-                            <option value="+34">🇪🇸 +34</option>
-                            <option value="+52">🇲🇽 +52</option>
-                            <option value="+54">🇦🇷 +54</option>
-                            <option value="+57">🇨🇴 +57</option>
-                            <option value="+51">🇵🇪 +51</option>
-                            <option value="+56">🇨🇱 +56</option>
-                            <option value="+598">🇺🇾 +598</option>
-                            <option value="+595">🇵🇾 +595</option>
-                            <option value="+58">🇻🇪 +58</option>
-                            <option value="+593">🇪🇨 +593</option>
-                            <option value="+591">🇧🇴 +591</option>
-                            <option value="+502">🇬🇹 +502</option>
-                            <option value="+503">🇸🇻 +503</option>
-                            <option value="+504">🇭🇳 +504</option>
-                            <option value="+505">🇳🇮 +505</option>
-                            <option value="+506">🇨🇷 +506</option>
-                            <option value="+507">🇵🇦 +507</option>
-                            <option value="+1">🇺🇸 +1</option>
-                          </select>
-                          <input type="text" placeholder="Ej. 414 555 0000" required
-                            disabled={!!modalFormData.id}
-                            value={modalFormData.numero_whatsapp}
-                            onChange={e => setModalFormData({...modalFormData, numero_whatsapp: e.target.value.replace(/\D/g, '')})}
-                            className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm disabled:bg-slate-50 disabled:opacity-75" />
-                        </div>
-                      ) : (
-                        <input type="text" placeholder="Ej. @usuario" required
-                          disabled={!!modalFormData.id}
-                          value={modalFormData.identificador_canal}
-                          onChange={e => setModalFormData({...modalFormData, identificador_canal: e.target.value.replace(/[^a-zA-Z0-9._@]/g, '')})}
-                          className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm disabled:bg-slate-50 disabled:opacity-75" />
-                      )}
-                      {!modalFormData.id && (
-                        <p className="text-xs text-ink-500 mt-1">Se formateará automáticamente al guardar.</p>
-                      )}
-                    </div>
-
-                    {/* Nombre */}
-                    <div>
-                      <label className="block text-sm font-500 text-ink-700 mb-1.5">Nombre <span className="text-ink-400 font-400">· opcional</span></label>
-                      <input type="text" placeholder="Nombre del contacto si lo conoces"
-                        value={modalFormData.nombre}
-                        onChange={e => setModalFormData({...modalFormData, nombre: e.target.value})}
-                        className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm" />
-                    </div>
-
-                    {/* Nota */}
-                    <div>
-                      <label className="block text-sm font-500 text-ink-700 mb-1.5">Nota / Razón</label>
-                      <textarea rows={3} placeholder="Ej. Insultos repetidos, cliente que prefiere humano..." required
-                        value={modalFormData.nota}
-                        onChange={e => setModalFormData({...modalFormData, nota: e.target.value})}
-                        className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white resize-none placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm"></textarea>
-                    </div>
-                  </div>
-          
-                  <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100 shrink-0">
-                    <button type="button" disabled={savingContacto} onClick={() => setIsModalOpen(false)} className="px-5 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition disabled:opacity-50">
-                      Cancelar
-                    </button>
-                    <button type="submit" disabled={savingContacto} className="px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition flex items-center gap-2 disabled:bg-brand-400">
-                      {savingContacto ? 'Guardando...' : 'Guardar'}
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                <form onSubmit={handleSaveConfig} className="flex flex-col flex-1 min-h-0">
-                  <div className="px-6 py-5 overflow-y-auto space-y-4">
-                    <p className="text-sm text-ink-500">Define qué sucederá por defecto cuando un contacto tenga estado "Bloqueado".</p>
-                    
-                    <div className="grid grid-cols-1 gap-3">
-                      {/* Modo 1: ignorar */}
-                      <label className={`relative rounded-2xl border-2 p-4 cursor-pointer transition ${nivelPermiso !== 'escritura' ? 'pointer-events-none opacity-50' : ''} ${modo === 'ignorar' ? 'border-brand-500 bg-brand-50/50 ring-4 ring-brand-100' : 'border-slate-200 bg-white hover:border-brand-300'}`}>
-                        <input type="radio" name="modo_global" value="ignorar" checked={modo === 'ignorar'} onChange={() => setModo('ignorar')} disabled={nivelPermiso !== 'escritura'} className="sr-only" />
-                        {modo === 'ignorar' && (
-                          <span className="absolute top-4 right-4 w-5 h-5 rounded-full bg-brand-600 flex items-center justify-center">
-                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
-                          </span>
-                        )}
-                        <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${modo === 'ignorar' ? 'bg-brand-100 text-brand-700' : 'bg-slate-100 text-slate-600'}`}>
-                            {MODO_UI_CONFIG.ignorar.icon}
-                          </div>
-                          <div>
-                            <p className="font-600 text-sm text-ink-900">Ignorar en silencio</p>
-                            <p className="text-xs text-ink-500 mt-0.5">no responde, no avisa</p>
-                          </div>
-                        </div>
-                      </label>
-
-                      {/* Modo 2: respuesta_automatica */}
-                      <label className={`relative rounded-2xl border-2 p-4 cursor-pointer transition ${nivelPermiso !== 'escritura' ? 'pointer-events-none opacity-50' : ''} ${modo === 'respuesta_automatica' ? 'border-brand-500 bg-brand-50/50 ring-4 ring-brand-100' : 'border-slate-200 bg-white hover:border-brand-300'}`}>
-                        <input type="radio" name="modo_global" value="respuesta_automatica" checked={modo === 'respuesta_automatica'} onChange={() => setModo('respuesta_automatica')} disabled={nivelPermiso !== 'escritura'} className="sr-only" />
-                        {modo === 'respuesta_automatica' && (
-                          <span className="absolute top-4 right-4 w-5 h-5 rounded-full bg-brand-600 flex items-center justify-center">
-                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
-                          </span>
-                        )}
-                        <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${modo === 'respuesta_automatica' ? 'bg-brand-100 text-brand-700' : 'bg-slate-100 text-slate-600'}`}>
-                            {MODO_UI_CONFIG.respuesta_automatica.icon}
-                          </div>
-                          <div>
-                            <p className="font-600 text-sm text-ink-900">Respuesta automática</p>
-                            <p className="text-xs text-ink-500 mt-0.5">envía un mensaje fijo, la IA no se activa</p>
-                          </div>
-                        </div>
-                      </label>
-
-                      {/* Modo 3: derivar */}
-                      <label className={`relative rounded-2xl border-2 p-4 cursor-pointer transition ${nivelPermiso !== 'escritura' ? 'pointer-events-none opacity-50' : ''} ${modo === 'derivar' ? 'border-brand-500 bg-brand-50/50 ring-4 ring-brand-100' : 'border-slate-200 bg-white hover:border-brand-300'}`}>
-                        <input type="radio" name="modo_global" value="derivar" checked={modo === 'derivar'} onChange={() => setModo('derivar')} disabled={nivelPermiso !== 'escritura'} className="sr-only" />
-                        {modo === 'derivar' && (
-                          <span className="absolute top-4 right-4 w-5 h-5 rounded-full bg-brand-600 flex items-center justify-center">
-                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
-                          </span>
-                        )}
-                        <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${modo === 'derivar' ? 'bg-brand-100 text-brand-700' : 'bg-slate-100 text-slate-600'}`}>
-                            {MODO_UI_CONFIG.derivar.icon}
-                          </div>
-                          <div>
-                            <p className="font-600 text-sm text-ink-900">Derivar a un agente</p>
-                            <p className="text-xs text-ink-500 mt-0.5">abre un caso para que un humano gestione cada mensaje</p>
-                          </div>
-                        </div>
-                      </label>
-                    </div>
-
-                    {modo === 'respuesta_automatica' && (
-                      <div className="mt-4 p-4 rounded-2xl bg-white border border-slate-200">
-                        <label className="block text-sm font-500 text-ink-700 mb-1.5">Mensaje que se enviará</label>
-                        <textarea rows={2} 
-                          value={respuestaAuto}
-                          onChange={e => setRespuestaAuto(e.target.value)}
-                          disabled={nivelPermiso !== 'escritura'}
-                          placeholder="Lo sentimos, no podemos atender tu mensaje en este momento. Para cualquier consulta urgente, contáctanos por otro canal."
-                          className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white resize-none placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition disabled:opacity-50 disabled:bg-slate-50"></textarea>
-                      </div>
-                    )}
-                  </div>
-          
-                  <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100 shrink-0">
-                    <button type="button" disabled={savingConfig} onClick={() => setIsModalOpen(false)} className="px-5 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition disabled:opacity-50">
-                      Cancelar
-                    </button>
-                    <button type="submit" disabled={savingConfig || nivelPermiso !== 'escritura'} className="px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition flex items-center gap-2 disabled:bg-brand-400 disabled:shadow-none">
-                      {savingConfig ? 'Guardando...' : 'Guardar configuración'}
-                    </button>
-                  </div>
-                </form>
-              )}
+        
+                <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100 shrink-0">
+                  <button type="button" disabled={savingContacto} onClick={() => setIsModalOpen(false)} className="px-5 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition disabled:opacity-50">
+                    Cancelar
+                  </button>
+                  <button type="submit" disabled={savingContacto} className="px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition flex items-center gap-2 disabled:bg-brand-400">
+                    {savingContacto ? 'Guardando...' : 'Guardar'}
+                  </button>
+                </div>
+              </form>
         
             </div>
           </div>

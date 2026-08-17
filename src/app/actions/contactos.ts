@@ -4,10 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { resolveBranchId } from '@/lib/active-branch'
 import { registrarAuditoria } from '@/lib/auditoria'
 
-export interface ContactosConfigData {
-  trato_contactos_modo: 'ignorar' | 'respuesta_automatica' | 'derivar'
-  trato_contactos_respuesta_auto: string | null
-}
+
 
 export interface ActualizarTratoContactoData {
   canal: string
@@ -39,56 +36,7 @@ async function getAuthData(supabase: any) {
   return { tenant_id: userData.tenant_id, branch_id: branchId, user_id: user.id }
 }
 
-export async function getContactosConfig() {
-  const supabase = await createClient()
-  const auth = await getAuthData(supabase)
-  if (auth.error) return { success: false, error: auth.error }
 
-  const { data, error } = await supabase
-    .from('sucursales')
-    .select('trato_contactos_modo, trato_contactos_respuesta_auto')
-    .eq('id', auth.branch_id)
-    .single()
-
-  if (error) return { success: false, error: error.message }
-  return { success: true, data }
-}
-
-export async function actualizarContactosConfig(data: ContactosConfigData) {
-  const supabase = await createClient()
-  const auth = await getAuthData(supabase)
-  if (auth.error) return { success: false, error: auth.error }
-
-  const { data: anterior } = await supabase
-    .from('sucursales')
-    .select('trato_contactos_modo, trato_contactos_respuesta_auto')
-    .eq('id', auth.branch_id)
-    .single()
-
-  const { data: updatedData, error } = await supabase
-    .from('sucursales')
-    .update({
-      trato_contactos_modo: data.trato_contactos_modo,
-      trato_contactos_respuesta_auto: data.trato_contactos_respuesta_auto
-    })
-    .eq('id', auth.branch_id)
-    .select('trato_contactos_modo, trato_contactos_respuesta_auto')
-    .single()
-
-  if (error) return { success: false, error: error.message }
-
-  await registrarAuditoria({
-    tenant_id: auth.tenant_id,
-    user_id: auth.user_id,
-    accion: 'actualizó la configuración de contactos',
-    tabla_afectada: 'contactos',
-    registro_id: auth.branch_id,
-    valor_anterior: anterior,
-    valor_nuevo: updatedData
-  })
-
-  return { success: true, data: updatedData }
-}
 
 export async function getContactos() {
   const supabase = await createClient()

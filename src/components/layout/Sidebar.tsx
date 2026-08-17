@@ -189,14 +189,14 @@ export default function Sidebar({ user, onCloseMobile, permisos, esAdmin, collap
           return nivel === 'ninguno' ? (
             <span title="Sin acceso" className={cls}>
               <span className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
-                <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
+                <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 1 0-6 0"/><path strokeLinecap="round" strokeLinejoin="round" d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/><path strokeLinecap="round" strokeLinejoin="round" d="M8 19h8"/></svg>
               </span>
               {!collapsed && <span className="truncate">Contactos</span>}
             </span>
           ) : (
             <Link href="/dashboard/contactos" onClick={onCloseMobile} className={cls} title={collapsed ? 'Contactos' : undefined}>
               <span className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
-                <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
+                <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 1 0-6 0"/><path strokeLinecap="round" strokeLinejoin="round" d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/><path strokeLinecap="round" strokeLinejoin="round" d="M8 19h8"/></svg>
               </span>
               {!collapsed && <span className="truncate">Contactos</span>}
             </Link>

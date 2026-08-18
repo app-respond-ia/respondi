@@ -50,6 +50,13 @@ export default function VendedorDropdown({ nombre, email, iniciales }: VendedorD
               Mi perfil
             </Link>
             <Link 
+              href="/vendedor/notificaciones" 
+              onClick={() => setIsOpen(false)}
+              className="block w-full text-left px-4 py-2 text-sm text-ink-700 hover:bg-slate-50 hover:text-brand-600 transition-colors"
+            >
+              Notificaciones
+            </Link>
+            <Link 
               href="/vendedor/configuracion" 
               onClick={() => setIsOpen(false)}
               className="block w-full text-left px-4 py-2 text-sm text-ink-700 hover:bg-slate-50 hover:text-brand-600 transition-colors"

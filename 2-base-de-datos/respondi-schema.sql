@@ -438,6 +438,15 @@ create table notifications (
   timestamp  timestamptz not null default now()
 );
 
+create table notification_preferences (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid references users(id) on delete cascade,
+  tipo       text not null,
+  activado   boolean not null default true,
+  created_at timestamptz not null default now(),
+  unique(user_id, tipo)
+);
+
 -- ============================================================================
 -- 11. ÍNDICES (rendimiento en consultas frecuentes)
 -- ============================================================================
@@ -542,6 +551,7 @@ alter table billing            enable row level security;
 alter table ai_logs            enable row level security;
 alter table audit_log          enable row level security;
 alter table notifications      enable row level security;
+alter table notification_preferences enable row level security;
 alter table plans              enable row level security;
 alter table vendedores         enable row level security;
 alter table error_logs         enable row level security;
@@ -674,6 +684,10 @@ create policy audit_tenant on audit_log for select
   );
 
 create policy notif_own on notifications for all
+  using (is_super_admin() or user_id = auth.uid())
+  with check (is_super_admin() or user_id = auth.uid());
+
+create policy notif_prefs_own on notification_preferences for all
   using (is_super_admin() or user_id = auth.uid())
   with check (is_super_admin() or user_id = auth.uid());
 

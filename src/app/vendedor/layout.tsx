@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import VendedorDropdown from './VendedorDropdown'
+import NotificationBell from './NotificationBell'
 
 export default async function VendedorLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -56,6 +57,7 @@ export default async function VendedorLayout({ children }: { children: React.Rea
           </nav>
 
           <div className="flex items-center gap-2">
+            <NotificationBell userId={session.user.id} />
             <VendedorDropdown nombre={nombreUsuario} email={email} iniciales={iniciales} />
           </div>
         </div>

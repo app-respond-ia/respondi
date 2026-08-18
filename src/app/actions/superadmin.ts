@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { registrarAuditoria } from '@/lib/auditoria'
+import { crearNotificacion } from '@/lib/notificaciones'
 
 // Helper de auth para asegurar que la action solo la ejecuta un super admin
 async function requireSuperAdmin() {
@@ -374,6 +375,18 @@ export async function aprobarComision(id: string) {
     valor_nuevo: { estado: 'aprobada' }
   })
 
+  if (anterior?.vendedor_id) {
+    const { data: vendedor } = await supabase.from('vendedores').select('user_id').eq('id', anterior.vendedor_id).single()
+    if (vendedor?.user_id) {
+      await crearNotificacion(supabaseAdmin, {
+        userId: vendedor.user_id,
+        tipo: 'comision_aprobada',
+        titulo: 'Comisión aprobada',
+        cuerpo: `Una comisión de ${anterior.importe} ${anterior.moneda} ha sido aprobada.`
+      })
+    }
+  }
+
   revalidatePath('/superadmin/comisiones')
   return { success: true, comision: result }
 }
@@ -404,6 +417,18 @@ export async function marcarComisionPagada(id: string, notas_pago?: string) {
     valor_anterior: { estado: anterior?.estado },
     valor_nuevo: { estado: 'pagada', notas_pago }
   })
+
+  if (anterior?.vendedor_id) {
+    const { data: vendedor } = await supabase.from('vendedores').select('user_id').eq('id', anterior.vendedor_id).single()
+    if (vendedor?.user_id) {
+      await crearNotificacion(supabaseAdmin, {
+        userId: vendedor.user_id,
+        tipo: 'comision_pagada',
+        titulo: 'Comisión pagada',
+        cuerpo: `Una comisión de ${anterior.importe} ${anterior.moneda} ha sido pagada.`
+      })
+    }
+  }
 
   revalidatePath('/superadmin/comisiones')
   return { success: true, comision: result }
@@ -703,6 +728,20 @@ export async function actualizarEstadoOrganizacion(id: string, estado: string) {
       valor_anterior: anterior,
       valor_nuevo: { estado }
     })
+
+    if (anterior?.estado === 'trial' && estado === 'activo') {
+      const { data: vinculo } = await supabaseAdmin.from('vendedor_clientes').select('vendedor_id, vendedores(user_id)').eq('organizacion_id', id).single()
+      const vendedorUserId = (vinculo?.vendedores as any)?.user_id
+      if (vendedorUserId) {
+        const { data: orgInfo } = await supabaseAdmin.from('organizaciones').select('nombre').eq('id', id).single()
+        await crearNotificacion(supabaseAdmin, {
+          userId: vendedorUserId,
+          tipo: 'conversion',
+          titulo: '¡Nuevo cliente convertido!',
+          cuerpo: `El cliente ${orgInfo?.nombre} ha pasado a un plan de pago.`
+        })
+      }
+    }
 
     revalidatePath('/superadmin/organizaciones')
     return { success: true }

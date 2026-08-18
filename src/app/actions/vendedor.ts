@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { registrarAuditoria } from '@/lib/auditoria'
+import { crearNotificacion } from '@/lib/notificaciones'
 
 async function requireVendedor() {
   const supabase = await createClient()
@@ -63,6 +64,16 @@ export async function actualizarClienteSeguimiento(id: string, data: {
       .select()
       .single()
     if (error) return { success: false, error: error.message }
+
+    if (anterior?.estado_seguimiento !== 'en_riesgo' && data.estado_seguimiento === 'en_riesgo') {
+      const { data: orgInfo } = await supabaseAdmin.from('organizaciones').select('nombre').eq('id', result.organizacion_id).single()
+      await crearNotificacion(supabaseAdmin, {
+        userId: userId,
+        tipo: 'cliente_riesgo',
+        titulo: 'Cliente en riesgo',
+        cuerpo: `El cliente ${orgInfo?.nombre} ha sido marcado como "en riesgo". Revisa su estado.`
+      })
+    }
 
     if (result.organizacion_id) {
       await registrarAuditoria({

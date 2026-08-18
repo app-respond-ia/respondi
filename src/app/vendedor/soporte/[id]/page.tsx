@@ -62,18 +62,6 @@ export default function TicketDetallePage() {
     return 'bg-slate-100 text-slate-700'
   }
 
-  const formatCategoria = (cat: string) => {
-    if (!cat) return 'Sin asignar'
-    const categorias: Record<string, string> = {
-      'comisiones': 'Comisiones',
-      'clientes': 'Clientes',
-      'tecnico': 'Técnico',
-      'facturacion': 'Facturación',
-      'otro': 'Otro'
-    }
-    return categorias[cat] || cat
-  }
-
   if (loading) return <Loading />
   if (!ticket) return null
 
@@ -94,12 +82,6 @@ export default function TicketDetallePage() {
         <div className="flex items-center gap-3 flex-wrap border-b border-slate-200 pb-5">
           <span className={`text-xs px-2.5 py-1 rounded-full font-700 uppercase tracking-wide ${getEstatusBadge(ticket.estatus)}`}>
             {ticket.estatus}
-          </span>
-          <span className="text-sm font-500 text-ink-500 bg-slate-100 px-3 py-1 rounded-full">
-            Categoría: {formatCategoria(ticket.categoria)}
-          </span>
-          <span className="text-sm font-500 text-ink-500 bg-slate-100 px-3 py-1 rounded-full">
-            Prioridad: <span className="capitalize">{ticket.prioridad}</span>
           </span>
         </div>
       </div>

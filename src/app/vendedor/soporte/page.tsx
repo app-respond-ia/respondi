@@ -54,24 +54,6 @@ export default function VendedorSoportePage() {
     return 'bg-slate-100 text-slate-700'
   }
 
-  const getPrioridadBadge = (prioridad: string) => {
-    if (prioridad === 'alta') return 'text-rose-600 bg-rose-50'
-    if (prioridad === 'media') return 'text-amber-600 bg-amber-50'
-    return 'text-slate-500 bg-slate-50'
-  }
-
-  const formatCategoria = (cat: string) => {
-    if (!cat) return 'Sin asignar'
-    const categorias: Record<string, string> = {
-      'comisiones': 'Comisiones',
-      'clientes': 'Clientes',
-      'tecnico': 'Técnico',
-      'facturacion': 'Facturación',
-      'otro': 'Otro'
-    }
-    return categorias[cat] || cat
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-start gap-4 flex-wrap">
@@ -105,12 +87,6 @@ export default function VendedorSoportePage() {
                   <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-600 uppercase tracking-wide ${getEstatusBadge(ticket.estatus)}`}>
                       {ticket.estatus}
-                    </span>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-700 uppercase tracking-wide border border-current/10 ${getPrioridadBadge(ticket.prioridad)}`}>
-                      Prioridad {ticket.prioridad}
-                    </span>
-                    <span className="text-xs text-ink-400 font-500">
-                      {formatCategoria(ticket.categoria)}
                     </span>
                   </div>
                   <h4 className="font-600 text-ink-900 group-hover:text-brand-600 transition line-clamp-1">{ticket.asunto}</h4>

@@ -7,7 +7,13 @@ import { getVendedorComisiones } from '@/app/actions/vendedor'
 export default function VendedorComisionesPage() {
   const [comisiones, setComisiones] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  
+  // Filtros
   const [filtroEstado, setFiltroEstado] = useState('')
+  const [filtroCliente, setFiltroCliente] = useState('')
+  const [filtroTipo, setFiltroTipo] = useState('')
+  const [fechaInicio, setFechaInicio] = useState('')
+  const [fechaFin, setFechaFin] = useState('')
 
   useEffect(() => {
     const cargar = async () => {
@@ -35,11 +41,40 @@ export default function VendedorComisionesPage() {
     return new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })
   }
 
-  const comisionesFiltradas = filtroEstado ? comisiones.filter(c => c.estado === filtroEstado) : comisiones
+  const clientesUnicos = Array.from(new Set(comisiones.map(c => c.organizaciones?.nombre).filter(Boolean)))
 
-  const totalPendiente = comisiones.filter(c => c.estado === 'pendiente').reduce((acc, c) => acc + Number(c.importe), 0)
-  const totalAprobado = comisiones.filter(c => c.estado === 'aprobada').reduce((acc, c) => acc + Number(c.importe), 0)
-  const totalPagado = comisiones.filter(c => c.estado === 'pagada').reduce((acc, c) => acc + Number(c.importe), 0)
+  const comisionesFiltradas = comisiones.filter(c => {
+    if (filtroEstado && c.estado !== filtroEstado) return false
+    if (filtroCliente && c.organizaciones?.nombre !== filtroCliente) return false
+    if (filtroTipo && c.tipo !== filtroTipo) return false
+    
+    if (fechaInicio || fechaFin) {
+      const fechaGen = new Date(c.fecha_generacion).getTime()
+      if (fechaInicio) {
+        const fInicio = new Date(fechaInicio).getTime()
+        if (fechaGen < fInicio) return false
+      }
+      if (fechaFin) {
+        const fFin = new Date(fechaFin + 'T23:59:59').getTime()
+        if (fechaGen > fFin) return false
+      }
+    }
+    return true
+  })
+
+  const totalPendiente = comisionesFiltradas.filter(c => c.estado === 'pendiente').reduce((acc, c) => acc + Number(c.importe), 0)
+  const totalAprobado = comisionesFiltradas.filter(c => c.estado === 'aprobada').reduce((acc, c) => acc + Number(c.importe), 0)
+  const totalPagado = comisionesFiltradas.filter(c => c.estado === 'pagada').reduce((acc, c) => acc + Number(c.importe), 0)
+
+  const hasFilters = filtroEstado !== '' || filtroCliente !== '' || filtroTipo !== '' || fechaInicio !== '' || fechaFin !== ''
+
+  const limpiarFiltros = () => {
+    setFiltroEstado('')
+    setFiltroCliente('')
+    setFiltroTipo('')
+    setFechaInicio('')
+    setFechaFin('')
+  }
 
   return (
     <div className="space-y-6">
@@ -74,18 +109,72 @@ export default function VendedorComisionesPage() {
       </div>
 
       {/* Filtros */}
-      <div className="flex gap-2 flex-wrap">
-        {[
-          { value: '', label: 'Todas' },
-          { value: 'pendiente', label: 'Por aprobar' },
-          { value: 'aprobada', label: 'Por cobrar' },
-          { value: 'pagada', label: 'Cobradas' },
-        ].map(f => (
-          <button key={f.value} onClick={() => setFiltroEstado(f.value)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-500 transition ${filtroEstado === f.value ? 'bg-ink-900 text-white' : 'bg-white border border-slate-200 text-ink-600 hover:bg-slate-50'}`}>
-            {f.label}
-          </button>
-        ))}
+      <div className="flex flex-col gap-3">
+        {/* Fila 1: Filtro de estado (botones existentes) */}
+        <div className="flex gap-2 flex-wrap">
+          {[
+            { value: '', label: 'Todas' },
+            { value: 'pendiente', label: 'Por aprobar' },
+            { value: 'aprobada', label: 'Por cobrar' },
+            { value: 'pagada', label: 'Cobradas' },
+          ].map(f => (
+            <button key={f.value} onClick={() => setFiltroEstado(f.value)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-500 transition ${filtroEstado === f.value ? 'bg-ink-900 text-white' : 'bg-white border border-slate-200 text-ink-600 hover:bg-slate-50'}`}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Fila 2: Resto de filtros */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <select 
+            value={filtroCliente}
+            onChange={(e) => setFiltroCliente(e.target.value)}
+            className="h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm text-ink-700 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition min-w-[200px]"
+          >
+            <option value="">Todos los clientes</option>
+            {clientesUnicos.map((cliente: any) => (
+              <option key={cliente} value={cliente}>{cliente}</option>
+            ))}
+          </select>
+
+          <select 
+            value={filtroTipo}
+            onChange={(e) => setFiltroTipo(e.target.value)}
+            className="h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm text-ink-700 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition min-w-[150px]"
+          >
+            <option value="">Todos los tipos</option>
+            <option value="conversion">Conversión</option>
+            <option value="mrr">MRR</option>
+          </select>
+
+          <div className="flex items-center gap-1.5 ml-0 sm:ml-2">
+            <input
+              type="date"
+              value={fechaInicio}
+              onChange={(e) => setFechaInicio(e.target.value)}
+              max={fechaFin || undefined}
+              className="h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm text-ink-700 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition"
+            />
+            <span className="text-ink-400 text-sm">–</span>
+            <input
+              type="date"
+              value={fechaFin}
+              onChange={(e) => setFechaFin(e.target.value)}
+              min={fechaInicio || undefined}
+              className="h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm text-ink-700 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition"
+            />
+          </div>
+
+          {hasFilters && (
+            <button
+              onClick={limpiarFiltros}
+              className="h-10 px-3 text-sm text-ink-500 hover:text-ink-700 font-500 transition ml-0 sm:ml-2 underline underline-offset-2"
+            >
+              Limpiar filtros
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Lista */}
@@ -93,7 +182,7 @@ export default function VendedorComisionesPage() {
         {loading ? (
           <Loading />
         ) : comisionesFiltradas.length === 0 ? (
-          <div className="p-8 text-center text-ink-500">No hay comisiones en este filtro.</div>
+          <div className="p-8 text-center text-ink-500">No hay comisiones con estos filtros.</div>
         ) : (
           <div className="divide-y divide-slate-100">
             {comisionesFiltradas.map(c => (

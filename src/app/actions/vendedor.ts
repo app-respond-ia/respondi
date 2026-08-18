@@ -255,3 +255,30 @@ export async function actualizarPerfilVendedor(nombre: string) {
     return { success: false, error: err.message }
   }
 }
+
+export async function cambiarContrasenaVendedor(password: string) {
+  try {
+    const { supabase, userId } = await requireVendedor()
+
+    if (password.length < 8) {
+      return { success: false, error: 'La contraseña debe tener al menos 8 caracteres' }
+    }
+
+    const { error } = await supabase.auth.updateUser({ password })
+    if (error) return { success: false, error: error.message }
+
+    await supabaseAdmin.from('audit_log').insert({
+      tenant_id: null,
+      user_id: userId,
+      accion: 'cambiar_contrasena',
+      tabla_afectada: 'auth.users',
+      registro_id: userId,
+      valor_anterior: null,
+      valor_nuevo: null
+    })
+
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}

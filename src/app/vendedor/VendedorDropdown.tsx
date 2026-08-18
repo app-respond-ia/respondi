@@ -49,6 +49,13 @@ export default function VendedorDropdown({ nombre, email, iniciales }: VendedorD
             >
               Mi perfil
             </Link>
+            <Link 
+              href="/vendedor/configuracion" 
+              onClick={() => setIsOpen(false)}
+              className="block w-full text-left px-4 py-2 text-sm text-ink-700 hover:bg-slate-50 hover:text-brand-600 transition-colors"
+            >
+              Configuración de cuenta
+            </Link>
           </div>
           
           <div className="border-t border-slate-100 py-1">

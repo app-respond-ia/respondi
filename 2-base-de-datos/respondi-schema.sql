@@ -735,7 +735,45 @@ end;
 $$;
 
 -- ============================================================================
--- 16. JOBS PROGRAMADOS (pg_cron)
+-- 16. SISTEMA DE TICKETS (VENDEDOR ↔ SUPERADMIN)
+-- ============================================================================
+
+create table support_tickets (
+  id             uuid primary key default gen_random_uuid(),
+  vendedor_id    uuid not null references vendedores(id) on delete cascade,
+  asunto         text not null,
+  categoria      text,
+  prioridad      text default 'normal',
+  estatus        text not null default 'abierto',
+  fecha_apertura timestamptz not null default now(),
+  fecha_cierre   timestamptz
+);
+
+create table support_ticket_messages (
+  id         uuid primary key default gen_random_uuid(),
+  ticket_id  uuid not null references support_tickets(id) on delete cascade,
+  user_id    uuid references users(id),
+  mensaje    text not null,
+  timestamp  timestamptz not null default now()
+);
+
+alter table support_tickets enable row level security;
+alter table support_ticket_messages enable row level security;
+
+create policy tickets_select on support_tickets for select
+  using (is_super_admin() or vendedor_id = (select id from vendedores where user_id = auth.uid()));
+create policy tickets_insert on support_tickets for insert
+  with check (is_super_admin() or vendedor_id = (select id from vendedores where user_id = auth.uid()));
+create policy tickets_update on support_tickets for update
+  using (is_super_admin() or vendedor_id = (select id from vendedores where user_id = auth.uid()));
+
+create policy ticket_messages_select on support_ticket_messages for select
+  using (is_super_admin() or ticket_id in (select id from support_tickets where vendedor_id = (select id from vendedores where user_id = auth.uid())));
+create policy ticket_messages_insert on support_ticket_messages for insert
+  with check (is_super_admin() or ticket_id in (select id from support_tickets where vendedor_id = (select id from vendedores where user_id = auth.uid())));
+
+-- ============================================================================
+-- 17. JOBS PROGRAMADOS (pg_cron)
 -- ============================================================================
 
 create extension if not exists pg_cron;

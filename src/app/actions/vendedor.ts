@@ -293,3 +293,140 @@ export async function cambiarContrasenaVendedor(password: string) {
     return { success: false, error: err.message }
   }
 }
+
+// ==========================================
+// SOPORTE (TICKETS)
+// ==========================================
+
+export async function crearTicketSoporte(asunto: string, mensajeInicial: string) {
+  try {
+    const { supabase, vendedor, userId } = await requireVendedor()
+
+    if (!asunto || !asunto.trim()) return { success: false, error: 'El asunto es obligatorio' }
+    if (!mensajeInicial || !mensajeInicial.trim()) return { success: false, error: 'El mensaje es obligatorio' }
+
+    // Crear ticket
+    const { data: ticket, error: errTicket } = await supabase
+      .from('support_tickets')
+      .insert({
+        vendedor_id: vendedor.id,
+        asunto: asunto.trim()
+      })
+      .select()
+      .single()
+
+    if (errTicket) throw new Error(errTicket.message)
+
+    // Crear mensaje inicial
+    const { error: errMsg } = await supabase
+      .from('support_ticket_messages')
+      .insert({
+        ticket_id: ticket.id,
+        user_id: userId,
+        mensaje: mensajeInicial.trim()
+      })
+
+    if (errMsg) throw new Error(errMsg.message)
+
+    await registrarAuditoria({
+      tenant_id: null,
+      user_id: userId,
+      accion: 'crear_ticket_soporte',
+      tabla_afectada: 'support_tickets',
+      registro_id: ticket.id,
+      valor_nuevo: ticket
+    })
+
+    // TODO: Notificar al superadmin si se requiere en un futuro.
+
+    return { success: true, ticket }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
+
+export async function getTicketsVendedor() {
+  try {
+    const { supabase, vendedor } = await requireVendedor()
+    
+    const { data, error } = await supabase
+      .from('support_tickets')
+      .select('*')
+      .eq('vendedor_id', vendedor.id)
+      .order('fecha_apertura', { ascending: false })
+
+    if (error) throw new Error(error.message)
+    return { success: true, tickets: data }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
+
+export async function getTicketDetalle(ticketId: string) {
+  try {
+    const { supabase, vendedor } = await requireVendedor()
+
+    const { data: ticket, error: errTicket } = await supabase
+      .from('support_tickets')
+      .select('*')
+      .eq('id', ticketId)
+      .eq('vendedor_id', vendedor.id)
+      .single()
+
+    if (errTicket || !ticket) throw new Error('Ticket no encontrado')
+
+    const { data: mensajes, error: errMsgs } = await supabase
+      .from('support_ticket_messages')
+      .select('*, users(nombre, email)')
+      .eq('ticket_id', ticket.id)
+      .order('timestamp', { ascending: true })
+
+    if (errMsgs) throw new Error(errMsgs.message)
+
+    return { success: true, ticket, mensajes }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
+
+export async function enviarMensajeTicket(ticketId: string, mensaje: string) {
+  try {
+    const { supabase, vendedor, userId } = await requireVendedor()
+
+    if (!mensaje || !mensaje.trim()) return { success: false, error: 'El mensaje no puede estar vacío' }
+
+    // Verificar si el ticket existe y es nuestro
+    const { data: ticket, error: errTicket } = await supabase
+      .from('support_tickets')
+      .select('id, estatus')
+      .eq('id', ticketId)
+      .eq('vendedor_id', vendedor.id)
+      .single()
+
+    if (errTicket || !ticket) throw new Error('Ticket no encontrado')
+
+    // Si estaba cerrado, lo reabrimos
+    if (ticket.estatus === 'cerrado') {
+      await supabase
+        .from('support_tickets')
+        .update({ estatus: 'abierto', fecha_cierre: null })
+        .eq('id', ticket.id)
+    }
+
+    const { data: nuevoMensaje, error: errMsg } = await supabase
+      .from('support_ticket_messages')
+      .insert({
+        ticket_id: ticket.id,
+        user_id: userId,
+        mensaje: mensaje.trim()
+      })
+      .select('*, users(nombre, email)')
+      .single()
+
+    if (errMsg) throw new Error(errMsg.message)
+
+    return { success: true, mensaje: nuevoMensaje }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}

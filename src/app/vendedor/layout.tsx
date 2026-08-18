@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
+import VendedorDropdown from './VendedorDropdown'
 
 export default async function VendedorLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -22,6 +23,7 @@ export default async function VendedorLayout({ children }: { children: React.Rea
 
   const nombreUsuario = userData.nombre || session.user.email || 'Vendedor'
   const iniciales = nombreUsuario.substring(0, 2).toUpperCase()
+  const email = session.user.email || ''
 
   return (
     <div className="min-h-screen bg-slate-50 text-ink-900">
@@ -54,9 +56,7 @@ export default async function VendedorLayout({ children }: { children: React.Rea
           </nav>
 
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center font-600 text-sm">
-              {iniciales}
-            </div>
+            <VendedorDropdown nombre={nombreUsuario} email={email} iniciales={iniciales} />
           </div>
         </div>
 

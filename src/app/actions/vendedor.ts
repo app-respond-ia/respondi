@@ -211,3 +211,47 @@ export async function crearCuentaTrial(data: {
     return { success: false, error: err.message }
   }
 }
+
+export async function actualizarPerfilVendedor(nombre: string) {
+  try {
+    const { supabase, vendedor, userId } = await requireVendedor()
+    if (!nombre || nombre.trim() === '') {
+      return { success: false, error: 'El nombre no puede estar vacío' }
+    }
+
+    const { error: errUsers } = await supabaseAdmin
+      .from('users')
+      .update({ nombre: nombre.trim() })
+      .eq('id', userId)
+
+    if (errUsers) throw new Error('Error al actualizar usuario: ' + errUsers.message)
+
+    const { data: anterior } = await supabaseAdmin.from('vendedores').select('*').eq('id', vendedor.id).single()
+    const { data: result, error: errVendedores } = await supabaseAdmin
+      .from('vendedores')
+      .update({ nombre: nombre.trim() })
+      .eq('id', vendedor.id)
+      .select()
+      .single()
+
+    if (errVendedores) throw new Error('Error al actualizar vendedor: ' + errVendedores.message)
+
+    await supabaseAdmin.from('audit_log').insert({
+      tenant_id: null,
+      user_id: userId,
+      accion: 'actualizar_perfil_vendedor',
+      tabla_afectada: 'vendedores',
+      registro_id: vendedor.id,
+      valor_anterior: anterior,
+      valor_nuevo: result
+    })
+
+    const { revalidatePath } = await import('next/cache')
+    revalidatePath('/vendedor/perfil')
+    revalidatePath('/vendedor')
+    
+    return { success: true, vendedor: result }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}

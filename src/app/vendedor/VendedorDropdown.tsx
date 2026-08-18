@@ -8,9 +8,10 @@ type VendedorDropdownProps = {
   nombre: string
   email: string
   iniciales: string
+  avatarUrl?: string
 }
 
-export default function VendedorDropdown({ nombre, email, iniciales }: VendedorDropdownProps) {
+export default function VendedorDropdown({ nombre, email, iniciales, avatarUrl }: VendedorDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -28,10 +29,14 @@ export default function VendedorDropdown({ nombre, email, iniciales }: VendedorD
     <div className="relative" ref={dropdownRef}>
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className="w-8 h-8 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center font-600 text-sm hover:bg-brand-200 transition focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-1"
+        className="w-8 h-8 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center font-600 text-sm hover:bg-brand-200 transition focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-1 overflow-hidden"
         aria-label="Menú de usuario"
       >
-        {iniciales}
+        {avatarUrl ? (
+          <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+        ) : (
+          iniciales
+        )}
       </button>
 
       {isOpen && (

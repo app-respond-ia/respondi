@@ -12,7 +12,7 @@ export default async function PerfilPage() {
     redirect('/login')
   }
 
-  const { vendedor } = res.data
+  const { vendedor, avatarUrl } = res.data
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -21,7 +21,7 @@ export default async function PerfilPage() {
         <p className="text-ink-500 mt-1">Gestiona tu información personal y revisa tus condiciones.</p>
       </div>
 
-      <PerfilForm vendedor={vendedor} />
+      <PerfilForm vendedor={vendedor} avatarUrl={avatarUrl} />
     </div>
   )
 }

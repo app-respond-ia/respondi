@@ -151,6 +151,7 @@ create table users (
   branch_id      uuid references sucursales(id),                        -- null para admin
   email          text not null,
   nombre         text,
+  avatar_url     text,
   rol            rol_usuario not null,
   activo         boolean not null default true,
   invitacion_aceptada boolean not null default false,

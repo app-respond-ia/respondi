@@ -11,7 +11,7 @@ export default async function VendedorLayout({ children }: { children: React.Rea
 
   const { data: userData } = await supabase
     .from('users')
-    .select('rol, nombre')
+    .select('rol, nombre, avatar_url')
     .eq('id', session.user.id)
     .single()
 
@@ -25,6 +25,7 @@ export default async function VendedorLayout({ children }: { children: React.Rea
   const nombreUsuario = userData.nombre || session.user.email || 'Vendedor'
   const iniciales = nombreUsuario.substring(0, 2).toUpperCase()
   const email = session.user.email || ''
+  const avatarUrl = userData.avatar_url || ''
 
   return (
     <div className="min-h-screen bg-slate-50 text-ink-900">
@@ -58,7 +59,7 @@ export default async function VendedorLayout({ children }: { children: React.Rea
 
           <div className="flex items-center gap-2">
             <NotificationBell userId={session.user.id} />
-            <VendedorDropdown nombre={nombreUsuario} email={email} iniciales={iniciales} />
+            <VendedorDropdown nombre={nombreUsuario} email={email} iniciales={iniciales} avatarUrl={avatarUrl} />
           </div>
         </div>
 

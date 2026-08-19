@@ -749,3 +749,166 @@ export async function actualizarEstadoOrganizacion(id: string, estado: string) {
     return { success: false, error: err.message }
   }
 }
+
+// ----------------------------------------------------------------------
+// SOPORTE TICKETS
+// ----------------------------------------------------------------------
+
+export async function getTicketsSoporte() {
+  try {
+    const { supabase, userId } = await requireSuperAdmin()
+    const { data: tickets, error } = await supabase
+      .from('support_tickets')
+      .select(`
+        *,
+        vendedores ( nombre ),
+        support_ticket_messages ( mensaje, timestamp )
+      `)
+      .order('fecha_apertura', { ascending: false })
+
+    if (error) throw error
+
+    // Transform to pick only the last message
+    const formatted = tickets?.map(t => {
+      // sort messages by timestamp desc to get the last one
+      const sortedMessages = (t.support_ticket_messages || []).sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      return {
+        ...t,
+        ultimo_mensaje: sortedMessages.length > 0 ? sortedMessages[0] : null
+      }
+    })
+
+    return { success: true, data: formatted }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
+
+export async function getTicketDetalleSuperadmin(ticketId: string) {
+  try {
+    const { supabase, userId } = await requireSuperAdmin()
+    const { data: ticket, error } = await supabase
+      .from('support_tickets')
+      .select(`
+        *,
+        vendedores ( nombre, user_id ),
+        support_ticket_messages (
+          id,
+          mensaje,
+          timestamp,
+          user_id,
+          users ( rol, nombre, avatar_url )
+        )
+      `)
+      .eq('id', ticketId)
+      .single()
+
+    if (error) throw error
+    if (!ticket) throw new Error('Ticket no encontrado')
+
+    // Sort messages ascending
+    if (ticket.support_ticket_messages) {
+      ticket.support_ticket_messages.sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+    }
+
+    return { success: true, data: ticket }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
+
+export async function asignarCategoriaPrioridad(ticketId: string, categoria: string | null, prioridad: string) {
+  try {
+    const { supabase, userId } = await requireSuperAdmin()
+    const { error } = await supabaseAdmin
+      .from('support_tickets')
+      .update({ categoria, prioridad })
+      .eq('id', ticketId)
+
+    if (error) throw error
+    
+    await registrarAuditoria({
+      tenant_id: null,
+      user_id: userId,
+      accion: 'actualizar_ticket',
+      tabla_afectada: 'support_tickets',
+      registro_id: ticketId,
+      valor_nuevo: { categoria, prioridad }
+    })
+
+    revalidatePath(`/superadmin/tickets/${ticketId}`)
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
+
+export async function responderTicket(ticketId: string, mensaje: string) {
+  try {
+    const { supabase, userId } = await requireSuperAdmin()
+    if (!mensaje || mensaje.trim() === '') return { success: false, error: 'Mensaje vacío' }
+
+    const { data: ticket, error: ticketError } = await supabaseAdmin
+      .from('support_tickets')
+      .select('vendedores ( user_id )')
+      .eq('id', ticketId)
+      .single()
+    if (ticketError || !ticket) throw new Error('Ticket no encontrado')
+
+    const vendedorUserId = (ticket.vendedores as any)?.user_id
+
+    const { error } = await supabaseAdmin
+      .from('support_ticket_messages')
+      .insert({
+        ticket_id: ticketId,
+        user_id: userId,
+        mensaje: mensaje.trim()
+      })
+
+    if (error) throw error
+
+    if (vendedorUserId) {
+      await crearNotificacion(supabaseAdmin, {
+        userId: vendedorUserId,
+        tipo: 'soporte_respuesta',
+        titulo: 'Nueva respuesta de soporte',
+        cuerpo: 'Soporte ha respondido a tu ticket.'
+      })
+    }
+
+    revalidatePath(`/superadmin/tickets/${ticketId}`)
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
+
+export async function cambiarEstatusTicket(ticketId: string, estatus: 'abierto' | 'cerrado') {
+  try {
+    const { supabase, userId } = await requireSuperAdmin()
+    const { error } = await supabaseAdmin
+      .from('support_tickets')
+      .update({ 
+        estatus,
+        fecha_cierre: estatus === 'cerrado' ? new Date().toISOString() : null
+      })
+      .eq('id', ticketId)
+
+    if (error) throw error
+
+    await registrarAuditoria({
+      tenant_id: null,
+      user_id: userId,
+      accion: 'estatus_ticket',
+      tabla_afectada: 'support_tickets',
+      registro_id: ticketId,
+      valor_nuevo: { estatus }
+    })
+
+    revalidatePath(`/superadmin/tickets/${ticketId}`)
+    revalidatePath(`/superadmin/tickets`)
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}

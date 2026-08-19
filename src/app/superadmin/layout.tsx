@@ -25,8 +25,14 @@ export default async function Layout({ children }: { children: React.ReactNode }
   const nombreUsuario = userData.nombre || session.user.email || 'Atsura'
   const iniciales = nombreUsuario.substring(0, 2).toUpperCase()
 
+  // 3. Obtener contador de tickets abiertos
+  const { count } = await supabase
+    .from('support_tickets')
+    .select('*', { count: 'exact', head: true })
+    .eq('estatus', 'abierto')
+
   return (
-    <SuperadminLayout nombreUsuario={nombreUsuario} iniciales={iniciales}>
+    <SuperadminLayout nombreUsuario={nombreUsuario} iniciales={iniciales} ticketsAbiertos={count || 0}>
       {children}
     </SuperadminLayout>
   )

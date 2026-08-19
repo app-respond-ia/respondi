@@ -1,0 +1,175 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import Loading from '@/components/Loading'
+import { getTicketsSoporte } from '@/app/actions/superadmin'
+import Link from 'next/link'
+
+export default function TicketsSoportePage() {
+  const [tickets, setTickets] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  // Filtros
+  const [filtroEstatus, setFiltroEstatus] = useState('')
+  const [filtroCategoria, setFiltroCategoria] = useState('')
+  const [filtroPrioridad, setFiltroPrioridad] = useState('')
+
+  useEffect(() => {
+    cargar()
+  }, [])
+
+  const cargar = async () => {
+    setLoading(true)
+    const res = await getTicketsSoporte()
+    if (res.success && res.data) {
+      setTickets(res.data)
+    }
+    setLoading(false)
+  }
+
+  const formatFecha = (d: string) => {
+    if (!d) return '—'
+    return new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  }
+
+  const getEstadoBadge = (estado: string) => {
+    if (estado === 'abierto') return 'bg-amber-100 text-amber-700'
+    if (estado === 'cerrado') return 'bg-slate-100 text-slate-600'
+    return 'bg-slate-100 text-slate-600'
+  }
+
+  const getCategoriaBadge = (cat: string) => {
+    if (!cat) return 'bg-slate-100 text-slate-600'
+    if (cat === 'comisiones') return 'bg-emerald-100 text-emerald-700'
+    if (cat === 'clientes') return 'bg-blue-100 text-blue-700'
+    if (cat === 'tecnico') return 'bg-purple-100 text-purple-700'
+    return 'bg-slate-100 text-slate-700'
+  }
+
+  const getPrioridadBadge = (prio: string) => {
+    if (prio === 'alta') return 'bg-red-100 text-red-700'
+    if (prio === 'normal') return 'bg-blue-100 text-blue-700'
+    if (prio === 'baja') return 'bg-slate-100 text-slate-600'
+    return 'bg-slate-100 text-slate-600'
+  }
+
+  const abiertos = tickets.filter(t => t.estatus === 'abierto').length
+  const sinCategorizar = tickets.filter(t => !t.categoria && t.estatus === 'abierto').length
+  const cerrados = tickets.filter(t => t.estatus === 'cerrado').length
+
+  const filtrados = tickets.filter(t => {
+    if (filtroEstatus && t.estatus !== filtroEstatus) return false
+    if (filtroCategoria && t.categoria !== filtroCategoria) return false
+    if (filtroPrioridad && t.prioridad !== filtroPrioridad) return false
+    return true
+  })
+
+  return (
+    <>
+      <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
+        <div>
+          <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Tickets de Soporte</h1>
+          <p className="text-ink-500 mt-1">Gestiona y responde las solicitudes de soporte de los vendedores.</p>
+        </div>
+      </div>
+
+      {/* Resumen */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <div className="bg-white rounded-2xl border border-slate-200 p-5">
+          <p className="text-sm text-ink-500 mb-1">Tickets abiertos</p>
+          <p className="font-display font-700 text-2xl text-amber-600">{abiertos}</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200 p-5">
+          <p className="text-sm text-ink-500 mb-1">Sin categorizar (abiertos)</p>
+          <p className="font-display font-700 text-2xl text-red-600">{sinCategorizar}</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200 p-5">
+          <p className="text-sm text-ink-500 mb-1">Tickets cerrados</p>
+          <p className="font-display font-700 text-2xl text-slate-600">{cerrados}</p>
+        </div>
+      </div>
+
+      {/* Filtros */}
+      <div className="flex flex-wrap gap-3 mb-5">
+        <select value={filtroEstatus} onChange={e => setFiltroEstatus(e.target.value)}
+          className="h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition">
+          <option value="">Todos los estados</option>
+          <option value="abierto">Abierto</option>
+          <option value="cerrado">Cerrado</option>
+        </select>
+        <select value={filtroCategoria} onChange={e => setFiltroCategoria(e.target.value)}
+          className="h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition">
+          <option value="">Todas las categorías</option>
+          <option value="comisiones">Comisiones</option>
+          <option value="clientes">Clientes</option>
+          <option value="tecnico">Problema técnico</option>
+          <option value="otro">Otro</option>
+        </select>
+        <select value={filtroPrioridad} onChange={e => setFiltroPrioridad(e.target.value)}
+          className="h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition">
+          <option value="">Todas las prioridades</option>
+          <option value="alta">Alta</option>
+          <option value="normal">Normal</option>
+          <option value="baja">Baja</option>
+        </select>
+      </div>
+
+      {/* Tabla */}
+      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+        {loading ? (
+          <Loading />
+        ) : filtrados.length === 0 ? (
+          <div className="p-8 text-center text-ink-500">No hay tickets con estos filtros.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[800px]">
+              <thead>
+                <tr className="border-b border-slate-200 text-left text-ink-500">
+                  <th className="font-600 px-5 py-3">Asunto</th>
+                  <th className="font-600 px-5 py-3">Vendedor</th>
+                  <th className="font-600 px-5 py-3">Categoría</th>
+                  <th className="font-600 px-5 py-3">Prioridad</th>
+                  <th className="font-600 px-5 py-3">Estado</th>
+                  <th className="font-600 px-5 py-3">Última actividad</th>
+                  <th className="font-600 px-5 py-3 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filtrados.map(t => (
+                  <tr key={t.id} className="hover:bg-slate-50 transition">
+                    <td className="px-5 py-3.5 font-500 text-ink-900 max-w-[200px] truncate" title={t.asunto}>{t.asunto}</td>
+                    <td className="px-5 py-3.5 text-ink-600">{t.vendedores?.nombre || '—'}</td>
+                    <td className="px-5 py-3.5">
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-600 capitalize ${getCategoriaBadge(t.categoria)}`}>
+                        {t.categoria || 'Sin asignar'}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-600 capitalize ${getPrioridadBadge(t.prioridad)}`}>
+                        {t.prioridad}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-600 capitalize ${getEstadoBadge(t.estatus)}`}>
+                        {t.estatus}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5 text-ink-500">
+                      {t.ultimo_mensaje ? formatFecha(t.ultimo_mensaje.timestamp) : formatFecha(t.fecha_apertura)}
+                    </td>
+                    <td className="px-5 py-3.5 text-right">
+                      <Link href={`/superadmin/tickets/${t.id}`}
+                        className="inline-flex items-center justify-center px-3 h-8 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-ink-700 text-xs font-600 transition">
+                        Ver detalles
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </>
+  )
+}

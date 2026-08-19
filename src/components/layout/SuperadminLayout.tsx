@@ -8,11 +8,13 @@ import { signOut } from '@/app/actions/auth'
 export default function SuperadminLayout({
   children,
   nombreUsuario,
-  iniciales
+  iniciales,
+  ticketsAbiertos
 }: {
   children: React.ReactNode
   nombreUsuario: string
   iniciales: string
+  ticketsAbiertos?: number
 }) {
   const pathname = usePathname()
   const [isSidebarOpen, setSidebarOpen] = useState(false)
@@ -40,6 +42,9 @@ export default function SuperadminLayout({
     )},
     { href: '/superadmin/errores', label: 'Errores del sistema', exact: false, icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+    )},
+    { href: '/superadmin/tickets', label: 'Soporte a Vendedores', exact: false, badge: ticketsAbiertos, icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
     )}
   ]
 
@@ -72,10 +77,17 @@ export default function SuperadminLayout({
                 key={link.href}
                 href={link.href}
                 onClick={closeSidebar}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition ${isActive ? 'bg-brand-600 text-white font-500 shadow-lg shadow-brand-900/40' : 'text-ink-400 hover:bg-white/5 hover:text-white'}`}
+                className={`flex items-center justify-between px-3 py-2.5 rounded-xl transition ${isActive ? 'bg-brand-600 text-white font-500 shadow-lg shadow-brand-900/40' : 'text-ink-400 hover:bg-white/5 hover:text-white'}`}
               >
-                {link.icon}
-                {link.label}
+                <div className="flex items-center gap-3">
+                  {link.icon}
+                  {link.label}
+                </div>
+                {!!link.badge && (
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-600 ${isActive ? 'bg-white text-brand-600' : 'bg-red-500 text-white'}`}>
+                    {link.badge}
+                  </span>
+                )}
               </Link>
             )
           })}

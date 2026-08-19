@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { marcarNotificacionLeida } from '@/app/actions/notificaciones'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -14,6 +15,7 @@ type Notification = {
   cuerpo: string
   leida: boolean
   timestamp: string
+  url: string | null
 }
 
 export default function NotificationBell({ userId }: { userId: string }) {
@@ -21,6 +23,7 @@ export default function NotificationBell({ userId }: { userId: string }) {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
+  const router = useRouter()
 
   const unreadCount = notifications.filter(n => !n.leida).length
 
@@ -89,6 +92,9 @@ export default function NotificationBell({ userId }: { userId: string }) {
       await marcarNotificacionLeida(notif.id)
     }
     setIsOpen(false)
+    if (notif.url) {
+      router.push(notif.url)
+    }
   }
 
   return (

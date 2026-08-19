@@ -13,6 +13,7 @@ interface NotificacionData {
   tipo: NotificacionTipo
   titulo: string
   cuerpo: string
+  url?: string
 }
 
 export async function crearNotificacion(
@@ -41,7 +42,8 @@ export async function crearNotificacion(
         tenant_id: data.tenantId || null,
         tipo: data.tipo,
         titulo: data.titulo,
-        cuerpo: data.cuerpo
+        cuerpo: data.cuerpo,
+        url: data.url || null
       })
       .select()
       .single()

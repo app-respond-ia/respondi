@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { getTicketDetalleSuperadmin, responderTicket, asignarCategoriaPrioridad, cambiarEstatusTicket } from '@/app/actions/superadmin'
+import { createClient } from '@/utils/supabase/client'
 import Loading from '@/components/Loading'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
@@ -17,11 +18,7 @@ export default function TicketDetalleSuperadminPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const mensajesEndRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    cargarDetalle()
-  }, [id])
-
-  const cargarDetalle = async () => {
+  const cargarDetalle = useCallback(async () => {
     const res = await getTicketDetalleSuperadmin(id as string)
     if (res.success) {
       setTicket(res.data)
@@ -29,7 +26,30 @@ export default function TicketDetalleSuperadminPage() {
       router.push('/superadmin/tickets')
     }
     setLoading(false)
-  }
+  }, [id, router])
+
+  useEffect(() => {
+    cargarDetalle()
+
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`ticket-admin-${id}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'support_ticket_messages', filter: `ticket_id=eq.${id}` },
+        () => cargarDetalle()
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'support_tickets', filter: `id=eq.${id}` },
+        () => cargarDetalle()
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [id, cargarDetalle])
 
   useEffect(() => {
     if (mensajesEndRef.current) {

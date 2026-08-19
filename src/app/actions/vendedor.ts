@@ -71,7 +71,8 @@ export async function actualizarClienteSeguimiento(id: string, data: {
         userId: userId,
         tipo: 'cliente_riesgo',
         titulo: 'Cliente en riesgo',
-        cuerpo: `El cliente ${orgInfo?.nombre} ha sido marcado como "en riesgo". Revisa su estado.`
+        cuerpo: `El cliente ${orgInfo?.nombre} ha sido marcado como "en riesgo". Revisa su estado.`,
+        url: '/vendedor/clientes'
       })
     }
 

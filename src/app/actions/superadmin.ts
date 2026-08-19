@@ -382,7 +382,8 @@ export async function aprobarComision(id: string) {
         userId: vendedor.user_id,
         tipo: 'comision_aprobada',
         titulo: 'Comisión aprobada',
-        cuerpo: `Una comisión de ${anterior.importe} ${anterior.moneda} ha sido aprobada.`
+        cuerpo: `Una comisión de ${anterior.importe} ${anterior.moneda} ha sido aprobada.`,
+        url: '/vendedor/comisiones'
       })
     }
   }
@@ -425,7 +426,8 @@ export async function marcarComisionPagada(id: string, notas_pago?: string) {
         userId: vendedor.user_id,
         tipo: 'comision_pagada',
         titulo: 'Comisión pagada',
-        cuerpo: `Una comisión de ${anterior.importe} ${anterior.moneda} ha sido pagada.`
+        cuerpo: `Una comisión de ${anterior.importe} ${anterior.moneda} ha sido pagada.`,
+        url: '/vendedor/comisiones'
       })
     }
   }
@@ -738,7 +740,8 @@ export async function actualizarEstadoOrganizacion(id: string, estado: string) {
           userId: vendedorUserId,
           tipo: 'conversion',
           titulo: '¡Nuevo cliente convertido!',
-          cuerpo: `El cliente ${orgInfo?.nombre} ha pasado a un plan de pago.`
+          cuerpo: `El cliente ${orgInfo?.nombre} ha pasado a un plan de pago.`,
+          url: '/vendedor/clientes'
         })
       }
     }
@@ -872,7 +875,8 @@ export async function responderTicket(ticketId: string, mensaje: string) {
         userId: vendedorUserId,
         tipo: 'soporte_respuesta',
         titulo: 'Nueva respuesta de soporte',
-        cuerpo: 'Soporte ha respondido a tu ticket.'
+        cuerpo: 'Soporte ha respondido a tu ticket.',
+        url: `/vendedor/soporte/${ticketId}`
       })
     }
 

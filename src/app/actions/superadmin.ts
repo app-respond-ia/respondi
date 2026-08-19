@@ -129,6 +129,13 @@ export async function getVendedores() {
         id,
         estado_seguimiento,
         organizaciones (nombre, estado, plan_id, plans(nombre))
+      ),
+      vendedor_notas (
+        id,
+        nota,
+        created_at,
+        user_id,
+        users (nombre)
       )
     `)
     .order('created_at', { ascending: false })
@@ -142,7 +149,9 @@ export async function crearVendedor(data: {
   email: string
   comision_conversion_pct: number
   comision_mrr_pct: number
-  notas?: string
+  telefono?: string
+  dni_nif?: string
+  direccion?: any
 }) {
   const { supabase, userId } = await requireSuperAdmin()
 
@@ -210,7 +219,9 @@ export async function crearVendedor(data: {
       email: data.email,
       comision_conversion_pct: data.comision_conversion_pct,
       comision_mrr_pct: data.comision_mrr_pct,
-      notas: data.notas || null,
+      telefono: data.telefono || null,
+      dni_nif: data.dni_nif || null,
+      direccion: data.direccion || {},
       activo: true
     }])
     .select()
@@ -243,7 +254,9 @@ export async function actualizarVendedor(id: string, data: {
   comision_conversion_pct?: number
   comision_mrr_pct?: number
   activo?: boolean
-  notas?: string
+  telefono?: string
+  dni_nif?: string
+  direccion?: any
 }) {
   const { supabase, userId } = await requireSuperAdmin()
 
@@ -271,6 +284,28 @@ export async function actualizarVendedor(id: string, data: {
 
   revalidatePath('/superadmin/vendedores')
   return { success: true, vendedor: result }
+}
+
+// E2) añadirNotaVendedor
+export async function añadirNotaVendedor(vendedor_id: string, nota: string) {
+  const { supabase, userId } = await requireSuperAdmin()
+
+  if (!nota.trim()) return { success: false, error: 'La nota no puede estar vacía' }
+
+  const { data, error } = await supabase
+    .from('vendedor_notas')
+    .insert([{
+      vendedor_id,
+      user_id: userId,
+      nota: nota.trim()
+    }])
+    .select('*, users(nombre)')
+    .single()
+
+  if (error) return { success: false, error: error.message }
+
+  revalidatePath('/superadmin/vendedores')
+  return { success: true, nota: data }
 }
 
 // F) getPlanes

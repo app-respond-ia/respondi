@@ -17,7 +17,6 @@ export default function TicketDetallePage() {
   const [loading, setLoading] = useState(true)
   const [nuevoMensaje, setNuevoMensaje] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [realtimeStatus, setRealtimeStatus] = useState('conectando...')
   const mensajesEndRef = useRef<HTMLDivElement>(null)
 
   const cargarDetalle = useCallback(async () => {
@@ -58,10 +57,7 @@ export default function TicketDetallePage() {
           { event: 'UPDATE', schema: 'public', table: 'support_tickets', filter: `id=eq.${id}` },
           () => cargarDetalle()
         )
-        .subscribe((status) => {
-          console.log('Realtime status:', status)
-          setRealtimeStatus(status)
-        })
+        .subscribe()
     }
 
     setupRealtime()
@@ -110,15 +106,10 @@ export default function TicketDetallePage() {
       
       {/* Header del Ticket */}
       <div className="shrink-0">
-        <div className="flex justify-between items-center mb-4">
-          <Link href="/vendedor/soporte" className="inline-flex items-center gap-1.5 text-sm font-600 text-brand-600 hover:text-brand-700 transition">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/></svg>
-            Volver a soporte
-          </Link>
-          <span className="text-[10px] uppercase font-700 text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-            Realtime: {realtimeStatus}
-          </span>
-        </div>
+        <Link href="/vendedor/soporte" className="inline-flex items-center gap-1.5 text-sm font-600 text-brand-600 hover:text-brand-700 transition mb-4">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/></svg>
+          Volver a soporte
+        </Link>
         
         <h1 className="font-display font-700 text-2xl text-ink-900 mb-3 leading-tight">
           {ticket.asunto}
@@ -137,24 +128,17 @@ export default function TicketDetallePage() {
           <div className="text-center py-12 text-ink-400 text-sm">No hay mensajes.</div>
         ) : (
           mensajes.map((msg, index) => {
-            // El usuario actual es el vendedor_id de session o lo inferimos porque msg.users.nombre será del superadmin o del vendedor.
-            // Para simplificar, si msg.users.rol !== 'vendedor', asumimos superadmin (o checkeamos si user_id coincide con el actual).
-            // En este caso, si msg.users.nombre existe, es del usuario; si el ticket es del vendedor y el user_id es distinto al del vendedor (no lo tenemos directamente en client, pero podemos inferirlo de si el msj lo envía soporte)
-            // Forma sencilla: los mensajes del vendedor tienen fondo blanco y borde, los de soporte fondo brand-50.
-            const esMio = !msg.users || !msg.users.email?.includes('@respondi') // Esto es una heorística simple. En produccion se deberia comprobar userId===msg.user_id
-            
-            // Asumiendo que podemos deducir si es del staff por un flag o asumiendo alternancia
-            // Vamos a mostrar un diseño neutral donde el autor está claro arriba.
+            const esMio = msg.users?.rol === 'vendedor'
             
             return (
-              <div key={msg.id} className="flex gap-4">
-                <div className="w-10 h-10 rounded-full bg-slate-200 shrink-0 flex items-center justify-center text-slate-600 font-700 text-sm uppercase">
-                  {msg.users?.nombre ? msg.users.nombre.substring(0, 2) : 'S'}
+              <div key={msg.id} className={`flex gap-4 ${esMio ? 'flex-row-reverse' : ''}`}>
+                <div className={`w-10 h-10 rounded-full shrink-0 flex items-center justify-center font-700 text-sm uppercase ${esMio ? 'bg-slate-200 text-slate-600' : 'bg-brand-100 text-brand-700'}`}>
+                  {msg.users?.nombre ? msg.users.nombre.substring(0, 2) : (esMio ? 'V' : 'S')}
                 </div>
-                <div className="flex-1 bg-white border border-slate-200 rounded-2xl rounded-tl-none p-4 shadow-sm">
+                <div className={`max-w-[80%] border rounded-2xl p-4 shadow-sm ${esMio ? 'bg-white border-slate-200 rounded-tr-none' : 'bg-brand-50 border-brand-100 rounded-tl-none'}`}>
                   <div className="flex justify-between items-start gap-4 mb-2">
                     <p className="text-sm font-700 text-ink-900">
-                      {msg.users?.nombre || 'Soporte Respondi'}
+                      {msg.users?.nombre || (esMio ? 'Tú' : 'Soporte Respondi')}
                     </p>
                     <p className="text-[11px] font-500 text-ink-400 shrink-0">
                       {formatDistanceToNow(new Date(msg.timestamp), { addSuffix: true, locale: es })}

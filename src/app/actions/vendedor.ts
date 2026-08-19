@@ -383,7 +383,7 @@ export async function getTicketDetalle(ticketId: string) {
 
     const { data: mensajes, error: errMsgs } = await supabase
       .from('support_ticket_messages')
-      .select('*, users(nombre, email)')
+      .select('*, users(nombre, email, rol)')
       .eq('ticket_id', ticket.id)
       .order('timestamp', { ascending: true })
 
@@ -426,7 +426,7 @@ export async function enviarMensajeTicket(ticketId: string, mensaje: string) {
         user_id: userId,
         mensaje: mensaje.trim()
       })
-      .select('*, users(nombre, email)')
+      .select('*, users(nombre, email, rol)')
       .single()
 
     if (errMsg) throw new Error(errMsg.message)

@@ -281,6 +281,14 @@ export async function getPlanes() {
   return { success: true, planes: data }
 }
 
+export async function crearPlan(data: any) {
+  const { supabase } = await requireSuperAdmin()
+  const { data: result, error } = await supabase.from('plans').insert(data).select().single()
+  if (error) return { success: false, error: error.message }
+  revalidatePath('/superadmin/planes')
+  return { success: true, plan: result }
+}
+
 // G) actualizarPlan
 export async function actualizarPlan(id: string, data: any) {
   const { supabase } = await requireSuperAdmin()
@@ -288,6 +296,23 @@ export async function actualizarPlan(id: string, data: any) {
   if (error) return { success: false, error: error.message }
   revalidatePath('/superadmin/planes')
   return { success: true, plan: result }
+}
+
+export async function eliminarPlan(id: string) {
+  const { supabase } = await requireSuperAdmin()
+  // Check if any organization uses this plan
+  const { count, error: countError } = await supabase
+    .from('organizaciones')
+    .select('*', { count: 'exact', head: true })
+    .eq('plan_id', id)
+    
+  if (countError) return { success: false, error: countError.message }
+  if (count && count > 0) return { success: false, error: 'No se puede eliminar este plan porque hay organizaciones usándolo.' }
+
+  const { error } = await supabase.from('plans').delete().eq('id', id)
+  if (error) return { success: false, error: error.message }
+  revalidatePath('/superadmin/planes')
+  return { success: true }
 }
 
 // H) getErrores

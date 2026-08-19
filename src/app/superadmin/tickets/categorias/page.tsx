@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { getCategoriasTickets, crearCategoriaTicket, actualizarCategoriaTicket, borrarCategoriaTicket } from '@/app/actions/superadmin'
 import Loading from '@/components/Loading'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 export default function CategoriasTicketsPage() {
   const [loading, setLoading] = useState(true)
@@ -15,6 +16,7 @@ export default function CategoriasTicketsPage() {
   const [color, setColor] = useState('#6366f1')
   const [saving, setSaving] = useState(false)
   const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
+  const [confirmarBorrar, setConfirmarBorrar] = useState<string | null>(null)
 
   const cargarCategorias = async () => {
     setLoading(true)
@@ -45,15 +47,19 @@ export default function CategoriasTicketsPage() {
     setIsModalOpen(true)
   }
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('¿Estás seguro de que quieres eliminar esta categoría? No se podrá borrar si hay tickets usándola.')) return
+  const handleConfirmarBorrar = async () => {
+    if (!confirmarBorrar) return
+    setSaving(true)
+    const res = await borrarCategoriaTicket(confirmarBorrar)
+    setSaving(false)
     
-    const res = await borrarCategoriaTicket(id)
     if (res.success) {
-      setCategorias(prev => prev.filter(c => c.id !== id))
+      setCategorias(prev => prev.filter(c => c.id !== confirmarBorrar))
+      setConfirmarBorrar(null)
       setMensaje({ tipo: 'exito', texto: 'Categoría eliminada correctamente' })
       setTimeout(() => setMensaje(null), 3000)
     } else {
+      setConfirmarBorrar(null)
       setMensaje({ tipo: 'error', texto: res.error || 'Error al eliminar' })
       setTimeout(() => setMensaje(null), 3000)
     }
@@ -142,7 +148,7 @@ export default function CategoriasTicketsPage() {
                       <button onClick={() => openEditar(cat)} className="p-2 rounded-lg text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition" title="Editar">
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                       </button>
-                      <button onClick={() => handleDelete(cat.id)} className="p-2 rounded-lg text-ink-400 hover:text-red-500 hover:bg-red-50 transition" title="Eliminar">
+                      <button onClick={() => setConfirmarBorrar(cat.id)} className="p-2 rounded-lg text-ink-400 hover:text-red-500 hover:bg-red-50 transition" title="Eliminar">
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                       </button>
                     </div>
@@ -199,6 +205,18 @@ export default function CategoriasTicketsPage() {
           </div>
         </div>
       )}
+
+      {/* ConfirmModal Eliminación */}
+      <ConfirmModal
+        isOpen={!!confirmarBorrar}
+        title="Eliminar categoría"
+        message="¿Estás seguro de que quieres eliminar esta categoría? No se podrá borrar si hay tickets usándola."
+        confirmText="Eliminar"
+        type="danger"
+        isLoading={saving}
+        onConfirm={handleConfirmarBorrar}
+        onClose={() => setConfirmarBorrar(null)}
+      />
     </div>
   )
 }

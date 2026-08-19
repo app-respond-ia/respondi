@@ -2,7 +2,8 @@
 import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
-import { getPlanes, actualizarPlan } from '@/app/actions/superadmin'
+import { getPlanes, actualizarPlan, crearPlan, eliminarPlan } from '@/app/actions/superadmin'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 export default function PlanesPage() {
   const [planes, setPlanes] = useState<any[]>([])
@@ -10,11 +11,16 @@ export default function PlanesPage() {
   const [modalData, setModalData] = useState<any>(null)
   const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
   
-  const [formData, setFormData] = useState({
-    precio_usd: 0, creditos_mensuales: 0, canales_max: 0, sucursales_max: 0, 
-    usuarios_max: 0, precio_credito_adicional: 0, precio_sucursal_extra: 0, 
-    dias_retencion_mensajes: 30, modelo_ia: 'gpt-4o-mini', activo: true
-  })
+  const [confirmarBorrar, setConfirmarBorrar] = useState<any>(null)
+  const [saving, setSaving] = useState(false)
+
+  const defaultFormData = {
+    nombre: '', precio_usd: 0, creditos_mensuales: 1000, canales_max: 1, sucursales_max: 1, 
+    usuarios_max: 1, precio_credito_adicional: 0.005, precio_sucursal_extra: 15, 
+    dias_retencion_mensajes: 30, modelo_ia: 'gpt-4o-mini', activo: false
+  }
+  
+  const [formData, setFormData] = useState({ ...defaultFormData })
 
   useEffect(() => {
     loadPlanes()
@@ -28,19 +34,25 @@ export default function PlanesPage() {
   }
 
   const openModal = (plan: any) => {
-    setFormData({
-      precio_usd: plan.precio_usd || 0,
-      creditos_mensuales: plan.creditos_mensuales || 0,
-      canales_max: plan.canales_max || 0,
-      sucursales_max: plan.sucursales_max || 0,
-      usuarios_max: plan.usuarios_max || 0,
-      precio_credito_adicional: plan.precio_credito_adicional || 0,
-      precio_sucursal_extra: plan.precio_sucursal_extra || 0,
-      dias_retencion_mensajes: plan.dias_retencion_mensajes || 30,
-      modelo_ia: plan.modelo_ia || 'gpt-4o-mini',
-      activo: plan.activo ?? true
-    })
-    setModalData(plan)
+    if (plan) {
+      setFormData({
+        nombre: plan.nombre || '',
+        precio_usd: plan.precio_usd || 0,
+        creditos_mensuales: plan.creditos_mensuales || 0,
+        canales_max: plan.canales_max || 0,
+        sucursales_max: plan.sucursales_max || 0,
+        usuarios_max: plan.usuarios_max || 0,
+        precio_credito_adicional: plan.precio_credito_adicional || 0,
+        precio_sucursal_extra: plan.precio_sucursal_extra || 0,
+        dias_retencion_mensajes: plan.dias_retencion_mensajes || 30,
+        modelo_ia: plan.modelo_ia || 'gpt-4o-mini',
+        activo: plan.activo ?? true
+      })
+      setModalData(plan)
+    } else {
+      setFormData({ ...defaultFormData })
+      setModalData({}) // Empty object for new plan
+    }
     document.body.style.overflow = 'hidden'
   }
 
@@ -50,18 +62,65 @@ export default function PlanesPage() {
   }
 
   const handleGuardar = async () => {
+    if (!formData.nombre.trim()) {
+      setMensaje({ tipo: 'error', texto: 'El nombre es obligatorio.' })
+      setTimeout(() => setMensaje(null), 3000)
+      return
+    }
     if (formData.precio_usd !== undefined && formData.precio_usd < 0) {
       setMensaje({ tipo: 'error', texto: 'El precio no puede ser negativo.' })
       setTimeout(() => setMensaje(null), 3000)
       return
     }
-    if (modalData) {
-      await actualizarPlan(modalData.id, formData)
+    
+    setSaving(true)
+    let res;
+    if (modalData && modalData.id) {
+      res = await actualizarPlan(modalData.id, formData)
+    } else {
+      res = await crearPlan(formData)
     }
-    closeModal()
-    setMensaje({ tipo: 'exito', texto: 'Plan actualizado ✓' })
-    setTimeout(() => setMensaje(null), 3000)
-    loadPlanes()
+    setSaving(false)
+
+    if (res.success) {
+      closeModal()
+      setMensaje({ tipo: 'exito', texto: modalData?.id ? 'Plan actualizado ✓' : 'Plan creado ✓' })
+      setTimeout(() => setMensaje(null), 3000)
+      loadPlanes()
+    } else {
+      setMensaje({ tipo: 'error', texto: res.error || 'Error al guardar.' })
+      setTimeout(() => setMensaje(null), 3000)
+    }
+  }
+
+  const handleToggleActivo = async (p: any) => {
+    const res = await actualizarPlan(p.id, { activo: !p.activo })
+    if (res.success) {
+      setMensaje({ tipo: 'exito', texto: `Plan ${!p.activo ? 'publicado' : 'ocultado'}` })
+      setTimeout(() => setMensaje(null), 3000)
+      loadPlanes()
+    } else {
+      setMensaje({ tipo: 'error', texto: res.error || 'Error al actualizar.' })
+      setTimeout(() => setMensaje(null), 3000)
+    }
+  }
+
+  const handleConfirmarBorrar = async () => {
+    if (!confirmarBorrar) return
+    setSaving(true)
+    const res = await eliminarPlan(confirmarBorrar.id)
+    setSaving(false)
+    if (res.success) {
+      setConfirmarBorrar(null)
+      closeModal() // In case it was opened from modal
+      setMensaje({ tipo: 'exito', texto: 'Plan eliminado ✓' })
+      setTimeout(() => setMensaje(null), 3000)
+      loadPlanes()
+    } else {
+      setConfirmarBorrar(null)
+      setMensaje({ tipo: 'error', texto: res.error || 'Error al eliminar.' })
+      setTimeout(() => setMensaje(null), 3000)
+    }
   }
 
   return (
@@ -79,7 +138,7 @@ export default function PlanesPage() {
           <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Planes y precios</h1>
           <p className="text-ink-500 mt-1">Configura los límites de cada nivel de suscripción.</p>
         </div>
-        <button disabled title="Próximamente" className="inline-flex items-center gap-2 px-4 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white text-sm font-600 transition">
+        <button onClick={() => openModal(null)} className="inline-flex items-center gap-2 px-4 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
           Nuevo plan
         </button>
@@ -102,7 +161,9 @@ export default function PlanesPage() {
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <h3 className={`font-display font-700 text-xl ${isPro ? 'text-white' : 'text-ink-900'}`}>{p.nombre}</h3>
-                      {!p.activo && <span className="inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-600 bg-red-100 text-red-600 uppercase tracking-wider">Inactivo</span>}
+                      <button onClick={() => handleToggleActivo(p)} className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-600 uppercase tracking-wider transition border ${p.activo ? (isPro ? 'bg-white/20 text-white border-white/30 hover:bg-white/30' : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100') : (isPro ? 'bg-red-500/20 text-red-100 border-red-500/30 hover:bg-red-500/40' : 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100')}`}>
+                        {p.activo ? 'Activo' : 'Inactivo'}
+                      </button>
                     </div>
                     <div className="text-right">
                       <p className={`font-display font-700 text-2xl ${isPro ? 'text-white' : 'text-ink-900'}`}>${p.precio_usd}</p>
@@ -143,9 +204,12 @@ export default function PlanesPage() {
                 </div>
 
                 {/* Botón */}
-                <div className="p-6 pt-0 bg-white relative z-10">
-                  <button onClick={() => openModal(p)} className={`w-full h-11 rounded-xl text-sm font-600 transition ${isPro ? 'bg-brand-600 hover:bg-brand-700 text-white' : 'bg-slate-100 hover:bg-slate-200 text-ink-900'}`}>
-                    Editar {p.nombre}
+                <div className="p-6 pt-0 bg-white relative z-10 flex gap-2">
+                  <button onClick={() => openModal(p)} className={`flex-1 h-11 rounded-xl text-sm font-600 transition ${isPro ? 'bg-brand-600 hover:bg-brand-700 text-white' : 'bg-slate-100 hover:bg-slate-200 text-ink-900'}`}>
+                    Editar
+                  </button>
+                  <button onClick={() => setConfirmarBorrar(p)} className="px-4 rounded-xl text-ink-400 hover:bg-red-50 hover:text-red-600 transition" title="Eliminar plan">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                   </button>
                 </div>
               </div>
@@ -161,7 +225,7 @@ export default function PlanesPage() {
           <div className="relative min-h-full flex items-center justify-center p-4">
             <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl">
               <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-                <h2 className="font-display font-700 text-lg text-ink-900">Editar plan: {modalData.nombre}</h2>
+                <h2 className="font-display font-700 text-lg text-ink-900">{modalData.id ? `Editar plan: ${modalData.nombre}` : 'Nuevo plan'}</h2>
                 <button onClick={closeModal} className="p-1.5 rounded-lg text-ink-400 hover:text-ink-700 hover:bg-slate-100 transition" aria-label="Cerrar">
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
@@ -170,7 +234,11 @@ export default function PlanesPage() {
                 
                 {/* Bloque Precios */}
                 <div>
-                  <h3 className="text-sm font-600 text-ink-900 mb-3 uppercase tracking-wide">Facturación</h3>
+                  <h3 className="text-sm font-600 text-ink-900 mb-3 uppercase tracking-wide">Configuración básica</h3>
+                  <div className="mb-4">
+                    <label className="block text-xs font-500 text-ink-600 mb-1.5">Nombre del plan</label>
+                    <input type="text" value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} className="w-full h-10 px-3 rounded-lg border border-slate-300 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-100" placeholder="Ej. Pro, Basic, Plus..." />
+                  </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-500 text-ink-600 mb-1.5">Precio base (USD/mes)</label>
@@ -241,14 +309,33 @@ export default function PlanesPage() {
                 </div>
 
               </div>
-              <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl">
-                <button onClick={closeModal} className="px-5 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition">Cancelar</button>
-                <button onClick={handleGuardar} className="px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 transition">Guardar cambios</button>
+              <div className="flex justify-between gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl">
+                {modalData.id ? (
+                  <button onClick={() => { closeModal(); setConfirmarBorrar(modalData); }} className="px-5 h-11 rounded-xl bg-white border border-red-200 hover:bg-red-50 text-sm font-600 text-red-600 transition">Eliminar</button>
+                ) : (
+                  <div></div>
+                )}
+                <div className="flex gap-3">
+                  <button onClick={closeModal} disabled={saving} className="px-5 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition disabled:opacity-50">Cancelar</button>
+                  <button onClick={handleGuardar} disabled={saving} className="px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 transition disabled:opacity-50">{saving ? 'Guardando...' : 'Guardar'}</button>
+                </div>
               </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* ConfirmModal Eliminación */}
+      <ConfirmModal
+        isOpen={!!confirmarBorrar}
+        title="Eliminar plan"
+        message={confirmarBorrar ? `¿Estás seguro de que quieres eliminar el plan ${confirmarBorrar.nombre}? Esto solo será posible si no hay clientes usando este plan.` : ''}
+        confirmText="Eliminar"
+        type="danger"
+        isLoading={saving}
+        onConfirm={handleConfirmarBorrar}
+        onClose={() => setConfirmarBorrar(null)}
+      />
     </>
   )
 }

@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import SuperadminLayout from '@/components/layout/SuperadminLayout'
+import { ToastProvider } from '@/components/ui/Toast'
 
 export default async function Layout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -32,8 +33,10 @@ export default async function Layout({ children }: { children: React.ReactNode }
     .eq('estatus', 'abierto')
 
   return (
-    <SuperadminLayout nombreUsuario={nombreUsuario} iniciales={iniciales} ticketsAbiertos={count || 0}>
-      {children}
-    </SuperadminLayout>
+    <ToastProvider>
+      <SuperadminLayout nombreUsuario={nombreUsuario} iniciales={iniciales} ticketsAbiertos={count || 0}>
+        {children}
+      </SuperadminLayout>
+    </ToastProvider>
   )
 }

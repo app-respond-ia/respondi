@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { getCategoriasTickets, crearCategoriaTicket, actualizarCategoriaTicket, borrarCategoriaTicket } from '@/app/actions/superadmin'
 import Loading from '@/components/Loading'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
+import { useToast } from '@/components/ui/Toast'
 
 export default function CategoriasTicketsPage() {
   const [loading, setLoading] = useState(true)
@@ -15,8 +16,8 @@ export default function CategoriasTicketsPage() {
   const [nombre, setNombre] = useState('')
   const [color, setColor] = useState('#6366f1')
   const [saving, setSaving] = useState(false)
-  const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
   const [confirmarBorrar, setConfirmarBorrar] = useState<string | null>(null)
+  const { showToast } = useToast()
 
   const cargarCategorias = async () => {
     setLoading(true)
@@ -56,12 +57,10 @@ export default function CategoriasTicketsPage() {
     if (res.success) {
       setCategorias(prev => prev.filter(c => c.id !== confirmarBorrar))
       setConfirmarBorrar(null)
-      setMensaje({ tipo: 'exito', texto: 'Categoría eliminada correctamente' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast('Categoría eliminada correctamente', 'success')
     } else {
       setConfirmarBorrar(null)
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al eliminar' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast(res.error || 'Error al eliminar', 'error')
     }
   }
 
@@ -80,11 +79,9 @@ export default function CategoriasTicketsPage() {
     if (res.success) {
       await cargarCategorias()
       setIsModalOpen(false)
-      setMensaje({ tipo: 'exito', texto: modalMode === 'añadir' ? 'Categoría añadida' : 'Categoría actualizada' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast(modalMode === 'añadir' ? 'Categoría añadida' : 'Categoría actualizada', 'success')
     } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al guardar' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast(res.error || 'Error al guardar', 'error')
     }
     setSaving(false)
   }
@@ -94,12 +91,6 @@ export default function CategoriasTicketsPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       
-      {mensaje && (
-        <div className={`mb-6 text-sm font-600 px-4 py-3 rounded-xl ${mensaje.tipo === 'exito' ? 'text-emerald-700 bg-emerald-50' : 'text-red-700 bg-red-50'}`}>
-          {mensaje.texto}
-        </div>
-      )}
-
       {/* Header */}
       <div className="flex justify-between items-center bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
         <div>

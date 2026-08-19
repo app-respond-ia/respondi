@@ -4,15 +4,16 @@ import Loading from '@/components/Loading'
 import { useState, useEffect } from 'react'
 import { getPlanes, actualizarPlan, crearPlan, eliminarPlan } from '@/app/actions/superadmin'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
+import { useToast } from '@/components/ui/Toast'
 
 export default function PlanesPage() {
   const [planes, setPlanes] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [modalData, setModalData] = useState<any>(null)
-  const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
   
   const [confirmarBorrar, setConfirmarBorrar] = useState<any>(null)
   const [saving, setSaving] = useState(false)
+  const { showToast } = useToast()
 
   const defaultFormData = {
     nombre: '', precio_usd: 0, creditos_mensuales: 1000, canales_max: 1, sucursales_max: 1, 
@@ -63,13 +64,11 @@ export default function PlanesPage() {
 
   const handleGuardar = async () => {
     if (!formData.nombre.trim()) {
-      setMensaje({ tipo: 'error', texto: 'El nombre es obligatorio.' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast('El nombre es obligatorio.', 'error')
       return
     }
     if (formData.precio_usd !== undefined && formData.precio_usd < 0) {
-      setMensaje({ tipo: 'error', texto: 'El precio no puede ser negativo.' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast('El precio no puede ser negativo.', 'error')
       return
     }
     
@@ -84,24 +83,20 @@ export default function PlanesPage() {
 
     if (res.success) {
       closeModal()
-      setMensaje({ tipo: 'exito', texto: modalData?.id ? 'Plan actualizado ✓' : 'Plan creado ✓' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast(modalData?.id ? 'Plan actualizado ✓' : 'Plan creado ✓', 'success')
       loadPlanes()
     } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al guardar.' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast(res.error || 'Error al guardar.', 'error')
     }
   }
 
   const handleToggleActivo = async (p: any) => {
     const res = await actualizarPlan(p.id, { activo: !p.activo })
     if (res.success) {
-      setMensaje({ tipo: 'exito', texto: `Plan ${!p.activo ? 'publicado' : 'ocultado'}` })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast(`Plan ${!p.activo ? 'publicado' : 'ocultado'}`, 'success')
       loadPlanes()
     } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al actualizar.' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast(res.error || 'Error al actualizar.', 'error')
     }
   }
 
@@ -113,26 +108,16 @@ export default function PlanesPage() {
     if (res.success) {
       setConfirmarBorrar(null)
       closeModal() // In case it was opened from modal
-      setMensaje({ tipo: 'exito', texto: 'Plan eliminado ✓' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast('Plan eliminado ✓', 'success')
       loadPlanes()
     } else {
       setConfirmarBorrar(null)
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al eliminar.' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast(res.error || 'Error al eliminar.', 'error')
     }
   }
 
   return (
     <>
-      {mensaje && (
-        <div className={`mb-6 p-4 rounded-xl font-500 text-sm border flex items-center gap-2 ${
-          mensaje.tipo === 'exito' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'
-        }`}>
-          {mensaje.texto}
-        </div>
-      )}
-
       <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
         <div>
           <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Planes y precios</h1>

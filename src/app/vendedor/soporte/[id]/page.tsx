@@ -17,6 +17,7 @@ export default function TicketDetallePage() {
   const [loading, setLoading] = useState(true)
   const [nuevoMensaje, setNuevoMensaje] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [realtimeStatus, setRealtimeStatus] = useState('conectando...')
   const mensajesEndRef = useRef<HTMLDivElement>(null)
 
   const cargarDetalle = useCallback(async () => {
@@ -46,7 +47,10 @@ export default function TicketDetallePage() {
         { event: 'UPDATE', schema: 'public', table: 'support_tickets', filter: `id=eq.${id}` },
         () => cargarDetalle()
       )
-      .subscribe()
+      .subscribe((status) => {
+        console.log('Realtime status:', status)
+        setRealtimeStatus(status)
+      })
 
     return () => {
       supabase.removeChannel(channel)
@@ -91,10 +95,15 @@ export default function TicketDetallePage() {
       
       {/* Header del Ticket */}
       <div className="shrink-0">
-        <Link href="/vendedor/soporte" className="inline-flex items-center gap-1.5 text-sm font-600 text-brand-600 hover:text-brand-700 transition mb-4">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/></svg>
-          Volver a soporte
-        </Link>
+        <div className="flex justify-between items-center mb-4">
+          <Link href="/vendedor/soporte" className="inline-flex items-center gap-1.5 text-sm font-600 text-brand-600 hover:text-brand-700 transition">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/></svg>
+            Volver a soporte
+          </Link>
+          <span className="text-[10px] uppercase font-700 text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+            Realtime: {realtimeStatus}
+          </span>
+        </div>
         
         <h1 className="font-display font-700 text-2xl text-ink-900 mb-3 leading-tight">
           {ticket.asunto}

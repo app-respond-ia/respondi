@@ -765,6 +765,8 @@ export async function getTicketsSoporte() {
       .select(`
         *,
         vendedores ( nombre ),
+        ticket_categorias ( id, nombre, color ),
+        asignado_a_user:users!support_tickets_asignado_a_fkey ( id, nombre, email ),
         support_ticket_messages ( mensaje, timestamp )
       `)
       .order('fecha_apertura', { ascending: false })
@@ -795,12 +797,14 @@ export async function getTicketDetalleSuperadmin(ticketId: string) {
       .select(`
         *,
         vendedores ( nombre, user_id ),
+        ticket_categorias ( id, nombre, color ),
+        asignado_a_user:users!support_tickets_asignado_a_fkey ( id, nombre, email ),
         support_ticket_messages (
           id,
           mensaje,
           timestamp,
           user_id,
-          users ( rol, nombre, avatar_url )
+          users!support_ticket_messages_user_id_fkey ( rol, nombre, avatar_url )
         )
       `)
       .eq('id', ticketId)
@@ -820,12 +824,12 @@ export async function getTicketDetalleSuperadmin(ticketId: string) {
   }
 }
 
-export async function asignarCategoriaPrioridad(ticketId: string, categoria: string | null, prioridad: string) {
+export async function asignarCategoriaPrioridad(ticketId: string, categoriaId: string | null, prioridad: string) {
   try {
     const { supabase, userId } = await requireSuperAdmin()
     const { error } = await supabaseAdmin
       .from('support_tickets')
-      .update({ categoria, prioridad })
+      .update({ categoria_id: categoriaId, prioridad })
       .eq('id', ticketId)
 
     if (error) throw error
@@ -836,7 +840,7 @@ export async function asignarCategoriaPrioridad(ticketId: string, categoria: str
       accion: 'actualizar_ticket',
       tabla_afectada: 'support_tickets',
       registro_id: ticketId,
-      valor_nuevo: { categoria, prioridad }
+      valor_nuevo: { categoria_id: categoriaId, prioridad }
     })
 
     revalidatePath(`/superadmin/tickets/${ticketId}`)
@@ -911,6 +915,134 @@ export async function cambiarEstatusTicket(ticketId: string, estatus: 'abierto' 
 
     revalidatePath(`/superadmin/tickets/${ticketId}`)
     revalidatePath(`/superadmin/tickets`)
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
+
+// ----------------------------------------------------------------------
+// GESTIÓN DE CATEGORÍAS DE TICKETS
+// ----------------------------------------------------------------------
+
+export async function getCategoriasTickets() {
+  try {
+    const { supabase } = await requireSuperAdmin()
+    const { data, error } = await supabase
+      .from('ticket_categorias')
+      .select('*')
+      .order('nombre', { ascending: true })
+      
+    if (error) throw error
+    return { success: true, data }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
+
+export async function crearCategoriaTicket(nombre: string, color: string) {
+  try {
+    const { supabase } = await requireSuperAdmin()
+    const { error } = await supabase
+      .from('ticket_categorias')
+      .insert({ nombre: nombre.trim(), color })
+      
+    if (error) throw error
+    revalidatePath('/superadmin/tickets')
+    revalidatePath('/superadmin/tickets/categorias')
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
+
+export async function actualizarCategoriaTicket(id: string, nombre: string, color: string) {
+  try {
+    const { supabase } = await requireSuperAdmin()
+    const { error } = await supabase
+      .from('ticket_categorias')
+      .update({ nombre: nombre.trim(), color })
+      .eq('id', id)
+      
+    if (error) throw error
+    revalidatePath('/superadmin/tickets')
+    revalidatePath('/superadmin/tickets/categorias')
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
+
+export async function borrarCategoriaTicket(id: string) {
+  try {
+    const { supabase } = await requireSuperAdmin()
+    
+    // Check if category is used
+    const { count, error: countError } = await supabase
+      .from('support_tickets')
+      .select('*', { count: 'exact', head: true })
+      .eq('categoria_id', id)
+      
+    if (countError) throw countError
+    if (count && count > 0) {
+      return { success: false, error: 'No se puede borrar porque hay tickets asociados a esta categoría.' }
+    }
+
+    const { error } = await supabase
+      .from('ticket_categorias')
+      .delete()
+      .eq('id', id)
+      
+    if (error) throw error
+    revalidatePath('/superadmin/tickets')
+    revalidatePath('/superadmin/tickets/categorias')
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
+
+// ----------------------------------------------------------------------
+// ASIGNACIÓN DE TICKETS
+// ----------------------------------------------------------------------
+
+export async function getSuperadmins() {
+  try {
+    const { supabase } = await requireSuperAdmin()
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, nombre, email')
+      .eq('rol', 'super_admin')
+      .order('nombre', { ascending: true })
+      
+    if (error) throw error
+    return { success: true, data }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
+
+export async function asignarTicket(ticketId: string, asignadoA: string | null) {
+  try {
+    const { supabase, userId } = await requireSuperAdmin()
+    const { error } = await supabaseAdmin
+      .from('support_tickets')
+      .update({ asignado_a: asignadoA })
+      .eq('id', ticketId)
+      
+    if (error) throw error
+    
+    await registrarAuditoria({
+      tenant_id: null,
+      user_id: userId,
+      accion: 'asignar_ticket',
+      tabla_afectada: 'support_tickets',
+      registro_id: ticketId,
+      valor_nuevo: { asignado_a: asignadoA }
+    })
+
+    revalidatePath(`/superadmin/tickets/${ticketId}`)
+    revalidatePath('/superadmin/tickets')
     return { success: true }
   } catch (err: any) {
     return { success: false, error: err.message }

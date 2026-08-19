@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import Loading from '@/components/Loading'
-import { getTicketsSoporte } from '@/app/actions/superadmin'
+import { getTicketsSoporte, getCategoriasTickets } from '@/app/actions/superadmin'
 import Link from 'next/link'
 
 export default function TicketsSoportePage() {
   const [tickets, setTickets] = useState<any[]>([])
+  const [categorias, setCategorias] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   // Filtros
@@ -20,9 +21,15 @@ export default function TicketsSoportePage() {
 
   const cargar = async () => {
     setLoading(true)
-    const res = await getTicketsSoporte()
-    if (res.success && res.data) {
-      setTickets(res.data)
+    const [resTickets, resCats] = await Promise.all([
+      getTicketsSoporte(),
+      getCategoriasTickets()
+    ])
+    if (resTickets.success && resTickets.data) {
+      setTickets(resTickets.data)
+    }
+    if (resCats.success && resCats.data) {
+      setCategorias(resCats.data)
     }
     setLoading(false)
   }
@@ -38,14 +45,6 @@ export default function TicketsSoportePage() {
     return 'bg-slate-100 text-slate-600'
   }
 
-  const getCategoriaBadge = (cat: string) => {
-    if (!cat) return 'bg-slate-100 text-slate-600'
-    if (cat === 'comisiones') return 'bg-emerald-100 text-emerald-700'
-    if (cat === 'clientes') return 'bg-blue-100 text-blue-700'
-    if (cat === 'tecnico') return 'bg-purple-100 text-purple-700'
-    return 'bg-slate-100 text-slate-700'
-  }
-
   const getPrioridadBadge = (prio: string) => {
     if (prio === 'alta') return 'bg-red-100 text-red-700'
     if (prio === 'normal') return 'bg-blue-100 text-blue-700'
@@ -54,12 +53,12 @@ export default function TicketsSoportePage() {
   }
 
   const abiertos = tickets.filter(t => t.estatus === 'abierto').length
-  const sinCategorizar = tickets.filter(t => !t.categoria && t.estatus === 'abierto').length
+  const sinCategorizar = tickets.filter(t => !t.categoria_id && t.estatus === 'abierto').length
   const cerrados = tickets.filter(t => t.estatus === 'cerrado').length
 
   const filtrados = tickets.filter(t => {
     if (filtroEstatus && t.estatus !== filtroEstatus) return false
-    if (filtroCategoria && t.categoria !== filtroCategoria) return false
+    if (filtroCategoria && t.categoria_id !== filtroCategoria) return false
     if (filtroPrioridad && t.prioridad !== filtroPrioridad) return false
     return true
   })
@@ -100,10 +99,9 @@ export default function TicketsSoportePage() {
         <select value={filtroCategoria} onChange={e => setFiltroCategoria(e.target.value)}
           className="h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition">
           <option value="">Todas las categorías</option>
-          <option value="comisiones">Comisiones</option>
-          <option value="clientes">Clientes</option>
-          <option value="tecnico">Problema técnico</option>
-          <option value="otro">Otro</option>
+          {categorias.map(c => (
+            <option key={c.id} value={c.id}>{c.nombre}</option>
+          ))}
         </select>
         <select value={filtroPrioridad} onChange={e => setFiltroPrioridad(e.target.value)}
           className="h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition">
@@ -130,6 +128,7 @@ export default function TicketsSoportePage() {
                   <th className="font-600 px-5 py-3">Categoría</th>
                   <th className="font-600 px-5 py-3">Prioridad</th>
                   <th className="font-600 px-5 py-3">Estado</th>
+                  <th className="font-600 px-5 py-3">Asignado a</th>
                   <th className="font-600 px-5 py-3">Última actividad</th>
                   <th className="font-600 px-5 py-3 text-right">Acciones</th>
                 </tr>
@@ -140,9 +139,13 @@ export default function TicketsSoportePage() {
                     <td className="px-5 py-3.5 font-500 text-ink-900 max-w-[200px] truncate" title={t.asunto}>{t.asunto}</td>
                     <td className="px-5 py-3.5 text-ink-600">{t.vendedores?.nombre || '—'}</td>
                     <td className="px-5 py-3.5">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-600 capitalize ${getCategoriaBadge(t.categoria)}`}>
-                        {t.categoria || 'Sin asignar'}
-                      </span>
+                      {t.ticket_categorias ? (
+                        <span className="px-2.5 py-1 rounded-full text-xs font-600" style={{ backgroundColor: `${t.ticket_categorias.color}15`, color: t.ticket_categorias.color, border: `1px solid ${t.ticket_categorias.color}30` }}>
+                          {t.ticket_categorias.nombre}
+                        </span>
+                      ) : (
+                        <span className="text-xs px-2 py-0.5 rounded-full font-600 bg-slate-100 text-slate-500">Sin asignar</span>
+                      )}
                     </td>
                     <td className="px-5 py-3.5">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-600 capitalize ${getPrioridadBadge(t.prioridad)}`}>
@@ -153,6 +156,18 @@ export default function TicketsSoportePage() {
                       <span className={`text-xs px-2 py-0.5 rounded-full font-600 capitalize ${getEstadoBadge(t.estatus)}`}>
                         {t.estatus}
                       </span>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      {t.asignado_a_user ? (
+                        <div className="flex items-center gap-2">
+                          <div className="w-5 h-5 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 text-[10px] font-bold">
+                            {t.asignado_a_user.nombre.charAt(0).toUpperCase()}
+                          </div>
+                          <span className="text-xs text-ink-700 font-500">{t.asignado_a_user.nombre}</span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-400 font-500">—</span>
+                      )}
                     </td>
                     <td className="px-5 py-3.5 text-ink-500">
                       {t.ultimo_mensaje ? formatFecha(t.ultimo_mensaje.timestamp) : formatFecha(t.fecha_apertura)}

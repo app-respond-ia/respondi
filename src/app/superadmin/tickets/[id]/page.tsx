@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { getTicketDetalleSuperadmin, responderTicket, asignarCategoriaPrioridad, cambiarEstatusTicket } from '@/app/actions/superadmin'
+import { getTicketDetalleSuperadmin, responderTicket, asignarCategoriaPrioridad, cambiarEstatusTicket, getCategoriasTickets, getSuperadmins, asignarTicket } from '@/app/actions/superadmin'
 import { createClient } from '@/utils/supabase/client'
 import Loading from '@/components/Loading'
 import Link from 'next/link'
@@ -13,6 +13,9 @@ export default function TicketDetalleSuperadminPage() {
   const { id } = useParams()
   const router = useRouter()
   const [ticket, setTicket] = useState<any>(null)
+  const [categorias, setCategorias] = useState<any[]>([])
+  const [superadmins, setSuperadmins] = useState<any[]>([])
+  const [miUserId, setMiUserId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [nuevoMensaje, setNuevoMensaje] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -24,7 +27,16 @@ export default function TicketDetalleSuperadminPage() {
       setTicket(res.data)
     } else {
       router.push('/superadmin/tickets')
+      return
     }
+
+    const [catsRes, adminsRes] = await Promise.all([
+      getCategoriasTickets(),
+      getSuperadmins()
+    ])
+    if (catsRes.success && catsRes.data) setCategorias(catsRes.data)
+    if (adminsRes.success && adminsRes.data) setSuperadmins(adminsRes.data)
+
     setLoading(false)
   }, [id, router])
 
@@ -39,6 +51,7 @@ export default function TicketDetalleSuperadminPage() {
       const { data: { session } } = await supabase.auth.getSession()
       if (session) {
         supabase.realtime.setAuth(session.access_token)
+        setMiUserId(session.user.id)
       }
 
       if (!isMounted) return
@@ -88,14 +101,19 @@ export default function TicketDetalleSuperadminPage() {
 
   const handleChangeCategoria = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newVal = e.target.value || null
-    setTicket({ ...ticket, categoria: newVal })
+    setTicket({ ...ticket, categoria_id: newVal })
     await asignarCategoriaPrioridad(ticket.id, newVal, ticket.prioridad)
   }
 
   const handleChangePrioridad = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newVal = e.target.value
     setTicket({ ...ticket, prioridad: newVal })
-    await asignarCategoriaPrioridad(ticket.id, ticket.categoria, newVal)
+    await asignarCategoriaPrioridad(ticket.id, ticket.categoria_id, newVal)
+  }
+
+  const handleAsignar = async (userId: string | null) => {
+    setTicket({ ...ticket, asignado_a: userId })
+    await asignarTicket(ticket.id, userId)
   }
 
   const handleToggleEstatus = async () => {
@@ -203,17 +221,19 @@ export default function TicketDetalleSuperadminPage() {
           <h3 className="font-display font-700 text-lg text-ink-900 border-b border-slate-100 pb-3">Detalles del ticket</h3>
           
           <div>
-            <label className="block text-sm font-600 text-ink-700 mb-2">Categoría</label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-600 text-ink-700">Categoría</label>
+              <Link href="/superadmin/tickets/categorias" className="text-xs font-500 text-brand-600 hover:text-brand-700 transition">Gestionar categorías</Link>
+            </div>
             <select 
-              value={ticket.categoria || ''} 
+              value={ticket.categoria_id || ''} 
               onChange={handleChangeCategoria}
               className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-slate-50 text-sm focus:outline-none focus:border-brand-500 transition"
             >
               <option value="">Sin asignar</option>
-              <option value="comisiones">Comisiones</option>
-              <option value="clientes">Clientes</option>
-              <option value="tecnico">Problema técnico</option>
-              <option value="otro">Otro</option>
+              {categorias.map(c => (
+                <option key={c.id} value={c.id}>{c.nombre}</option>
+              ))}
             </select>
           </div>
 
@@ -227,6 +247,25 @@ export default function TicketDetalleSuperadminPage() {
               <option value="alta">Alta</option>
               <option value="normal">Normal</option>
               <option value="baja">Baja</option>
+            </select>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-600 text-ink-700">Asignado a</label>
+              {miUserId && ticket.asignado_a !== miUserId && (
+                <button type="button" onClick={() => handleAsignar(miUserId)} className="text-xs font-500 text-brand-600 hover:text-brand-700 transition">Asignarme a mí</button>
+              )}
+            </div>
+            <select 
+              value={ticket.asignado_a || ''} 
+              onChange={(e) => handleAsignar(e.target.value || null)}
+              className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-slate-50 text-sm focus:outline-none focus:border-brand-500 transition"
+            >
+              <option value="">Sin asignar</option>
+              {superadmins.map(admin => (
+                <option key={admin.id} value={admin.id}>{admin.nombre}</option>
+              ))}
             </select>
           </div>
 

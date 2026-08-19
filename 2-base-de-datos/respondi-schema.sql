@@ -739,11 +739,20 @@ $$;
 -- 16. SISTEMA DE TICKETS (VENDEDOR ↔ SUPERADMIN)
 -- ============================================================================
 
+create table ticket_categorias (
+  id         uuid primary key default gen_random_uuid(),
+  nombre     text not null unique,
+  color      text not null default '#6366f1',
+  created_at timestamptz not null default now()
+);
+
 create table support_tickets (
   id             uuid primary key default gen_random_uuid(),
   vendedor_id    uuid not null references vendedores(id) on delete cascade,
   asunto         text not null,
-  categoria      text,
+  categoria      text, -- Deprecated, use categoria_id instead
+  categoria_id   uuid references ticket_categorias(id),
+  asignado_a     uuid references users(id),
   prioridad      text default 'normal',
   estatus        text not null default 'abierto',
   fecha_apertura timestamptz not null default now(),
@@ -772,6 +781,17 @@ create policy ticket_messages_select on support_ticket_messages for select
   using (exists (select 1 from public.users where id = auth.uid() and rol = 'super_admin') or ticket_id in (select id from support_tickets where vendedor_id = (select id from vendedores where user_id = auth.uid())));
 create policy ticket_messages_insert on support_ticket_messages for insert
   with check (is_super_admin() or ticket_id in (select id from support_tickets where vendedor_id = (select id from vendedores where user_id = auth.uid())));
+
+alter table ticket_categorias enable row level security;
+
+create policy categorias_select on ticket_categorias for select
+  using (exists (select 1 from public.users where id = auth.uid() and rol = 'super_admin'));
+create policy categorias_insert on ticket_categorias for insert
+  with check (exists (select 1 from public.users where id = auth.uid() and rol = 'super_admin'));
+create policy categorias_update on ticket_categorias for update
+  using (exists (select 1 from public.users where id = auth.uid() and rol = 'super_admin'));
+create policy categorias_delete on ticket_categorias for delete
+  using (exists (select 1 from public.users where id = auth.uid() and rol = 'super_admin'));
 
 -- ============================================================================
 -- 17. JOBS PROGRAMADOS (pg_cron)

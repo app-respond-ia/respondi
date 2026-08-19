@@ -33,29 +33,44 @@ export default function TicketDetalleSuperadminPage() {
     cargarDetalle()
 
     const supabase = createClient()
-    const channel = supabase
-      .channel(`ticket-admin-${id}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'support_ticket_messages', filter: `ticket_id=eq.${id}` },
-        (payload) => {
-          console.log('EVENTO RECIBIDO:', payload)
-          setRealtimeStatus(`Evento recibido: ${JSON.stringify(payload.new)}`)
-          cargarDetalle()
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'support_tickets', filter: `id=eq.${id}` },
-        () => cargarDetalle()
-      )
-      .subscribe((status) => {
-        console.log('Realtime status:', status)
-        setRealtimeStatus(status)
-      })
+    let channel: any
+    let isMounted = true
+
+    const setupRealtime = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        supabase.realtime.setAuth(session.access_token)
+      }
+
+      if (!isMounted) return
+
+      channel = supabase
+        .channel(`ticket-admin-${id}`)
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'support_ticket_messages', filter: `ticket_id=eq.${id}` },
+          (payload) => {
+            console.log('EVENTO RECIBIDO:', payload)
+            setRealtimeStatus(`Evento recibido: ${JSON.stringify(payload.new)}`)
+            cargarDetalle()
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'support_tickets', filter: `id=eq.${id}` },
+          () => cargarDetalle()
+        )
+        .subscribe((status) => {
+          console.log('Realtime status:', status)
+          setRealtimeStatus(status)
+        })
+    }
+
+    setupRealtime()
 
     return () => {
-      supabase.removeChannel(channel)
+      isMounted = false
+      if (channel) supabase.removeChannel(channel)
     }
   }, [id, cargarDetalle])
 

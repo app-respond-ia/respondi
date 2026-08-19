@@ -41,37 +41,52 @@ export default function NotificationBell({ userId }: { userId: string }) {
     }
     fetchInitial()
 
+    let channel: any
+    let isMounted = true
+
     // 2. Suscribirse a Realtime
-    const channel = supabase
-      .channel('notificaciones-vendedor')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${userId}`
-        },
-        (payload) => {
-          setNotifications(prev => [payload.new as Notification, ...prev].slice(0, 10))
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${userId}`
-        },
-        (payload) => {
-          setNotifications(prev => prev.map(n => n.id === payload.new.id ? payload.new as Notification : n))
-        }
-      )
-      .subscribe()
+    const setupRealtime = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        supabase.realtime.setAuth(session.access_token)
+      }
+
+      if (!isMounted) return
+
+      channel = supabase
+        .channel('notificaciones-vendedor')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'notifications',
+            filter: `user_id=eq.${userId}`
+          },
+          (payload) => {
+            setNotifications(prev => [payload.new as Notification, ...prev].slice(0, 10))
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'notifications',
+            filter: `user_id=eq.${userId}`
+          },
+          (payload) => {
+            setNotifications(prev => prev.map(n => n.id === payload.new.id ? payload.new as Notification : n))
+          }
+        )
+        .subscribe()
+    }
+
+    setupRealtime()
 
     return () => {
-      supabase.removeChannel(channel)
+      isMounted = false
+      if (channel) supabase.removeChannel(channel)
     }
   }, [userId, supabase])
 

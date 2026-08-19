@@ -762,14 +762,14 @@ alter table support_tickets enable row level security;
 alter table support_ticket_messages enable row level security;
 
 create policy tickets_select on support_tickets for select
-  using (is_super_admin() or vendedor_id = (select id from vendedores where user_id = auth.uid()));
+  using (exists (select 1 from public.users where id = auth.uid() and rol = 'super_admin') or vendedor_id = (select id from vendedores where user_id = auth.uid()));
 create policy tickets_insert on support_tickets for insert
   with check (is_super_admin() or vendedor_id = (select id from vendedores where user_id = auth.uid()));
 create policy tickets_update on support_tickets for update
   using (is_super_admin() or vendedor_id = (select id from vendedores where user_id = auth.uid()));
 
 create policy ticket_messages_select on support_ticket_messages for select
-  using (is_super_admin() or ticket_id in (select id from support_tickets where vendedor_id = (select id from vendedores where user_id = auth.uid())));
+  using (exists (select 1 from public.users where id = auth.uid() and rol = 'super_admin') or ticket_id in (select id from support_tickets where vendedor_id = (select id from vendedores where user_id = auth.uid())));
 create policy ticket_messages_insert on support_ticket_messages for insert
   with check (is_super_admin() or ticket_id in (select id from support_tickets where vendedor_id = (select id from vendedores where user_id = auth.uid())));
 

@@ -38,7 +38,11 @@ export default function TicketDetalleSuperadminPage() {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'support_ticket_messages', filter: `ticket_id=eq.${id}` },
-        () => cargarDetalle()
+        (payload) => {
+          console.log('EVENTO RECIBIDO:', payload)
+          setRealtimeStatus(`Evento recibido: ${JSON.stringify(payload.new)}`)
+          cargarDetalle()
+        }
       )
       .on(
         'postgres_changes',

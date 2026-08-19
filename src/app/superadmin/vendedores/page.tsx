@@ -13,7 +13,8 @@ export default function VendedoresPage() {
   // Búsqueda, Filtro y Ordenamiento
   const [search, setSearch] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('todos') // todos, activos, inactivos
-  const [orden, setOrden] = useState('fecha_desc') // fecha_desc, fecha_asc, nombre_asc, clientes_desc, comision_desc
+  const [orden, setOrden] = useState('fecha') // fecha, nombre, clientes, comision
+  const [ordenDesc, setOrdenDesc] = useState(true)
 
   // Modal
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -156,16 +157,17 @@ export default function VendedoresPage() {
   }
 
   vendedoresProcesados.sort((a, b) => {
-    if (orden === 'fecha_desc') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    if (orden === 'fecha_asc') return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-    if (orden === 'nombre_asc') return a.nombre.localeCompare(b.nombre)
-    if (orden === 'clientes_desc') {
+    let diff = 0
+    if (orden === 'fecha') diff = new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    if (orden === 'nombre') diff = a.nombre.localeCompare(b.nombre)
+    if (orden === 'clientes') {
       const ca = a.vendedor_clientes?.length || 0
       const cb = b.vendedor_clientes?.length || 0
-      return cb - ca
+      diff = ca - cb
     }
-    if (orden === 'comision_desc') return b.comision_conversion_pct - a.comision_conversion_pct
-    return 0
+    if (orden === 'comision') diff = a.comision_conversion_pct - b.comision_conversion_pct
+    
+    return ordenDesc ? -diff : diff
   })
 
   return (
@@ -216,14 +218,24 @@ export default function VendedoresPage() {
         
         <div className="flex items-center gap-2">
           <span className="text-sm text-ink-500">Ordenar por:</span>
-          <select value={orden} onChange={e => setOrden(e.target.value)}
-            className="h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition">
-            <option value="fecha_desc">Más recientes primero</option>
-            <option value="fecha_asc">Más antiguos primero</option>
-            <option value="nombre_asc">Nombre (A-Z)</option>
-            <option value="clientes_desc">Más clientes referidos</option>
-            <option value="comision_desc">Mayor comisión</option>
-          </select>
+          <div className="flex items-center gap-1">
+            <select value={orden} onChange={e => setOrden(e.target.value)}
+              className="h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition">
+              <option value="fecha">Fecha de registro</option>
+              <option value="nombre">Nombre</option>
+              <option value="clientes">Clientes referidos</option>
+              <option value="comision">Comisión</option>
+            </select>
+            <button onClick={() => setOrdenDesc(!ordenDesc)}
+              className="h-10 w-10 flex items-center justify-center rounded-lg border border-slate-300 bg-white text-ink-500 hover:bg-slate-50 transition"
+              title={ordenDesc ? 'Descendente' : 'Ascendente'}>
+              {ordenDesc ? (
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+              ) : (
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 

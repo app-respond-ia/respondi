@@ -3,12 +3,13 @@ import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
 import { getComisiones, getVendedores, aprobarComision, marcarComisionPagada, crearComisionManual } from '@/app/actions/superadmin'
+import { useToast } from '@/components/ui/Toast'
 
 export default function ComisionesPage() {
   const [comisiones, setComisiones] = useState<any[]>([])
   const [vendedores, setVendedores] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
+  const { showToast } = useToast()
 
   // Filtros
   const [filtroVendedor, setFiltroVendedor] = useState('')
@@ -26,7 +27,7 @@ export default function ComisionesPage() {
   const [formCrear, setFormCrear] = useState({
     vendedor_id: '',
     organizacion_id: '',
-    tipo: 'conversion' as 'conversion' | 'mrr_mensual',
+    tipo: 'manual' as 'conversion' | 'mrr_mensual' | 'manual',
     importe: 0,
     moneda: 'EUR',
     mes_referencia: '',
@@ -53,12 +54,11 @@ export default function ComisionesPage() {
   const handleAprobar = async (id: string) => {
     const res = await aprobarComision(id)
     if (res.success) {
-      setMensaje({ tipo: 'exito', texto: 'Comisión aprobada ✓' })
+      showToast('Comisión aprobada ✓', 'success')
       cargar()
     } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al aprobar' })
+      showToast(res.error || 'Error al aprobar', 'error')
     }
-    setTimeout(() => setMensaje(null), 3000)
   }
 
   const handleMarcarPagada = async () => {
@@ -68,26 +68,15 @@ export default function ComisionesPage() {
     if (res.success) {
       setModalPago(null)
       setNotasPago('')
-      setMensaje({ tipo: 'exito', texto: 'Comisión marcada como pagada ✓' })
+      showToast('Comisión marcada como pagada ✓', 'success')
       cargar()
     } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al marcar como pagada' })
+      showToast(res.error || 'Error al marcar como pagada', 'error')
     }
-    setTimeout(() => setMensaje(null), 3000)
     setSavingPago(false)
   }
 
   const handleCrearManual = async () => {
-    if (!formCrear.vendedor_id || !formCrear.organizacion_id) {
-      setMensaje({ tipo: 'error', texto: 'Selecciona un vendedor y un cliente.' })
-      setTimeout(() => setMensaje(null), 3000)
-      return
-    }
-    if (!formCrear.importe || formCrear.importe <= 0) {
-      setMensaje({ tipo: 'error', texto: 'El importe debe ser mayor que 0.' })
-      setTimeout(() => setMensaje(null), 3000)
-      return
-    }
     setSavingCrear(true)
     const res = await crearComisionManual({
       ...formCrear,
@@ -95,12 +84,11 @@ export default function ComisionesPage() {
     })
     if (res.success) {
       setIsModalCrear(false)
-      setMensaje({ tipo: 'exito', texto: 'Comisión creada manualmente ✓' })
+      showToast('Comisión creada manualmente ✓', 'success')
       cargar()
     } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al crear comisión' })
+      showToast(res.error || 'Error al crear comisión', 'error')
     }
-    setTimeout(() => setMensaje(null), 3000)
     setSavingCrear(false)
   }
 
@@ -118,6 +106,7 @@ export default function ComisionesPage() {
 
   const getTipoBadge = (tipo: string) => {
     if (tipo === 'conversion') return 'bg-purple-100 text-purple-700'
+    if (tipo === 'manual') return 'bg-orange-100 text-orange-700'
     return 'bg-cyan-100 text-cyan-700'
   }
 
@@ -128,17 +117,10 @@ export default function ComisionesPage() {
   // Clientes disponibles según vendedor seleccionado
   const vendedorSeleccionado = vendedores.find(v => v.id === formCrear.vendedor_id)
   const clientesDisponibles = vendedorSeleccionado?.vendedor_clientes || []
+  const formularioValido = formCrear.vendedor_id && formCrear.organizacion_id && formCrear.importe > 0
 
   return (
     <>
-      {mensaje && (
-        <div className={`mb-6 p-4 rounded-xl font-500 text-sm border flex items-center gap-2 ${
-          mensaje.tipo === 'exito' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'
-        }`}>
-          {mensaje.texto}
-        </div>
-      )}
-
       <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
         <div>
           <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Comisiones</h1>
@@ -185,6 +167,7 @@ export default function ComisionesPage() {
           <option value="">Todos los tipos</option>
           <option value="conversion">Conversión</option>
           <option value="mrr_mensual">MRR mensual</option>
+          <option value="manual">Manual</option>
         </select>
       </div>
 
@@ -215,7 +198,7 @@ export default function ComisionesPage() {
                     <td className="px-5 py-3.5 text-ink-600">{c.organizaciones?.nombre || '—'}</td>
                     <td className="px-5 py-3.5">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-600 ${getTipoBadge(c.tipo)}`}>
-                        {c.tipo === 'conversion' ? 'Conversión' : 'MRR'}
+                        {c.tipo === 'conversion' ? 'Conversión' : c.tipo === 'manual' ? 'Manual' : 'MRR'}
                       </span>
                     </td>
                     <td className="px-5 py-3.5 font-600 text-ink-900">{Number(c.importe).toFixed(2)} {c.moneda}</td>
@@ -326,11 +309,8 @@ export default function ComisionesPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-500 text-ink-700 mb-1.5">Tipo</label>
-                    <select value={formCrear.tipo} onChange={e => setFormCrear({...formCrear, tipo: e.target.value as any})}
-                      className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition">
-                      <option value="conversion">Conversión</option>
-                      <option value="mrr_mensual">MRR mensual</option>
-                    </select>
+                    <input type="text" value="Manual" disabled
+                      className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 text-sm focus:outline-none transition" />
                   </div>
                   <div>
                     <label className="block text-sm font-500 text-ink-700 mb-1.5">Moneda</label>
@@ -338,6 +318,12 @@ export default function ComisionesPage() {
                       className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition">
                       <option value="EUR">EUR</option>
                       <option value="USD">USD</option>
+                      <option value="GBP">GBP</option>
+                      <option value="MXN">MXN</option>
+                      <option value="ARS">ARS</option>
+                      <option value="COP">COP</option>
+                      <option value="CLP">CLP</option>
+                      <option value="BRL">BRL</option>
                     </select>
                   </div>
                 </div>
@@ -367,7 +353,7 @@ export default function ComisionesPage() {
                   className="px-5 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition disabled:opacity-50">
                   Cancelar
                 </button>
-                <button onClick={handleCrearManual} disabled={savingCrear}
+                <button onClick={handleCrearManual} disabled={savingCrear || !formularioValido}
                   className="px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 transition disabled:opacity-50">
                   {savingCrear ? 'Creando...' : 'Crear comisión'}
                 </button>

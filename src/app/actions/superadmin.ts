@@ -465,7 +465,7 @@ export async function marcarComisionPagada(id: string, notas_pago?: string) {
 export async function crearComisionManual(data: {
   vendedor_id: string
   organizacion_id: string
-  tipo: 'conversion' | 'mrr_mensual'
+  tipo: 'conversion' | 'mrr_mensual' | 'manual'
   importe: number
   moneda: string
   mes_referencia?: string

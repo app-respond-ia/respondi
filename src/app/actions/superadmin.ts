@@ -98,7 +98,7 @@ export async function getOrganizaciones(filtro?: string) {
     .from('organizaciones')
     .select(`
       id, nombre, estado, plan_id, plan_pendiente_id, fecha_vencimiento, id_vendedor, created_at,
-      plans (nombre),
+      plans!plan_id (nombre),
       vendedor_clientes ( vendedores (nombre) )
     `)
     .order('created_at', { ascending: false })
@@ -108,12 +108,6 @@ export async function getOrganizaciones(filtro?: string) {
   }
 
   const { data, error } = await query
-  
-  console.log('--- DEBUG getOrganizaciones ---')
-  console.log(`Filtro: ${filtro}`)
-  console.log(`Filas devueltas: ${data?.length || 0}`)
-  if (error) console.log('Error:', error)
-  console.log('-------------------------------')
 
   if (error) return { success: false, error: error.message }
   return { success: true, organizaciones: data }
@@ -156,7 +150,7 @@ export async function salirDeImpersonacion() {
 export async function cambiarPlanOrganizacion(organizacionId: string, nuevoPlanId: string) {
   const { supabase, userId } = await requireSuperAdmin()
 
-  const { data: org } = await supabase.from('organizaciones').select('plan_id, plans(precio_usd)').eq('id', organizacionId).single()
+  const { data: org } = await supabase.from('organizaciones').select('plan_id, plans!plan_id(precio_usd)').eq('id', organizacionId).single()
   const { data: nuevoPlan } = await supabase.from('plans').select('precio_usd').eq('id', nuevoPlanId).single()
 
   if (!org || !nuevoPlan) return { success: false, error: 'Organización o plan no encontrados' }
@@ -257,7 +251,7 @@ export async function getVendedores() {
       vendedor_clientes (
         id,
         estado_seguimiento,
-        organizaciones (nombre, estado, plan_id, plans(nombre))
+        organizaciones (nombre, estado, plan_id, plans!plan_id(nombre))
       ),
       vendedor_notas (
         id,
@@ -464,7 +458,7 @@ export async function getClientesDeVendedor(vendedorId: string) {
         nombre, 
         estado, 
         plan_id, 
-        plans(nombre, precio_usd)
+        plans!plan_id(nombre, precio_usd)
       )
     `)
     .eq('vendedor_id', vendedorId)
@@ -748,7 +742,7 @@ export async function getVendedorDashboard() {
       .from('vendedor_clientes')
       .select(`
         *,
-        organizaciones (nombre, estado, plan_id, plans(nombre, precio_usd))
+        organizaciones (nombre, estado, plan_id, plans!plan_id(nombre, precio_usd))
       `)
       .eq('vendedor_id', vendedor.id)
 
@@ -799,7 +793,7 @@ export async function getVendedorClientes() {
       .from('vendedor_clientes')
       .select(`
         *,
-        organizaciones (nombre, estado, plan_id, plans(nombre))
+        organizaciones (nombre, estado, plan_id, plans!plan_id(nombre))
       `)
       .eq('vendedor_id', vendedor.id)
       .order('fecha_vinculacion', { ascending: false })

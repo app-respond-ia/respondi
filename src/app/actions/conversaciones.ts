@@ -1,16 +1,14 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
+import { getAuthContext } from '@/lib/auth-context'
 
 export async function getConversaciones(filtros?: { estado?: string, canal?: string, search?: string, iaPausada?: boolean, dateRange?: { from: string, to: string }, sort?: 'asc' | 'desc' }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: 'No autorizado' }
-
-  // Obtener tenant_id del usuario
-  const { data: userData } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
-  const tenantId = userData?.tenant_id
-  if (!tenantId) return { success: false, error: 'No tenant' }
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+  const tenantId = auth.tenant_id
+  const user = { id: auth.user_id }
 
   let query = supabase
     .from('conversations')
@@ -75,11 +73,10 @@ export async function getConversaciones(filtros?: { estado?: string, canal?: str
 
 export async function getConversacionDetalle(convId: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: 'No autorizado' }
-
-  const { data: userData } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
-  const tenantId = userData?.tenant_id
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+  const tenantId = auth.tenant_id
+  const user = { id: auth.user_id }
 
   const { data: conv, error } = await supabase
     .from('conversations')
@@ -123,10 +120,10 @@ export async function getConversacionDetalle(convId: string) {
 
 export async function pausarIA(convId: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: 'No autorizado' }
-
-  const { data: userData } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+  const userData = { tenant_id: auth.tenant_id }
+  const user = { id: auth.user_id }
 
   const { error } = await supabase
     .from('conversations')
@@ -149,10 +146,10 @@ export async function pausarIA(convId: string) {
 
 export async function reanudarIA(convId: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: 'No autorizado' }
-
-  const { data: userData } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+  const userData = { tenant_id: auth.tenant_id }
+  const user = { id: auth.user_id }
   
   const { error } = await supabase
     .from('conversations')
@@ -175,10 +172,10 @@ export async function reanudarIA(convId: string) {
 
 export async function enviarMensajeAgenteConv(convId: string, contenido: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: 'No autorizado' }
-
-  const { data: userData } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+  const userData = { tenant_id: auth.tenant_id }
+  const user = { id: auth.user_id }
 
   const { error } = await supabase
     .from('messages')

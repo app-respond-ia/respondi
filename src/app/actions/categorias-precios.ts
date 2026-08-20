@@ -9,29 +9,11 @@ export interface CategoriaData {
   orden?: number
 }
 
-async function getAuthData(supabase: any) {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'No autorizado' }
-
-  const { data: userData } = await supabase
-    .from('users')
-    .select('tenant_id')
-    .eq('id', user.id)
-    .single()
-
-  if (!userData?.tenant_id) {
-    return { error: 'Usuario no vinculado a una organización' }
-  }
-
-  const branchId = await resolveBranchId(supabase, user.id)
-  if (!branchId) return { error: 'Usuario no vinculado a una sucursal' }
-
-  return { tenant_id: userData.tenant_id, branch_id: branchId }
-}
+import { getAuthContext } from '@/lib/auth-context'
 
 export async function getCategorias() {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   const { data, error } = await supabase
@@ -46,7 +28,7 @@ export async function getCategorias() {
 
 export async function crearCategoria(data: CategoriaData) {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   if (!data.nombre?.trim()) {
@@ -71,7 +53,7 @@ export async function crearCategoria(data: CategoriaData) {
 
 export async function actualizarCategoria(id: string, data: Partial<CategoriaData>) {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   const { data: updated, error } = await supabase
@@ -88,7 +70,7 @@ export async function actualizarCategoria(id: string, data: Partial<CategoriaDat
 
 export async function eliminarCategoria(id: string) {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   const { error } = await supabase

@@ -3,29 +3,10 @@
 import { createClient } from '@/utils/supabase/server'
 import { resolveBranchId } from '@/lib/active-branch'
 
-async function getAuthData(supabase: any) {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'No autorizado', user_id: null }
-
-  const { data: userData } = await supabase
-    .from('users')
-    .select('tenant_id, branch_id, rol')
-    .eq('id', user.id)
-    .single()
-
-  if (!userData?.tenant_id) {
-    return { error: 'Usuario no vinculado a una organización', user_id: user.id }
-  }
-
-  const branchId = await resolveBranchId(supabase, user.id)
-  if (!branchId) return { error: 'Usuario no vinculado a una sucursal', user_id: user.id }
-
-  return { tenant_id: userData.tenant_id, branch_id: branchId, user_id: user.id }
-}
-
+import { getAuthContext } from '@/lib/auth-context'
 export async function getDashboardData(period: 'hoy' | 'semana' | 'mes' = 'semana', canalTipo?: string) {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   let canalIds: string[] | null = null

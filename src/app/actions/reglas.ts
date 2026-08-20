@@ -14,30 +14,11 @@ export interface ReglaData {
   prioridad_default?: string
 }
 
-// Función auxiliar para obtener credenciales del usuario activo
-async function getAuthData(supabase: any) {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'No autorizado' }
-
-  const { data: userData } = await supabase
-    .from('users')
-    .select('tenant_id, branch_id, rol')
-    .eq('id', user.id)
-    .single()
-
-  if (!userData?.tenant_id) {
-    return { error: 'Usuario no vinculado a una organización' }
-  }
-
-  const branchId = await resolveBranchId(supabase, user.id)
-  if (!branchId) return { error: 'Usuario no vinculado a una sucursal' }
-
-  return { tenant_id: userData.tenant_id, branch_id: branchId, user_id: user.id }
-}
+import { getAuthContext } from '@/lib/auth-context'
 
 export async function getReglas() {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   const { data, error } = await supabase
@@ -52,7 +33,7 @@ export async function getReglas() {
 
 export async function crearRegla(data: ReglaData) {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   const condicion = data.condicion || data.descripcion_intencion
@@ -111,7 +92,7 @@ export async function crearRegla(data: ReglaData) {
 
 export async function actualizarRegla(id: string, data: Partial<{ nombre: string, descripcion_intencion: string, tipo_caso: string, activa: boolean, prioridad_default: string }>) {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   const { data: anterior } = await supabase
@@ -155,7 +136,7 @@ export async function actualizarRegla(id: string, data: Partial<{ nombre: string
 
 export async function eliminarRegla(id: string) {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   const { data: anterior } = await supabase
@@ -186,7 +167,7 @@ export async function eliminarRegla(id: string) {
 
 export async function reordenarReglas(ids: string[]) {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   for (let i = 0; i < ids.length; i++) {
@@ -205,7 +186,7 @@ export async function reordenarReglas(ids: string[]) {
 
 export async function crearReglasPlantilla() {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   // Verificar si ya existen reglas

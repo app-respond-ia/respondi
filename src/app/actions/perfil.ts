@@ -3,25 +3,15 @@
 import { createClient } from '@/utils/supabase/server'
 import { resolveBranchId } from '@/lib/active-branch'
 import { registrarAuditoria } from '@/lib/auditoria'
+import { getAuthContext } from '@/lib/auth-context'
 
 export async function getPerfilSucursal() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: 'No autorizado' }
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
 
-  // Obtener tenant_id y branch_id del usuario
-  const { data: userData } = await supabase
-    .from('users')
-    .select('tenant_id, branch_id, rol')
-    .eq('id', user.id)
-    .single()
-    
-  if (!userData?.tenant_id) {
-    return { success: false, error: 'Usuario no vinculado a una organización' }
-  }
-
-  const branchId = await resolveBranchId(supabase, user.id)
-  if (!branchId) return { success: false, error: 'Usuario no vinculado a una sucursal' }
+  const branchId = auth.branch_id
+  const userData = { tenant_id: auth.tenant_id }
 
   // 1. Obtener datos de la sucursal
   const { data: sucursal } = await supabase
@@ -60,21 +50,12 @@ export async function savePerfilSucursal(data: {
   caso_fuera_horario: boolean
 }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: 'No autorizado' }
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
 
-  const { data: userData } = await supabase
-    .from('users')
-    .select('tenant_id, branch_id, rol')
-    .eq('id', user.id)
-    .single()
-
-  if (!userData?.tenant_id) {
-    return { success: false, error: 'Usuario no vinculado a una organización' }
-  }
-
-  const branchId = await resolveBranchId(supabase, user.id)
-  if (!branchId) return { success: false, error: 'Usuario no vinculado a una sucursal' }
+  const branchId = auth.branch_id
+  const userData = { tenant_id: auth.tenant_id }
+  const user = { id: auth.user_id }
 
   const { data: sucursalAnterior } = await supabase
     .from('sucursales')

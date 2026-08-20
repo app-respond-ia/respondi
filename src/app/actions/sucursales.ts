@@ -3,27 +3,12 @@
 import { createClient } from '@/utils/supabase/server'
 import { canManageRole } from './roles'
 import { registrarAuditoria } from '@/lib/auditoria'
+import { getAuthContext } from '@/lib/auth-context'
 
-async function getAuthData(supabase: any) {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'No autorizado', user_id: null }
-
-  const { data: userData } = await supabase
-    .from('users')
-    .select('tenant_id, branch_id')
-    .eq('id', user.id)
-    .single()
-
-  if (!userData?.tenant_id) {
-    return { error: 'Usuario no vinculado a una organización', user_id: user.id }
-  }
-
-  return { tenant_id: userData.tenant_id, branch_id: userData.branch_id, user_id: user.id }
-}
 
 export async function getSucursales() {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   const { data: sucursales, error } = await supabase
@@ -53,7 +38,7 @@ export async function crearSucursal(nombre: string, direccion?: string, copiarDe
   }
 
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   const sucRes = await getSucursales()
@@ -184,7 +169,7 @@ export async function crearSucursal(nombre: string, direccion?: string, copiarDe
 
 export async function desactivarSucursal(id: string) {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   // Verificar que no es la única sucursal activa
@@ -224,7 +209,7 @@ export async function desactivarSucursal(id: string) {
 
 export async function reactivarSucursal(id: string) {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   const sucRes = await getSucursales()
@@ -260,16 +245,10 @@ export async function reactivarSucursal(id: string) {
 
 export async function getDatosSucursalParaCopiar(branchIdOrigen: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: 'No autorizado' }
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
 
-  const { data: userData } = await supabase
-    .from('users')
-    .select('tenant_id')
-    .eq('id', user.id)
-    .single()
-
-  if (!userData?.tenant_id) return { success: false, error: 'Sin organización' }
+  const userData = { tenant_id: auth.tenant_id }
 
   // Verificar que la sucursal origen pertenece al mismo tenant
   const { data: sucursal } = await supabase
@@ -370,16 +349,11 @@ export async function crearSucursalConDatos(data: {
   tipos_novedad?: { nombre: string, icono: string, color: string }[]
 }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: 'No autorizado' }
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
 
-  const { data: userData } = await supabase
-    .from('users')
-    .select('tenant_id, rol')
-    .eq('id', user.id)
-    .single()
-
-  if (!userData?.tenant_id) return { success: false, error: 'Sin organización' }
+  const userData = { tenant_id: auth.tenant_id }
+  const user = { id: auth.user_id }
   
   const misPermisos = await getMisPermisos()
   if (!misPermisos.success) return { success: false, error: 'Error verificando permisos' }

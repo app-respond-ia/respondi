@@ -39,24 +39,12 @@ export async function canManageRole(userId: string, targetRoleLevel: number, tar
 }
 
 
-async function getAuthData(supabase: any) {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'No autorizado', user_id: null, tenant_id: null }
-
-  const { data: userData } = await supabase
-    .from('users')
-    .select('tenant_id, rol')
-    .eq('id', user.id)
-    .single()
-
-  if (!userData?.tenant_id) return { error: 'Sin organización', user_id: user.id, tenant_id: null }
-  return { user_id: user.id, tenant_id: userData.tenant_id, rol: userData.rol }
-}
+import { getAuthContext } from '@/lib/auth-context'
 
 export async function getRolesPersonalizados() {
   try {
     const supabase = await createClient()
-    const auth = await getAuthData(supabase)
+    const auth = await getAuthContext(supabase)
     if (auth.error) return { success: false, error: auth.error }
 
     const { data, error } = await supabaseAdmin
@@ -79,7 +67,7 @@ export async function crearRolPersonalizado(data: {
   permisos: { seccion: string, nivel: string, alcance?: string }[]
 }) {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
   
   const newLevel = data.nivel ?? 5
@@ -121,7 +109,7 @@ export async function actualizarRolPersonalizado(id: string, data: {
   permisos?: { seccion: string, nivel: string, alcance?: string }[]
 }) {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   const { data: targetRole } = await supabaseAdmin
@@ -167,7 +155,7 @@ export async function actualizarRolPersonalizado(id: string, data: {
 
 export async function eliminarRolPersonalizado(id: string) {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   const { data: targetRole } = await supabaseAdmin

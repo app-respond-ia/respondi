@@ -13,30 +13,11 @@ export interface SkillData {
   activo: boolean
 }
 
-// Función auxiliar para obtener credenciales del usuario activo
-async function getAuthData(supabase: any) {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'No autorizado' }
-
-  const { data: userData } = await supabase
-    .from('users')
-    .select('tenant_id, branch_id, rol')
-    .eq('id', user.id)
-    .single()
-
-  if (!userData?.tenant_id) {
-    return { error: 'Usuario no vinculado a una organización' }
-  }
-
-  const branchId = await resolveBranchId(supabase, user.id)
-  if (!branchId) return { error: 'Usuario no vinculado a una sucursal' }
-
-  return { tenant_id: userData.tenant_id, branch_id: branchId }
-}
+import { getAuthContext } from '@/lib/auth-context'
 
 export async function getSkills() {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   const { data, error } = await supabase
@@ -51,7 +32,7 @@ export async function getSkills() {
 
 export async function crearSkill(data: SkillData) {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   // Calcular el máximo orden actual
@@ -85,7 +66,7 @@ export async function crearSkill(data: SkillData) {
 
 export async function actualizarSkill(id: string, data: Partial<{ nombre: string, descripcion: string, activo: boolean, orden: number }>) {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   const { data: updatedData, error } = await supabase
@@ -102,7 +83,7 @@ export async function actualizarSkill(id: string, data: Partial<{ nombre: string
 
 export async function eliminarSkill(id: string) {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   const { error } = await supabase
@@ -117,7 +98,7 @@ export async function eliminarSkill(id: string) {
 
 export async function reordenarSkills(ids: string[]) {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   for (let i = 0; i < ids.length; i++) {

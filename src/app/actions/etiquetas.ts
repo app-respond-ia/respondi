@@ -11,30 +11,11 @@ export interface EtiquetaData {
   activa: boolean
 }
 
-// Función auxiliar para obtener credenciales del usuario activo
-async function getAuthData(supabase: any) {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'No autorizado' }
-
-  const { data: userData } = await supabase
-    .from('users')
-    .select('tenant_id, branch_id, rol')
-    .eq('id', user.id)
-    .single()
-
-  if (!userData?.tenant_id) {
-    return { error: 'Usuario no vinculado a una organización' }
-  }
-
-  const branchId = await resolveBranchId(supabase, user.id)
-  if (!branchId) return { error: 'Usuario no vinculado a una sucursal' }
-
-  return { tenant_id: userData.tenant_id, branch_id: branchId, user_id: user.id }
-}
+import { getAuthContext } from '@/lib/auth-context'
 
 export async function getEtiquetas() {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   // 1. Obtener etiquetas
@@ -71,7 +52,7 @@ export async function getEtiquetas() {
 
 export async function crearEtiqueta(data: EtiquetaData) {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   // Verificar límite máximo de etiquetas
@@ -128,7 +109,7 @@ export async function crearEtiqueta(data: EtiquetaData) {
 
 export async function actualizarEtiqueta(id: string, data: Partial<{ nombre: string, descripcion_intencion: string, color: string, activa: boolean, orden: number }>) {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   const { data: anterior } = await supabase
@@ -162,7 +143,7 @@ export async function actualizarEtiqueta(id: string, data: Partial<{ nombre: str
 
 export async function eliminarEtiqueta(id: string) {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   const { data: anterior } = await supabase
@@ -193,7 +174,7 @@ export async function eliminarEtiqueta(id: string) {
 
 export async function reordenarEtiquetas(ids: string[]) {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   for (let i = 0; i < ids.length; i++) {
@@ -212,7 +193,7 @@ export async function reordenarEtiquetas(ids: string[]) {
 
 export async function crearEtiquetasPlantilla() {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   // Verificar si ya existen etiquetas

@@ -3,25 +3,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { resolveBranchId } from '@/lib/active-branch'
 
-async function getAuthData(supabase: any) {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'No autorizado', user_id: null }
-
-  const { data: userData } = await supabase
-    .from('users')
-    .select('tenant_id')
-    .eq('id', user.id)
-    .single()
-
-  if (!userData?.tenant_id) {
-    return { error: 'Usuario no vinculado a una organización', user_id: user.id }
-  }
-
-  const branchId = await resolveBranchId(supabase, user.id)
-  if (!branchId) return { error: 'No hay sucursal activa', user_id: user.id }
-
-  return { tenant_id: userData.tenant_id, branch_id: branchId, user_id: user.id }
-}
+import { getAuthContext } from '@/lib/auth-context'
 
 export async function getConversaciones(filtros?: { 
   estado?: string, 
@@ -36,7 +18,7 @@ export async function getConversaciones(filtros?: {
   sort?: 'asc' | 'desc' 
 }) {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   let query = supabase
@@ -143,7 +125,7 @@ export async function getConversaciones(filtros?: {
 
 export async function getEtiquetasTenant() {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   const { data, error } = await supabase
@@ -158,7 +140,7 @@ export async function getEtiquetasTenant() {
 
 export async function getMensajes(conversationId: string) {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   // Check tenant
@@ -183,7 +165,7 @@ export async function getMensajes(conversationId: string) {
 
 export async function toggleIAPausa(conversationId: string, pausada: boolean) {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   const { data: conversacion, error: errConv } = await supabase
@@ -251,7 +233,7 @@ export async function toggleIAPausa(conversationId: string, pausada: boolean) {
 
 export async function cerrarConversacion(conversationId: string) {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   const { data, error } = await supabase
@@ -289,7 +271,7 @@ export async function cerrarConversacion(conversationId: string) {
 
 export async function reabrirConversacion(conversationId: string) {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   const { data, error } = await supabase
@@ -328,7 +310,7 @@ export async function reabrirConversacion(conversationId: string) {
 
 export async function getContextoChat(conversationId: string) {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   
   if (auth.error) {
     return { success: false, error: auth.error }

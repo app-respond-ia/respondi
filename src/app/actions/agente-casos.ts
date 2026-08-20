@@ -2,26 +2,11 @@
 
 import { createClient } from '@/utils/supabase/server'
 
-async function getAuthData(supabase: any) {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'No autorizado', user_id: null }
-
-  const { data: userData } = await supabase
-    .from('users')
-    .select('tenant_id, branch_id')
-    .eq('id', user.id)
-    .single()
-
-  if (!userData?.tenant_id) {
-    return { error: 'Usuario no vinculado a una organización', user_id: user.id }
-  }
-
-  return { tenant_id: userData.tenant_id, branch_id: userData.branch_id, user_id: user.id }
-}
+import { getAuthContext } from '@/lib/auth-context'
 
 export async function getMisCasos(filtro: 'todos' | 'pendiente' | 'atendiendo' | 'resuelto' = 'todos') {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   
   if (auth.error) {
     return { success: false, error: auth.error }

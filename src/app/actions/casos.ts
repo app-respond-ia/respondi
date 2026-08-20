@@ -1,16 +1,14 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
+import { getAuthContext } from '@/lib/auth-context'
 
 export async function getCasos(filtros?: { estado?: string, canal?: string, search?: string, agentesIds?: string[], dateRange?: { from: string, to: string }, sort?: 'asc' | 'desc' }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: 'No autorizado' }
-
-  // Obtener tenant_id del usuario
-  const { data: userData } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
-  const tenantId = userData?.tenant_id
-  if (!tenantId) return { success: false, error: 'No tenant' }
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+  const tenantId = auth.tenant_id
+  const user = { id: auth.user_id }
 
   let query = supabase
     .from('cases')
@@ -95,10 +93,12 @@ export async function getCasos(filtros?: { estado?: string, canal?: string, sear
 
 export async function getCasoDetalle(casoId: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: 'No autorizado' }
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
 
-  const { data: userData } = await supabase.from('users').select('tenant_id, roles_personalizados(nivel, es_propietario)').eq('id', user.id).single()
+  const { data: userDataObj } = await supabase.from('users').select('roles_personalizados(nivel, es_propietario)').eq('id', auth.user_id).single()
+  const userData = { tenant_id: auth.tenant_id, ...userDataObj }
+  const user = { id: auth.user_id }
   
   const roleData = Array.isArray(userData?.roles_personalizados) ? userData?.roles_personalizados[0] : userData?.roles_personalizados
   const current_user_level = roleData?.nivel ?? 5
@@ -162,10 +162,10 @@ export async function getCasoDetalle(casoId: string) {
 
 export async function tomarCaso(casoId: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: 'No autorizado' }
-
-  const { data: userData } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+  const userData = { tenant_id: auth.tenant_id }
+  const user = { id: auth.user_id }
   const { data: caso } = await supabase.from('cases').select('conversation_id').eq('id', casoId).single()
   
   const { error } = await supabase
@@ -197,10 +197,10 @@ export async function tomarCaso(casoId: string) {
 
 export async function cerrarCaso(casoId: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: 'No autorizado' }
-
-  const { data: userData } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+  const userData = { tenant_id: auth.tenant_id }
+  const user = { id: auth.user_id }
   
   const { data: caso } = await supabase.from('cases').select('conversation_id').eq('id', casoId).single()
 
@@ -233,10 +233,10 @@ export async function cerrarCaso(casoId: string) {
 
 export async function enviarMensajeAgente(conversationId: string, contenido: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: 'No autorizado' }
-
-  const { data: userData } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+  const userData = { tenant_id: auth.tenant_id }
+  const user = { id: auth.user_id }
 
   const { error } = await supabase
     .from('messages')
@@ -252,10 +252,10 @@ export async function enviarMensajeAgente(conversationId: string, contenido: str
 
 export async function reabrirCaso(casoId: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: 'No autorizado' }
-
-  const { data: userData } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+  const userData = { tenant_id: auth.tenant_id }
+  const user = { id: auth.user_id }
   const { data: caso } = await supabase.from('cases').select('agente_id, conversation_id').eq('id', casoId).single()
   
   const nuevoEstatus = caso?.agente_id ? 'atendiendo' : 'pendiente'
@@ -289,11 +289,10 @@ export async function reabrirCaso(casoId: string) {
 
 export async function crearCasoDesdeConversacion(conversationId: string, agenteId: string | null) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: 'No autorizado' }
-
-  const { data: userData } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
-  if (!userData?.tenant_id) return { success: false, error: 'Sin organización' }
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+  const userData = { tenant_id: auth.tenant_id }
+  const user = { id: auth.user_id }
 
   // 1. Obtener datos de la conversación para rellenar el caso
   const { data: conv, error: convError } = await supabase
@@ -356,10 +355,10 @@ export async function crearCasoDesdeConversacion(conversationId: string, agenteI
 
 export async function asignarCaso(casoId: string, agenteId: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: 'No autorizado' }
-
-  const { data: userData } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+  const userData = { tenant_id: auth.tenant_id }
+  const user = { id: auth.user_id }
 
   const { error } = await supabase
     .from('cases')
@@ -388,10 +387,10 @@ export async function asignarCaso(casoId: string, agenteId: string) {
 
 export async function soltarCaso(casoId: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: 'No autorizado' }
-
-  const { data: userData } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+  const userData = { tenant_id: auth.tenant_id }
+  const user = { id: auth.user_id }
 
   const { error } = await supabase
     .from('cases')
@@ -415,11 +414,10 @@ export async function soltarCaso(casoId: string) {
 
 export async function getAgentesParaCasos() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: 'No autorizado' }
-
-  const { data: userData } = await supabase.from('users').select('tenant_id, branch_id').eq('id', user.id).single()
-  if (!userData?.tenant_id || !userData?.branch_id) return { success: false, error: 'Sin sucursal' }
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+  const userData = { tenant_id: auth.tenant_id, branch_id: auth.branch_id }
+  const user = { id: auth.user_id }
 
   const { data: users, error } = await supabase
     .from('users')
@@ -447,10 +445,10 @@ export async function getAgentesParaCasos() {
 
 export async function actualizarPrioridadCaso(casoId: string, prioridad: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: 'No autorizado' }
-
-  const { data: userData } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+  const userData = { tenant_id: auth.tenant_id }
+  const user = { id: auth.user_id }
   
   const { data: anterior } = await supabase.from('cases').select('prioridad').eq('id', casoId).single()
 
@@ -476,10 +474,10 @@ export async function actualizarPrioridadCaso(casoId: string, prioridad: string)
 
 export async function actualizarSLACaso(casoId: string, sla_horas: number | null) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: 'No autorizado' }
-
-  const { data: userData } = await supabase.from('users').select('tenant_id').eq('id', user.id).single()
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+  const userData = { tenant_id: auth.tenant_id }
+  const user = { id: auth.user_id }
 
   const { data: anterior } = await supabase.from('cases').select('sla_horas').eq('id', casoId).single()
 

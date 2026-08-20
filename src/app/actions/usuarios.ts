@@ -5,26 +5,11 @@ import { supabaseAdmin } from '@/utils/supabase/admin'
 import { canManageRole } from './roles'
 import { registrarAuditoria } from '@/lib/auditoria'
 
-async function getAuthData(supabase: any) {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'No autorizado', user_id: null }
-
-  const { data: userData } = await supabase
-    .from('users')
-    .select('tenant_id, branch_id')
-    .eq('id', user.id)
-    .single()
-
-  if (!userData?.tenant_id || !userData?.branch_id) {
-    return { error: 'Usuario no vinculado a una sucursal', user_id: user.id }
-  }
-
-  return { tenant_id: userData.tenant_id, branch_id: userData.branch_id, user_id: user.id }
-}
+import { getAuthContext } from '@/lib/auth-context'
 
 export async function getUsuarios() {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   const { data: sucursales, error: sucErr } = await supabase
@@ -67,7 +52,7 @@ export async function getUsuarios() {
 export async function invitarUsuario(data: { email: string, nombre: string | null, branch_ids: string[], rol_personalizado_id: string }) {
 
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   const { data: targetRole } = await supabaseAdmin
@@ -159,7 +144,7 @@ export async function invitarUsuario(data: { email: string, nombre: string | nul
 export async function actualizarUsuario(id: string, data: Partial<{ nombre: string, branch_ids: string[], activo: boolean, rol_personalizado_id: string }>) {
 
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   const { data: targetUser } = await supabaseAdmin
@@ -236,7 +221,7 @@ export async function actualizarUsuario(id: string, data: Partial<{ nombre: stri
 
 export async function reenviarInvitacion(email: string) {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   const { data: userRow } = await supabase
@@ -264,7 +249,7 @@ export async function reenviarInvitacion(email: string) {
 
 export async function desactivarUsuario(id: string) {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   const { data: updated, error } = await supabase
@@ -292,7 +277,7 @@ export async function desactivarUsuario(id: string) {
 
 export async function reactivarUsuario(id: string) {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   const { data: updated, error } = await supabase

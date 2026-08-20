@@ -15,32 +15,13 @@ export interface ActualizarTratoContactoData {
   modo?: 'ignorar' | 'respuesta_automatica' | 'derivar' | null
 }
 
-// Función auxiliar para obtener credenciales del usuario activo
-async function getAuthData(supabase: any) {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'No autorizado', user_id: null }
-
-  const { data: userData } = await supabase
-    .from('users')
-    .select('tenant_id, branch_id, rol')
-    .eq('id', user.id)
-    .single()
-
-  if (!userData?.tenant_id) {
-    return { error: 'Usuario no vinculado a una organización', user_id: user.id }
-  }
-
-  const branchId = await resolveBranchId(supabase, user.id)
-  if (!branchId) return { error: 'Usuario no vinculado a una sucursal', user_id: user.id }
-
-  return { tenant_id: userData.tenant_id, branch_id: branchId, user_id: user.id }
-}
+import { getAuthContext } from '@/lib/auth-context'
 
 
 
 export async function getContactos() {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   // Obtenemos todos los contactos para permitir filtrar en UI
@@ -56,7 +37,7 @@ export async function getContactos() {
 
 export async function actualizarTratoContacto(data: ActualizarTratoContactoData) {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   // 1. Buscar si ya existe el contacto

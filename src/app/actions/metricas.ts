@@ -2,22 +2,15 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { resolveBranchId } from '@/lib/active-branch'
+import { getAuthContext } from '@/lib/auth-context'
 
 export async function getMetricas(periodo: 'hoy' | 'semana' | 'mes' | 'total' = 'mes') {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: 'No autorizado' }
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
 
-  const { data: userData } = await supabase
-    .from('users')
-    .select('tenant_id, rol')
-    .eq('id', user.id)
-    .single()
-
-  if (!userData?.tenant_id) return { success: false, error: 'Sin organización' }
-
-  const branchId = await resolveBranchId(supabase, user.id)
-  if (!branchId) return { success: false, error: 'Sin sucursal' }
+  const branchId = auth.branch_id
+  const userData = { tenant_id: auth.tenant_id }
 
   const now = new Date()
   let desde: string

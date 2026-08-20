@@ -1281,3 +1281,70 @@ export async function asignarTicket(ticketId: string, asignadoA: string | null) 
     return { success: false, error: err.message }
   }
 }
+
+export async function actualizarPerfilSuperadmin(nombre: string, apodo: string, avatarUrl?: string) {
+  try {
+    const { userId } = await requireSuperAdmin()
+    if (!nombre || nombre.trim() === '') {
+      return { success: false, error: 'El nombre no puede estar vacío' }
+    }
+
+    const updatePayload: any = { nombre: nombre.trim(), apodo: apodo.trim() }
+    if (avatarUrl !== undefined) {
+      updatePayload.avatar_url = avatarUrl
+    }
+
+    const { data: anterior } = await supabaseAdmin.from('users').select('nombre, apodo, avatar_url').eq('id', userId).single()
+
+    const { error: errUsers } = await supabaseAdmin
+      .from('users')
+      .update(updatePayload)
+      .eq('id', userId)
+
+    if (errUsers) throw new Error('Error al actualizar usuario: ' + errUsers.message)
+
+    await supabaseAdmin.from('audit_log').insert({
+      tenant_id: null,
+      user_id: userId,
+      accion: 'actualizar_perfil',
+      tabla_afectada: 'users',
+      registro_id: userId,
+      valor_anterior: anterior,
+      valor_nuevo: updatePayload
+    })
+
+    revalidatePath('/superadmin')
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
+
+export async function cambiarContrasenaSuperadmin(password: string) {
+  try {
+    const { supabase, userId } = await requireSuperAdmin()
+
+    if (password.length < 8) {
+      return { success: false, error: 'La contraseña debe tener al menos 8 caracteres' }
+    }
+
+    const { error } = await supabase.auth.updateUser({ password })
+    if (error) return { success: false, error: error.message }
+
+    await supabaseAdmin.from('audit_log').insert({
+      tenant_id: null,
+      user_id: userId,
+      accion: 'cambiar_contrasena',
+      tabla_afectada: 'auth.users',
+      registro_id: userId,
+      valor_anterior: null,
+      valor_nuevo: null
+    })
+
+    revalidatePath('/superadmin')
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
+

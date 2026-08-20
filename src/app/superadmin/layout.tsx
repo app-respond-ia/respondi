@@ -15,7 +15,7 @@ export default async function Layout({ children }: { children: React.ReactNode }
   // 2. Verificar rol super_admin
   const { data: userData, error: userError } = await supabase
     .from('users')
-    .select('rol, nombre')
+    .select('rol, nombre, avatar_url, email')
     .eq('id', session.user.id)
     .single()
 
@@ -34,7 +34,13 @@ export default async function Layout({ children }: { children: React.ReactNode }
 
   return (
     <ToastProvider>
-      <SuperadminLayout nombreUsuario={nombreUsuario} iniciales={iniciales} ticketsAbiertos={count || 0}>
+      <SuperadminLayout 
+        nombreUsuario={nombreUsuario} 
+        iniciales={iniciales} 
+        ticketsAbiertos={count || 0}
+        email={userData.email || session.user.email || ''}
+        avatarUrl={userData.avatar_url || undefined}
+      >
         {children}
       </SuperadminLayout>
     </ToastProvider>

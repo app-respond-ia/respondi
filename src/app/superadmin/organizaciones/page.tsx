@@ -87,7 +87,7 @@ export default function OrganizacionesPage() {
     setImpersonatingId(id)
     const res = await entrarComoOrganizacion(id)
     if (res.success) {
-      router.push('/dashboard')
+      window.location.href = '/dashboard'
     } else {
       setImpersonatingId(null)
       alert('Error al intentar impersonar la organización')

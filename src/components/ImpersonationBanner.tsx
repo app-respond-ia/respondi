@@ -12,7 +12,7 @@ export default function ImpersonationBanner({ orgName }: { orgName: string }) {
   const handleSalir = async () => {
     setLoading(true)
     await salirDeImpersonacion()
-    router.push('/superadmin/organizaciones')
+    window.location.href = '/superadmin/organizaciones'
   }
 
   return (

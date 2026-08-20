@@ -56,10 +56,10 @@ export default function SuperadminLayout({
   ]
 
   return (
-    <div className="min-h-screen lg:flex bg-slate-50 text-ink-900">
+    <div className="min-h-[100dvh] lg:h-screen lg:overflow-hidden lg:flex bg-slate-50 text-ink-900">
       {/* SIDEBAR SUPER-ADMIN */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 ${collapsed ? 'w-20' : 'w-72'} bg-ink-900 text-white transform transition-all duration-300 ease-out flex flex-col ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static lg:z-auto`}
+        className={`fixed inset-y-0 left-0 z-40 ${collapsed ? 'w-20' : 'w-72'} bg-ink-900 text-white transform transition-all duration-300 ease-out flex flex-col h-full ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static lg:z-auto`}
       >
         <div className={`flex items-center gap-3 h-20 border-b border-white/10 shrink-0 overflow-hidden transition-all ${collapsed ? 'justify-center px-2' : 'px-6'}`}>
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center shadow-lg shadow-brand-600/30 shrink-0">
@@ -104,7 +104,7 @@ export default function SuperadminLayout({
         </nav>
 
         <button onClick={() => setCollapsed(c => !c)}
-          className="hidden lg:flex absolute top-1/2 -translate-y-1/2 -right-3 w-6 h-14 rounded-full bg-ink-800 border border-white/10 shadow-lg items-center justify-center text-ink-400 hover:text-white hover:bg-brand-600 hover:border-brand-600 transition z-20">
+          className="hidden lg:flex absolute top-1/2 -translate-y-1/2 -right-3 w-6 h-14 rounded-full bg-brand-600 border border-brand-500 shadow-lg items-center justify-center text-white hover:bg-brand-700 transition z-20">
           <svg className={`w-3.5 h-3.5 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/>
           </svg>
@@ -117,7 +117,7 @@ export default function SuperadminLayout({
       )}
 
       {/* CONTENIDO PRINCIPAL */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
         <header className="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-slate-200">
           <div className="flex items-center gap-3 px-4 sm:px-6 lg:px-8 h-20">
             <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 -ml-2 rounded-lg hover:bg-slate-100 transition" aria-label="Abrir menú">

@@ -24,6 +24,7 @@ export default function SuperadminLayout({
 }) {
   const pathname = usePathname()
   const [isSidebarOpen, setSidebarOpen] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
 
   const closeSidebar = () => setSidebarOpen(false)
 
@@ -58,21 +59,23 @@ export default function SuperadminLayout({
     <div className="min-h-screen lg:flex bg-slate-50 text-ink-900">
       {/* SIDEBAR SUPER-ADMIN */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-72 bg-ink-900 text-white transform transition-transform duration-300 ease-out flex flex-col ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static lg:z-auto`}
+        className={`fixed inset-y-0 left-0 z-40 ${collapsed ? 'w-20' : 'w-72'} bg-ink-900 text-white transform transition-all duration-300 ease-out flex flex-col ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static lg:z-auto`}
       >
-        <div className="flex items-center gap-3 px-6 h-20 border-b border-white/10 shrink-0">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center shadow-lg shadow-brand-600/30">
+        <div className={`flex items-center gap-3 h-20 border-b border-white/10 shrink-0 overflow-hidden transition-all ${collapsed ? 'justify-center px-2' : 'px-6'}`}>
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center shadow-lg shadow-brand-600/30 shrink-0">
             <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h8M8 14h5M21 12c0 4.418-4.03 8-9 8a9.7 9.7 0 01-4-.85L3 20l1.1-3.3A7.6 7.6 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
             </svg>
           </div>
-          <div>
-            <p className="font-display font-700 text-lg leading-none">Respondi</p>
-            <p className="inline-flex items-center gap-1 text-[11px] text-brand-300 mt-1 tracking-wide">
-              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm14 3c0 .6-.4 1-1 1H6c-.6 0-1-.4-1-1v-1h14v1z"/></svg>
-              Panel maestro · Atsura
-            </p>
-          </div>
+          {!collapsed && (
+            <div className="min-w-0">
+              <p className="font-display font-700 text-lg leading-none truncate">Respondi</p>
+              <p className="inline-flex items-center gap-1 text-[11px] text-brand-300 mt-1 tracking-wide truncate">
+                <svg className="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm14 3c0 .6-.4 1-1 1H6c-.6 0-1-.4-1-1v-1h14v1z"/></svg>
+                Panel maestro · Atsura
+              </p>
+            </div>
+          )}
         </div>
 
         <nav className="flex-1 px-3 py-5 space-y-1 overflow-y-auto">
@@ -83,13 +86,14 @@ export default function SuperadminLayout({
                 key={link.href}
                 href={link.href}
                 onClick={closeSidebar}
-                className={`flex items-center justify-between px-3 py-2.5 rounded-xl transition ${isActive ? 'bg-brand-600 text-white font-500 shadow-lg shadow-brand-900/40' : 'text-ink-400 hover:bg-white/5 hover:text-white'}`}
+                className={`flex items-center justify-between py-2.5 rounded-xl transition ${isActive ? `bg-brand-600 text-white font-500 shadow-lg shadow-brand-900/40 ${collapsed ? 'px-0 justify-center' : 'px-3'}` : `text-ink-400 hover:bg-white/5 hover:text-white ${collapsed ? 'px-0 justify-center' : 'px-3'}`}`}
+                title={collapsed ? link.label : undefined}
               >
-                <div className="flex items-center gap-3">
+                <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'}`}>
                   {link.icon}
-                  {link.label}
+                  {!collapsed && <span className="truncate">{link.label}</span>}
                 </div>
-                {!!link.badge && (
+                {!collapsed && !!link.badge && (
                   <span className={`px-2 py-0.5 rounded-full text-xs font-600 ${isActive ? 'bg-white text-brand-600' : 'bg-red-500 text-white'}`}>
                     {link.badge}
                   </span>
@@ -99,7 +103,12 @@ export default function SuperadminLayout({
           })}
         </nav>
 
-
+        <button onClick={() => setCollapsed(c => !c)}
+          className="hidden lg:flex absolute top-1/2 -translate-y-1/2 -right-3 w-6 h-14 rounded-full bg-ink-800 border border-white/10 shadow-lg items-center justify-center text-ink-400 hover:text-white hover:bg-brand-600 hover:border-brand-600 transition z-20">
+          <svg className={`w-3.5 h-3.5 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/>
+          </svg>
+        </button>
       </aside>
 
       {/* OVERLAY MÓVIL */}

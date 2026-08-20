@@ -99,7 +99,7 @@ export async function getOrganizaciones(filtro?: string) {
     .select(`
       id, nombre, estado, plan_id, fecha_vencimiento, id_vendedor, created_at,
       plans (nombre),
-      vendedores (nombre)
+      vendedor_clientes ( vendedores (nombre) )
     `)
     .order('created_at', { ascending: false })
 

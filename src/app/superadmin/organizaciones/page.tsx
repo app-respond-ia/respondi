@@ -29,10 +29,15 @@ export default function OrganizacionesPage() {
     setLoading(false)
   }
 
-  const organizacionesFiltradas = organizaciones.filter(o => 
-    o.nombre.toLowerCase().includes(search.toLowerCase()) || 
-    (o.vendedores?.nombre || '').toLowerCase().includes(search.toLowerCase())
-  )
+  const organizacionesFiltradas = organizaciones.filter(o => {
+    const nombresVendedores = (o.vendedor_clientes || [])
+      .map((vc: any) => vc.vendedores?.nombre)
+      .filter(Boolean)
+      .join(', ')
+
+    return o.nombre.toLowerCase().includes(search.toLowerCase()) || 
+      nombresVendedores.toLowerCase().includes(search.toLowerCase())
+  })
 
   const openModal = (organizacion: any) => {
     setModalOrganizacion(organizacion)
@@ -146,7 +151,7 @@ export default function OrganizacionesPage() {
                     </span>
                   </div>
                   <p className="text-sm text-ink-500 mt-0.5 truncate">
-                    Plan {o.plans?.nombre || 'Ninguno'} · vence el {o.fecha_vencimiento ? new Date(o.fecha_vencimiento).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'N/A'} · vendedor: {o.vendedores?.nombre || 'Sin vendedor'}
+                    Plan {o.plans?.nombre || 'Ninguno'} · vence el {o.fecha_vencimiento ? new Date(o.fecha_vencimiento).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'N/A'} · vendedor: {((o.vendedor_clientes || []).map((vc: any) => vc.vendedores?.nombre).filter(Boolean).join(', ')) || 'Sin vendedor'}
                   </p>
                 </div>
                 
@@ -198,7 +203,7 @@ export default function OrganizacionesPage() {
                 {/* Datos */}
                 <dl className="space-y-2.5 text-sm">
                   <div className="flex justify-between gap-2"><dt className="text-ink-500">Alta</dt><dd className="text-ink-900 font-500 text-right">{new Date(modalOrganizacion.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}</dd></div>
-                  <div className="flex justify-between gap-2"><dt className="text-ink-500">Vendedor</dt><dd className="text-ink-900 font-500 text-right">{modalOrganizacion.vendedores?.nombre || 'Sin vendedor'}</dd></div>
+                  <div className="flex justify-between gap-2"><dt className="text-ink-500">Vendedor</dt><dd className="text-ink-900 font-500 text-right">{((modalOrganizacion.vendedor_clientes || []).map((vc: any) => vc.vendedores?.nombre).filter(Boolean).join(', ')) || 'Sin vendedor'}</dd></div>
                 </dl>
 
                 {/* Acciones de gestión */}

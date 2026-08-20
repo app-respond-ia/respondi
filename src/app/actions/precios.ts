@@ -16,30 +16,11 @@ export interface PrecioData {
   subcategoria: string | null
 }
 
-// Función auxiliar para obtener credenciales del usuario activo
-async function getAuthData(supabase: any) {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'No autorizado' }
-
-  const { data: userData } = await supabase
-    .from('users')
-    .select('tenant_id, branch_id, rol')
-    .eq('id', user.id)
-    .single()
-
-  if (!userData?.tenant_id) {
-    return { error: 'Usuario no vinculado a una organización' }
-  }
-
-  const branchId = await resolveBranchId(supabase, user.id)
-  if (!branchId) return { error: 'Usuario no vinculado a una sucursal' }
-
-  return { tenant_id: userData.tenant_id, branch_id: branchId, user_id: user.id }
-}
+import { getAuthContext } from '@/lib/auth-context'
 
 export async function getPrecios() {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   const { data, error } = await supabase
@@ -54,7 +35,7 @@ export async function getPrecios() {
 
 export async function crearPrecio(data: PrecioData) {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   const { data: insertedData, error } = await supabase
@@ -91,7 +72,7 @@ export async function crearPrecio(data: PrecioData) {
 
 export async function actualizarPrecio(id: string, data: Partial<PrecioData>) {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   const { data: anterior } = await supabase
@@ -125,7 +106,7 @@ export async function actualizarPrecio(id: string, data: Partial<PrecioData>) {
 
 export async function eliminarPrecio(id: string) {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   const { data: anterior } = await supabase
@@ -165,7 +146,7 @@ export async function importarPreciosMasivo(items: {
   descripcion: string | null
 }[]) {
   const supabase = await createClient()
-  const auth = await getAuthData(supabase)
+  const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
   if (!items || items.length === 0) return { success: false, error: 'No hay ítems para importar' }

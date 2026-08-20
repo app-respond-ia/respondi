@@ -5,6 +5,7 @@ import { supabaseAdmin } from '@/utils/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { registrarAuditoria } from '@/lib/auditoria'
 import { crearNotificacion } from '@/lib/notificaciones'
+import { setImpersonatedTenantId, clearImpersonatedTenantId } from '@/lib/impersonate'
 
 // Helper de auth para asegurar que la action solo la ejecuta un super admin
 async function requireSuperAdmin() {
@@ -117,6 +118,40 @@ export async function getOrganizaciones(filtro?: string) {
   if (error) return { success: false, error: error.message }
   return { success: true, organizaciones: data }
 }
+
+export async function entrarComoOrganizacion(organizacionId: string) {
+  const { supabase, userId } = await requireSuperAdmin()
+  
+  await setImpersonatedTenantId(organizacionId)
+  
+  await supabase.from('audit_log').insert({
+    tenant_id: organizacionId,
+    user_id: null,
+    actuado_como_id: userId,
+    accion: 'inicio_impersonacion',
+    tabla_afectada: 'organizaciones',
+    registro_id: organizacionId
+  })
+  
+  return { success: true }
+}
+
+export async function salirDeImpersonacion() {
+  const { supabase, userId } = await requireSuperAdmin()
+  
+  await clearImpersonatedTenantId()
+  
+  await supabase.from('audit_log').insert({
+    tenant_id: null,
+    user_id: null,
+    actuado_como_id: userId,
+    accion: 'fin_impersonacion',
+    tabla_afectada: 'organizaciones'
+  })
+  
+  return { success: true }
+}
+
 
 // C) getVendedores (superadmin)
 export async function getVendedores() {

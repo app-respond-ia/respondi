@@ -2,7 +2,8 @@
 import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
-import { getOrganizaciones, actualizarEstadoOrganizacion } from '@/app/actions/superadmin'
+import { useRouter } from 'next/navigation'
+import { getOrganizaciones, actualizarEstadoOrganizacion, entrarComoOrganizacion } from '@/app/actions/superadmin'
 
 
 export default function OrganizacionesPage() {
@@ -10,6 +11,8 @@ export default function OrganizacionesPage() {
   const [loading, setLoading] = useState(true)
   const [filtro, setFiltro] = useState('Todos')
   const [search, setSearch] = useState('')
+  const router = useRouter()
+  const [impersonatingId, setImpersonatingId] = useState<string | null>(null)
 
   const [modalOrganizacion, setModalOrganizacion] = useState<any>(null)
 
@@ -74,6 +77,18 @@ export default function OrganizacionesPage() {
     }
   }
 
+  const handleImpersonar = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    setImpersonatingId(id)
+    const res = await entrarComoOrganizacion(id)
+    if (res.success) {
+      router.push('/dashboard')
+    } else {
+      setImpersonatingId(null)
+      alert('Error al intentar impersonar la organización')
+    }
+  }
+
   return (
     <>
       <div className="mb-5">
@@ -121,7 +136,7 @@ export default function OrganizacionesPage() {
             const iniciales = o.nombre.substring(0, 2).toUpperCase()
             
             return (
-              <button key={o.id} onClick={() => openModal(o)} className="w-full text-left flex items-center gap-3 p-4 hover:bg-slate-50 transition">
+              <div key={o.id} onClick={() => openModal(o)} className="w-full text-left flex items-center gap-3 p-4 hover:bg-slate-50 transition cursor-pointer">
                 <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-600 shrink-0 ${avatarStyle}`}>{iniciales}</div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -134,8 +149,24 @@ export default function OrganizacionesPage() {
                     Plan {o.plans?.nombre || 'Ninguno'} · vence el {o.fecha_vencimiento ? new Date(o.fecha_vencimiento).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'N/A'} · vendedor: {o.vendedores?.nombre || 'Sin vendedor'}
                   </p>
                 </div>
+                
+                <button
+                  onClick={(e) => handleImpersonar(e, o.id)}
+                  disabled={impersonatingId === o.id}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-600 bg-brand-50 text-brand-700 hover:bg-brand-100 transition shrink-0 mr-2 disabled:opacity-50"
+                >
+                  {impersonatingId === o.id ? (
+                    <Loading />
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/></svg>
+                      Entrar como
+                    </>
+                  )}
+                </button>
+                
                 <svg className="w-5 h-5 text-ink-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
-              </button>
+              </div>
             )
           })
         )}

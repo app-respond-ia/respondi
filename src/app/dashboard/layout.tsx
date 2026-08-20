@@ -3,6 +3,8 @@ import { createClient } from '@/utils/supabase/server'
 import AdminLayout from '@/components/layout/AdminLayout'
 import { getMisPermisos } from '@/app/actions/permisos'
 import { resolveBranchId } from '@/lib/active-branch'
+import { getImpersonatedTenantId } from '@/lib/impersonate'
+import ImpersonationBanner from '@/components/ImpersonationBanner'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,7 +27,22 @@ export default async function DashboardLayout({
   if (!userData) redirect('/login')
   if (!userData.activo) redirect('/login?error=cuenta_inactiva')
 
-  if (userData.rol === 'super_admin') redirect('/superadmin')
+  let orgName = ''
+  let isImpersonating = false
+
+  if (userData.rol === 'super_admin') {
+    const impId = await getImpersonatedTenantId()
+    if (impId) {
+      userData.tenant_id = impId
+      isImpersonating = true
+      
+      const { data: org } = await supabase.from('organizaciones').select('nombre').eq('id', impId).single()
+      if (org) orgName = org.nombre
+    } else {
+      redirect('/superadmin')
+    }
+  }
+
   if (userData.rol === 'vendedor') redirect('/vendedor')
 
   const permisosRes = await getMisPermisos()
@@ -61,15 +78,18 @@ export default async function DashboardLayout({
   }
 
   return (
-    <AdminLayout
-      esAdmin={esAdmin}
-      permisos={permisos}
-      nombreUsuario={userData.nombre || user.email || ''}
-      branches={branches}
-      activeBranchId={activeBranchId}
-      creditos={creditos}
-    >
-      {children}
-    </AdminLayout>
+    <>
+      {isImpersonating && <ImpersonationBanner orgName={orgName} />}
+      <AdminLayout
+        esAdmin={esAdmin}
+        permisos={permisos}
+        nombreUsuario={userData.nombre || user.email || ''}
+        branches={branches}
+        activeBranchId={activeBranchId}
+        creditos={creditos}
+      >
+        {children}
+      </AdminLayout>
+    </>
   )
 }

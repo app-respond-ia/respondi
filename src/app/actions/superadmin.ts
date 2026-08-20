@@ -308,6 +308,56 @@ export async function añadirNotaVendedor(vendedor_id: string, nota: string) {
   return { success: true, nota: data }
 }
 
+// E3) getVendedorDetalle
+export async function getVendedorDetalle(vendedorId: string) {
+  const { supabase } = await requireSuperAdmin()
+  const { data, error } = await supabase
+    .from('vendedores')
+    .select(`
+      *,
+      vendedor_notas (id, nota, created_at, user_id, users(nombre))
+    `)
+    .eq('id', vendedorId)
+    .single()
+  
+  if (error) return { success: false, error: error.message }
+  return { success: true, vendedor: data }
+}
+
+// E4) getClientesDeVendedor
+export async function getClientesDeVendedor(vendedorId: string) {
+  const { supabase } = await requireSuperAdmin()
+  const { data, error } = await supabase
+    .from('vendedor_clientes')
+    .select(`
+      *, 
+      organizaciones (
+        nombre, 
+        estado, 
+        plan_id, 
+        plans(nombre, precio_usd)
+      )
+    `)
+    .eq('vendedor_id', vendedorId)
+    .order('fecha_vinculacion', { ascending: false })
+  
+  if (error) return { success: false, error: error.message }
+  return { success: true, clientes: data }
+}
+
+// E5) getComisionesDeVendedor
+export async function getComisionesDeVendedor(vendedorId: string) {
+  const { supabase } = await requireSuperAdmin()
+  const { data, error } = await supabase
+    .from('comisiones')
+    .select('*, organizaciones(nombre)')
+    .eq('vendedor_id', vendedorId)
+    .order('fecha_generacion', { ascending: false })
+  
+  if (error) return { success: false, error: error.message }
+  return { success: true, comisiones: data }
+}
+
 // F) getPlanes
 export async function getPlanes() {
   const { supabase } = await requireSuperAdmin()

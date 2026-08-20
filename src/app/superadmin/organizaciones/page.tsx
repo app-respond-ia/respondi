@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { getOrganizaciones, actualizarEstadoOrganizacion, entrarComoOrganizacion, getPlanes, cambiarPlanOrganizacion, registrarPagoYRenovar } from '@/app/actions/superadmin'
 import { useToast } from '@/components/ui/Toast'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 
 export default function OrganizacionesPage() {
@@ -26,6 +27,9 @@ export default function OrganizacionesPage() {
   const [modalPago, setModalPago] = useState<any>(null)
   const [pagoForm, setPagoForm] = useState({ importe: '', moneda: 'USD', notas: '' })
   const [registrandoPago, setRegistrandoPago] = useState(false)
+
+  const [confirmarEstado, setConfirmarEstado] = useState<{org: any, nuevoEstado: string} | null>(null)
+  const [changingEstado, setChangingEstado] = useState(false)
 
   useEffect(() => {
     loadOrganizaciones()
@@ -66,16 +70,23 @@ export default function OrganizacionesPage() {
     document.body.style.overflow = ''
   }
 
-  const handleCambiarEstado = async (org: any, nuevoEstado: string) => {
-    const accion = nuevoEstado === 'suspendido' ? 'suspender' : 'activar'
-    if (!confirm(`¿Seguro que quieres ${accion} la organización "${org.nombre}"?`)) return
+  const handleConfirmarCambioEstado = async () => {
+    if (!confirmarEstado) return
+    const { org, nuevoEstado } = confirmarEstado
     
+    setChangingEstado(true)
     const res = await actualizarEstadoOrganizacion(org.id, nuevoEstado)
+    setChangingEstado(false)
+    
     if (res && res.success) {
       loadOrganizaciones()
       if (modalOrganizacion?.id === org.id) {
         setModalOrganizacion({ ...modalOrganizacion, estado: nuevoEstado })
       }
+      showToast(`Organización ${nuevoEstado === 'suspendido' ? 'suspendida' : 'activada'} correctamente`, 'success')
+      setConfirmarEstado(null)
+    } else {
+      showToast(res?.error || 'Error al cambiar estado', 'error')
     }
   }
 
@@ -285,9 +296,9 @@ export default function OrganizacionesPage() {
                       setPlanSeleccionado(modalOrganizacion.plan_id || '')
                     }} className="h-10 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition">Cambiar plan</button>
                     {modalOrganizacion.estado === 'suspendido' ? (
-                      <button onClick={() => handleCambiarEstado(modalOrganizacion, 'activo')} className="h-10 rounded-xl border border-emerald-200 bg-white hover:bg-emerald-50 text-sm font-600 text-emerald-600 transition">Activar</button>
+                      <button onClick={() => setConfirmarEstado({ org: modalOrganizacion, nuevoEstado: 'activo' })} className="h-10 rounded-xl border border-emerald-200 bg-white hover:bg-emerald-50 text-sm font-600 text-emerald-600 transition">Activar</button>
                     ) : (
-                      <button onClick={() => handleCambiarEstado(modalOrganizacion, 'suspendido')} className="h-10 rounded-xl border border-red-200 bg-white hover:bg-red-50 text-sm font-600 text-red-600 transition">Suspender</button>
+                      <button onClick={() => setConfirmarEstado({ org: modalOrganizacion, nuevoEstado: 'suspendido' })} className="h-10 rounded-xl border border-red-200 bg-white hover:bg-red-50 text-sm font-600 text-red-600 transition">Suspender</button>
                     )}
                   </div>
                 </div>
@@ -415,6 +426,18 @@ export default function OrganizacionesPage() {
           </div>
         </div>
       )}
+
+      {/* ConfirmModal Estado */}
+      <ConfirmModal
+        isOpen={!!confirmarEstado}
+        title={confirmarEstado?.nuevoEstado === 'suspendido' ? 'Suspender organización' : 'Activar organización'}
+        message={confirmarEstado ? `¿Estás seguro de que quieres ${confirmarEstado.nuevoEstado === 'suspendido' ? 'suspender' : 'activar'} la organización "${confirmarEstado.org.nombre}"?` : ''}
+        confirmText={confirmarEstado?.nuevoEstado === 'suspendido' ? 'Suspender' : 'Activar'}
+        type={confirmarEstado?.nuevoEstado === 'suspendido' ? 'danger' : 'info'}
+        isLoading={changingEstado}
+        onConfirm={handleConfirmarCambioEstado}
+        onClose={() => setConfirmarEstado(null)}
+      />
     </>
   )
 }

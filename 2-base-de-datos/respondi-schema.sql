@@ -94,6 +94,7 @@ create table organizaciones (
   fecha_inicio       date not null default current_date,
   fecha_vencimiento  date,
   trial_activo       boolean not null default true,
+  plan_pendiente_id  uuid references plans(id),
   id_vendedor        uuid references vendedores(id),
   forma_pago         forma_pago_enum,
   created_at         timestamptz not null default now()
@@ -381,6 +382,7 @@ create table billing (
   tenant_id   uuid not null references organizaciones(id) on delete cascade,
   plan_id     uuid references plans(id),
   importe_usd numeric(10,2) not null,
+  moneda      text not null default 'USD',
   forma_pago  forma_pago_enum,
   estado      estado_pago not null default 'pendiente',
   fecha       timestamptz not null default now(),

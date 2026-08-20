@@ -3,7 +3,8 @@ import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { getOrganizaciones, actualizarEstadoOrganizacion, entrarComoOrganizacion } from '@/app/actions/superadmin'
+import { getOrganizaciones, actualizarEstadoOrganizacion, entrarComoOrganizacion, getPlanes, cambiarPlanOrganizacion, registrarPagoYRenovar } from '@/app/actions/superadmin'
+import { useToast } from '@/components/ui/Toast'
 
 
 export default function OrganizacionesPage() {
@@ -12,13 +13,29 @@ export default function OrganizacionesPage() {
   const [filtro, setFiltro] = useState('Todos')
   const [search, setSearch] = useState('')
   const router = useRouter()
+  const { showToast } = useToast()
   const [impersonatingId, setImpersonatingId] = useState<string | null>(null)
 
   const [modalOrganizacion, setModalOrganizacion] = useState<any>(null)
+  const [planes, setPlanes] = useState<any[]>([])
+  
+  const [modalPlan, setModalPlan] = useState<any>(null)
+  const [planSeleccionado, setPlanSeleccionado] = useState('')
+  const [guardandoPlan, setGuardandoPlan] = useState(false)
+
+  const [modalPago, setModalPago] = useState<any>(null)
+  const [pagoForm, setPagoForm] = useState({ importe: '', moneda: 'USD', notas: '' })
+  const [registrandoPago, setRegistrandoPago] = useState(false)
 
   useEffect(() => {
     loadOrganizaciones()
+    loadPlanes()
   }, [filtro])
+
+  async function loadPlanes() {
+    const res = await getPlanes()
+    if (res.success && res.planes) setPlanes(res.planes)
+  }
 
   async function loadOrganizaciones() {
     setLoading(true)
@@ -94,6 +111,43 @@ export default function OrganizacionesPage() {
     }
   }
 
+  const handleGuardarPlan = async () => {
+    if (!planSeleccionado) return
+    setGuardandoPlan(true)
+    const res = await cambiarPlanOrganizacion(modalPlan.id, planSeleccionado)
+    if (res.success) {
+      showToast('Plan actualizado correctamente', 'success')
+      setModalPlan(null)
+      loadOrganizaciones()
+      if (modalOrganizacion?.id === modalPlan.id) closeModal()
+    } else {
+      showToast(res.error || 'Error al cambiar plan', 'error')
+    }
+    setGuardandoPlan(false)
+  }
+
+  const handleRegistrarPago = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!pagoForm.importe || isNaN(Number(pagoForm.importe))) return showToast('Importe inválido', 'error')
+    
+    setRegistrandoPago(true)
+    const res = await registrarPagoYRenovar(
+      modalPago.id,
+      Number(pagoForm.importe),
+      pagoForm.moneda,
+      pagoForm.notas
+    )
+    if (res.success) {
+      showToast('Pago registrado y renovación aplicada', 'success')
+      setModalPago(null)
+      loadOrganizaciones()
+      if (modalOrganizacion?.id === modalPago.id) closeModal()
+    } else {
+      showToast(res.error || 'Error al registrar pago', 'error')
+    }
+    setRegistrandoPago(false)
+  }
+
   return (
     <>
       <div className="mb-5">
@@ -151,7 +205,7 @@ export default function OrganizacionesPage() {
                     </span>
                   </div>
                   <p className="text-sm text-ink-500 mt-0.5 truncate">
-                    Plan {o.plans?.nombre || 'Ninguno'} · vence el {o.fecha_vencimiento ? new Date(o.fecha_vencimiento).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'N/A'} · vendedor: {((o.vendedor_clientes || []).map((vc: any) => vc.vendedores?.nombre).filter(Boolean).join(', ')) || 'Sin vendedor'}
+                    Plan {o.plans?.nombre || 'Ninguno'} {o.plan_pendiente_id && planes.find(p => p.id === o.plan_pendiente_id) ? `(→ ${planes.find(p => p.id === o.plan_pendiente_id).nombre})` : ''} · vence el {o.fecha_vencimiento ? new Date(o.fecha_vencimiento).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'N/A'} · vendedor: {((o.vendedor_clientes || []).map((vc: any) => vc.vendedores?.nombre).filter(Boolean).join(', ')) || 'Sin vendedor'}
                   </p>
                 </div>
                 
@@ -202,6 +256,9 @@ export default function OrganizacionesPage() {
                   <span className={`w-2.5 h-2.5 rounded-full ${getStatusColor(modalOrganizacion.estado).split(' marker:')[1]}`}></span>
                   <div className="flex-1">
                     <p className="text-sm font-600 text-ink-900">Plan {modalOrganizacion.plans?.nombre} · {modalOrganizacion.estado}</p>
+                    {modalOrganizacion.plan_pendiente_id && planes.find(p => p.id === modalOrganizacion.plan_pendiente_id) && (
+                      <p className="text-xs font-600 text-brand-600 mt-0.5">Cambiará a {planes.find(p => p.id === modalOrganizacion.plan_pendiente_id).nombre} el {modalOrganizacion.fecha_vencimiento ? new Date(modalOrganizacion.fecha_vencimiento).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'próxima renovación'}</p>
+                    )}
                     <p className="text-xs text-ink-500">Vence el {modalOrganizacion.fecha_vencimiento ? new Date(modalOrganizacion.fecha_vencimiento).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'N/A'}</p>
                   </div>
                 </div>
@@ -215,12 +272,18 @@ export default function OrganizacionesPage() {
                 {/* Acciones de gestión */}
                 <div className="pt-2 border-t border-slate-100 space-y-2">
                   <p className="text-xs font-600 text-ink-500 uppercase tracking-wide">Gestión del plan</p>
-                  <button disabled title="Próximamente" className="w-full flex items-center justify-center gap-2 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white text-sm font-600 transition">
+                  <button onClick={() => {
+                    setModalPago(modalOrganizacion)
+                    setPagoForm({ importe: '', moneda: 'USD', notas: '' })
+                  }} className="w-full flex items-center justify-center gap-2 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white text-sm font-600 transition">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     Registrar pago y renovar
                   </button>
                   <div className="grid grid-cols-2 gap-2">
-                    <button title="Próximamente" className="h-10 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition">Cambiar plan</button>
+                    <button onClick={() => {
+                      setModalPlan(modalOrganizacion)
+                      setPlanSeleccionado(modalOrganizacion.plan_id || '')
+                    }} className="h-10 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition">Cambiar plan</button>
                     {modalOrganizacion.estado === 'suspendido' ? (
                       <button onClick={() => handleCambiarEstado(modalOrganizacion, 'activo')} className="h-10 rounded-xl border border-emerald-200 bg-white hover:bg-emerald-50 text-sm font-600 text-emerald-600 transition">Activar</button>
                     ) : (
@@ -229,6 +292,125 @@ export default function OrganizacionesPage() {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CAMBIAR PLAN */}
+      {modalPlan && (
+        <div className="fixed inset-0 z-[60]">
+          <div className="absolute inset-0 bg-ink-900/50 backdrop-blur-sm" onClick={() => setModalPlan(null)}></div>
+          <div className="relative min-h-full flex items-center justify-center p-4">
+            <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                <h2 className="font-display font-700 text-lg text-ink-900">Cambiar plan</h2>
+                <button onClick={() => setModalPlan(null)} className="p-1.5 rounded-lg text-ink-400 hover:text-ink-700 hover:bg-slate-100 transition" aria-label="Cerrar">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+              </div>
+              <div className="px-6 py-5 space-y-4">
+                <div>
+                  <label className="block text-sm font-500 text-ink-700 mb-1.5">Nuevo plan</label>
+                  <select 
+                    value={planSeleccionado} 
+                    onChange={e => setPlanSeleccionado(e.target.value)}
+                    className="w-full h-11 px-3 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition"
+                  >
+                    <option value="">Selecciona un plan</option>
+                    {planes.map(p => (
+                      <option key={p.id} value={p.id}>{p.nombre} (${p.precio_usd})</option>
+                    ))}
+                  </select>
+                </div>
+                
+                {planSeleccionado && planSeleccionado !== modalPlan.plan_id && (
+                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-sm text-ink-600">
+                    {(() => {
+                      const currentPlan = planes.find(p => p.id === modalPlan.plan_id)
+                      const nextPlan = planes.find(p => p.id === planSeleccionado)
+                      const currentPrice = currentPlan ? Number(currentPlan.precio_usd) : 0
+                      const nextPrice = nextPlan ? Number(nextPlan.precio_usd) : 0
+                      
+                      if (nextPrice >= currentPrice) {
+                        return <p><span className="font-600 text-ink-900">Upgrade (o igual):</span> Este cambio se aplicará de inmediato.</p>
+                      } else {
+                        return <p><span className="font-600 text-ink-900">Downgrade:</span> Este cambio se aplicará en la próxima renovación. El cliente mantiene su plan actual hasta entonces.</p>
+                      }
+                    })()}
+                  </div>
+                )}
+                
+                <button 
+                  onClick={handleGuardarPlan} 
+                  disabled={guardandoPlan || !planSeleccionado || planSeleccionado === modalPlan.plan_id}
+                  className="w-full h-11 rounded-xl bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white text-sm font-600 transition flex items-center justify-center"
+                >
+                  {guardandoPlan ? 'Guardando...' : 'Guardar cambios'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL REGISTRAR PAGO Y RENOVAR */}
+      {modalPago && (
+        <div className="fixed inset-0 z-[60]">
+          <div className="absolute inset-0 bg-ink-900/50 backdrop-blur-sm" onClick={() => setModalPago(null)}></div>
+          <div className="relative min-h-full flex items-center justify-center p-4">
+            <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                <h2 className="font-display font-700 text-lg text-ink-900">Registrar pago y renovar</h2>
+                <button onClick={() => setModalPago(null)} className="p-1.5 rounded-lg text-ink-400 hover:text-ink-700 hover:bg-slate-100 transition" aria-label="Cerrar">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+              </div>
+              <form onSubmit={handleRegistrarPago} className="px-6 py-5 space-y-4">
+                <p className="text-sm text-ink-500">
+                  Esta acción extenderá la suscripción por 1 mes (y activará la cuenta si estaba suspendida/vencida).
+                </p>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-500 text-ink-700 mb-1.5">Importe</label>
+                    <input 
+                      type="number" step="0.01" required
+                      value={pagoForm.importe} onChange={e => setPagoForm({...pagoForm, importe: e.target.value})}
+                      className="w-full h-11 px-3 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition"
+                      placeholder="Ej. 19.90"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-500 text-ink-700 mb-1.5">Moneda</label>
+                    <select 
+                      value={pagoForm.moneda} onChange={e => setPagoForm({...pagoForm, moneda: e.target.value})}
+                      className="w-full h-11 px-3 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition"
+                    >
+                      {['USD', 'EUR', 'COP', 'MXN', 'ARS', 'CLP', 'PEN'].map(m => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-500 text-ink-700 mb-1.5">Notas (Opcional)</label>
+                  <textarea 
+                    value={pagoForm.notas} onChange={e => setPagoForm({...pagoForm, notas: e.target.value})}
+                    className="w-full h-20 px-3 py-2 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition resize-none"
+                    placeholder="Referencia de pago, detalles..."
+                  />
+                </div>
+
+                <button 
+                  type="submit"
+                  disabled={registrandoPago || !pagoForm.importe}
+                  className="w-full h-11 rounded-xl bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white text-sm font-600 transition flex items-center justify-center"
+                >
+                  {registrandoPago ? 'Registrando...' : 'Registrar y renovar'}
+                </button>
+              </form>
             </div>
           </div>
         </div>

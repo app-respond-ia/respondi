@@ -97,7 +97,7 @@ export async function getOrganizaciones(filtro?: string) {
   let query = supabaseAdmin
     .from('organizaciones')
     .select(`
-      id, nombre, estado, plan_id, fecha_vencimiento, id_vendedor, created_at,
+      id, nombre, estado, plan_id, plan_pendiente_id, fecha_vencimiento, id_vendedor, created_at,
       plans (nombre),
       vendedor_clientes ( vendedores (nombre) )
     `)
@@ -149,6 +149,100 @@ export async function salirDeImpersonacion() {
     tabla_afectada: 'organizaciones'
   })
   
+  return { success: true }
+}
+
+// B2) cambiarPlanOrganizacion
+export async function cambiarPlanOrganizacion(organizacionId: string, nuevoPlanId: string) {
+  const { supabase, userId } = await requireSuperAdmin()
+
+  const { data: org } = await supabase.from('organizaciones').select('plan_id, plans(precio_usd)').eq('id', organizacionId).single()
+  const { data: nuevoPlan } = await supabase.from('plans').select('precio_usd').eq('id', nuevoPlanId).single()
+
+  if (!org || !nuevoPlan) return { success: false, error: 'Organización o plan no encontrados' }
+
+  const precioActual = org.plans ? Number((org.plans as any).precio_usd) : 0
+  const nuevoPrecio = Number(nuevoPlan.precio_usd)
+
+  let updates: any = {}
+  if (nuevoPrecio >= precioActual) {
+    // Upgrade o lateral: aplicar inmediato y limpiar pendiente
+    updates = { plan_id: nuevoPlanId, plan_pendiente_id: null }
+  } else {
+    // Downgrade: programar para la renovación
+    updates = { plan_pendiente_id: nuevoPlanId }
+  }
+
+  const { error } = await supabase.from('organizaciones').update(updates).eq('id', organizacionId)
+  if (error) return { success: false, error: error.message }
+
+  await supabase.from('audit_log').insert({
+    tenant_id: organizacionId,
+    user_id: userId,
+    accion: 'cambiar_plan',
+    tabla_afectada: 'organizaciones',
+    registro_id: organizacionId,
+    valor_anterior: { plan_id: org.plan_id },
+    valor_nuevo: updates
+  })
+
+  revalidatePath('/superadmin/organizaciones')
+  return { success: true }
+}
+
+// B3) registrarPagoYRenovar
+export async function registrarPagoYRenovar(organizacionId: string, importe: number, moneda: string, notas?: string) {
+  const { supabase, userId } = await requireSuperAdmin()
+
+  const { data: org } = await supabase.from('organizaciones').select('fecha_vencimiento, plan_pendiente_id, plan_id, estado').eq('id', organizacionId).single()
+  if (!org) return { success: false, error: 'Organización no encontrada' }
+
+  let baseDate = new Date()
+  if (org.fecha_vencimiento) {
+    const v = new Date(org.fecha_vencimiento)
+    if (v > baseDate) {
+      baseDate = v
+    }
+  }
+  
+  // sumar 1 mes
+  baseDate.setMonth(baseDate.getMonth() + 1)
+  const nuevaFecha = baseDate.toISOString().split('T')[0]
+
+  let updates: any = { 
+    fecha_vencimiento: nuevaFecha, 
+    estado: 'activo'
+  }
+
+  if (org.plan_pendiente_id) {
+    updates.plan_id = org.plan_pendiente_id
+    updates.plan_pendiente_id = null
+  }
+
+  const { error } = await supabase.from('organizaciones').update(updates).eq('id', organizacionId)
+  if (error) return { success: false, error: error.message }
+
+  const { error: billingErr } = await supabase.from('billing').insert({
+    tenant_id: organizacionId,
+    plan_id: updates.plan_id || org.plan_id,
+    importe_usd: importe,
+    moneda,
+    estado: 'confirmado',
+    notas
+  })
+  if (billingErr) console.error('Error insertando en billing:', billingErr)
+
+  await supabase.from('audit_log').insert({
+    tenant_id: organizacionId,
+    user_id: userId,
+    accion: 'registrar_pago_renovar',
+    tabla_afectada: 'organizaciones',
+    registro_id: organizacionId,
+    valor_anterior: { fecha_vencimiento: org.fecha_vencimiento, estado: org.estado, plan_id: org.plan_id },
+    valor_nuevo: updates
+  })
+
+  revalidatePath('/superadmin/organizaciones')
   return { success: true }
 }
 

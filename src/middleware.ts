@@ -94,10 +94,12 @@ export async function middleware(request: NextRequest) {
     const isDashboardRoute = pathname.startsWith('/dashboard')
     const isSuperadminRoute = pathname.startsWith('/superadmin')
 
+    const isImpersonating = request.cookies.has('impersonate_tenant_id')
+
     if (isVendedorRoute && role !== 'vendedor' && role !== null) {
       return redirectWithCookies(roleBasePath || '/login')
     }
-    if (isDashboardRoute && (role === 'vendedor' || role === 'super_admin') && role !== null) {
+    if (isDashboardRoute && (role === 'vendedor' || (role === 'super_admin' && !isImpersonating)) && role !== null) {
       return redirectWithCookies(roleBasePath || '/login')
     }
     if (isSuperadminRoute && role !== 'super_admin' && role !== null) {

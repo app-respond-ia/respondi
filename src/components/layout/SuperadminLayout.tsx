@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 import { signOut } from '@/app/actions/auth'
 
 import SuperadminDropdown from './SuperadminDropdown'
+import SuperadminNotificationBell from './SuperadminNotificationBell'
 
 export default function SuperadminLayout({
   children,
@@ -13,7 +14,8 @@ export default function SuperadminLayout({
   iniciales,
   ticketsAbiertos,
   email,
-  avatarUrl
+  avatarUrl,
+  userId
 }: {
   children: React.ReactNode
   nombreUsuario: string
@@ -21,6 +23,7 @@ export default function SuperadminLayout({
   ticketsAbiertos?: number
   email: string
   avatarUrl?: string
+  userId: string
 }) {
   const pathname = usePathname()
   const [isSidebarOpen, setSidebarOpen] = useState(false)
@@ -128,9 +131,7 @@ export default function SuperadminLayout({
               Panel maestro
             </span>
             <div className="flex-1"></div>
-            <button className="relative p-2 rounded-lg hover:bg-slate-100 transition" aria-label="Notificaciones">
-              <svg className="w-6 h-6 text-ink-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
-            </button>
+            <SuperadminNotificationBell userId={userId} />
             <div>
               <SuperadminDropdown 
                 nombre={nombreUsuario} 

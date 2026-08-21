@@ -6,6 +6,11 @@ export type NotificacionTipo =
   | 'comision_pagada' 
   | 'cliente_riesgo' 
   | 'soporte_respuesta'
+  | 'ticket_nuevo'
+  | 'ticket_respuesta_vendedor'
+  | 'organizacion_por_vencer'
+  | 'nueva_organizacion'
+  | 'comision_pendiente'
 
 interface NotificacionData {
   userId: string
@@ -52,6 +57,39 @@ export async function crearNotificacion(
     return { success: true, notificacion: notif }
   } catch (err: any) {
     console.error('Error al crear notificación:', err.message)
+    return { success: false, error: err.message }
+  }
+}
+
+export async function notificarATodosLosSuperadmins(
+  supabaseAdmin: SupabaseClient<any, "public", any>,
+  data: Omit<NotificacionData, 'userId'>
+) {
+  try {
+    const { data: superadmins, error } = await supabaseAdmin
+      .from('users')
+      .select('id')
+      .eq('rol', 'super_admin')
+      .eq('activo', true)
+
+    if (error) throw error
+
+    if (!superadmins || superadmins.length === 0) {
+      return { success: true, count: 0 }
+    }
+
+    let enviados = 0
+    for (const admin of superadmins) {
+      await crearNotificacion(supabaseAdmin, {
+        ...data,
+        userId: admin.id
+      })
+      enviados++
+    }
+
+    return { success: true, count: enviados }
+  } catch (err: any) {
+    console.error('Error notificando a superadmins:', err.message)
     return { success: false, error: err.message }
   }
 }

@@ -3,7 +3,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { registrarAuditoria } from '@/lib/auditoria'
-import { crearNotificacion } from '@/lib/notificaciones'
+import { crearNotificacion, notificarATodosLosSuperadmins } from '@/lib/notificaciones'
 
 async function requireVendedor() {
   const supabase = await createClient()
@@ -218,6 +218,13 @@ export async function crearCuentaTrial(data: {
       valor_nuevo: org
     })
 
+    await notificarATodosLosSuperadmins(supabaseAdmin, {
+      tipo: 'nueva_organizacion',
+      titulo: 'Nueva organización creada',
+      cuerpo: `El vendedor "${vendedor.nombre}" ha registrado al cliente "${data.nombre_organizacion}".`,
+      url: '/superadmin/organizaciones'
+    })
+
     return { success: true, organizacion: org }
   } catch (err: any) {
     return { success: false, error: err.message }
@@ -343,7 +350,12 @@ export async function crearTicketSoporte(asunto: string, mensajeInicial: string)
       valor_nuevo: ticket
     })
 
-    // TODO: Notificar al superadmin si se requiere en un futuro.
+    await notificarATodosLosSuperadmins(supabaseAdmin, {
+      tipo: 'ticket_nuevo',
+      titulo: 'Nuevo ticket de soporte',
+      cuerpo: `El vendedor "${vendedor.nombre}" ha abierto un ticket: ${asunto.trim()}`,
+      url: `/superadmin/tickets/${ticket.id}`
+    })
 
     return { success: true, ticket }
   } catch (err: any) {
@@ -404,7 +416,7 @@ export async function enviarMensajeTicket(ticketId: string, mensaje: string) {
     // Verificar si el ticket existe y es nuestro
     const { data: ticket, error: errTicket } = await supabase
       .from('support_tickets')
-      .select('id, estatus')
+      .select('id, estatus, asignado_a')
       .eq('id', ticketId)
       .eq('vendedor_id', vendedor.id)
       .single()
@@ -430,6 +442,23 @@ export async function enviarMensajeTicket(ticketId: string, mensaje: string) {
       .single()
 
     if (errMsg) throw new Error(errMsg.message)
+
+    if (ticket.asignado_a) {
+      await crearNotificacion(supabaseAdmin, {
+        userId: ticket.asignado_a,
+        tipo: 'ticket_respuesta_vendedor',
+        titulo: 'Nueva respuesta de vendedor',
+        cuerpo: `El vendedor "${vendedor.nombre}" ha respondido a un ticket.`,
+        url: `/superadmin/tickets/${ticket.id}`
+      })
+    } else {
+      await notificarATodosLosSuperadmins(supabaseAdmin, {
+        tipo: 'ticket_respuesta_vendedor',
+        titulo: 'Nueva respuesta de vendedor',
+        cuerpo: `El vendedor "${vendedor.nombre}" ha respondido a un ticket.`,
+        url: `/superadmin/tickets/${ticket.id}`
+      })
+    }
 
     return { success: true, mensaje: nuevoMensaje }
   } catch (err: any) {

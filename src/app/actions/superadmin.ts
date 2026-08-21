@@ -4,7 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { registrarAuditoria } from '@/lib/auditoria'
-import { crearNotificacion } from '@/lib/notificaciones'
+import { crearNotificacion, notificarATodosLosSuperadmins } from '@/lib/notificaciones'
 import { setImpersonatedTenantId, clearImpersonatedTenantId } from '@/lib/impersonate'
 
 // Helper de auth para asegurar que la action solo la ejecuta un super admin
@@ -699,6 +699,13 @@ export async function crearComisionManual(data: {
     user_id: userId,
     valor_anterior: null,
     valor_nuevo: data
+  })
+
+  await notificarATodosLosSuperadmins(supabaseAdmin, {
+    tipo: 'comision_pendiente',
+    titulo: 'Nueva comisión pendiente',
+    cuerpo: `Se ha creado una comisión manual de ${data.importe} ${data.moneda}.`,
+    url: '/superadmin/comisiones'
   })
 
   revalidatePath('/superadmin/comisiones')

@@ -11,6 +11,8 @@ export type NotificacionTipo =
   | 'organizacion_por_vencer'
   | 'nueva_organizacion'
   | 'comision_pendiente'
+  | 'ticket_nuevo_cliente'
+  | 'respuesta_cliente'
 
 interface NotificacionData {
   userId: string

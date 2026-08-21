@@ -202,6 +202,25 @@ export default function Sidebar({ user, onCloseMobile, permisos, esAdmin, collap
             </Link>
           )
         })()}
+        {(() => {
+          const nivel = getNivel('soporte')
+          const cls = navItemWithPermClass('/dashboard/soporte', 'soporte')
+          return nivel === 'ninguno' ? (
+            <span title="Sin acceso" className={cls}>
+              <span className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
+                <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+              </span>
+              {!collapsed && <span className="truncate">Soporte</span>}
+            </span>
+          ) : (
+            <Link href="/dashboard/soporte" onClick={onCloseMobile} className={cls} title={collapsed ? 'Soporte' : undefined}>
+              <span className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
+                <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+              </span>
+              {!collapsed && <span className="truncate">Soporte</span>}
+            </Link>
+          )
+        })()}
 
         {collapsed ? (
           <div className="flex flex-col items-center gap-1 pt-5 pb-1">

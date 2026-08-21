@@ -1372,3 +1372,219 @@ export async function cambiarContrasenaSuperadmin(password: string) {
   }
 }
 
+// ============================================================================
+// TICKETS DE CLIENTES (SOPORTE)
+// ============================================================================
+
+export async function getCategoriasTicketsClientes() {
+  try {
+    await requireSuperAdmin()
+    const { data, error } = await supabaseAdmin
+      .from('client_ticket_categorias')
+      .select('*')
+      .order('nombre', { ascending: true })
+
+    if (error) return { success: false, error: error.message }
+    return { success: true, data: data || [] }
+  } catch (err: any) { return { success: false, error: err.message } }
+}
+
+export async function crearCategoriaTicketCliente(nombre: string, color: string) {
+  try {
+    await requireSuperAdmin()
+    const { data, error } = await supabaseAdmin
+      .from('client_ticket_categorias')
+      .insert({ nombre, color })
+      .select()
+      .single()
+
+    if (error) return { success: false, error: error.message }
+    return { success: true, data }
+  } catch (err: any) { return { success: false, error: err.message } }
+}
+
+export async function actualizarCategoriaTicketCliente(id: string, nombre: string, color: string) {
+  try {
+    await requireSuperAdmin()
+    const { data, error } = await supabaseAdmin
+      .from('client_ticket_categorias')
+      .update({ nombre, color })
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) return { success: false, error: error.message }
+    return { success: true, data }
+  } catch (err: any) { return { success: false, error: err.message } }
+}
+
+export async function borrarCategoriaTicketCliente(id: string) {
+  try {
+    await requireSuperAdmin()
+    const { count, error: countError } = await supabaseAdmin
+      .from('client_tickets')
+      .select('*', { count: 'exact', head: true })
+      .eq('categoria_id', id)
+
+    if (countError) return { success: false, error: countError.message }
+    if (count && count > 0) return { success: false, error: 'No se puede borrar porque hay tickets usando esta categoría' }
+
+    const { error } = await supabaseAdmin
+      .from('client_ticket_categorias')
+      .delete()
+      .eq('id', id)
+
+    if (error) return { success: false, error: error.message }
+    return { success: true }
+  } catch (err: any) { return { success: false, error: err.message } }
+}
+
+export async function getTicketsClientesSoporte() {
+  try {
+    await requireSuperAdmin()
+    const { data, error } = await supabaseAdmin
+      .from('client_tickets')
+      .select(`
+        *,
+        categoria:categoria_id(nombre, color),
+        organizacion:tenant_id(nombre),
+        sucursal:branch_id(nombre),
+        creador:user_id(nombre, email),
+        mensajes:client_ticket_messages(count)
+      `)
+      .order('fecha_apertura', { ascending: false })
+
+    if (error) return { success: false, error: error.message }
+    return { success: true, data: data || [] }
+  } catch (err: any) { return { success: false, error: err.message } }
+}
+
+export async function getTicketDetalleClienteSuperadmin(ticketId: string) {
+  try {
+    await requireSuperAdmin()
+    const { data, error } = await supabaseAdmin
+      .from('client_tickets')
+      .select(`
+        *,
+        categoria:categoria_id(nombre, color),
+        organizacion:tenant_id(nombre),
+        sucursal:branch_id(nombre),
+        creador:user_id(nombre, email, avatar_url),
+        asignado:asignado_a(nombre, avatar_url),
+        mensajes:client_ticket_messages(
+          id,
+          mensaje,
+          timestamp,
+          user_id,
+          user:users(nombre, email, rol, avatar_url)
+        )
+      `)
+      .eq('id', ticketId)
+      .single()
+
+    if (error) return { success: false, error: error.message }
+    if (data?.mensajes) {
+      data.mensajes.sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+    }
+    return { success: true, data }
+  } catch (err: any) { return { success: false, error: err.message } }
+}
+
+export async function asignarCategoriaPrioridadCliente(ticketId: string, categoriaId: string | null, prioridad: string) {
+  try {
+    await requireSuperAdmin()
+    const { error } = await supabaseAdmin
+      .from('client_tickets')
+      .update({ categoria_id: categoriaId, prioridad })
+      .eq('id', ticketId)
+
+    if (error) return { success: false, error: error.message }
+    return { success: true }
+  } catch (err: any) { return { success: false, error: err.message } }
+}
+
+export async function asignarTicketCliente(ticketId: string, userId: string | null) {
+  try {
+    await requireSuperAdmin()
+    const { error } = await supabaseAdmin
+      .from('client_tickets')
+      .update({ asignado_a: userId })
+      .eq('id', ticketId)
+
+    if (error) return { success: false, error: error.message }
+    return { success: true }
+  } catch (err: any) { return { success: false, error: err.message } }
+}
+
+export async function cambiarEstatusTicketCliente(ticketId: string, estatus: string) {
+  try {
+    await requireSuperAdmin()
+    const fecha_cierre = estatus === 'cerrado' ? new Date().toISOString() : null
+
+    const { data: ticket, error } = await supabaseAdmin
+      .from('client_tickets')
+      .update({ estatus, fecha_cierre })
+      .eq('id', ticketId)
+      .select('user_id, asunto')
+      .single()
+
+    if (error) return { success: false, error: error.message }
+    
+    if (estatus === 'cerrado') {
+      await crearNotificacion(supabaseAdmin, {
+        userId: ticket.user_id,
+        tipo: 'soporte_respuesta',
+        titulo: 'Ticket cerrado',
+        cuerpo: `El ticket "${ticket.asunto}" ha sido cerrado.`,
+        url: `/dashboard/soporte/${ticketId}`,
+        entidadId: ticketId
+      })
+    }
+    
+    return { success: true }
+  } catch (err: any) { return { success: false, error: err.message } }
+}
+
+export async function responderTicketCliente(ticketId: string, mensaje: string) {
+  try {
+    const { userId } = await requireSuperAdmin()
+    const { data: ticket, error: tErr } = await supabaseAdmin
+      .from('client_tickets')
+      .select('tenant_id, user_id, asunto, estatus')
+      .eq('id', ticketId)
+      .single()
+      
+    if (tErr || !ticket) return { success: false, error: 'Ticket no encontrado' }
+
+    const { data: nuevoMensaje, error: msgError } = await supabaseAdmin
+      .from('client_ticket_messages')
+      .insert({
+        tenant_id: ticket.tenant_id,
+        ticket_id: ticketId,
+        user_id: userId,
+        mensaje: mensaje
+      })
+      .select('id, mensaje, timestamp, user_id, user:users(nombre, avatar_url, rol)')
+      .single()
+
+    if (msgError) return { success: false, error: msgError.message }
+
+    if (ticket.estatus === 'cerrado') {
+      await supabaseAdmin
+        .from('client_tickets')
+        .update({ estatus: 'abierto', fecha_cierre: null })
+        .eq('id', ticketId)
+    }
+
+    await crearNotificacion(supabaseAdmin, {
+      userId: ticket.user_id,
+      tipo: 'soporte_respuesta',
+      titulo: 'Nueva respuesta en soporte',
+      cuerpo: `Han respondido a tu ticket "${ticket.asunto}".`,
+      url: `/dashboard/soporte/${ticketId}`,
+      entidadId: ticketId
+    })
+
+    return { success: true, data: nuevoMensaje }
+  } catch (err: any) { return { success: false, error: err.message } }
+}

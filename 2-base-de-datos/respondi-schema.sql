@@ -28,7 +28,7 @@ create type rol_usuario        as enum ('super_admin', 'admin', 'usuario');
 create type seccion_permiso as enum (
   'casos', 'conversaciones', 'chats', 'novedades', 'blacklist',
   'skills', 'precios', 'reglas', 'etiquetas', 'canales',
-  'usuarios', 'sucursales', 'perfil', 'audit_log'
+  'usuarios', 'sucursales', 'perfil', 'audit_log', 'soporte'
 );
 create type nivel_permiso as enum ('ninguno', 'lectura', 'escritura');
 create type alcance_permiso as enum ('todos', 'propios');
@@ -814,6 +814,82 @@ select cron.schedule(
     and fecha_vigencia_fin < now();
   $$
 );
+
+-- ============================================================================
+-- 18. SOPORTE A CLIENTES FINALES
+-- ============================================================================
+
+create table client_ticket_categorias (
+  id         uuid primary key default gen_random_uuid(),
+  nombre     text not null unique,
+  color      text not null default '#6366f1',
+  created_at timestamptz not null default now()
+);
+
+create table client_tickets (
+  id             uuid primary key default gen_random_uuid(),
+  tenant_id      uuid not null references organizaciones(id) on delete cascade,
+  branch_id      uuid references sucursales(id),
+  user_id        uuid not null references users(id),
+  asunto         text not null,
+  categoria_id   uuid references client_ticket_categorias(id),
+  prioridad      text default 'normal',
+  estatus        text not null default 'abierto',
+  asignado_a     uuid references users(id),
+  fecha_apertura timestamptz not null default now(),
+  fecha_cierre   timestamptz
+);
+
+create table client_ticket_messages (
+  id         uuid primary key default gen_random_uuid(),
+  tenant_id  uuid not null references organizaciones(id) on delete cascade,
+  ticket_id  uuid not null references client_tickets(id) on delete cascade,
+  user_id    uuid references users(id),
+  mensaje    text not null,
+  timestamp  timestamptz not null default now()
+);
+
+alter table client_ticket_categorias enable row level security;
+alter table client_tickets enable row level security;
+alter table client_ticket_messages enable row level security;
+
+create policy cat_cliente_select on client_ticket_categorias for select
+  using (exists (select 1 from users where id = auth.uid() and rol = 'super_admin') or auth.uid() is not null);
+create policy cat_cliente_insert on client_ticket_categorias for insert
+  with check (exists (select 1 from users where id = auth.uid() and rol = 'super_admin'));
+create policy cat_cliente_update on client_ticket_categorias for update
+  using (exists (select 1 from users where id = auth.uid() and rol = 'super_admin'));
+create policy cat_cliente_delete on client_ticket_categorias for delete
+  using (exists (select 1 from users where id = auth.uid() and rol = 'super_admin'));
+
+create policy client_tickets_select on client_tickets for select
+  using (
+    exists (select 1 from users where id = auth.uid() and rol = 'super_admin')
+    or (tenant_id = auth_tenant_id() and auth_has_permission(branch_id, 'soporte', 'lectura'))
+  );
+create policy client_tickets_insert on client_tickets for insert
+  with check (
+    exists (select 1 from users where id = auth.uid() and rol = 'super_admin')
+    or (tenant_id = auth_tenant_id() and auth_has_permission(branch_id, 'soporte', 'escritura'))
+  );
+create policy client_tickets_update on client_tickets for update
+  using (
+    exists (select 1 from users where id = auth.uid() and rol = 'super_admin')
+    or (tenant_id = auth_tenant_id() and auth_has_permission(branch_id, 'soporte', 'escritura'))
+  );
+
+create policy client_ticket_messages_select on client_ticket_messages for select
+  using (
+    exists (select 1 from users where id = auth.uid() and rol = 'super_admin')
+    or ticket_id in (select id from client_tickets where tenant_id = auth_tenant_id() and auth_has_permission(branch_id, 'soporte', 'lectura'))
+  );
+create policy client_ticket_messages_insert on client_ticket_messages for insert
+  with check (
+    exists (select 1 from users where id = auth.uid() and rol = 'super_admin')
+    or ticket_id in (select id from client_tickets where tenant_id = auth_tenant_id() and auth_has_permission(branch_id, 'soporte', 'escritura'))
+  );
+
+alter publication supabase_realtime add table client_tickets, client_ticket_messages;
 
 -- ============================================================================
 -- FIN DEL ESQUEMA

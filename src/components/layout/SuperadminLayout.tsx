@@ -28,6 +28,7 @@ export default function SuperadminLayout({
   const pathname = usePathname()
   const [isSidebarOpen, setSidebarOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
+  const [expandedGroup, setExpandedGroup] = useState<string | null>('Soporte')
 
   const closeSidebar = () => setSidebarOpen(false)
 
@@ -53,9 +54,16 @@ export default function SuperadminLayout({
     { href: '/superadmin/errores', label: 'Errores del sistema', exact: false, icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
     )},
-    { href: '/superadmin/tickets', label: 'Soporte a Vendedores', exact: false, badge: ticketsAbiertos, icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
-    )}
+    {
+      label: 'Soporte',
+      icon: (
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+      ),
+      subLinks: [
+        { href: '/superadmin/tickets', label: 'Vendedores', exact: false, badge: ticketsAbiertos },
+        { href: '/superadmin/tickets-clientes', label: 'Clientes', exact: false }
+      ]
+    }
   ]
 
   return (
@@ -82,7 +90,55 @@ export default function SuperadminLayout({
         </div>
 
         <nav className="flex-1 px-3 py-5 space-y-1 overflow-y-auto">
-          {links.map((link) => {
+          {links.map((link: any) => {
+            if (link.subLinks) {
+              const isGroupActive = link.subLinks.some((sub: any) => pathname.startsWith(sub.href))
+              const isExpanded = expandedGroup === link.label || (isGroupActive && expandedGroup === null)
+              
+              return (
+                <div key={link.label} className="space-y-1">
+                  <button
+                    onClick={() => setExpandedGroup(isExpanded ? null : link.label)}
+                    className={`w-full flex items-center justify-between py-2.5 rounded-xl transition ${isGroupActive ? 'bg-brand-600/10 text-brand-500 font-600' : 'text-ink-400 hover:bg-white/5 hover:text-white'} ${collapsed ? 'px-0 justify-center' : 'px-3'}`}
+                    title={collapsed ? link.label : undefined}
+                  >
+                    <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'}`}>
+                      {link.icon}
+                      {!collapsed && <span className="truncate">{link.label}</span>}
+                    </div>
+                    {!collapsed && (
+                      <svg className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    )}
+                  </button>
+                  
+                  {!collapsed && isExpanded && (
+                    <div className="pl-11 pr-3 space-y-1 py-1">
+                      {link.subLinks.map((sub: any) => {
+                        const isSubActive = sub.exact ? pathname === sub.href : pathname.startsWith(sub.href)
+                        return (
+                          <Link
+                            key={sub.href}
+                            href={sub.href}
+                            onClick={closeSidebar}
+                            className={`flex items-center justify-between py-2 px-3 rounded-lg text-sm transition ${isSubActive ? 'bg-brand-600 text-white font-500 shadow-md shadow-brand-900/20' : 'text-ink-400 hover:text-white hover:bg-white/5'}`}
+                          >
+                            <span className="truncate">{sub.label}</span>
+                            {!!sub.badge && (
+                              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-600 ${isSubActive ? 'bg-white text-brand-600' : 'bg-red-500 text-white'}`}>
+                                {sub.badge}
+                              </span>
+                            )}
+                          </Link>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            }
+
             const isActive = link.exact ? pathname === link.href : pathname.startsWith(link.href)
             return (
               <Link

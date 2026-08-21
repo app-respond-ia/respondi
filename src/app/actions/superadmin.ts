@@ -628,7 +628,8 @@ export async function aprobarComision(id: string) {
         tipo: 'comision_aprobada',
         titulo: 'Comisión aprobada',
         cuerpo: `Una comisión de ${anterior.importe} ${anterior.moneda} ha sido aprobada.`,
-        url: '/vendedor/comisiones'
+        url: '/vendedor/comisiones',
+        entidadId: anterior.id
       })
     }
   }
@@ -672,7 +673,8 @@ export async function marcarComisionPagada(id: string, notas_pago?: string) {
         tipo: 'comision_pagada',
         titulo: 'Comisión pagada',
         cuerpo: `Una comisión de ${anterior.importe} ${anterior.moneda} ha sido pagada.`,
-        url: '/vendedor/comisiones'
+        url: '/vendedor/comisiones',
+        entidadId: anterior.id
       })
     }
   }
@@ -717,7 +719,8 @@ export async function crearComisionManual(data: {
     tipo: 'comision_pendiente',
     titulo: 'Nueva comisión pendiente',
     cuerpo: `Se ha creado una comisión manual de ${data.importe} ${data.moneda}.`,
-    url: '/superadmin/comisiones'
+    url: '/superadmin/comisiones',
+    entidadId: result.id
   })
 
   revalidatePath('/superadmin/comisiones')
@@ -993,7 +996,8 @@ export async function actualizarEstadoOrganizacion(id: string, estado: string) {
           tipo: 'conversion',
           titulo: '¡Nuevo cliente convertido!',
           cuerpo: `El cliente ${orgInfo?.nombre} ha pasado a un plan de pago.`,
-          url: '/vendedor/clientes'
+          url: '/vendedor/clientes',
+          entidadId: id
         })
       }
     }
@@ -1132,7 +1136,8 @@ export async function responderTicket(ticketId: string, mensaje: string) {
         tipo: 'soporte_respuesta',
         titulo: 'Nueva respuesta de soporte',
         cuerpo: 'Soporte ha respondido a tu ticket.',
-        url: `/vendedor/soporte/${ticketId}`
+        url: `/vendedor/soporte/${ticketId}`,
+        entidadId: ticketId
       })
     }
 

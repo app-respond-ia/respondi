@@ -72,7 +72,8 @@ export async function actualizarClienteSeguimiento(id: string, data: {
         tipo: 'cliente_riesgo',
         titulo: 'Cliente en riesgo',
         cuerpo: `El cliente ${orgInfo?.nombre} ha sido marcado como "en riesgo". Revisa su estado.`,
-        url: '/vendedor/clientes'
+        url: '/vendedor/clientes',
+        entidadId: result.organizacion_id
       })
     }
 
@@ -222,7 +223,8 @@ export async function crearCuentaTrial(data: {
       tipo: 'nueva_organizacion',
       titulo: 'Nueva organización creada',
       cuerpo: `El vendedor "${vendedor.nombre}" ha registrado al cliente "${data.nombre_organizacion}".`,
-      url: '/superadmin/organizaciones'
+      url: '/superadmin/organizaciones',
+      entidadId: org.id
     })
 
     return { success: true, organizacion: org }
@@ -354,7 +356,8 @@ export async function crearTicketSoporte(asunto: string, mensajeInicial: string)
       tipo: 'ticket_nuevo',
       titulo: 'Nuevo ticket de soporte',
       cuerpo: `El vendedor "${vendedor.nombre}" ha abierto un ticket: ${asunto.trim()}`,
-      url: `/superadmin/tickets/${ticket.id}`
+      url: `/superadmin/tickets/${ticket.id}`,
+      entidadId: ticket.id
     })
 
     return { success: true, ticket }
@@ -449,14 +452,16 @@ export async function enviarMensajeTicket(ticketId: string, mensaje: string) {
         tipo: 'ticket_respuesta_vendedor',
         titulo: 'Nueva respuesta de vendedor',
         cuerpo: `El vendedor "${vendedor.nombre}" ha respondido a un ticket.`,
-        url: `/superadmin/tickets/${ticket.id}`
+        url: `/superadmin/tickets/${ticket.id}`,
+        entidadId: ticket.id
       })
     } else {
       await notificarATodosLosSuperadmins(supabaseAdmin, {
         tipo: 'ticket_respuesta_vendedor',
         titulo: 'Nueva respuesta de vendedor',
         cuerpo: `El vendedor "${vendedor.nombre}" ha respondido a un ticket.`,
-        url: `/superadmin/tickets/${ticket.id}`
+        url: `/superadmin/tickets/${ticket.id}`,
+        entidadId: ticket.id
       })
     }
 

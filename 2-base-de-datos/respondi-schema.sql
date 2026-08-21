@@ -439,7 +439,8 @@ create table notifications (
   titulo     text,
   cuerpo     text,
   leida      boolean not null default false,
-  timestamp  timestamptz not null default now()
+  timestamp  timestamptz not null default now(),
+  entidad_id uuid
 );
 
 create table notification_preferences (

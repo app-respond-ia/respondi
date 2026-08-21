@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { useRouter } from 'next/navigation'
 import { marcarNotificacionLeida, marcarTodasLeidas, actualizarPreferencia } from '@/app/actions/notificaciones'
 
 type Notification = {
@@ -12,6 +13,7 @@ type Notification = {
   cuerpo: string
   leida: boolean
   timestamp: string
+  url?: string | null
 }
 
 type Preference = {
@@ -38,10 +40,20 @@ export default function NotificationsTabs({
   const [activeTab, setActiveTab] = useState<'lista' | 'preferencias'>('lista')
   const [notifications, setNotifications] = useState(initialNotifications)
   const [preferences, setPreferences] = useState(initialPreferences)
+  const router = useRouter()
 
   const handleMarkAsRead = async (id: string) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, leida: true } : n))
     await marcarNotificacionLeida(id)
+  }
+
+  const handleNotificationClick = async (notif: Notification) => {
+    if (!notif.leida) {
+      await handleMarkAsRead(notif.id)
+    }
+    if (notif.url) {
+      router.push(notif.url)
+    }
   }
 
   const handleMarkAllAsRead = async () => {
@@ -109,7 +121,11 @@ export default function NotificationsTabs({
                 </div>
               ) : (
                 notifications.map(notif => (
-                  <div key={notif.id} className={`p-4 sm:px-6 flex gap-4 transition hover:bg-slate-50 ${!notif.leida ? 'bg-brand-50/20' : ''}`}>
+                  <div 
+                    key={notif.id} 
+                    onClick={() => handleNotificationClick(notif)}
+                    className={`p-4 sm:px-6 flex gap-4 transition hover:bg-slate-50 ${!notif.leida ? 'bg-brand-50/20' : ''} ${notif.url ? 'cursor-pointer' : ''}`}
+                  >
                     <div className="mt-1">
                       {notif.leida ? (
                         <div className="w-2.5 h-2.5 rounded-full bg-slate-300"></div>
@@ -130,7 +146,10 @@ export default function NotificationsTabs({
                       
                       {!notif.leida && (
                         <button 
-                          onClick={() => handleMarkAsRead(notif.id)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleMarkAsRead(notif.id)
+                          }}
                           className="text-xs font-500 text-brand-600 mt-2 hover:underline"
                         >
                           Marcar como leída

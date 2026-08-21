@@ -19,7 +19,8 @@ export async function getTicketsCliente() {
     .select(`
       *,
       categoria:categoria_id(nombre, color),
-      mensajes:client_ticket_messages(count)
+      mensajes:client_ticket_messages(mensaje, timestamp),
+      tickets_fijados ( user_id )
     `)
     .eq('tenant_id', auth.tenant_id)
     .order('fecha_apertura', { ascending: false })
@@ -33,7 +34,17 @@ export async function getTicketsCliente() {
   const { data, error } = await query
   
   if (error) return { success: false, error: error.message }
-  return { success: true, data: data || [] }
+
+  const formatted = data?.map(t => {
+    const sortedMessages = (t.mensajes || []).sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    return {
+      ...t,
+      ultimo_mensaje: sortedMessages.length > 0 ? sortedMessages[0] : null,
+      fijado: t.tickets_fijados && t.tickets_fijados.length > 0
+    }
+  })
+
+  return { success: true, data: formatted || [] }
 }
 
 export async function getTicketDetalleCliente(ticketId: string) {

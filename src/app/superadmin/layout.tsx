@@ -32,12 +32,18 @@ export default async function Layout({ children }: { children: React.ReactNode }
     .select('*', { count: 'exact', head: true })
     .eq('estatus', 'abierto')
 
+  const { count: countClientes } = await supabase
+    .from('client_tickets')
+    .select('*', { count: 'exact', head: true })
+    .eq('estatus', 'abierto')
+
   return (
     <ToastProvider>
       <SuperadminLayout 
         nombreUsuario={nombreUsuario} 
         iniciales={iniciales} 
         ticketsAbiertos={count || 0}
+        ticketsClientesAbiertos={countClientes || 0}
         email={userData.email || session.user.email || ''}
         avatarUrl={userData.avatar_url || undefined}
         userId={session.user.id}

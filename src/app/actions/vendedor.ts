@@ -368,16 +368,30 @@ export async function crearTicketSoporte(asunto: string, mensajeInicial: string)
 
 export async function getTicketsVendedor() {
   try {
-    const { supabase, vendedor } = await requireVendedor()
+    const { supabase, vendedor, userId } = await requireVendedor()
     
     const { data, error } = await supabase
       .from('support_tickets')
-      .select('*')
+      .select(`
+        *,
+        support_ticket_messages ( mensaje, timestamp ),
+        tickets_fijados ( user_id )
+      `)
       .eq('vendedor_id', vendedor.id)
       .order('fecha_apertura', { ascending: false })
 
     if (error) throw new Error(error.message)
-    return { success: true, tickets: data }
+
+    const formatted = data?.map(t => {
+      const sortedMessages = (t.support_ticket_messages || []).sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      return {
+        ...t,
+        ultimo_mensaje: sortedMessages.length > 0 ? sortedMessages[0] : null,
+        fijado: t.tickets_fijados && t.tickets_fijados.length > 0
+      }
+    })
+
+    return { success: true, tickets: formatted }
   } catch (err: any) {
     return { success: false, error: err.message }
   }

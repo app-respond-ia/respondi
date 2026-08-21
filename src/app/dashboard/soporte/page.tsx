@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { getTicketsCliente, crearTicketCliente } from '@/app/actions/soporte-cliente'
+import { toggleFijarTicket } from '@/app/actions/soporte-fijar'
 import Loading from '@/components/Loading'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
@@ -16,6 +17,9 @@ export default function DashboardSoportePage() {
   const [asunto, setAsunto] = useState('')
   const [mensaje, setMensaje] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
+
+  const [filtroBusqueda, setFiltroBusqueda] = useState('')
+  const [filtroEstatus, setFiltroEstatus] = useState('')
 
   const cargarTickets = async () => {
     setLoading(true)
@@ -54,6 +58,29 @@ export default function DashboardSoportePage() {
     return 'bg-slate-100 text-slate-700'
   }
 
+  const toggleFijar = async (id: string, currentlyPinned: boolean, e: React.MouseEvent) => {
+    e.preventDefault()
+    setTickets(prev => prev.map(t => t.id === id ? { ...t, fijado: !currentlyPinned } : t))
+    const res = await toggleFijarTicket(id, 'cliente', !currentlyPinned)
+    if (!res.success) {
+      setTickets(prev => prev.map(t => t.id === id ? { ...t, fijado: currentlyPinned } : t))
+    }
+  }
+
+  const getSortDate = (t: any) => t.ultimo_mensaje ? new Date(t.ultimo_mensaje.timestamp).getTime() : new Date(t.fecha_apertura).getTime()
+
+  const filtrados = tickets.filter(t => {
+    if (filtroBusqueda) {
+      if (!t.asunto?.toLowerCase().includes(filtroBusqueda.toLowerCase())) return false
+    }
+    if (filtroEstatus && t.estatus !== filtroEstatus) return false
+    return true
+  }).sort((a, b) => {
+    if (a.fijado && !b.fijado) return -1
+    if (!a.fijado && b.fijado) return 1
+    return getSortDate(b) - getSortDate(a)
+  })
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-start gap-4 flex-wrap">
@@ -70,21 +97,49 @@ export default function DashboardSoportePage() {
         </button>
       </div>
 
+      <div className="flex flex-wrap gap-3 items-center">
+        <div className="relative flex-1 min-w-[200px]">
+          <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input 
+            type="text" 
+            placeholder="Buscar por asunto..." 
+            value={filtroBusqueda}
+            onChange={e => setFiltroBusqueda(e.target.value)}
+            className="w-full h-10 pl-9 pr-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition"
+          />
+        </div>
+        <select value={filtroEstatus} onChange={e => setFiltroEstatus(e.target.value)}
+          className="h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition">
+          <option value="">Todos los estados</option>
+          <option value="abierto">Abierto</option>
+          <option value="cerrado">Cerrado</option>
+        </select>
+      </div>
+
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
         {loading ? (
           <Loading />
-        ) : tickets.length === 0 ? (
+        ) : filtrados.length === 0 ? (
           <div className="p-12 text-center">
             <svg className="w-12 h-12 text-ink-200 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
-            <h3 className="text-lg font-600 text-ink-900 mb-1">No tienes tickets</h3>
-            <p className="text-ink-500 text-sm">Crea un nuevo ticket para hablar con nuestro equipo de soporte.</p>
+            <h3 className="text-lg font-600 text-ink-900 mb-1">No hay tickets</h3>
+            <p className="text-ink-500 text-sm">No se encontraron tickets con los filtros actuales.</p>
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
-            {tickets.map(ticket => (
-              <Link href={`/dashboard/soporte/${ticket.id}`} key={ticket.id} className="flex flex-col sm:flex-row gap-3 sm:gap-6 p-4 sm:p-5 hover:bg-slate-50 transition group">
+            {filtrados.map(ticket => (
+              <Link href={`/dashboard/soporte/${ticket.id}`} key={ticket.id} className={`flex flex-col sm:flex-row gap-3 sm:gap-6 p-4 sm:p-5 hover:bg-slate-50 transition group ${ticket.fijado ? 'bg-amber-50/30' : ''}`}>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                    <button 
+                      onClick={(e) => toggleFijar(ticket.id, ticket.fijado, e)}
+                      className={`p-1 rounded hover:bg-slate-200 transition ${ticket.fijado ? 'text-amber-500' : 'text-slate-300'}`}
+                      title={ticket.fijado ? 'Desfijar' : 'Fijar'}
+                    >
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M16 11V6a4 4 0 00-8 0v5l-2 3v2h5.5v5h1v-5H18v-2l-2-3z"/></svg>
+                    </button>
                     <span className={`text-xs px-2 py-0.5 rounded-full font-600 uppercase tracking-wide ${getEstatusBadge(ticket.estatus)}`}>
                       {ticket.estatus}
                     </span>

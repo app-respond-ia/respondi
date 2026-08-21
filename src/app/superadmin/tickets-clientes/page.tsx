@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Loading from '@/components/Loading'
 import { getTicketsClientesSoporte, getCategoriasTicketsClientes } from '@/app/actions/superadmin'
+import { toggleFijarTicket } from '@/app/actions/soporte-fijar'
 import Link from 'next/link'
 
 export default function TicketsClientesPage() {
@@ -11,6 +12,8 @@ export default function TicketsClientesPage() {
   const [loading, setLoading] = useState(true)
 
   // Filtros
+  const [filtroBusqueda, setFiltroBusqueda] = useState('')
+  const [filtroOrganizacion, setFiltroOrganizacion] = useState('')
   const [filtroEstatus, setFiltroEstatus] = useState('')
   const [filtroCategoria, setFiltroCategoria] = useState('')
   const [filtroPrioridad, setFiltroPrioridad] = useState('')
@@ -52,15 +55,40 @@ export default function TicketsClientesPage() {
     return 'bg-slate-100 text-slate-600'
   }
 
+  const toggleFijar = async (id: string, currentlyPinned: boolean) => {
+    // optimistic update
+    setTickets(prev => prev.map(t => t.id === id ? { ...t, fijado: !currentlyPinned } : t))
+    const res = await toggleFijarTicket(id, 'cliente', !currentlyPinned)
+    if (!res.success) {
+      // revert on fail
+      setTickets(prev => prev.map(t => t.id === id ? { ...t, fijado: currentlyPinned } : t))
+    }
+  }
+
+  const getSortDate = (t: any) => t.ultimo_mensaje ? new Date(t.ultimo_mensaje.timestamp).getTime() : new Date(t.fecha_apertura).getTime()
+
+  const organizacionesUnicas = Array.from(new Set(tickets.map(t => t.organizacion?.nombre).filter(Boolean)))
+
   const abiertos = tickets.filter(t => t.estatus === 'abierto').length
   const sinCategorizar = tickets.filter(t => !t.categoria_id && t.estatus === 'abierto').length
   const cerrados = tickets.filter(t => t.estatus === 'cerrado').length
 
   const filtrados = tickets.filter(t => {
+    if (filtroBusqueda) {
+      const search = filtroBusqueda.toLowerCase()
+      if (!t.asunto?.toLowerCase().includes(search) && !t.organizacion?.nombre?.toLowerCase().includes(search)) {
+        return false
+      }
+    }
+    if (filtroOrganizacion && t.organizacion?.nombre !== filtroOrganizacion) return false
     if (filtroEstatus && t.estatus !== filtroEstatus) return false
     if (filtroCategoria && t.categoria_id !== filtroCategoria) return false
     if (filtroPrioridad && t.prioridad !== filtroPrioridad) return false
     return true
+  }).sort((a, b) => {
+    if (a.fijado && !b.fijado) return -1
+    if (!a.fijado && b.fijado) return 1
+    return getSortDate(b) - getSortDate(a)
   })
 
   return (
@@ -96,7 +124,26 @@ export default function TicketsClientesPage() {
       </div>
 
       {/* Filtros */}
-      <div className="flex flex-wrap gap-3 mb-5">
+      <div className="flex flex-wrap gap-3 mb-5 items-center">
+        <div className="relative flex-1 min-w-[200px]">
+          <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input 
+            type="text" 
+            placeholder="Buscar por asunto o cliente..." 
+            value={filtroBusqueda}
+            onChange={e => setFiltroBusqueda(e.target.value)}
+            className="w-full h-10 pl-9 pr-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition"
+          />
+        </div>
+        <select value={filtroOrganizacion} onChange={e => setFiltroOrganizacion(e.target.value)}
+          className="h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition">
+          <option value="">Todas las organizaciones</option>
+          {organizacionesUnicas.map(org => (
+            <option key={org as string} value={org as string}>{org as string}</option>
+          ))}
+        </select>
         <select value={filtroEstatus} onChange={e => setFiltroEstatus(e.target.value)}
           className="h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition">
           <option value="">Todos los estados</option>
@@ -143,8 +190,19 @@ export default function TicketsClientesPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filtrados.map(t => (
-                  <tr key={t.id} className="hover:bg-slate-50 transition">
-                    <td className="px-5 py-3.5 font-500 text-ink-900 max-w-[200px] truncate" title={t.asunto}>{t.asunto}</td>
+                  <tr key={t.id} className={`hover:bg-slate-50 transition ${t.fijado ? 'bg-amber-50/30' : ''}`}>
+                    <td className="px-5 py-3.5 font-500 text-ink-900 max-w-[200px] truncate">
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => toggleFijar(t.id, t.fijado)}
+                          className={`p-1 rounded hover:bg-slate-200 transition ${t.fijado ? 'text-amber-500' : 'text-slate-300'}`}
+                          title={t.fijado ? 'Desfijar' : 'Fijar'}
+                        >
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M16 11V6a4 4 0 00-8 0v5l-2 3v2h5.5v5h1v-5H18v-2l-2-3z"/></svg>
+                        </button>
+                        <span title={t.asunto}>{t.asunto}</span>
+                      </div>
+                    </td>
                     <td className="px-5 py-3.5 text-ink-600">{t.organizacion?.nombre || '—'}</td>
                     <td className="px-5 py-3.5 text-ink-600">{t.sucursal?.nombre || '—'}</td>
                     <td className="px-5 py-3.5">

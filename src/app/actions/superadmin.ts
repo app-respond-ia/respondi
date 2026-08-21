@@ -1023,7 +1023,8 @@ export async function getTicketsSoporte() {
         vendedores ( nombre ),
         ticket_categorias ( id, nombre, color ),
         asignado_a_user:users!support_tickets_asignado_a_fkey ( id, nombre, email ),
-        support_ticket_messages ( mensaje, timestamp )
+        support_ticket_messages ( mensaje, timestamp ),
+        tickets_fijados ( id )
       `)
       .order('fecha_apertura', { ascending: false })
 
@@ -1035,7 +1036,8 @@ export async function getTicketsSoporte() {
       const sortedMessages = (t.support_ticket_messages || []).sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       return {
         ...t,
-        ultimo_mensaje: sortedMessages.length > 0 ? sortedMessages[0] : null
+        ultimo_mensaje: sortedMessages.length > 0 ? sortedMessages[0] : null,
+        fijado: t.tickets_fijados && t.tickets_fijados.length > 0
       }
     })
 
@@ -1450,12 +1452,23 @@ export async function getTicketsClientesSoporte() {
         organizacion:tenant_id(nombre),
         sucursal:branch_id(nombre),
         creador:user_id(nombre, email),
-        mensajes:client_ticket_messages(count)
+        mensajes:client_ticket_messages(mensaje, timestamp),
+        tickets_fijados ( user_id )
       `)
       .order('fecha_apertura', { ascending: false })
 
     if (error) return { success: false, error: error.message }
-    return { success: true, data: data || [] }
+
+    const formatted = data?.map(t => {
+      const sortedMessages = (t.mensajes || []).sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      return {
+        ...t,
+        ultimo_mensaje: sortedMessages.length > 0 ? sortedMessages[0] : null,
+        fijado: t.tickets_fijados && t.tickets_fijados.length > 0
+      }
+    })
+
+    return { success: true, data: formatted || [] }
   } catch (err: any) { return { success: false, error: err.message } }
 }
 

@@ -129,7 +129,7 @@ export default function TicketDetalleClientePage() {
       </div>
 
       {/* Zona de Mensajes */}
-      <div className="flex-1 overflow-y-auto pr-2 space-y-6 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto space-y-6 custom-scrollbar bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 shadow-sm">
         {mensajes.length === 0 ? (
           <div className="text-center py-12 text-ink-400 text-sm">No hay mensajes.</div>
         ) : (
@@ -162,7 +162,7 @@ export default function TicketDetalleClientePage() {
       </div>
 
       {/* Input inferior */}
-      <div className="shrink-0 bg-white rounded-2xl border border-slate-200 p-2 sm:p-3 shadow-sm">
+      <div className="shrink-0 bg-white rounded-2xl border border-slate-200 p-2 sm:p-3 shadow-sm mt-0">
         <form onSubmit={handleEnviarMensaje} className="flex gap-2 sm:gap-3">
           <textarea 
             value={nuevoMensaje}

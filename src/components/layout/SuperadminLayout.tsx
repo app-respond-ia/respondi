@@ -13,6 +13,7 @@ export default function SuperadminLayout({
   nombreUsuario,
   iniciales,
   ticketsAbiertos,
+  ticketsClientesAbiertos,
   email,
   avatarUrl,
   userId
@@ -21,6 +22,7 @@ export default function SuperadminLayout({
   nombreUsuario: string
   iniciales: string
   ticketsAbiertos?: number
+  ticketsClientesAbiertos?: number
   email: string
   avatarUrl?: string
   userId: string
@@ -61,7 +63,7 @@ export default function SuperadminLayout({
       ),
       subLinks: [
         { href: '/superadmin/tickets', label: 'Vendedores', exact: false, badge: ticketsAbiertos },
-        { href: '/superadmin/tickets-clientes', label: 'Clientes', exact: false }
+        { href: '/superadmin/tickets-clientes', label: 'Clientes', exact: false, badge: ticketsClientesAbiertos }
       ]
     }
   ]
@@ -92,7 +94,7 @@ export default function SuperadminLayout({
         <nav className="flex-1 px-3 py-5 space-y-1 overflow-y-auto">
           {links.map((link: any) => {
             if (link.subLinks) {
-              const isGroupActive = link.subLinks.some((sub: any) => pathname.startsWith(sub.href))
+              const isGroupActive = link.subLinks.some((sub: any) => sub.exact ? pathname === sub.href : (pathname === sub.href || pathname.startsWith(sub.href + '/')))
               const isExpanded = expandedGroup === link.label || (isGroupActive && expandedGroup === null)
               
               return (
@@ -116,7 +118,7 @@ export default function SuperadminLayout({
                   {!collapsed && isExpanded && (
                     <div className="pl-11 pr-3 space-y-1 py-1">
                       {link.subLinks.map((sub: any) => {
-                        const isSubActive = sub.exact ? pathname === sub.href : pathname.startsWith(sub.href)
+                        const isSubActive = sub.exact ? pathname === sub.href : (pathname === sub.href || pathname.startsWith(sub.href + '/'))
                         return (
                           <Link
                             key={sub.href}
@@ -199,7 +201,7 @@ export default function SuperadminLayout({
           </div>
         </header>
 
-        <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-5xl w-full mx-auto">
+        <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl w-full mx-auto">
           {children}
         </main>
       </div>

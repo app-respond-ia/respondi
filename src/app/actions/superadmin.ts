@@ -241,6 +241,18 @@ export async function registrarPagoYRenovar(organizacionId: string, importe: num
 }
 
 
+export async function getOrganizacionesBasico() {
+  const { supabase } = await requireSuperAdmin()
+  const { data, error } = await supabase
+    .from('organizaciones')
+    .select('id, nombre, estado')
+    .in('estado', ['activo', 'trial'])
+    .order('nombre', { ascending: true })
+
+  if (error) return { success: false, error: error.message }
+  return { success: true, organizaciones: data }
+}
+
 // C) getVendedores (superadmin)
 export async function getVendedores() {
   const { supabase } = await requireSuperAdmin()

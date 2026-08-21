@@ -2,12 +2,13 @@
 import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
-import { getComisiones, getVendedores, aprobarComision, marcarComisionPagada, crearComisionManual } from '@/app/actions/superadmin'
+import { getComisiones, getVendedores, aprobarComision, marcarComisionPagada, crearComisionManual, getOrganizacionesBasico } from '@/app/actions/superadmin'
 import { useToast } from '@/components/ui/Toast'
 
 export default function ComisionesPage() {
   const [comisiones, setComisiones] = useState<any[]>([])
   const [vendedores, setVendedores] = useState<any[]>([])
+  const [organizaciones, setOrganizaciones] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const { showToast } = useToast()
 
@@ -38,16 +39,18 @@ export default function ComisionesPage() {
 
   const cargar = async () => {
     setLoading(true)
-    const [resC, resV] = await Promise.all([
+    const [resC, resV, resO] = await Promise.all([
       getComisiones({
         vendedor_id: filtroVendedor || undefined,
         estado: filtroEstado || undefined,
         tipo: filtroTipo || undefined
       }),
-      getVendedores()
+      getVendedores(),
+      getOrganizacionesBasico()
     ])
     if (resC.success && resC.comisiones) setComisiones(resC.comisiones)
     if (resV.success && resV.vendedores) setVendedores(resV.vendedores)
+    if (resO.success && resO.organizaciones) setOrganizaciones(resO.organizaciones)
     setLoading(false)
   }
 
@@ -114,9 +117,6 @@ export default function ComisionesPage() {
   const totalAprobado = comisiones.filter(c => c.estado === 'aprobada').reduce((acc, c) => acc + Number(c.importe), 0)
   const totalPagado = comisiones.filter(c => c.estado === 'pagada').reduce((acc, c) => acc + Number(c.importe), 0)
 
-  // Clientes disponibles según vendedor seleccionado
-  const vendedorSeleccionado = vendedores.find(v => v.id === formCrear.vendedor_id)
-  const clientesDisponibles = vendedorSeleccionado?.vendedor_clientes || []
   const formularioValido = formCrear.vendedor_id && formCrear.organizacion_id && formCrear.importe > 0
 
   return (
@@ -301,8 +301,8 @@ export default function ComisionesPage() {
                     disabled={!formCrear.vendedor_id}
                     className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition disabled:opacity-50">
                     <option value="">Seleccionar cliente</option>
-                    {clientesDisponibles.map((c: any) => (
-                      <option key={c.organizacion_id} value={c.organizacion_id}>{c.organizaciones?.nombre}</option>
+                    {organizaciones.map((o: any) => (
+                      <option key={o.id} value={o.id}>{o.nombre}</option>
                     ))}
                   </select>
                 </div>

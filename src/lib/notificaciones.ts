@@ -129,11 +129,14 @@ export async function notificarAAdminsDeOrganizacion(
 
     let enviados = 0
     for (const admin of admins) {
-      await crearNotificacion(supabaseAdmin, {
+      const res = await crearNotificacion(supabaseAdmin, {
         ...data,
         tenantId,
         userId: admin.id
       })
+      if (!res.success) {
+        return { success: false, error: 'crearNotificacion falló: ' + res.error }
+      }
       enviados++
     }
 

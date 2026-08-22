@@ -247,12 +247,16 @@ export async function registrarPagoYRenovar(organizacionId: string, importe: num
     valor_nuevo: updates
   })
 
-  await notificarAAdminsDeOrganizacion(supabaseAdmin, organizacionId, {
+  const notifRes = await notificarAAdminsDeOrganizacion(supabaseAdmin, organizacionId, {
     tipo: 'pago_confirmado',
     titulo: 'Pago confirmado',
     cuerpo: `Se ha procesado un pago de ${importe} ${moneda}. Renovación hasta el ${nuevaFecha}.`,
     url: '/dashboard'
   })
+  
+  if (!notifRes.success) {
+    return { success: false, error: 'La renovación funcionó pero la notificación falló: ' + notifRes.error }
+  }
 
   if (org.plan_pendiente_id) {
     const { data: planDown } = await supabase.from('plans').select('nombre').eq('id', org.plan_pendiente_id).single()

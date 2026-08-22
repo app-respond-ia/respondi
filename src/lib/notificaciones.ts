@@ -13,6 +13,16 @@ export type NotificacionTipo =
   | 'comision_pendiente'
   | 'ticket_nuevo_cliente'
   | 'respuesta_cliente'
+  | 'trial_por_vencer'
+  | 'creditos_bajos'
+  | 'cambio_plan_aplicado'
+  | 'pago_confirmado'
+  | 'caso_asignado'
+  | 'conversacion_escalada'
+  | 'creditos_cliente_bajos'
+  | 'caso_estancado'
+  | 'cliente_cambio_plan'
+  | 'cliente_solicita_cancelar'
 
 interface NotificacionData {
   userId: string
@@ -94,6 +104,42 @@ export async function notificarATodosLosSuperadmins(
     return { success: true, count: enviados }
   } catch (err: any) {
     console.error('Error notificando a superadmins:', err.message)
+    return { success: false, error: err.message }
+  }
+}
+
+export async function notificarAAdminsDeOrganizacion(
+  supabaseAdmin: SupabaseClient<any, "public", any>,
+  tenantId: string,
+  data: Omit<NotificacionData, 'userId' | 'tenantId'>
+) {
+  try {
+    const { data: admins, error } = await supabaseAdmin
+      .from('users')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('rol', 'admin')
+      .eq('activo', true)
+
+    if (error) throw error
+
+    if (!admins || admins.length === 0) {
+      return { success: true, count: 0 }
+    }
+
+    let enviados = 0
+    for (const admin of admins) {
+      await crearNotificacion(supabaseAdmin, {
+        ...data,
+        tenantId,
+        userId: admin.id
+      })
+      enviados++
+    }
+
+    return { success: true, count: enviados }
+  } catch (err: any) {
+    console.error('Error notificando a admins de organización:', err.message)
     return { success: false, error: err.message }
   }
 }

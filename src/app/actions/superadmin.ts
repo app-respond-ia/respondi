@@ -4,7 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { registrarAuditoria } from '@/lib/auditoria'
-import { crearNotificacion, notificarATodosLosSuperadmins } from '@/lib/notificaciones'
+import { crearNotificacion, notificarATodosLosSuperadmins, notificarAAdminsDeOrganizacion } from '@/lib/notificaciones'
 import { setImpersonatedTenantId, clearImpersonatedTenantId } from '@/lib/impersonate'
 
 // Helper de auth para asegurar que la action solo la ejecuta un super admin
@@ -151,7 +151,7 @@ export async function cambiarPlanOrganizacion(organizacionId: string, nuevoPlanI
   const { supabase, userId } = await requireSuperAdmin()
 
   const { data: org } = await supabase.from('organizaciones').select('plan_id, plans!plan_id(precio_usd)').eq('id', organizacionId).single()
-  const { data: nuevoPlan } = await supabase.from('plans').select('precio_usd').eq('id', nuevoPlanId).single()
+  const { data: nuevoPlan } = await supabase.from('plans').select('nombre, precio_usd').eq('id', nuevoPlanId).single()
 
   if (!org || !nuevoPlan) return { success: false, error: 'Organización o plan no encontrados' }
 
@@ -159,9 +159,11 @@ export async function cambiarPlanOrganizacion(organizacionId: string, nuevoPlanI
   const nuevoPrecio = Number(nuevoPlan.precio_usd)
 
   let updates: any = {}
+  let inmediate = false
   if (nuevoPrecio >= precioActual) {
     // Upgrade o lateral: aplicar inmediato y limpiar pendiente
     updates = { plan_id: nuevoPlanId, plan_pendiente_id: null }
+    inmediate = true
   } else {
     // Downgrade: programar para la renovación
     updates = { plan_pendiente_id: nuevoPlanId }
@@ -179,6 +181,15 @@ export async function cambiarPlanOrganizacion(organizacionId: string, nuevoPlanI
     valor_anterior: { plan_id: org.plan_id },
     valor_nuevo: updates
   })
+
+  if (inmediate) {
+    await notificarAAdminsDeOrganizacion(supabaseAdmin, organizacionId, {
+      tipo: 'cambio_plan_aplicado',
+      titulo: 'Plan actualizado',
+      cuerpo: `Tu organización ha cambiado al plan ${nuevoPlan.nombre}.`,
+      url: '/dashboard'
+    })
+  }
 
   revalidatePath('/superadmin/organizaciones')
   return { success: true }
@@ -235,6 +246,25 @@ export async function registrarPagoYRenovar(organizacionId: string, importe: num
     valor_anterior: { fecha_vencimiento: org.fecha_vencimiento, estado: org.estado, plan_id: org.plan_id },
     valor_nuevo: updates
   })
+
+  await notificarAAdminsDeOrganizacion(supabaseAdmin, organizacionId, {
+    tipo: 'pago_confirmado',
+    titulo: 'Pago confirmado',
+    cuerpo: `Se ha procesado un pago de ${importe} ${moneda}. Renovación hasta el ${nuevaFecha}.`,
+    url: '/dashboard'
+  })
+
+  if (org.plan_pendiente_id) {
+    const { data: planDown } = await supabase.from('plans').select('nombre').eq('id', org.plan_pendiente_id).single()
+    if (planDown) {
+      await notificarAAdminsDeOrganizacion(supabaseAdmin, organizacionId, {
+        tipo: 'cambio_plan_aplicado',
+        titulo: 'Nuevo plan activo',
+        cuerpo: `Tu cuenta ha cambiado al plan ${planDown.nombre} tras la renovación.`,
+        url: '/dashboard'
+      })
+    }
+  }
 
   revalidatePath('/superadmin/organizaciones')
   return { success: true }

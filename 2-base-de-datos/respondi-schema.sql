@@ -64,6 +64,7 @@ create table plans (
   usuarios_max              integer,
   modelo_ia                 text not null default 'gpt-4o-mini',
   dias_retencion_mensajes   integer not null default 30,
+  umbral_alerta_creditos    integer not null default 100,
   precio_credito_adicional  numeric(10,4) not null default 0,
   precio_sucursal_extra     numeric(10,2) default 0,
   activo                    boolean not null default true,
@@ -921,3 +922,124 @@ alter publication supabase_realtime add table client_tickets, client_ticket_mess
 -- ============================================================================
 -- FIN DEL ESQUEMA
 -- ============================================================================
+
+-- ============================================================================
+-- 15. CRONS DE NOTIFICACIONES (Módulo de Clientes)
+-- ============================================================================
+
+create or replace function check_clientes_por_vencer_y_creditos()
+returns void language plpgsql security definer as $$
+declare
+  r_org record;
+  r_admin record;
+  v_pref boolean;
+  v_saldo numeric;
+begin
+  -- Trial/organización por vencer -> notificar a los ADMINS de esa organización
+  for r_org in
+    select id, nombre, fecha_vencimiento, estado
+    from public.organizaciones
+    where estado in ('activo', 'trial')
+      and fecha_vencimiento >= current_date
+      and fecha_vencimiento <= current_date + 3
+  loop
+    for r_admin in
+      select id from public.users where tenant_id = r_org.id and rol = 'admin'
+    loop
+      select activado into v_pref from public.notification_preferences
+      where user_id = r_admin.id and tipo = 'trial_por_vencer';
+      if coalesce(v_pref, true) then
+        insert into public.notifications (user_id, tenant_id, tipo, titulo, cuerpo, url, entidad_id)
+        values (r_admin.id, r_org.id, 'trial_por_vencer', 'Tu plan está por vencer',
+          'Tu cuenta vence el ' || to_char(r_org.fecha_vencimiento, 'DD/MM/YYYY') || '. Contacta con soporte para renovar.',
+          '/dashboard', r_org.id);
+      end if;
+    end loop;
+  end loop;
+
+  -- Créditos bajos -> notificar a ADMINS del cliente Y a todos los superadmins
+  for r_org in
+    select o.id, o.nombre, o.plan_id, p.creditos_mensuales, p.umbral_alerta_creditos
+    from public.organizaciones o
+    join public.plans p on p.id = o.plan_id
+    where o.estado in ('activo', 'trial')
+  loop
+    select saldo into v_saldo from public.message_quotas
+    where tenant_id = r_org.id order by timestamp desc limit 1;
+
+    if v_saldo is not null and r_org.creditos_mensuales > 0 and v_saldo < r_org.umbral_alerta_creditos then
+      -- Notificar a admins del cliente
+      for r_admin in select id from public.users where tenant_id = r_org.id and rol = 'admin' loop
+        select activado into v_pref from public.notification_preferences where user_id = r_admin.id and tipo = 'creditos_bajos';
+        if coalesce(v_pref, true) then
+          insert into public.notifications (user_id, tenant_id, tipo, titulo, cuerpo, url, entidad_id)
+          values (r_admin.id, r_org.id, 'creditos_bajos', 'Créditos de IA casi agotados',
+            'Te quedan pocos créditos de IA (' || v_saldo || ' de ' || r_org.creditos_mensuales || '). Considera ampliar tu plan.',
+            '/dashboard', r_org.id);
+        end if;
+      end loop;
+      -- Notificar a superadmins
+      for r_admin in select id from public.users where rol = 'super_admin' and activo = true loop
+        select activado into v_pref from public.notification_preferences where user_id = r_admin.id and tipo = 'creditos_cliente_bajos';
+        if coalesce(v_pref, true) then
+          insert into public.notifications (user_id, tenant_id, tipo, titulo, cuerpo, url, entidad_id)
+          values (r_admin.id, r_org.id, 'creditos_cliente_bajos', 'Cliente con créditos bajos',
+            'La organización "' || r_org.nombre || '" tiene pocos créditos de IA (' || v_saldo || ' de ' || r_org.creditos_mensuales || ').',
+            '/superadmin/organizaciones', r_org.id);
+        end if;
+      end loop;
+    end if;
+  end loop;
+end;
+$$;
+
+select cron.schedule(
+  'notificar-clientes-vencer-y-creditos',
+  '0 10 * * *',
+  $$ select check_clientes_por_vencer_y_creditos(); $$
+);
+
+-- Casos sin resolver mucho tiempo -> notificar a superadmins
+create or replace function check_casos_estancados()
+returns void language plpgsql security definer as $$
+declare
+  r_caso record;
+  r_admin record;
+  v_pref boolean;
+  v_ultima_actividad timestamptz;
+begin
+  for r_caso in
+    select c.id, c.tenant_id, o.nombre as org_nombre
+    from public.cases c
+    join public.organizaciones o on o.id = c.tenant_id
+    where c.estatus not in ('resuelto', 'cerrado')
+      and c.fecha_apertura < now() - interval '24 hours'
+  loop
+    select max(timestamp) into v_ultima_actividad from public.case_notes where case_id = r_caso.id;
+    if v_ultima_actividad is null or v_ultima_actividad < now() - interval '24 hours' then
+      for r_admin in select id from public.users where rol = 'super_admin' and activo = true loop
+        select activado into v_pref from public.notification_preferences where user_id = r_admin.id and tipo = 'caso_estancado';
+        if coalesce(v_pref, true) then
+          -- Evitar duplicados: solo notificar si no se notificó este mismo caso en las últimas 24h
+          if not exists (
+            select 1 from public.notifications
+            where user_id = r_admin.id and tipo = 'caso_estancado' and entidad_id = r_caso.id
+              and timestamp > now() - interval '24 hours'
+          ) then
+            insert into public.notifications (user_id, tenant_id, tipo, titulo, cuerpo, url, entidad_id)
+            values (r_admin.id, r_caso.tenant_id, 'caso_estancado', 'Caso sin resolver hace tiempo',
+              'Un caso de "' || r_caso.org_nombre || '" lleva más de 24h sin actividad.',
+              '/superadmin/organizaciones', r_caso.id);
+          end if;
+        end if;
+      end loop;
+    end if;
+  end loop;
+end;
+$$;
+
+select cron.schedule(
+  'notificar-casos-estancados',
+  '0 11 * * *',
+  $$ select check_casos_estancados(); $$
+);

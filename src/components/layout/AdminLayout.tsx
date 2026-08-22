@@ -13,6 +13,7 @@ interface AdminLayoutProps {
   activeBranchId?: string
   creditos?: { saldo: number; max: number } | null
   isImpersonating?: boolean
+  userId?: string
 }
 
 export default function AdminLayout({
@@ -23,7 +24,8 @@ export default function AdminLayout({
   branches = [],
   activeBranchId = '',
   creditos = null,
-  isImpersonating = false
+  isImpersonating = false,
+  userId = ''
 }: AdminLayoutProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
@@ -58,6 +60,7 @@ export default function AdminLayout({
           onOpenMobile={() => setIsMobileMenuOpen(true)}
           userInitials={user.initials}
           creditos={creditos}
+          userId={userId}
         />
         <main className="flex-1 flex flex-col min-h-0 px-4 sm:px-6 lg:px-8 py-6">
           {children}

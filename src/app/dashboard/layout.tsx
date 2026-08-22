@@ -88,6 +88,7 @@ export default async function DashboardLayout({
         activeBranchId={activeBranchId}
         creditos={creditos}
         isImpersonating={isImpersonating}
+        userId={user.id}
       >
         {children}
       </AdminLayout>

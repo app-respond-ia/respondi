@@ -2,6 +2,8 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { getAuthContext } from '@/lib/auth-context'
+import { supabaseAdmin } from '@/utils/supabase/admin'
+import { crearNotificacion, notificarAAdminsDeOrganizacion } from '@/lib/notificaciones'
 
 export async function getCasos(filtros?: { estado?: string, canal?: string, search?: string, agentesIds?: string[], dateRange?: { from: string, to: string }, sort?: 'asc' | 'desc' }) {
   const supabase = await createClient()
@@ -347,6 +349,14 @@ export async function crearCasoDesdeConversacion(conversationId: string, agenteI
       tabla_afectada: 'cases',
       registro_id: nuevoCaso.id
     })
+
+    await notificarAAdminsDeOrganizacion(supabaseAdmin, userData.tenant_id, {
+      tipo: 'conversacion_escalada',
+      titulo: 'Conversación escalada a soporte',
+      cuerpo: 'Se ha creado un nuevo caso a partir de una conversación que requiere atención.',
+      url: `/dashboard/casos/${nuevoCaso.id}`,
+      entidadId: nuevoCaso.id
+    })
   }
 
   if (error) return { success: false, error: error.message }
@@ -380,6 +390,18 @@ export async function asignarCaso(casoId: string, agenteId: string) {
       tabla_afectada: 'cases',
       registro_id: casoId
     })
+
+    if (agenteId !== user.id) {
+      await crearNotificacion(supabaseAdmin, {
+        userId: agenteId,
+        tenantId: userData?.tenant_id,
+        tipo: 'caso_asignado',
+        titulo: 'Nuevo caso asignado',
+        cuerpo: `Se te ha asignado un nuevo caso en soporte.`,
+        url: `/dashboard/casos/${casoId}`,
+        entidadId: casoId
+      })
+    }
   }
 
   return { success: !error, error: error?.message }

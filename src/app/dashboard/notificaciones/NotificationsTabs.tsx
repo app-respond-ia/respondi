@@ -23,18 +23,15 @@ type Preference = {
 }
 
 const TIPOS_NOTIFICACIONES = [
-  { id: 'ticket_nuevo', label: 'Nuevos tickets', desc: 'Cuando un vendedor abre un nuevo ticket de soporte.' },
-  { id: 'ticket_respuesta_vendedor', label: 'Respuestas en tickets', desc: 'Cuando un vendedor responde a un ticket abierto.' },
-  { id: 'organizacion_por_vencer', label: 'Organizaciones por vencer', desc: 'Alertas sobre organizaciones cuyo trial o plan vence pronto (se procesa a diario).' },
-  { id: 'nueva_organizacion', label: 'Nuevas organizaciones', desc: 'Cuando un vendedor crea una nueva cuenta (trial) para un cliente.' },
-  { id: 'comision_pendiente', label: 'Nuevas comisiones pendientes', desc: 'Cuando se registra una comisión manual que requiere revisión.' },
-  { id: 'creditos_cliente_bajos', label: 'Clientes con créditos bajos', desc: 'Cuando un cliente está por agotar sus créditos de IA.' },
-  { id: 'caso_estancado', label: 'Casos estancados', desc: 'Cuando un ticket de soporte lleva más de 24h sin actividad.' },
-  { id: 'cliente_cambio_plan', label: 'Cambios de plan', desc: 'Cuando un cliente realiza un upgrade o downgrade.' },
-  { id: 'cliente_solicita_cancelar', label: 'Solicitudes de cancelación', desc: 'Cuando un cliente pide dar de baja su servicio.' },
+  { id: 'ticket_nuevo_cliente', label: 'Nuevos tickets', desc: 'Cuando se abre un nuevo ticket de soporte de tus clientes.' },
+  { id: 'respuesta_cliente', label: 'Respuestas de clientes', desc: 'Cuando un cliente responde a un ticket de soporte.' },
+  { id: 'trial_por_vencer', label: 'Trial por vencer', desc: 'Cuando tu período de prueba está a punto de finalizar.' },
+  { id: 'creditos_bajos', label: 'Créditos bajos', desc: 'Cuando tus créditos de IA están por agotarse.' },
+  { id: 'cambio_plan_aplicado', label: 'Cambios de plan', desc: 'Cuando tu organización cambia de plan de suscripción.' },
+  { id: 'pago_confirmado', label: 'Pagos confirmados', desc: 'Cuando se confirma la renovación o pago de tu suscripción.' },
 ]
 
-export default function SuperadminNotificationsTabs({
+export default function NotificationsTabs({
   initialNotifications,
   initialPreferences
 }: {

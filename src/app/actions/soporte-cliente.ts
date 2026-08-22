@@ -206,3 +206,59 @@ export async function enviarMensajeTicketCliente(ticketId: string, mensaje: stri
 
   return { success: true, data: nuevoMensaje }
 }
+
+export async function crearNotaTicket(ticketId: string, nota: string, visibilidad: 'privada' | 'compartida') {
+  const supabase = await createClient()
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+
+  const { data, error } = await supabase
+    .from('client_ticket_notas')
+    .insert({
+      tenant_id: auth.tenant_id,
+      ticket_id: ticketId,
+      user_id: auth.user_id,
+      nota: nota,
+      visibilidad: visibilidad
+    })
+    .select('id, nota, visibilidad, created_at, user:users(nombre, avatar_url)')
+    .single()
+
+  if (error) return { success: false, error: error.message }
+  return { success: true, data }
+}
+
+export async function getNotasTicket(ticketId: string) {
+  const supabase = await createClient()
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+
+  const { data, error } = await supabase
+    .from('client_ticket_notas')
+    .select('id, nota, visibilidad, created_at, user_id, user:users(nombre, avatar_url)')
+    .eq('ticket_id', ticketId)
+    .order('created_at', { ascending: false })
+
+  if (error) return { success: false, error: error.message }
+  return { success: true, data }
+}
+
+export async function calificarTicket(ticketId: string, calificacion: number, comentario: string) {
+  const supabase = await createClient()
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+
+  const { error } = await supabase
+    .from('client_tickets')
+    .update({
+      calificacion: calificacion,
+      comentario_calificacion: comentario,
+      fecha_calificacion: new Date().toISOString()
+    })
+    .eq('id', ticketId)
+    .eq('tenant_id', auth.tenant_id)
+    .is('calificacion', null)
+
+  if (error) return { success: false, error: error.message }
+  return { success: true }
+}

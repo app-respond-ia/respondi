@@ -837,7 +837,10 @@ create table client_tickets (
   estatus        text not null default 'abierto',
   asignado_a     uuid references users(id),
   fecha_apertura timestamptz not null default now(),
-  fecha_cierre   timestamptz
+  fecha_cierre   timestamptz,
+  calificacion   integer,
+  comentario_calificacion text,
+  fecha_calificacion timestamptz
 );
 
 create table client_ticket_messages (
@@ -847,6 +850,16 @@ create table client_ticket_messages (
   user_id    uuid references users(id),
   mensaje    text not null,
   timestamp  timestamptz not null default now()
+);
+
+create table client_ticket_notas (
+  id           uuid primary key default gen_random_uuid(),
+  ticket_id    uuid not null references client_tickets(id) on delete cascade,
+  tenant_id    uuid not null references organizaciones(id) on delete cascade,
+  user_id      uuid not null references users(id),
+  nota         text not null,
+  visibilidad  text not null default 'privada' check (visibilidad in ('privada', 'compartida')),
+  created_at   timestamptz not null default now()
 );
 
 alter table client_ticket_categorias enable row level security;
@@ -888,6 +901,17 @@ create policy client_ticket_messages_insert on client_ticket_messages for insert
     exists (select 1 from users where id = auth.uid() and rol = 'super_admin')
     or ticket_id in (select id from client_tickets where tenant_id = auth_tenant_id() and auth_has_permission(branch_id, 'soporte', 'escritura'))
   );
+
+alter table client_ticket_notas enable row level security;
+
+create policy notas_cliente_select on client_ticket_notas for select
+  using (
+    tenant_id = auth_tenant_id() and (visibilidad = 'compartida' or user_id = auth.uid())
+  );
+create policy notas_cliente_insert on client_ticket_notas for insert
+  with check (tenant_id = auth_tenant_id() and user_id = auth.uid());
+create policy notas_cliente_delete on client_ticket_notas for delete
+  using (tenant_id = auth_tenant_id() and user_id = auth.uid());
 
 alter publication supabase_realtime add table client_tickets, client_ticket_messages;
 

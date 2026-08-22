@@ -116,9 +116,9 @@ export async function notificarAAdminsDeOrganizacion(
   try {
     const { data: admins, error } = await supabaseAdmin
       .from('users')
-      .select('id')
+      .select('id, roles_personalizados!inner(es_propietario)')
       .eq('tenant_id', tenantId)
-      .eq('rol', 'admin')
+      .eq('roles_personalizados.es_propietario', true)
       .eq('activo', true)
 
     if (error) throw error

@@ -179,7 +179,6 @@ export default function TicketsClientesPage() {
                 <tr className="border-b border-slate-200 text-ink-500 bg-slate-50/50">
                   <th className="font-600 px-5 py-3">Asunto</th>
                   <th className="font-600 px-5 py-3">Cliente</th>
-                  <th className="font-600 px-5 py-3">Sucursal</th>
                   <th className="font-600 px-5 py-3">Categoría</th>
                   <th className="font-600 px-5 py-3 whitespace-nowrap">Prioridad</th>
                   <th className="font-600 px-5 py-3 whitespace-nowrap">Estado</th>
@@ -204,8 +203,14 @@ export default function TicketsClientesPage() {
                         <span title={t.asunto} className="truncate">{t.asunto}</span>
                       </div>
                     </td>
-                    <td className="px-5 py-3.5 text-ink-600 whitespace-nowrap">{t.organizacion?.nombre || '—'}</td>
-                    <td className="px-5 py-3.5 text-ink-600 whitespace-nowrap">{t.sucursal?.nombre || '—'}</td>
+                    <td className="px-5 py-3.5 whitespace-nowrap">
+                      <div className="flex flex-col">
+                        <span className="text-ink-600">{t.organizacion?.nombre || '—'}</span>
+                        {t.sucursal?.nombre && (
+                          <span className="text-[11px] text-ink-400">{t.sucursal.nombre}</span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-5 py-3.5">
                       <div className="flex flex-wrap gap-1">
                         {t.categoria ? (

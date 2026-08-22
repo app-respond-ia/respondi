@@ -484,3 +484,25 @@ export async function enviarMensajeTicket(ticketId: string, mensaje: string) {
     return { success: false, error: err.message }
   }
 }
+
+export async function calificarTicketVendedor(ticketId: string, calificacion: number, comentario: string) {
+  try {
+    const { supabase, vendedor } = await requireVendedor()
+
+    const { error } = await supabase
+      .from('support_tickets')
+      .update({
+        calificacion: calificacion,
+        comentario_calificacion: comentario,
+        fecha_calificacion: new Date().toISOString()
+      })
+      .eq('id', ticketId)
+      .eq('vendedor_id', vendedor.id)
+      .is('calificacion', null)
+
+    if (error) throw new Error(error.message)
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { getTicketDetalle, enviarMensajeTicket } from '@/app/actions/vendedor'
+import { getTicketDetalle, enviarMensajeTicket, calificarTicketVendedor } from '@/app/actions/vendedor'
 import { createClient } from '@/utils/supabase/client'
 import Loading from '@/components/Loading'
 import Link from 'next/link'
@@ -17,6 +17,9 @@ export default function TicketDetallePage() {
   const [loading, setLoading] = useState(true)
   const [nuevoMensaje, setNuevoMensaje] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [calificacion, setCalificacion] = useState<number>(0)
+  const [comentarioCalificacion, setComentarioCalificacion] = useState('')
+  const [isSubmittingCalificacion, setIsSubmittingCalificacion] = useState(false)
   const mensajesEndRef = useRef<HTMLDivElement>(null)
 
   const cargarDetalle = useCallback(async () => {
@@ -84,12 +87,27 @@ export default function TicketDetallePage() {
     if (res.success && res.mensaje) {
       setMensajes(prev => [...prev, res.mensaje])
       setNuevoMensaje('')
-      // Si el ticket estaba cerrado, se reabre en el backend, actualizamos estado local
       if (ticket.estatus === 'cerrado') {
         setTicket((prev: any) => ({ ...prev, estatus: 'abierto' }))
       }
     }
     setIsSubmitting(false)
+  }
+
+  const handleCalificar = async () => {
+    if (calificacion === 0 || isSubmittingCalificacion) return
+
+    setIsSubmittingCalificacion(true)
+    const res = await calificarTicketVendedor(id as string, calificacion, comentarioCalificacion)
+    if (res.success) {
+      setTicket((prev: any) => ({
+        ...prev,
+        calificacion,
+        comentario_calificacion: comentarioCalificacion,
+        fecha_calificacion: new Date().toISOString()
+      }))
+    }
+    setIsSubmittingCalificacion(false)
   }
 
   const getEstatusBadge = (estatus: string) => {
@@ -102,7 +120,10 @@ export default function TicketDetallePage() {
   if (!ticket) return null
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 flex flex-col h-[calc(100vh-8rem)]">
+    <div className="max-w-5xl mx-auto flex flex-col lg:flex-row gap-6 h-[calc(100vh-8rem)]">
+      
+      {/* Panel principal: Chat */}
+      <div className="flex-1 flex flex-col space-y-4">
       
       {/* Header del Ticket */}
       <div className="shrink-0">
@@ -180,6 +201,53 @@ export default function TicketDetallePage() {
             ) : 'Enviar'}
           </button>
         </form>
+      </div>
+      </div>
+
+      {/* Panel lateral: Valoración */}
+      <div className="w-full lg:w-[360px] shrink-0 space-y-4 flex flex-col h-full overflow-hidden">
+        {/* Valoración al cerrar el ticket */}
+        {ticket.estatus === 'cerrado' && (
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm shrink-0">
+            <h3 className="font-display font-700 text-lg text-ink-900 mb-2">Valoración del soporte</h3>
+            {ticket.calificacion ? (
+              <div>
+                <div className="flex gap-1 mb-2">
+                  {[1,2,3,4,5].map(star => (
+                    <svg key={star} className={`w-5 h-5 ${star <= ticket.calificacion ? 'text-amber-400' : 'text-slate-200'}`} fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+                  ))}
+                </div>
+                {ticket.comentario_calificacion && (
+                  <p className="text-sm text-ink-600 mt-2 italic">"{ticket.comentario_calificacion}"</p>
+                )}
+              </div>
+            ) : (
+              <div>
+                <p className="text-sm text-ink-600 mb-3">¿Cómo calificarías la atención recibida?</p>
+                <div className="flex gap-1 mb-3">
+                  {[1,2,3,4,5].map(star => (
+                    <button key={star} type="button" onClick={() => setCalificacion(star)} className="focus:outline-none group">
+                      <svg className={`w-6 h-6 transition ${star <= calificacion ? 'text-amber-400' : 'text-slate-200 group-hover:text-amber-200'}`} fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+                    </button>
+                  ))}
+                </div>
+                <textarea 
+                  value={comentarioCalificacion}
+                  onChange={e => setComentarioCalificacion(e.target.value)}
+                  placeholder="Comentario opcional..."
+                  className="w-full h-20 px-3 py-2 text-sm border border-slate-300 rounded-xl focus:border-brand-500 outline-none resize-none mb-3"
+                ></textarea>
+                <button 
+                  onClick={handleCalificar}
+                  disabled={calificacion === 0 || isSubmittingCalificacion}
+                  className="w-full h-10 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-600 text-sm transition disabled:opacity-50"
+                >
+                  {isSubmittingCalificacion ? 'Enviando...' : 'Enviar valoración'}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
     </div>

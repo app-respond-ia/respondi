@@ -760,7 +760,10 @@ create table support_tickets (
   prioridad      text default 'normal',
   estatus        text not null default 'abierto',
   fecha_apertura timestamptz not null default now(),
-  fecha_cierre   timestamptz
+  fecha_cierre   timestamptz,
+  calificacion   integer,
+  comentario_calificacion text,
+  fecha_calificacion timestamptz
 );
 
 create table support_ticket_messages (

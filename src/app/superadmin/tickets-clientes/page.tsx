@@ -174,57 +174,71 @@ export default function TicketsClientesPage() {
           <div className="p-8 text-center text-ink-500">No hay tickets con estos filtros.</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[800px]">
+            <table className="w-full text-left border-collapse text-sm min-w-[900px]">
               <thead>
-                <tr className="border-b border-slate-200 text-left text-ink-500">
+                <tr className="border-b border-slate-200 text-ink-500 bg-slate-50/50">
                   <th className="font-600 px-5 py-3">Asunto</th>
                   <th className="font-600 px-5 py-3">Cliente</th>
                   <th className="font-600 px-5 py-3">Sucursal</th>
                   <th className="font-600 px-5 py-3">Categoría</th>
-                  <th className="font-600 px-5 py-3">Prioridad</th>
-                  <th className="font-600 px-5 py-3">Estado</th>
-                  <th className="font-600 px-5 py-3">Asignado a</th>
-                  <th className="font-600 px-5 py-3">Última actividad</th>
-                  <th className="font-600 px-5 py-3 text-right">Acciones</th>
+                  <th className="font-600 px-5 py-3 whitespace-nowrap">Prioridad</th>
+                  <th className="font-600 px-5 py-3 whitespace-nowrap">Estado</th>
+                  <th className="font-600 px-5 py-3 whitespace-nowrap">Valoración</th>
+                  <th className="font-600 px-5 py-3 whitespace-nowrap">Asignado a</th>
+                  <th className="font-600 px-5 py-3 whitespace-nowrap">Última actividad</th>
+                  <th className="font-600 px-5 py-3 text-right whitespace-nowrap">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filtrados.map(t => (
                   <tr key={t.id} className={`hover:bg-slate-50 transition ${t.fijado ? 'bg-amber-50/30' : ''}`}>
-                    <td className="px-5 py-3.5 font-500 text-ink-900 max-w-[200px] truncate">
+                    <td className="px-5 py-3.5 font-500 text-ink-900 max-w-[180px] 2xl:max-w-[240px] truncate">
                       <div className="flex items-center gap-2">
                         <button 
                           onClick={() => toggleFijar(t.id, t.fijado)}
-                          className={`p-1 rounded hover:bg-slate-200 transition ${t.fijado ? 'text-amber-500' : 'text-slate-300'}`}
+                          className={`p-1 rounded hover:bg-slate-200 transition shrink-0 ${t.fijado ? 'text-amber-500' : 'text-slate-300'}`}
                           title={t.fijado ? 'Desfijar' : 'Fijar'}
                         >
                           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M16 11V6a4 4 0 00-8 0v5l-2 3v2h5.5v5h1v-5H18v-2l-2-3z"/></svg>
                         </button>
-                        <span title={t.asunto}>{t.asunto}</span>
+                        <span title={t.asunto} className="truncate">{t.asunto}</span>
                       </div>
                     </td>
-                    <td className="px-5 py-3.5 text-ink-600">{t.organizacion?.nombre || '—'}</td>
-                    <td className="px-5 py-3.5 text-ink-600">{t.sucursal?.nombre || '—'}</td>
+                    <td className="px-5 py-3.5 text-ink-600 whitespace-nowrap">{t.organizacion?.nombre || '—'}</td>
+                    <td className="px-5 py-3.5 text-ink-600 whitespace-nowrap">{t.sucursal?.nombre || '—'}</td>
                     <td className="px-5 py-3.5">
-                      {t.categoria ? (
-                        <span className="px-2.5 py-1 rounded-full text-xs font-600" style={{ backgroundColor: `${t.categoria.color}15`, color: t.categoria.color, border: `1px solid ${t.categoria.color}30` }}>
-                          {t.categoria.nombre}
-                        </span>
-                      ) : (
-                        <span className="text-xs px-2 py-0.5 rounded-full font-600 bg-slate-100 text-slate-500">Sin asignar</span>
-                      )}
+                      <div className="flex flex-wrap gap-1">
+                        {t.categoria ? (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-600 border" style={{ backgroundColor: `${t.categoria.color}15`, color: t.categoria.color, borderColor: `${t.categoria.color}30` }}>
+                            {t.categoria.nombre}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded font-600 bg-slate-100 text-slate-500 border border-slate-200">Sin asignar</span>
+                        )}
+                      </div>
                     </td>
-                    <td className="px-5 py-3.5">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-600 capitalize ${getPrioridadBadge(t.prioridad)}`}>
+                    <td className="px-5 py-3.5 whitespace-nowrap">
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-600 capitalize ${getPrioridadBadge(t.prioridad)}`}>
                         {t.prioridad}
                       </span>
                     </td>
-                    <td className="px-5 py-3.5">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-600 capitalize ${getEstadoBadge(t.estatus)}`}>
+                    <td className="px-5 py-3.5 whitespace-nowrap">
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-600 capitalize ${getEstadoBadge(t.estatus)}`}>
                         {t.estatus}
                       </span>
                     </td>
-                    <td className="px-5 py-3.5">
+                    <td className="px-5 py-3.5 whitespace-nowrap">
+                      {t.calificacion ? (
+                        <div className="flex gap-0.5" title={t.comentario_calificacion || ''}>
+                          {[1,2,3,4,5].map(star => (
+                            <svg key={star} className={`w-3.5 h-3.5 ${star <= t.calificacion ? 'text-amber-400' : 'text-slate-200'}`} fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-slate-400">—</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3.5 whitespace-nowrap">
                       {t.asignado_a_user ? (
                         <div className="flex items-center gap-2">
                           <div className="w-5 h-5 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 text-[10px] font-bold">
@@ -236,13 +250,13 @@ export default function TicketsClientesPage() {
                         <span className="text-xs text-slate-400 font-500">—</span>
                       )}
                     </td>
-                    <td className="px-5 py-3.5 text-ink-500">
+                    <td className="px-5 py-3.5 text-ink-500 whitespace-nowrap text-xs">
                       {t.ultimo_mensaje ? formatFecha(t.ultimo_mensaje.timestamp) : formatFecha(t.fecha_apertura)}
                     </td>
-                    <td className="px-5 py-3.5 text-right">
+                    <td className="px-5 py-3.5 text-right whitespace-nowrap">
                       <Link href={`/superadmin/tickets-clientes/${t.id}`}
                         className="inline-flex items-center justify-center px-3 h-8 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-ink-700 text-xs font-600 transition">
-                        Ver detalles
+                        Ver
                       </Link>
                     </td>
                   </tr>

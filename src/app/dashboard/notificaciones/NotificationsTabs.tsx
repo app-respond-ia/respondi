@@ -29,6 +29,8 @@ const TIPOS_NOTIFICACIONES = [
   { id: 'creditos_bajos', label: 'Créditos bajos', desc: 'Cuando tus créditos de IA están por agotarse.' },
   { id: 'cambio_plan_aplicado', label: 'Cambios de plan', desc: 'Cuando tu organización cambia de plan de suscripción.' },
   { id: 'pago_confirmado', label: 'Pagos confirmados', desc: 'Cuando se confirma la renovación o pago de tu suscripción.' },
+  { id: 'cuenta_suspendida', label: 'Cuenta suspendida', desc: 'Cuando se suspende el acceso a tu cuenta.' },
+  { id: 'cuenta_reactivada', label: 'Cuenta reactivada', desc: 'Cuando se restaura el acceso a tu cuenta.' },
 ]
 
 export default function NotificationsTabs({

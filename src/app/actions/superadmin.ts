@@ -1036,6 +1036,22 @@ export async function actualizarEstadoOrganizacion(id: string, estado: string) {
       }
     }
 
+    if (estado === 'suspendido' && anterior?.estado !== 'suspendido') {
+      await notificarAAdminsDeOrganizacion(supabaseAdmin, id, {
+        tipo: 'cuenta_suspendida',
+        titulo: 'Tu cuenta ha sido suspendida',
+        cuerpo: 'El acceso y los servicios de tu cuenta han sido suspendidos. Por favor, contacta con soporte para resolverlo.',
+        url: '/dashboard'
+      })
+    } else if (estado === 'activo' && anterior?.estado === 'suspendido') {
+      await notificarAAdminsDeOrganizacion(supabaseAdmin, id, {
+        tipo: 'cuenta_reactivada',
+        titulo: 'Tu cuenta ha sido reactivada',
+        cuerpo: 'Se ha restaurado el acceso y los servicios de tu cuenta. ¡Bienvenido de nuevo!',
+        url: '/dashboard'
+      })
+    }
+
     revalidatePath('/superadmin/organizaciones')
     return { success: true }
   } catch (err: any) {

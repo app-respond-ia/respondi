@@ -21,8 +21,9 @@ export type NotificacionTipo =
   | 'conversacion_escalada'
   | 'creditos_cliente_bajos'
   | 'caso_estancado'
-  | 'cliente_cambio_plan'
   | 'cliente_solicita_cancelar'
+  | 'cuenta_suspendida'
+  | 'cuenta_reactivada'
 
 interface NotificacionData {
   userId: string

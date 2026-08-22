@@ -130,7 +130,18 @@ export default function OrganizacionesPage() {
       showToast('Plan actualizado correctamente', 'success')
       setModalPlan(null)
       loadOrganizaciones()
-      if (modalOrganizacion?.id === modalPlan.id) closeModal()
+      if (modalOrganizacion?.id === modalPlan.id) {
+        const currentPlan = planes.find(p => p.id === modalPlan.plan_id)
+        const nextPlan = planes.find(p => p.id === planSeleccionado)
+        const currentPrice = currentPlan ? Number(currentPlan.precio_usd) : 0
+        const nextPrice = nextPlan ? Number(nextPlan.precio_usd) : 0
+        
+        if (nextPrice >= currentPrice) {
+          setModalOrganizacion({ ...modalOrganizacion, plan_id: planSeleccionado, plan_pendiente_id: null })
+        } else {
+          setModalOrganizacion({ ...modalOrganizacion, plan_pendiente_id: planSeleccionado })
+        }
+      }
     } else {
       showToast(res.error || 'Error al cambiar plan', 'error')
     }
@@ -321,6 +332,11 @@ export default function OrganizacionesPage() {
                 </button>
               </div>
               <div className="px-6 py-5 space-y-4">
+                {modalPlan.plan_pendiente_id && (
+                  <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-800 mb-4">
+                    <strong>Cambio programado:</strong> La organización cambiará al plan {planes.find(p => p.id === modalPlan.plan_pendiente_id)?.nombre} en su próxima renovación ({modalPlan.fecha_vencimiento ? new Date(modalPlan.fecha_vencimiento).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'N/A'}).
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-500 text-ink-700 mb-1.5">Nuevo plan</label>
                   <select 

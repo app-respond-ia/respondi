@@ -43,7 +43,7 @@ export async function getDashboardData(from?: string, to?: string) {
       cuotasRes,
       erroresRes
     ] = await Promise.allSettled([
-      supabase.from('organizaciones').select('estado, fecha_inicio, fecha_vencimiento, plans(precio_usd)'),
+      supabase.from('organizaciones').select('estado, fecha_inicio, fecha_vencimiento, plans!plan_id(precio_usd)'),
       supabase.from('message_quotas').select('cantidad').eq('tipo', 'consumo').gte('timestamp', startDate).lte('timestamp', endDate),
       supabase.from('error_logs').select('*', { count: 'exact', head: true }).eq('resuelto', false)
     ])
@@ -123,6 +123,99 @@ export async function getDashboardData(from?: string, to?: string) {
     }
   } catch (err: any) {
     return { success: false, error: err.message || 'Error cargando dashboard', data: null }
+  }
+}
+
+export async function getEvolucionNegocio(from?: string, to?: string) {
+  try {
+    const { supabase } = await requireSuperAdmin()
+    
+    const now = new Date()
+    const startDate = from ? new Date(from) : new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+    const endDate = to ? new Date(to) : now
+
+    // Necesitamos TODAS las organizaciones para calcular el MRR en cualquier punto del tiempo.
+    const { data: organizaciones, error } = await supabase
+      .from('organizaciones')
+      .select('estado, fecha_inicio, fecha_vencimiento, plans!plan_id(precio_usd)')
+      
+    if (error) throw error
+
+    const diffDays = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+    const granularity = diffDays > 365 ? 'mes' : diffDays > 90 ? 'semana' : 'dia'
+
+    const dataPoints = []
+    let current = new Date(startDate)
+    current.setHours(0, 0, 0, 0)
+    
+    const end = new Date(endDate)
+    end.setHours(23, 59, 59, 999)
+
+    while (current <= end) {
+      const bucketEnd = new Date(current)
+      let label = ''
+      
+      if (granularity === 'dia') {
+        bucketEnd.setHours(23, 59, 59, 999)
+        label = current.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })
+      } else if (granularity === 'semana') {
+        bucketEnd.setDate(current.getDate() + 6)
+        bucketEnd.setHours(23, 59, 59, 999)
+        if (bucketEnd > end) bucketEnd.setTime(end.getTime())
+        label = `Sem. ${current.getDate()} ${current.toLocaleDateString('es-ES', { month: 'short' })}`
+      } else {
+        bucketEnd.setMonth(current.getMonth() + 1)
+        bucketEnd.setDate(0)
+        bucketEnd.setHours(23, 59, 59, 999)
+        if (bucketEnd > end) bucketEnd.setTime(end.getTime())
+        label = current.toLocaleDateString('es-ES', { month: 'short', year: '2-digit' })
+      }
+
+      let nuevas = 0
+      let bajas = 0
+      let mrrSnapshot = 0
+
+      organizaciones.forEach(o => {
+        const fInicio = o.fecha_inicio ? new Date(o.fecha_inicio) : null
+        const fVencimiento = o.fecha_vencimiento ? new Date(o.fecha_vencimiento) : null
+        const precio = o.plans && (o.plans as any).precio_usd ? Number((o.plans as any).precio_usd) : 0
+
+        if (fInicio && fInicio >= current && fInicio <= bucketEnd) nuevas++
+        
+        if ((o.estado === 'vencido' || o.estado === 'suspendido') && fVencimiento && fVencimiento >= current && fVencimiento <= bucketEnd) {
+          bajas++
+        }
+
+        if (fInicio && fInicio <= bucketEnd) {
+          if (!fVencimiento || fVencimiento > bucketEnd) {
+            if (o.estado !== 'trial') { // Aproximación para no contar las que sabemos que 100% no llegaron a pagar
+              mrrSnapshot += precio
+            }
+          }
+        }
+      })
+
+      dataPoints.push({
+        fecha: label,
+        timestamp: current.getTime(),
+        nuevasOrganizaciones: nuevas,
+        bajas,
+        mrr: mrrSnapshot
+      })
+
+      if (granularity === 'dia') {
+        current.setDate(current.getDate() + 1)
+      } else if (granularity === 'semana') {
+        current.setDate(current.getDate() + 7)
+      } else {
+        current.setMonth(current.getMonth() + 1)
+        current.setDate(1)
+      }
+    }
+
+    return { success: true, data: dataPoints }
+  } catch (err: any) {
+    return { success: false, error: err.message, data: null }
   }
 }
 

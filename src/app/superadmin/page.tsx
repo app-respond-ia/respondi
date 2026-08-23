@@ -1,6 +1,7 @@
 import Link from 'next/link'
-import { getDashboardData } from '@/app/actions/superadmin'
+import { getDashboardData, getEvolucionNegocio } from '@/app/actions/superadmin'
 import DateRangeSelector from './DateRangeSelector'
+import EvolucionChart from './EvolucionChart'
 
 export const dynamic = 'force-dynamic'
 
@@ -8,10 +9,13 @@ export default async function SuperadminDashboardPage({ searchParams }: { search
   const from = typeof searchParams.from === 'string' ? searchParams.from : undefined
   const to = typeof searchParams.to === 'string' ? searchParams.to : undefined
   
-  const { data, success, error } = await getDashboardData(from, to)
+  const [dashboardRes, evolucionRes] = await Promise.all([
+    getDashboardData(from, to),
+    getEvolucionNegocio(from, to)
+  ])
 
-  if (!success || !data) {
-    return <div className="p-6 text-red-500">Error cargando dashboard: {error}</div>
+  if (!dashboardRes.success || !dashboardRes.data) {
+    return <div className="p-6 text-red-500">Error cargando dashboard: {dashboardRes.error}</div>
   }
 
   const { 
@@ -23,7 +27,7 @@ export default async function SuperadminDashboardPage({ searchParams }: { search
     trialsPorVencer, 
     totalMensajesMes, 
     erroresSinResolver 
-  } = data
+  } = dashboardRes.data
 
   const totalOrganizaciones = organizacionesPorEstado.total
   const pctActivos = totalOrganizaciones > 0 ? (organizacionesPorEstado.activos / totalOrganizaciones) * 100 : 0
@@ -81,6 +85,11 @@ export default async function SuperadminDashboardPage({ searchParams }: { search
           <p className="text-xs text-amber-600 font-500 mt-1">en los próximos 3 días</p>
         </div>
       </div>
+
+      {/* Gráfico principal */}
+      {evolucionRes.success && evolucionRes.data && (
+        <EvolucionChart data={evolucionRes.data} />
+      )}
 
       {/* Alertas de errores */}
       {erroresSinResolver > 0 && (

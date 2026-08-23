@@ -1,20 +1,29 @@
 import Link from 'next/link'
 import { getDashboardData } from '@/app/actions/superadmin'
+import DateRangeSelector from './DateRangeSelector'
 
 export const dynamic = 'force-dynamic'
 
-export default async function SuperadminDashboardPage() {
-  const { data, success, error } = await getDashboardData()
+export default async function SuperadminDashboardPage({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
+  const from = typeof searchParams.from === 'string' ? searchParams.from : undefined
+  const to = typeof searchParams.to === 'string' ? searchParams.to : undefined
+  
+  const { data, success, error } = await getDashboardData(from, to)
 
   if (!success || !data) {
     return <div className="p-6 text-red-500">Error cargando dashboard: {error}</div>
   }
 
-  const { organizacionesPorEstado, trialsPorVencer, totalMensajesMes, erroresSinResolver } = data
-
-  // Estimación simple de ingresos (en una app real sacaríamos de una query más compleja o pagos reales)
-  // Para el stub, asumimos un valor promedio por comercio activo.
-  const ingresosEstimados = organizacionesPorEstado.activos * 59 
+  const { 
+    organizacionesPorEstado, 
+    mrrReal, 
+    nuevasOrganizaciones, 
+    tasaConversion, 
+    churnEnRango, 
+    trialsPorVencer, 
+    totalMensajesMes, 
+    erroresSinResolver 
+  } = data
 
   const totalOrganizaciones = organizacionesPorEstado.total
   const pctActivos = totalOrganizaciones > 0 ? (organizacionesPorEstado.activos / totalOrganizaciones) * 100 : 0
@@ -24,30 +33,48 @@ export default async function SuperadminDashboardPage() {
 
   return (
     <>
-      <div className="mb-6">
-        <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Visión general</h1>
-        <p className="text-ink-500 mt-1">El estado de Respondi en todas las organizaciones.</p>
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Visión general</h1>
+          <p className="text-ink-500 mt-1">El estado de Respondi en todas las organizaciones.</p>
+        </div>
+        <DateRangeSelector />
       </div>
 
       {/* KPIs de negocio */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <div className="bg-white rounded-2xl border border-slate-200 p-4">
-          <p className="text-xs text-ink-500 mb-1">Ingresos del mes (Est.)</p>
-          <p className="font-display font-700 text-2xl text-ink-900">{ingresosEstimados} $</p>
+          <p className="text-xs text-ink-500 mb-1">MRR (Snapshot actual)</p>
+          <p className="font-display font-700 text-2xl text-ink-900">${mrrReal}</p>
         </div>
+        
         <div className="bg-white rounded-2xl border border-slate-200 p-4">
-          <p className="text-xs text-ink-500 mb-1">Organizaciones activas</p>
+          <p className="text-xs text-ink-500 mb-1">Organizaciones activas (Total)</p>
           <p className="font-display font-700 text-2xl text-ink-900">
             {organizacionesPorEstado.activos}<span className="text-lg text-ink-400">/{totalOrganizaciones}</span>
           </p>
           <p className="text-xs text-ink-400 mt-1">{organizacionesPorEstado.trial} en trial</p>
         </div>
+
         <div className="bg-white rounded-2xl border border-slate-200 p-4">
-          <p className="text-xs text-ink-500 mb-1">Mensajes IA (mes)</p>
+          <p className="text-xs text-ink-500 mb-1">Nuevas Orgs (En el rango)</p>
+          <p className="font-display font-700 text-2xl text-ink-900">{nuevasOrganizaciones}</p>
+          <p className="text-xs text-brand-600 font-500 mt-1">{tasaConversion.toFixed(1)}% conversión a pago</p>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200 p-4">
+          <p className="text-xs text-ink-500 mb-1">Churn (En el rango)</p>
+          <p className="font-display font-700 text-2xl text-red-600">{churnEnRango}</p>
+          <p className="text-xs text-ink-400 mt-1">Cuentas vencidas o suspendidas</p>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200 p-4">
+          <p className="text-xs text-ink-500 mb-1">Mensajes IA (En el rango)</p>
           <p className="font-display font-700 text-2xl text-ink-900">
             {(totalMensajesMes / 1000).toFixed(1)}<span className="text-lg text-ink-400">k</span>
           </p>
         </div>
+
         <div className="bg-white rounded-2xl border border-slate-200 p-4">
           <p className="text-xs text-ink-500 mb-1">Trials por vencer</p>
           <p className="font-display font-700 text-2xl text-ink-900">{trialsPorVencer}</p>

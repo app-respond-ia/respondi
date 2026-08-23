@@ -27,21 +27,24 @@ async function requireSuperAdmin() {
 }
 
 // A) getDashboardData
-export async function getDashboardData() {
+export async function getDashboardData(from?: string, to?: string) {
   try {
     const { supabase } = await requireSuperAdmin()
 
     const now = new Date()
     const in3Days = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000)
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+    
+    // Si no hay rango, por defecto usamos los últimos 30 días
+    const startDate = from ? new Date(from).toISOString() : new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString()
+    const endDate = to ? new Date(to).toISOString() : now.toISOString()
 
     const [
       organizacionesRes,
       cuotasRes,
       erroresRes
     ] = await Promise.allSettled([
-      supabase.from('organizaciones').select('estado, fecha_vencimiento'),
-      supabase.from('message_quotas').select('cantidad').eq('tipo', 'consumo').gte('created_at', startOfMonth),
+      supabase.from('organizaciones').select('estado, fecha_inicio, fecha_vencimiento, plans(precio_usd)'),
+      supabase.from('message_quotas').select('cantidad').eq('tipo', 'consumo').gte('timestamp', startDate).lte('timestamp', endDate),
       supabase.from('error_logs').select('*', { count: 'exact', head: true }).eq('resuelto', false)
     ])
 
@@ -54,9 +57,20 @@ export async function getDashboardData() {
     let organizacionesVencidas = 0
     let organizacionesSuspendidas = 0
     let trialsPorVencer = 0
+    let mrrReal = 0
+    
+    let nuevasOrganizaciones = 0
+    let conversionesEnRango = 0
+    let churnEnRango = 0
 
     organizaciones?.forEach(o => {
-      if (o.estado === 'activo') organizacionesActivas++
+      // Snapshot states
+      if (o.estado === 'activo') {
+        organizacionesActivas++
+        if (o.plans && (o.plans as any).precio_usd) {
+          mrrReal += Number((o.plans as any).precio_usd)
+        }
+      }
       if (o.estado === 'trial') {
         organizacionesTrial++
         if (o.fecha_vencimiento && new Date(o.fecha_vencimiento) <= in3Days) {
@@ -65,8 +79,27 @@ export async function getDashboardData() {
       }
       if (o.estado === 'vencido') organizacionesVencidas++
       if (o.estado === 'suspendido') organizacionesSuspendidas++
+      
+      // Range metrics
+      if (o.fecha_inicio) {
+        const fInicio = new Date(o.fecha_inicio)
+        if (fInicio >= new Date(startDate) && fInicio <= new Date(endDate)) {
+          nuevasOrganizaciones++
+          if (o.estado === 'activo') {
+            conversionesEnRango++
+          }
+        }
+      }
+      
+      if (o.fecha_vencimiento && (o.estado === 'vencido' || o.estado === 'suspendido')) {
+        const fVencimiento = new Date(o.fecha_vencimiento)
+        if (fVencimiento >= new Date(startDate) && fVencimiento <= new Date(endDate)) {
+          churnEnRango++
+        }
+      }
     })
 
+    const tasaConversion = nuevasOrganizaciones > 0 ? (conversionesEnRango / nuevasOrganizaciones) * 100 : 0
     const totalMensajesMes = cuotas?.reduce((acc, curr) => acc + curr.cantidad, 0) || 0
 
     return {
@@ -79,6 +112,10 @@ export async function getDashboardData() {
           suspendidos: organizacionesSuspendidas,
           total: organizaciones?.length || 0
         },
+        mrrReal,
+        nuevasOrganizaciones,
+        tasaConversion,
+        churnEnRango,
         trialsPorVencer,
         totalMensajesMes,
         erroresSinResolver: erroresSinResolver || 0

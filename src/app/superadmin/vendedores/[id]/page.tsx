@@ -11,6 +11,7 @@ import {
   getClientesDeVendedor, 
   getComisionesDeVendedor 
 } from '@/app/actions/superadmin'
+import { useSuperadminPermisos } from '@/components/layout/SuperadminPermisosContext'
 
 export default function VendedorDetallePage() {
   const { id } = useParams()
@@ -24,6 +25,9 @@ export default function VendedorDetallePage() {
   
   const [activeTab, setActiveTab] = useState<'clientes' | 'comisiones'>('clientes')
   const [isModalOpen, setIsModalOpen] = useState(false)
+
+  const { hasPermission } = useSuperadminPermisos()
+  const canWrite = hasPermission('vendedores', 'escritura')
 
   const cargar = useCallback(async () => {
     setLoading(true)
@@ -251,13 +255,15 @@ export default function VendedorDetallePage() {
           <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-5 shadow-sm sticky top-0">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="font-display font-700 text-lg text-ink-900">Ficha del Vendedor</h3>
-              <button 
-                onClick={() => setIsModalOpen(true)}
-                className="text-xs font-600 text-brand-600 hover:text-brand-700 flex items-center gap-1 transition"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                Editar
-              </button>
+              {canWrite && (
+                <button 
+                  onClick={() => setIsModalOpen(true)}
+                  className="text-xs font-600 text-brand-600 hover:text-brand-700 flex items-center gap-1 transition"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                  Editar
+                </button>
+              )}
             </div>
 
             <div className="space-y-4 text-sm">

@@ -16,6 +16,7 @@ import Loading from '@/components/Loading'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { useSuperadminPermisos } from '@/components/layout/SuperadminPermisosContext'
 
 export default function TicketDetalleClienteSuperadminPage() {
   const { id } = useParams()
@@ -29,6 +30,9 @@ export default function TicketDetalleClienteSuperadminPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isTogglingEstatus, setIsTogglingEstatus] = useState(false)
   const mensajesEndRef = useRef<HTMLDivElement>(null)
+
+  const { hasPermission } = useSuperadminPermisos()
+  const canWrite = hasPermission('soporte_clientes', 'escritura')
 
   const cargarDetalle = useCallback(async () => {
     const res = await getTicketDetalleClienteSuperadmin(id as string)
@@ -210,22 +214,25 @@ export default function TicketDetalleClienteSuperadminPage() {
             <textarea 
               value={nuevoMensaje}
               onChange={e => setNuevoMensaje(e.target.value)}
-              placeholder="Escribe tu respuesta aquí..."
-              className="flex-1 max-h-32 min-h-[44px] h-[44px] px-3 py-2.5 text-sm text-ink-900 bg-transparent border-0 focus:ring-0 resize-none outline-none"
+              placeholder={canWrite ? "Escribe tu respuesta aquí..." : "No tienes permiso para responder"}
+              disabled={!canWrite}
+              className="flex-1 max-h-32 min-h-[44px] h-[44px] px-3 py-2.5 text-sm text-ink-900 bg-transparent border-0 focus:ring-0 resize-none outline-none disabled:bg-slate-50"
               onKeyDown={e => {
-                if (e.key === 'Enter' && !e.shiftKey) {
+                if (canWrite && e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
                   handleEnviarMensaje(e)
                 }
               }}
             ></textarea>
-            <button 
-              type="submit"
-              disabled={!nuevoMensaje.trim() || isSubmitting}
-              className="h-11 px-5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-600 text-sm transition shadow-sm hover:shadow disabled:opacity-50 disabled:cursor-not-allowed shrink-0 flex items-center justify-center min-w-[120px]"
-            >
-              {isSubmitting ? 'Enviando...' : 'Enviar'}
-            </button>
+            {canWrite && (
+              <button 
+                type="submit"
+                disabled={!nuevoMensaje.trim() || isSubmitting}
+                className="h-11 px-5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-600 text-sm transition shadow-sm hover:shadow disabled:opacity-50 disabled:cursor-not-allowed shrink-0 flex items-center justify-center min-w-[120px]"
+              >
+                {isSubmitting ? 'Enviando...' : 'Enviar'}
+              </button>
+            )}
           </form>
         </div>
       </div>
@@ -238,12 +245,13 @@ export default function TicketDetalleClienteSuperadminPage() {
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="block text-sm font-600 text-ink-700">Categoría</label>
-              <Link href="/superadmin/tickets-clientes/categorias" className="text-xs font-500 text-brand-600 hover:text-brand-700 transition">Gestionar categorías</Link>
+              {canWrite && <Link href="/superadmin/tickets-clientes/categorias" className="text-xs font-500 text-brand-600 hover:text-brand-700 transition">Gestionar categorías</Link>}
             </div>
             <select 
               value={ticket.categoria_id || ''} 
               onChange={handleChangeCategoria}
-              className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-slate-50 text-sm focus:outline-none focus:border-brand-500 transition"
+              disabled={!canWrite}
+              className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-slate-50 text-sm focus:outline-none focus:border-brand-500 transition disabled:opacity-50"
             >
               <option value="">Sin asignar</option>
               {categorias.map(c => (
@@ -257,7 +265,8 @@ export default function TicketDetalleClienteSuperadminPage() {
             <select 
               value={ticket.prioridad || 'normal'} 
               onChange={handleChangePrioridad}
-              className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-slate-50 text-sm focus:outline-none focus:border-brand-500 transition"
+              disabled={!canWrite}
+              className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-slate-50 text-sm focus:outline-none focus:border-brand-500 transition disabled:opacity-50"
             >
               <option value="alta">Alta</option>
               <option value="normal">Normal</option>
@@ -268,35 +277,38 @@ export default function TicketDetalleClienteSuperadminPage() {
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="block text-sm font-600 text-ink-700">Asignado a</label>
-              {miUserId && ticket.asignado_a !== miUserId && (
+              {canWrite && miUserId && ticket.asignado_a !== miUserId && (
                 <button type="button" onClick={() => handleAsignar(miUserId)} className="text-xs font-500 text-brand-600 hover:text-brand-700 transition">Asignarme a mí</button>
               )}
             </div>
             <select 
               value={ticket.asignado_a || ''} 
               onChange={(e) => handleAsignar(e.target.value || null)}
-              className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-slate-50 text-sm focus:outline-none focus:border-brand-500 transition"
+              disabled={!canWrite}
+              className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-slate-50 text-sm focus:outline-none focus:border-brand-500 transition disabled:opacity-50"
             >
               <option value="">Sin asignar</option>
-              {superadmins.map(a => (
-                <option key={a.id} value={a.id}>{a.nombre || a.email}</option>
+              {superadmins.map(admin => (
+                <option key={admin.id} value={admin.id}>{admin.nombre}</option>
               ))}
             </select>
           </div>
           
-          <div className="pt-2">
-            <button 
-              onClick={handleToggleEstatus}
-              disabled={isTogglingEstatus}
-              className={`w-full h-10 rounded-xl font-600 text-sm transition shadow-sm hover:shadow flex items-center justify-center gap-2 ${
-                ticket.estatus === 'cerrado' 
-                  ? 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50' 
-                  : 'bg-emerald-500 hover:bg-emerald-600 text-white'
-              }`}
-            >
-              {isTogglingEstatus ? 'Actualizando...' : (ticket.estatus === 'cerrado' ? 'Reabrir ticket' : 'Marcar como resuelto')}
-            </button>
-          </div>
+          {canWrite && (
+            <div className="pt-2">
+              <button 
+                onClick={handleToggleEstatus}
+                disabled={isTogglingEstatus}
+                className={`w-full h-10 rounded-xl font-600 text-sm transition shadow-sm hover:shadow flex items-center justify-center gap-2 ${
+                  ticket.estatus === 'cerrado' 
+                    ? 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50' 
+                    : 'bg-emerald-500 hover:bg-emerald-600 text-white'
+                }`}
+              >
+                {isTogglingEstatus ? 'Actualizando...' : (ticket.estatus === 'cerrado' ? 'Reabrir ticket' : 'Marcar como resuelto')}
+              </button>
+            </div>
+          )}
           
           {ticket.calificacion && (
             <div className="border-t border-slate-100 pt-4 mt-2">

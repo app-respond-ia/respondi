@@ -15,13 +15,17 @@ export default async function Layout({ children }: { children: React.ReactNode }
   // 2. Verificar rol super_admin
   const { data: userData, error: userError } = await supabase
     .from('users')
-    .select('rol, nombre, avatar_url, email')
+    .select('rol, nombre, avatar_url, email, superadmin_roles(*)')
     .eq('id', session.user.id)
     .single()
 
   if (userError || !userData || userData.rol !== 'super_admin') {
     redirect('/dashboard') // No tiene permisos, mandarlo a su dashboard normal
   }
+
+  const roleData = Array.isArray(userData.superadmin_roles) ? userData.superadmin_roles[0] : userData.superadmin_roles
+  const permisosSuperadmin = roleData?.permisos ?? []
+  const esPropietarioSuperadmin = roleData?.es_propietario ?? false
 
   const nombreUsuario = userData.nombre || session.user.email || 'Atsura'
   const iniciales = nombreUsuario.substring(0, 2).toUpperCase()
@@ -47,6 +51,8 @@ export default async function Layout({ children }: { children: React.ReactNode }
         email={userData.email || session.user.email || ''}
         avatarUrl={userData.avatar_url || undefined}
         userId={session.user.id}
+        permisos={permisosSuperadmin}
+        esPropietario={esPropietarioSuperadmin}
       >
         {children}
       </SuperadminLayout>

@@ -3,6 +3,7 @@ import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
 import { getSkillsGlobales, crearSkillGlobal, actualizarSkillGlobal, eliminarSkillGlobal } from '@/app/actions/skills-globales'
+import { useSuperadminPermisos } from '@/components/layout/SuperadminPermisosContext'
 
 export default function SuperadminSkillsPage() {
   const [skills, setSkills] = useState<any[]>([])
@@ -19,6 +20,9 @@ export default function SuperadminSkillsPage() {
     cliente_puede_toggle: true,
     activa_por_defecto: true,
   })
+
+  const { hasPermission } = useSuperadminPermisos()
+  const canWrite = hasPermission('skills', 'escritura')
 
   useEffect(() => { cargar() }, [])
 
@@ -99,10 +103,12 @@ export default function SuperadminSkillsPage() {
           <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Skills de IA</h1>
           <p className="text-ink-500 mt-1">Skills globales disponibles para todos los clientes.</p>
         </div>
-        <button onClick={openCrear} className="inline-flex items-center gap-2 px-4 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 transition shadow-lg shadow-brand-600/30">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
-          Nueva skill
-        </button>
+        {canWrite && (
+          <button onClick={openCrear} className="inline-flex items-center gap-2 px-4 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 transition shadow-lg shadow-brand-600/30">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
+            Nueva skill
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100">
@@ -128,14 +134,16 @@ export default function SuperadminSkillsPage() {
                   </span>
                 </div>
               </div>
-              <div className="flex items-center gap-1 shrink-0">
-                <button onClick={() => openEditar(s)} className="p-1.5 rounded-lg text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                </button>
-                <button onClick={() => handleEliminar(s.id)} className="p-1.5 rounded-lg text-ink-400 hover:text-red-500 hover:bg-red-50 transition">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                </button>
-              </div>
+              {canWrite && (
+                <div className="flex items-center gap-1 shrink-0">
+                  <button onClick={() => openEditar(s)} className="p-1.5 rounded-lg text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                  </button>
+                  <button onClick={() => handleEliminar(s.id)} className="p-1.5 rounded-lg text-ink-400 hover:text-red-500 hover:bg-red-50 transition">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                  </button>
+                </div>
+              )}
             </div>
           ))
         )}

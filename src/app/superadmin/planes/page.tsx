@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import { getPlanes, actualizarPlan, crearPlan, eliminarPlan } from '@/app/actions/superadmin'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { useToast } from '@/components/ui/Toast'
+import { useSuperadminPermisos } from '@/components/layout/SuperadminPermisosContext'
 
 export default function PlanesPage() {
   const [planes, setPlanes] = useState<any[]>([])
@@ -14,6 +15,9 @@ export default function PlanesPage() {
   const [confirmarBorrar, setConfirmarBorrar] = useState<any>(null)
   const [saving, setSaving] = useState(false)
   const { showToast } = useToast()
+
+  const { hasPermission } = useSuperadminPermisos()
+  const canWrite = hasPermission('planes', 'escritura')
 
   const defaultFormData = {
     nombre: '', precio_usd: 0, creditos_mensuales: 1000, canales_max: 1, sucursales_max: 1, 
@@ -123,10 +127,12 @@ export default function PlanesPage() {
           <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Planes y precios</h1>
           <p className="text-ink-500 mt-1">Configura los límites de cada nivel de suscripción.</p>
         </div>
-        <button onClick={() => openModal(null)} className="inline-flex items-center gap-2 px-4 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
-          Nuevo plan
-        </button>
+        {canWrite && (
+          <button onClick={() => openModal(null)} className="inline-flex items-center gap-2 px-4 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
+            Nuevo plan
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -146,7 +152,7 @@ export default function PlanesPage() {
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <h3 className={`font-display font-700 text-xl ${isPro ? 'text-white' : 'text-ink-900'}`}>{p.nombre}</h3>
-                      <button onClick={() => handleToggleActivo(p)} className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-600 uppercase tracking-wider transition border ${p.activo ? (isPro ? 'bg-white/20 text-white border-white/30 hover:bg-white/30' : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100') : (isPro ? 'bg-red-500/20 text-red-100 border-red-500/30 hover:bg-red-500/40' : 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100')}`}>
+                      <button disabled={!canWrite} onClick={() => handleToggleActivo(p)} className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-600 uppercase tracking-wider transition border disabled:opacity-50 disabled:cursor-not-allowed ${p.activo ? (isPro ? 'bg-white/20 text-white border-white/30 hover:bg-white/30' : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100') : (isPro ? 'bg-red-500/20 text-red-100 border-red-500/30 hover:bg-red-500/40' : 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100')}`}>
                         {p.activo ? 'Activo' : 'Inactivo'}
                       </button>
                     </div>
@@ -189,14 +195,16 @@ export default function PlanesPage() {
                 </div>
 
                 {/* Botón */}
-                <div className="p-6 pt-0 bg-white relative z-10 flex gap-2">
-                  <button onClick={() => openModal(p)} className={`flex-1 h-11 rounded-xl text-sm font-600 transition ${isPro ? 'bg-brand-600 hover:bg-brand-700 text-white' : 'bg-slate-100 hover:bg-slate-200 text-ink-900'}`}>
-                    Editar
-                  </button>
-                  <button onClick={() => setConfirmarBorrar(p)} className="px-4 rounded-xl text-ink-400 hover:bg-red-50 hover:text-red-600 transition" title="Eliminar plan">
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                  </button>
-                </div>
+                {canWrite && (
+                  <div className="p-6 pt-0 bg-white relative z-10 flex gap-2">
+                    <button onClick={() => openModal(p)} className={`flex-1 h-11 rounded-xl text-sm font-600 transition ${isPro ? 'bg-brand-600 hover:bg-brand-700 text-white' : 'bg-slate-100 hover:bg-slate-200 text-ink-900'}`}>
+                      Editar
+                    </button>
+                    <button onClick={() => setConfirmarBorrar(p)} className="px-4 rounded-xl text-ink-400 hover:bg-red-50 hover:text-red-600 transition" title="Eliminar plan">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    </button>
+                  </div>
+                )}
               </div>
             )
           })}

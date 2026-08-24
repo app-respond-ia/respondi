@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import { getVendedores } from '@/app/actions/superadmin'
 import Link from 'next/link'
 import VendedorModal from '@/components/vendedores/VendedorModal'
+import { useSuperadminPermisos } from '@/components/layout/SuperadminPermisosContext'
 
 export default function VendedoresPage() {
   const [vendedores, setVendedores] = useState<any[]>([])
@@ -20,6 +21,9 @@ export default function VendedoresPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [modalMode, setModalMode] = useState<'crear' | 'editar'>('crear')
   const [selectedVendedor, setSelectedVendedor] = useState<any>(null)
+
+  const { hasPermission } = useSuperadminPermisos()
+  const canWrite = hasPermission('vendedores', 'escritura')
 
   useEffect(() => { cargar() }, [])
 
@@ -84,10 +88,12 @@ export default function VendedoresPage() {
           <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Vendedores</h1>
           <p className="text-ink-500 mt-1">Afiliados externos que traen clientes a Respondi.</p>
         </div>
-        <button onClick={openCrear} className="inline-flex items-center gap-2 px-4 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 transition shadow-lg shadow-brand-600/30">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
-          Nuevo vendedor
-        </button>
+        {canWrite && (
+          <button onClick={openCrear} className="inline-flex items-center gap-2 px-4 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 transition shadow-lg shadow-brand-600/30">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
+            Nuevo vendedor
+          </button>
+        )}
       </div>
 
       {/* Resumen */}
@@ -187,9 +193,11 @@ export default function VendedoresPage() {
                 </div>
                 
                 <div className="flex items-center gap-2 shrink-0 ml-2">
-                  <button onClick={(e) => openEditar(v, e)} className="p-1.5 rounded-lg text-ink-400 hover:text-ink-700 hover:bg-slate-200 transition shrink-0" title="Editar vendedor">
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                  </button>
+                  {canWrite && (
+                    <button onClick={(e) => openEditar(v, e)} className="p-1.5 rounded-lg text-ink-400 hover:text-ink-700 hover:bg-slate-200 transition shrink-0" title="Editar vendedor">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                    </button>
+                  )}
                   <div className="text-ink-300 group-hover:text-brand-600 transition">
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
                   </div>

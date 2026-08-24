@@ -6,6 +6,7 @@ import { getCategoriasTickets, crearCategoriaTicket, actualizarCategoriaTicket, 
 import Loading from '@/components/Loading'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { useToast } from '@/components/ui/Toast'
+import { useSuperadminPermisos } from '@/components/layout/SuperadminPermisosContext'
 
 export default function CategoriasTicketsPage() {
   const [loading, setLoading] = useState(true)
@@ -18,6 +19,9 @@ export default function CategoriasTicketsPage() {
   const [saving, setSaving] = useState(false)
   const [confirmarBorrar, setConfirmarBorrar] = useState<string | null>(null)
   const { showToast } = useToast()
+
+  const { hasPermission } = useSuperadminPermisos()
+  const canWrite = hasPermission('soporte_vendedores', 'escritura')
 
   const cargarCategorias = async () => {
     setLoading(true)
@@ -101,10 +105,12 @@ export default function CategoriasTicketsPage() {
           <h1 className="font-display font-700 text-2xl text-ink-900 leading-tight">Categorías de Tickets</h1>
           <p className="text-ink-500 mt-1">Gestiona los nombres y colores de las etiquetas de soporte.</p>
         </div>
-        <button onClick={openAñadir} className="inline-flex items-center gap-2 px-5 h-12 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition">
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
-          Nueva categoría
-        </button>
+        {canWrite && (
+          <button onClick={openAñadir} className="inline-flex items-center gap-2 px-5 h-12 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
+            Nueva categoría
+          </button>
+        )}
       </div>
 
       {/* List */}
@@ -136,12 +142,16 @@ export default function CategoriasTicketsPage() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center justify-end gap-2">
-                      <button onClick={() => openEditar(cat)} className="p-2 rounded-lg text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition" title="Editar">
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                      </button>
-                      <button onClick={() => setConfirmarBorrar(cat.id)} className="p-2 rounded-lg text-ink-400 hover:text-red-500 hover:bg-red-50 transition" title="Eliminar">
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                      </button>
+                      {canWrite && (
+                        <>
+                          <button onClick={() => openEditar(cat)} className="p-2 rounded-lg text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition" title="Editar">
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                          </button>
+                          <button onClick={() => setConfirmarBorrar(cat.id)} className="p-2 rounded-lg text-ink-400 hover:text-red-500 hover:bg-red-50 transition" title="Eliminar">
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>

@@ -1,4 +1,5 @@
 'use server'
+import { superadminHasPermission } from '@/lib/permisosSuperadmin'
 
 import { createClient } from '@/utils/supabase/server'
 import { supabaseAdmin } from '@/utils/supabase/admin'
@@ -8,14 +9,14 @@ import { crearNotificacion, notificarATodosLosSuperadmins, notificarAAdminsDeOrg
 import { setImpersonatedTenantId, clearImpersonatedTenantId } from '@/lib/impersonate'
 
 // Helper de auth para asegurar que la action solo la ejecuta un super admin
-async function requireSuperAdmin() {
+export async function requireSuperAdmin() {
   const supabase = await createClient()
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) throw new Error('No autorizado')
 
   const { data: userData } = await supabase
     .from('users')
-    .select('rol')
+    .select('rol, superadmin_rol_id, superadmin_roles(*)')
     .eq('id', session.user.id)
     .single()
 
@@ -23,8 +24,24 @@ async function requireSuperAdmin() {
     throw new Error('No autorizado. Se requiere rol super_admin')
   }
 
-  return { supabase, userId: session.user.id }
+  const roleData = Array.isArray(userData.superadmin_roles) 
+    ? userData.superadmin_roles[0] 
+    : userData.superadmin_roles
+
+  const userLevel = roleData?.nivel ?? 5
+  const userPermisos = roleData?.permisos ?? []
+  const esPropietario = roleData?.es_propietario ?? false
+
+  return { 
+    supabase, 
+    userId: session.user.id, 
+    userLevel, 
+    userPermisos, 
+    esPropietario,
+    roleData
+  }
 }
+
 
 // A) getDashboardData
 export async function getDashboardData(from?: string, to?: string) {
@@ -1447,10 +1464,10 @@ export async function borrarCategoriaTicket(id: string) {
 
 export async function getSuperadmins() {
   try {
-    const { supabase } = await requireSuperAdmin()
-    const { data, error } = await supabase
+    const auth = await requireSuperAdmin()
+    const { data, error } = await supabaseAdmin
       .from('users')
-      .select('id, nombre, email')
+      .select('id, nombre, email, activo, superadmin_rol_id, superadmin_roles(nombre, nivel, es_propietario)')
       .eq('rol', 'super_admin')
       .order('nombre', { ascending: true })
       
@@ -1780,4 +1797,232 @@ export async function responderTicketCliente(ticketId: string, mensaje: string) 
 
     return { success: true, data: nuevoMensaje }
   } catch (err: any) { return { success: false, error: err.message } }
+}
+// ==========================================
+// ROLES Y PERMISOS DE SUPERADMIN
+// ==========================================
+
+export async function canManageSuperadminRole(userId: string, targetRoleLevel: number) {
+  const { data: user } = await supabaseAdmin
+    .from('users')
+    .select('superadmin_rol_id, superadmin_roles(nivel, es_propietario)')
+    .eq('id', userId)
+    .single()
+
+  if (!user) return { allowed: false, error: 'Usuario no encontrado' }
+  
+  const roleData = Array.isArray(user.superadmin_roles) 
+    ? user.superadmin_roles[0] 
+    : user.superadmin_roles
+
+  if (roleData?.es_propietario) return { allowed: true, userLevel: 1 }
+
+  const userLevel = roleData?.nivel ?? 5
+
+  if (userLevel >= targetRoleLevel) {
+    return { 
+      allowed: false, 
+      error: 'No tienes jerarquía suficiente para gestionar roles de este nivel' 
+    }
+  }
+
+  return { allowed: true, userLevel }
+}
+
+export async function getSuperadminRoles() {
+  try {
+    const auth = await requireSuperAdmin()
+
+    const { data, error } = await supabaseAdmin
+      .from('superadmin_roles')
+      .select('*')
+      .order('nivel', { ascending: true })
+
+    if (error) return { success: false, error: error.message }
+    return { success: true, data: data || [] }
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Error al cargar los roles' }
+  }
+}
+
+export async function getMisPermisosSuperadmin() {
+  try {
+    const auth = await requireSuperAdmin()
+    return { 
+      success: true, 
+      userLevel: auth.userLevel, 
+      permisos: auth.userPermisos, 
+      esPropietario: auth.esPropietario 
+    }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
+
+export async function crearSuperadminRol(data: {
+  nombre: string
+  descripcion?: string
+  nivel?: number
+  permisos: { seccion: string, nivel: string }[]
+}) {
+  try {
+    const auth = await requireSuperAdmin()
+    if (!superadminHasPermission(auth, 'gestion_superadmins', 'escritura')) {
+      return { success: false, error: 'No tienes permiso para crear roles' }
+    }
+    
+    const newLevel = data.nivel ?? 5
+    if (newLevel <= 1) return { success: false, error: 'No se pueden crear roles de nivel 1 manualmente' }
+
+    const check = await canManageSuperadminRole(auth.userId, newLevel)
+    if (!check.allowed) return { success: false, error: check.error }
+
+    const { data: result, error } = await supabaseAdmin
+      .from('superadmin_roles')
+      .insert([{
+        nombre: data.nombre,
+        descripcion: data.descripcion || null,
+        nivel: newLevel,
+        permisos: data.permisos
+      }])
+      .select()
+      .single()
+
+    if (error) return { success: false, error: error.message }
+    return { success: true, data: result }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
+
+export async function actualizarSuperadminRol(id: string, data: {
+  nombre?: string
+  descripcion?: string
+  nivel?: number
+  permisos?: { seccion: string, nivel: string }[]
+}) {
+  try {
+    const auth = await requireSuperAdmin()
+    if (!superadminHasPermission(auth, 'gestion_superadmins', 'escritura')) {
+      return { success: false, error: 'No tienes permiso para editar roles' }
+    }
+
+    const { data: targetRole } = await supabaseAdmin
+      .from('superadmin_roles')
+      .select('*')
+      .eq('id', id)
+      .single()
+
+    if (!targetRole) return { success: false, error: 'Rol no encontrado' }
+    if (targetRole.es_propietario) return { success: false, error: 'El rol Propietario no se puede editar' }
+    
+    const check = await canManageSuperadminRole(auth.userId, targetRole.nivel)
+    if (!check.allowed) return { success: false, error: check.error }
+
+    if (data.nivel && data.nivel !== targetRole.nivel) {
+      if (data.nivel <= 1) return { success: false, error: 'No se puede cambiar un rol a nivel 1' }
+      const newCheck = await canManageSuperadminRole(auth.userId, data.nivel)
+      if (!newCheck.allowed) return { success: false, error: newCheck.error }
+    }
+
+    const { data: result, error } = await supabaseAdmin
+      .from('superadmin_roles')
+      .update({ ...data, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) return { success: false, error: error.message }
+    return { success: true, data: result }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
+
+export async function eliminarSuperadminRol(id: string) {
+  try {
+    const auth = await requireSuperAdmin()
+    if (!superadminHasPermission(auth, 'gestion_superadmins', 'escritura')) {
+      return { success: false, error: 'No tienes permiso para eliminar roles' }
+    }
+
+    const { data: targetRole } = await supabaseAdmin
+      .from('superadmin_roles')
+      .select('*')
+      .eq('id', id)
+      .single()
+
+    if (!targetRole) return { success: false, error: 'Rol no encontrado' }
+    if (targetRole.es_propietario) return { success: false, error: 'El rol Propietario no se puede eliminar' }
+    
+    const check = await canManageSuperadminRole(auth.userId, targetRole.nivel)
+    if (!check.allowed) return { success: false, error: check.error }
+
+    const { error } = await supabaseAdmin
+      .from('superadmin_roles')
+      .delete()
+      .eq('id', id)
+
+    if (error) return { success: false, error: error.message }
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
+
+
+export async function asignarRolSuperadmin(targetUserId: string, rolId: string | null) {
+  try {
+    const auth = await requireSuperAdmin()
+    if (!superadminHasPermission(auth, 'gestion_superadmins', 'escritura')) {
+      return { success: false, error: 'No tienes permiso para gestionar superadmins' }
+    }
+
+    // Comprobar rol actual del target
+    const { data: targetUser } = await supabaseAdmin
+      .from('users')
+      .select('superadmin_rol_id, superadmin_roles(nivel, es_propietario)')
+      .eq('id', targetUserId)
+      .single()
+
+    if (!targetUser) return { success: false, error: 'Usuario no encontrado' }
+    
+    const currentTargetRole = Array.isArray(targetUser.superadmin_roles) 
+      ? targetUser.superadmin_roles[0] 
+      : targetUser.superadmin_roles
+
+    const currentTargetLevel = currentTargetRole?.nivel ?? 5
+
+    // No puedes quitarle rol a alguien de mayor nivel
+    const checkUser = await canManageSuperadminRole(auth.userId, currentTargetLevel)
+    if (!checkUser.allowed && currentTargetRole?.es_propietario !== true) { // Propietarios pueden modificar a cualquiera si ellos son propietarios
+        if (!auth.esPropietario) {
+            return { success: false, error: 'No tienes permiso para modificar a este usuario' }
+        }
+    }
+
+    // Comprobar el rol que se quiere asignar
+    if (rolId) {
+      const { data: targetRole } = await supabaseAdmin
+        .from('superadmin_roles')
+        .select('*')
+        .eq('id', rolId)
+        .single()
+      
+      if (!targetRole) return { success: false, error: 'Rol no encontrado' }
+      
+      const checkRole = await canManageSuperadminRole(auth.userId, targetRole.nivel)
+      if (!checkRole.allowed) return { success: false, error: 'No tienes permiso para asignar este rol' }
+    }
+
+    const { error } = await supabaseAdmin
+      .from('users')
+      .update({ superadmin_rol_id: rolId })
+      .eq('id', targetUserId)
+
+    if (error) return { success: false, error: error.message }
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
 }

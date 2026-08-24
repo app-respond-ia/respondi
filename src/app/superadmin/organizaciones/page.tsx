@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { getOrganizaciones, actualizarEstadoOrganizacion, entrarComoOrganizacion, getPlanes, cambiarPlanOrganizacion, registrarPagoYRenovar } from '@/app/actions/superadmin'
 import { useToast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
+import { useSuperadminPermisos } from '@/components/layout/SuperadminPermisosContext'
 
 
 export default function OrganizacionesPage() {
@@ -30,6 +31,9 @@ export default function OrganizacionesPage() {
 
   const [confirmarEstado, setConfirmarEstado] = useState<{org: any, nuevoEstado: string} | null>(null)
   const [changingEstado, setChangingEstado] = useState(false)
+
+  const { hasPermission } = useSuperadminPermisos()
+  const canWrite = hasPermission('organizaciones', 'escritura')
 
   useEffect(() => {
     loadOrganizaciones()
@@ -297,19 +301,19 @@ export default function OrganizacionesPage() {
                   <button onClick={() => {
                     setModalPago(modalOrganizacion)
                     setPagoForm({ importe: '', moneda: 'USD', notas: '' })
-                  }} className="w-full flex items-center justify-center gap-2 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white text-sm font-600 transition">
+                  }} disabled={!canWrite} className="w-full flex items-center justify-center gap-2 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white text-sm font-600 transition">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     Registrar pago y renovar
                   </button>
                   <div className="grid grid-cols-2 gap-2">
-                    <button onClick={() => {
+                    <button disabled={!canWrite} onClick={() => {
                       setModalPlan(modalOrganizacion)
                       setPlanSeleccionado(modalOrganizacion.plan_id || '')
-                    }} className="h-10 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition">Cambiar plan</button>
+                    }} className="h-10 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-50 text-sm font-600 text-ink-700 transition">Cambiar plan</button>
                     {modalOrganizacion.estado === 'suspendido' ? (
-                      <button onClick={() => setConfirmarEstado({ org: modalOrganizacion, nuevoEstado: 'activo' })} className="h-10 rounded-xl border border-emerald-200 bg-white hover:bg-emerald-50 text-sm font-600 text-emerald-600 transition">Activar</button>
+                      <button disabled={!canWrite} onClick={() => setConfirmarEstado({ org: modalOrganizacion, nuevoEstado: 'activo' })} className="h-10 rounded-xl border border-emerald-200 bg-white hover:bg-emerald-50 disabled:opacity-50 text-sm font-600 text-emerald-600 transition">Activar</button>
                     ) : (
-                      <button onClick={() => setConfirmarEstado({ org: modalOrganizacion, nuevoEstado: 'suspendido' })} className="h-10 rounded-xl border border-red-200 bg-white hover:bg-red-50 text-sm font-600 text-red-600 transition">Suspender</button>
+                      <button disabled={!canWrite} onClick={() => setConfirmarEstado({ org: modalOrganizacion, nuevoEstado: 'suspendido' })} className="h-10 rounded-xl border border-red-200 bg-white hover:bg-red-50 disabled:opacity-50 text-sm font-600 text-red-600 transition">Suspender</button>
                     )}
                   </div>
                 </div>

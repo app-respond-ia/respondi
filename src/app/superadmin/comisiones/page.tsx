@@ -4,6 +4,7 @@ import Loading from '@/components/Loading'
 import { useState, useEffect } from 'react'
 import { getComisiones, getVendedores, aprobarComision, marcarComisionPagada, crearComisionManual, getOrganizacionesBasico } from '@/app/actions/superadmin'
 import { useToast } from '@/components/ui/Toast'
+import { useSuperadminPermisos } from '@/components/layout/SuperadminPermisosContext'
 
 export default function ComisionesPage() {
   const [comisiones, setComisiones] = useState<any[]>([])
@@ -34,6 +35,9 @@ export default function ComisionesPage() {
     mes_referencia: '',
     notas_pago: ''
   })
+
+  const { hasPermission } = useSuperadminPermisos()
+  const canWrite = hasPermission('comisiones', 'escritura')
 
   useEffect(() => { cargar() }, [filtroVendedor, filtroEstado, filtroTipo])
 
@@ -126,10 +130,12 @@ export default function ComisionesPage() {
           <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Comisiones</h1>
           <p className="text-ink-500 mt-1">Gestiona y aprueba las comisiones de los vendedores.</p>
         </div>
-        <button onClick={() => setIsModalCrear(true)} className="inline-flex items-center gap-2 px-4 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 transition shadow-lg shadow-brand-600/30">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
-          Crear manual
-        </button>
+        {canWrite && (
+          <button onClick={() => setIsModalCrear(true)} className="inline-flex items-center gap-2 px-4 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 transition shadow-lg shadow-brand-600/30">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
+            Crear manual
+          </button>
+        )}
       </div>
 
       {/* Resumen */}
@@ -210,13 +216,13 @@ export default function ComisionesPage() {
                     <td className="px-5 py-3.5 text-ink-500">{formatFecha(c.fecha_generacion)}</td>
                     <td className="px-5 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {c.estado === 'pendiente' && (
+                        {canWrite && c.estado === 'pendiente' && (
                           <button onClick={() => handleAprobar(c.id)}
                             className="px-3 h-8 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-600 transition">
                             Aprobar
                           </button>
                         )}
-                        {c.estado === 'aprobada' && (
+                        {canWrite && c.estado === 'aprobada' && (
                           <button onClick={() => { setModalPago(c); setNotasPago('') }}
                             className="px-3 h-8 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-600 transition">
                             Marcar pagada

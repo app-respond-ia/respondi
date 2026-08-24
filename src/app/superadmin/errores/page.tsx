@@ -3,7 +3,7 @@ import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
 import { getErrores, resolverError } from '@/app/actions/superadmin'
-
+import { useSuperadminPermisos } from '@/components/layout/SuperadminPermisosContext'
 
 export default function ErroresPage() {
   const [errores, setErrores] = useState<any[]>([])
@@ -14,6 +14,9 @@ export default function ErroresPage() {
   const [filtroOrigen, setFiltroOrigen] = useState('Todos')
   
   const [modalData, setModalData] = useState<any>(null)
+
+  const { hasPermission } = useSuperadminPermisos()
+  const canWrite = hasPermission('errores', 'escritura')
 
   useEffect(() => {
     loadErrores()
@@ -185,7 +188,7 @@ export default function ErroresPage() {
               </div>
               <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl shrink-0">
                 <button onClick={closeModal} className="px-5 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition">Cerrar</button>
-                {!modalData.resuelto && (
+                {canWrite && !modalData.resuelto && (
                   <button onClick={markResolved} className="px-5 h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-600 transition flex items-center gap-2">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
                     Marcar como resuelto

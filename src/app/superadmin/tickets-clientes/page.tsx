@@ -5,6 +5,7 @@ import Loading from '@/components/Loading'
 import { getTicketsClientesSoporte, getCategoriasTicketsClientes } from '@/app/actions/superadmin'
 import { toggleFijarTicket } from '@/app/actions/soporte-fijar'
 import Link from 'next/link'
+import { useSuperadminPermisos } from '@/components/layout/SuperadminPermisosContext'
 
 export default function TicketsClientesPage() {
   const [tickets, setTickets] = useState<any[]>([])
@@ -17,6 +18,9 @@ export default function TicketsClientesPage() {
   const [filtroEstatus, setFiltroEstatus] = useState('')
   const [filtroCategoria, setFiltroCategoria] = useState('')
   const [filtroPrioridad, setFiltroPrioridad] = useState('')
+
+  const { hasPermission } = useSuperadminPermisos()
+  const canWrite = hasPermission('soporte_clientes', 'escritura')
 
   useEffect(() => {
     cargar()
@@ -98,13 +102,15 @@ export default function TicketsClientesPage() {
           <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Tickets de Clientes</h1>
           <p className="text-ink-500 mt-1">Gestiona y responde las solicitudes de soporte de los clientes finales.</p>
         </div>
-        <Link 
-          href="/superadmin/tickets-clientes/categorias"
-          className="h-11 px-5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-ink-700 font-600 text-sm transition shadow-sm hover:shadow flex items-center gap-2"
-        >
-          <svg className="w-5 h-5 text-ink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.99 1.99 0 013 12V7a4 4 0 014-4z"/></svg>
-          Gestionar categorías
-        </Link>
+        {canWrite && (
+          <Link 
+            href="/superadmin/tickets-clientes/categorias"
+            className="h-11 px-5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-ink-700 font-600 text-sm transition shadow-sm hover:shadow flex items-center gap-2"
+          >
+            <svg className="w-5 h-5 text-ink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.99 1.99 0 013 12V7a4 4 0 014-4z"/></svg>
+            Gestionar categorías
+          </Link>
+        )}
       </div>
 
       {/* Resumen */}
@@ -193,13 +199,18 @@ export default function TicketsClientesPage() {
                   <tr key={t.id} className={`hover:bg-slate-50 transition ${t.fijado ? 'bg-amber-50/30' : ''}`}>
                     <td className="px-5 py-3.5 font-500 text-ink-900 max-w-[180px] 2xl:max-w-[240px] truncate">
                       <div className="flex items-center gap-2">
-                        <button 
-                          onClick={() => toggleFijar(t.id, t.fijado)}
-                          className={`p-1 rounded hover:bg-slate-200 transition shrink-0 ${t.fijado ? 'text-amber-500' : 'text-slate-300'}`}
-                          title={t.fijado ? 'Desfijar' : 'Fijar'}
-                        >
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M16 11V6a4 4 0 00-8 0v5l-2 3v2h5.5v5h1v-5H18v-2l-2-3z"/></svg>
-                        </button>
+                        {canWrite && (
+                          <button 
+                            onClick={() => toggleFijar(t.id, t.fijado)}
+                            className={`p-1 rounded hover:bg-slate-200 transition shrink-0 ${t.fijado ? 'text-amber-500' : 'text-slate-300'}`}
+                            title={t.fijado ? 'Desfijar' : 'Fijar'}
+                          >
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M16 11V6a4 4 0 00-8 0v5l-2 3v2h5.5v5h1v-5H18v-2l-2-3z"/></svg>
+                          </button>
+                        )}
+                        {!canWrite && t.fijado && (
+                          <span className="text-amber-500 p-1 shrink-0"><svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M16 11V6a4 4 0 00-8 0v5l-2 3v2h5.5v5h1v-5H18v-2l-2-3z"/></svg></span>
+                        )}
                         <span title={t.asunto} className="truncate">{t.asunto}</span>
                       </div>
                     </td>

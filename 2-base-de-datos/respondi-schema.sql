@@ -53,6 +53,17 @@ create type resultado_ia       as enum ('respondio','abrio_caso','fuera_horario'
 -- 2. TABLAS GLOBALES (sin tenant_id · solo super-admin)
 -- ============================================================================
 
+create table superadmin_roles (
+  id            uuid primary key default gen_random_uuid(),
+  nombre        text not null,
+  descripcion   text,
+  nivel         integer not null,
+  es_propietario boolean not null default false,
+  permisos      jsonb not null default '[]'::jsonb,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+
 create table plans (
   id                        uuid primary key default gen_random_uuid(),
   nombre                    text not null,
@@ -156,6 +167,7 @@ create table users (
   apodo          text,
   avatar_url     text,
   rol            rol_usuario not null,
+  superadmin_rol_id uuid references superadmin_roles(id),
   activo         boolean not null default true,
   invitacion_aceptada boolean not null default false,
   fecha_creacion timestamptz not null default now()
@@ -561,6 +573,7 @@ alter table notification_preferences enable row level security;
 alter table plans              enable row level security;
 alter table vendedores         enable row level security;
 alter table error_logs         enable row level security;
+alter table superadmin_roles   enable row level security;
 
 -- ============================================================================
 -- 14. POLÍTICAS RLS
@@ -701,6 +714,12 @@ create policy plans_read on plans for select using (auth.uid() is not null);
 create policy plans_super on plans for all using (is_super_admin()) with check (is_super_admin());
 create policy vendedores_super on vendedores for all using (is_super_admin()) with check (is_super_admin());
 create policy errors_super on error_logs for all using (is_super_admin()) with check (is_super_admin());
+
+create policy superadmin_roles_select on superadmin_roles for select
+  using (is_super_admin());
+create policy superadmin_roles_write on superadmin_roles for all
+  using (exists (select 1 from users u join superadmin_roles r on r.id = u.superadmin_rol_id where u.id = auth.uid() and (r.es_propietario = true or r.nivel <= 2)))
+  with check (exists (select 1 from users u join superadmin_roles r on r.id = u.superadmin_rol_id where u.id = auth.uid() and (r.es_propietario = true or r.nivel <= 2)));
 
 -- ============================================================================
 -- 15. RPC PARA REGISTRO DE TRIAL ATÓMICO (SECURITY DEFINER)

@@ -2115,3 +2115,154 @@ export async function getRendimientoVendedores(from?: string, to?: string) {
     return { success: false, error: err.message, data: [] }
   }
 }
+
+// ============================================================
+// FASE 3: CALIDAD DE SOPORTE (Visión General)
+// ============================================================
+
+export async function getCalidadSoporte(from?: string, to?: string, superadminId?: string) {
+  try {
+    const { supabase } = await requireSuperAdmin()
+    
+    // Fetch all support tickets (vendedores) and client tickets (clientes)
+    let querySupport = supabase.from('support_tickets').select('fecha_apertura, fecha_cierre, calificacion, fecha_calificacion, asignado_a')
+    let queryClient = supabase.from('client_tickets').select('fecha_apertura, fecha_cierre, calificacion, fecha_calificacion, asignado_a')
+
+    if (superadminId && superadminId !== 'todos') {
+      querySupport = querySupport.eq('asignado_a', superadminId)
+      queryClient = queryClient.eq('asignado_a', superadminId)
+    }
+
+    const [supportRes, clientRes] = await Promise.all([querySupport, queryClient])
+    if (supportRes.error) throw supportRes.error
+    if (clientRes.error) throw clientRes.error
+
+    const supportTickets = supportRes.data || []
+    const clientTickets = clientRes.data || []
+
+    const now = new Date()
+    const startDate = from ? new Date(from) : new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+    
+    let endDate = to ? new Date(to) : now
+    if (to && to.length <= 10) endDate.setHours(23, 59, 59, 999)
+
+    // Helper: is in range
+    const isInRange = (dateString: string | null) => {
+      if (!dateString) return false
+      const d = new Date(dateString)
+      return d >= startDate && d <= endDate
+    }
+
+    // Calcular KPIs resumen
+    const calcKPIs = (tickets: any[]) => {
+      let abiertosEnRango = 0
+      let cerradosEnRango = 0
+      let sumaHoras = 0
+      let countHoras = 0
+      let sumaValoracion = 0
+      let countValoracion = 0
+
+      tickets.forEach(t => {
+        const apertura = t.fecha_apertura ? new Date(t.fecha_apertura) : null
+        const cierre = t.fecha_cierre ? new Date(t.fecha_cierre) : null
+
+        if (t.fecha_apertura && isInRange(t.fecha_apertura)) abiertosEnRango++
+        if (t.fecha_cierre && isInRange(t.fecha_cierre)) cerradosEnRango++
+
+        if (apertura && cierre && isInRange(t.fecha_cierre)) {
+          const diffHoras = (cierre.getTime() - apertura.getTime()) / (1000 * 60 * 60)
+          sumaHoras += diffHoras
+          countHoras++
+        }
+
+        if (t.calificacion !== null && t.fecha_calificacion && isInRange(t.fecha_calificacion)) {
+           sumaValoracion += t.calificacion
+           countValoracion++
+        }
+      })
+
+      return {
+        abiertosEnRango,
+        cerradosEnRango,
+        tiempoMedioResolucionHoras: countHoras > 0 ? Number((sumaHoras / countHoras).toFixed(1)) : 0,
+        valoracionMedia: countValoracion > 0 ? Number((sumaValoracion / countValoracion).toFixed(1)) : 0
+      }
+    }
+
+    const diffDays = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+    const granularity = diffDays > 365 ? 'mes' : diffDays > 90 ? 'semana' : 'dia'
+
+    const dataPoints = []
+    let current = new Date(startDate)
+    current.setHours(0, 0, 0, 0)
+    
+    const end = new Date(endDate)
+    end.setHours(23, 59, 59, 999)
+
+    while (current <= end) {
+      const bucketEnd = new Date(current)
+      let label = ''
+      
+      if (granularity === 'dia') {
+        bucketEnd.setHours(23, 59, 59, 999)
+        label = current.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })
+      } else if (granularity === 'semana') {
+        bucketEnd.setDate(current.getDate() + 6)
+        bucketEnd.setHours(23, 59, 59, 999)
+        if (bucketEnd > end) bucketEnd.setTime(end.getTime())
+        label = `Sem. ${current.getDate()} ${current.toLocaleDateString('es-ES', { month: 'short' })}`
+      } else {
+        bucketEnd.setMonth(current.getMonth() + 1)
+        bucketEnd.setDate(0)
+        bucketEnd.setHours(23, 59, 59, 999)
+        if (bucketEnd > end) bucketEnd.setTime(end.getTime())
+        label = current.toLocaleDateString('es-ES', { month: 'short', year: '2-digit' })
+      }
+
+      // Calc medias para bucket
+      const calcBucketMedia = (tickets: any[]) => {
+        let sum = 0
+        let count = 0
+        tickets.forEach(t => {
+          if (t.calificacion !== null && t.fecha_calificacion) {
+            const d = new Date(t.fecha_calificacion)
+            if (d >= current && d <= bucketEnd) {
+              sum += t.calificacion
+              count++
+            }
+          }
+        })
+        return count > 0 ? Number((sum / count).toFixed(1)) : null
+      }
+
+      dataPoints.push({
+        fecha: label,
+        timestamp: current.getTime(),
+        mediaVendedores: calcBucketMedia(supportTickets),
+        mediaClientes: calcBucketMedia(clientTickets)
+      })
+
+      if (granularity === 'dia') {
+        current.setDate(current.getDate() + 1)
+      } else if (granularity === 'semana') {
+        current.setDate(current.getDate() + 7)
+      } else {
+        current.setMonth(current.getMonth() + 1)
+        current.setDate(1)
+      }
+    }
+
+    return { 
+      success: true, 
+      data: {
+        grafico: dataPoints,
+        resumen: {
+          vendedores: calcKPIs(supportTickets),
+          clientes: calcKPIs(clientTickets)
+        }
+      } 
+    }
+  } catch (err: any) {
+    return { success: false, error: err.message, data: null }
+  }
+}

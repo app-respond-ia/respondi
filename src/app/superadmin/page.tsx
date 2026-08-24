@@ -1,10 +1,11 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { getDashboardData, getEvolucionNegocio, getRendimientoVendedores, requireSuperAdmin } from '@/app/actions/superadmin'
+import { getDashboardData, getEvolucionNegocio, getRendimientoVendedores, getSuperadmins, getCalidadSoporte, requireSuperAdmin } from '@/app/actions/superadmin'
 import { superadminHasPermission } from '@/lib/permisosSuperadmin'
 import DateRangeSelector from './DateRangeSelector'
 import EvolucionChart from './EvolucionChart'
 import RendimientoVendedores from './RendimientoVendedores'
+import CalidadSoporte from './CalidadSoporte'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,10 +18,12 @@ export default async function SuperadminDashboardPage({ searchParams }: { search
   const from = typeof searchParams.from === 'string' ? searchParams.from : undefined
   const to = typeof searchParams.to === 'string' ? searchParams.to : undefined
   
-  const [dashboardRes, evolucionRes, rendimientoRes] = await Promise.all([
+  const [dashboardRes, evolucionRes, rendimientoRes, superadminsRes, calidadSoporteRes] = await Promise.all([
     getDashboardData(from, to),
     getEvolucionNegocio(from, to),
-    getRendimientoVendedores(from, to)
+    getRendimientoVendedores(from, to),
+    getSuperadmins(),
+    getCalidadSoporte(from, to)
   ])
 
   if (!dashboardRes.success || !dashboardRes.data) {
@@ -103,6 +106,16 @@ export default async function SuperadminDashboardPage({ searchParams }: { search
       {/* Fase 2: Rendimiento de vendedores */}
       {rendimientoRes.success && rendimientoRes.data && (
         <RendimientoVendedores initialData={rendimientoRes.data} />
+      )}
+
+      {/* Fase 3: Calidad de soporte */}
+      {calidadSoporteRes.success && calidadSoporteRes.data && superadminsRes.success && superadminsRes.data && (
+        <CalidadSoporte 
+          initialData={calidadSoporteRes.data} 
+          superadmins={superadminsRes.data} 
+          from={from} 
+          to={to} 
+        />
       )}
 
       {/* Alertas de errores */}

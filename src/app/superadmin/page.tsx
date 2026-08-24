@@ -1,9 +1,10 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { getDashboardData, getEvolucionNegocio, requireSuperAdmin } from '@/app/actions/superadmin'
+import { getDashboardData, getEvolucionNegocio, getRendimientoVendedores, requireSuperAdmin } from '@/app/actions/superadmin'
 import { superadminHasPermission } from '@/lib/permisosSuperadmin'
 import DateRangeSelector from './DateRangeSelector'
 import EvolucionChart from './EvolucionChart'
+import RendimientoVendedores from './RendimientoVendedores'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,9 +17,10 @@ export default async function SuperadminDashboardPage({ searchParams }: { search
   const from = typeof searchParams.from === 'string' ? searchParams.from : undefined
   const to = typeof searchParams.to === 'string' ? searchParams.to : undefined
   
-  const [dashboardRes, evolucionRes] = await Promise.all([
+  const [dashboardRes, evolucionRes, rendimientoRes] = await Promise.all([
     getDashboardData(from, to),
-    getEvolucionNegocio(from, to)
+    getEvolucionNegocio(from, to),
+    getRendimientoVendedores(from, to)
   ])
 
   if (!dashboardRes.success || !dashboardRes.data) {
@@ -96,6 +98,11 @@ export default async function SuperadminDashboardPage({ searchParams }: { search
       {/* Gráfico principal */}
       {evolucionRes.success && evolucionRes.data && (
         <EvolucionChart data={evolucionRes.data} />
+      )}
+
+      {/* Fase 2: Rendimiento de vendedores */}
+      {rendimientoRes.success && rendimientoRes.data && (
+        <RendimientoVendedores initialData={rendimientoRes.data} />
       )}
 
       {/* Alertas de errores */}

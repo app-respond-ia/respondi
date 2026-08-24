@@ -2032,3 +2032,86 @@ export async function asignarRolSuperadmin(targetUserId: string, rolId: string |
     return { success: false, error: err.message }
   }
 }
+
+// ============================================================
+// FASE 2: RENDIMIENTO DE VENDEDORES (Visión General)
+// ============================================================
+
+export async function getRendimientoVendedores(from?: string, to?: string) {
+  try {
+    const { supabase } = await requireSuperAdmin()
+    
+    const { data: vendedores, error } = await supabase.from('vendedores').select(`
+      id,
+      nombre,
+      vendedor_clientes ( id, fecha_vinculacion ),
+      comisiones ( importe, estado, fecha_generacion, fecha_pago, moneda )
+    `)
+    
+    if (error) throw error
+
+    let fromDate = from ? new Date(from) : null
+    let toDate = to ? new Date(to) : null
+
+    // Asegurarse de que toDate llega a final del día si no tiene hora específica
+    if (toDate && to && to.length <= 10) {
+      toDate.setHours(23, 59, 59, 999)
+    }
+
+    const isInRange = (dateString: string | null) => {
+      if (!dateString) return false
+      const d = new Date(dateString)
+      if (fromDate && d < fromDate) return false
+      if (toDate && d > toDate) return false
+      return true
+    }
+
+    const stats = (vendedores || []).map(v => {
+      const clientes = v.vendedor_clientes || []
+      const comisiones = v.comisiones || []
+
+      const clientesHistoricos = clientes.length
+      const clientesCaptadosEnRango = from || to ? clientes.filter((c: any) => isInRange(c.fecha_vinculacion)).length : clientesHistoricos
+
+      let comisionesGeneradasEnRango = 0
+      let comisionesPagadasEnRango = 0
+      let comisionesPendientes = 0
+
+      comisiones.forEach((c: any) => {
+        const importe = Number(c.importe) || 0
+
+        // Comisiones pendientes (sin filtro de fecha porque es estado actual)
+        if (c.estado === 'pendiente') {
+          comisionesPendientes += importe
+        }
+
+        // Comisiones generadas en rango
+        if (isInRange(c.fecha_generacion)) {
+          comisionesGeneradasEnRango += importe
+        }
+
+        // Comisiones pagadas en rango
+        if (c.estado === 'pagada' && isInRange(c.fecha_pago)) {
+          comisionesPagadasEnRango += importe
+        }
+      })
+
+      return {
+        id: v.id,
+        nombre: v.nombre,
+        clientesCaptadosEnRango,
+        clientesHistoricos,
+        comisionesGeneradasEnRango,
+        comisionesPagadasEnRango,
+        comisionesPendientes
+      }
+    }).filter(v => v.clientesHistoricos > 0 || v.comisionesGeneradasEnRango > 0 || v.comisionesPendientes > 0 || v.comisionesPagadasEnRango > 0)
+
+    // Ordenar por defecto por comisionesGeneradasEnRango DESC
+    stats.sort((a, b) => b.comisionesGeneradasEnRango - a.comisionesGeneradasEnRango)
+
+    return { success: true, data: stats }
+  } catch (err: any) {
+    return { success: false, error: err.message, data: [] }
+  }
+}

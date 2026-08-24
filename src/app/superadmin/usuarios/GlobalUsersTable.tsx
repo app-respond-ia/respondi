@@ -12,7 +12,7 @@ import {
   cambiarRolUsuario,
   degradarSuperadmin
 } from '@/app/actions/usuarios-globales'
-import { getSuperadminRoles, asignarRolSuperadmin } from '@/app/actions/superadmin'
+import { getSuperadminRoles, asignarRolSuperadmin, getOrganizacionesBasico, getPlanes } from '@/app/actions/superadmin'
 
 export default function GlobalUsersTable({ defaultFiltro }: { defaultFiltro: string }) {
   const { hasPermission } = useSuperadminPermisos()
@@ -24,6 +24,16 @@ export default function GlobalUsersTable({ defaultFiltro }: { defaultFiltro: str
   const [filtro, setFiltro] = useState(defaultFiltro)
   const [busqueda, setBusqueda] = useState('')
   const [superadminRoles, setSuperadminRoles] = useState<any[]>([])
+
+  // Advanced filters (only used for Clientes)
+  const [estadoFiltro, setEstadoFiltro] = useState('todos')
+  const [tenantFiltro, setTenantFiltro] = useState('')
+  const [planFiltro, setPlanFiltro] = useState('')
+  const [fechaDesde, setFechaDesde] = useState('')
+  const [fechaHasta, setFechaHasta] = useState('')
+  const [rolEmpresaFiltro, setRolEmpresaFiltro] = useState('todos')
+  const [organizaciones, setOrganizaciones] = useState<any[]>([])
+  const [planes, setPlanes] = useState<any[]>([])
 
   // Modal State
   const [confirmProps, setConfirmProps] = useState<{
@@ -43,14 +53,26 @@ export default function GlobalUsersTable({ defaultFiltro }: { defaultFiltro: str
 
   useEffect(() => {
     cargarRoles()
+    if (defaultFiltro === 'Clientes') {
+      cargarFiltros()
+    }
   }, [])
+
+  const cargarFiltros = async () => {
+    const [orgs, planesRes] = await Promise.all([
+      getOrganizacionesBasico(),
+      getPlanes()
+    ])
+    if (orgs.success && orgs.organizaciones) setOrganizaciones(orgs.organizaciones)
+    if (planesRes.success && planesRes.planes) setPlanes(planesRes.planes)
+  }
 
   useEffect(() => {
     const timer = setTimeout(() => {
       cargarUsuarios()
     }, 400)
     return () => clearTimeout(timer)
-  }, [filtro, busqueda])
+  }, [filtro, busqueda, estadoFiltro, tenantFiltro, planFiltro, fechaDesde, fechaHasta, rolEmpresaFiltro])
 
   const cargarRoles = async () => {
     const res = await getSuperadminRoles()
@@ -61,7 +83,14 @@ export default function GlobalUsersTable({ defaultFiltro }: { defaultFiltro: str
 
   const cargarUsuarios = async () => {
     setLoading(true)
-    const res = await getTodosLosUsuarios(filtro, busqueda)
+    const res = await getTodosLosUsuarios(filtro, busqueda, {
+      estado: estadoFiltro,
+      tenant_id: tenantFiltro,
+      plan_id: planFiltro,
+      fecha_desde: fechaDesde,
+      fecha_hasta: fechaHasta,
+      rol_empresa: rolEmpresaFiltro
+    })
     if (res.success && res.data) {
       setUsers(res.data)
     } else {
@@ -181,6 +210,58 @@ export default function GlobalUsersTable({ defaultFiltro }: { defaultFiltro: str
           <p className="text-ink-500 mt-1">Gestión centralizada de todos los usuarios de la plataforma.</p>
         </div>
       </div>
+
+      {defaultFiltro === 'Clientes' && (
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm mb-6 p-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div>
+              <label className="block text-xs font-600 text-ink-500 mb-1.5 uppercase tracking-wide">Estado</label>
+              <select value={estadoFiltro} onChange={e => setEstadoFiltro(e.target.value)} className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-brand-500 transition text-sm">
+                <option value="todos">Todos</option>
+                <option value="activo">Activos</option>
+                <option value="inactivo">Inactivos</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-xs font-600 text-ink-500 mb-1.5 uppercase tracking-wide">Organización</label>
+              <select value={tenantFiltro} onChange={e => setTenantFiltro(e.target.value)} className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-brand-500 transition text-sm">
+                <option value="">Cualquiera</option>
+                {organizaciones.map(o => (
+                  <option key={o.id} value={o.id}>{o.nombre}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-600 text-ink-500 mb-1.5 uppercase tracking-wide">Plan</label>
+              <select value={planFiltro} onChange={e => setPlanFiltro(e.target.value)} className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-brand-500 transition text-sm">
+                <option value="">Cualquiera</option>
+                {planes.map(p => (
+                  <option key={p.id} value={p.id}>{p.nombre}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-600 text-ink-500 mb-1.5 uppercase tracking-wide">Alta (Desde - Hasta)</label>
+              <div className="flex gap-2">
+                <input type="date" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)} className="w-1/2 h-10 px-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-brand-500 transition text-xs" />
+                <input type="date" value={fechaHasta} onChange={e => setFechaHasta(e.target.value)} className="w-1/2 h-10 px-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-brand-500 transition text-xs" />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-600 text-ink-500 mb-1.5 uppercase tracking-wide">Rol en empresa</label>
+              <select value={rolEmpresaFiltro} onChange={e => setRolEmpresaFiltro(e.target.value)} className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-brand-500 transition text-sm">
+                <option value="todos">Todos</option>
+                <option value="propietario">Propietarios</option>
+                <option value="resto">Resto de roles</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
         <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row gap-4">

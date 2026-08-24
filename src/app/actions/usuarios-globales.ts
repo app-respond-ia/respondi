@@ -7,7 +7,18 @@ import { superadminHasPermission } from '@/lib/permisosSuperadmin'
 import { revalidatePath } from 'next/cache'
 
 // 1. Obtener todos los usuarios globales
-export async function getTodosLosUsuarios(filtro: string = 'Todos', busqueda: string = '') {
+export async function getTodosLosUsuarios(
+  filtro: string = 'Todos', 
+  busqueda: string = '',
+  opts?: {
+    estado?: string, // 'activo', 'inactivo', 'todos'
+    tenant_id?: string,
+    plan_id?: string,
+    fecha_desde?: string,
+    fecha_hasta?: string,
+    rol_empresa?: string // 'propietario', 'resto', 'todos'
+  }
+) {
   try {
     const auth = await requireSuperAdmin()
     if (!superadminHasPermission(auth, 'usuarios_globales', 'lectura')) {
@@ -19,9 +30,11 @@ export async function getTodosLosUsuarios(filtro: string = 'Todos', busqueda: st
       .select(`
         id, email, nombre, rol, activo, fecha_creacion,
         tenant_id,
-        organizaciones (nombre),
+        organizaciones (nombre, plan_id),
         superadmin_rol_id,
-        superadmin_roles (nombre, nivel)
+        superadmin_roles (nombre, nivel),
+        rol_personalizado_id,
+        roles_personalizados (es_propietario, nombre)
       `)
       .order('fecha_creacion', { ascending: false })
 
@@ -37,10 +50,38 @@ export async function getTodosLosUsuarios(filtro: string = 'Todos', busqueda: st
       query = query.or(`email.ilike.%${busqueda}%,nombre.ilike.%${busqueda}%`)
     }
 
+    // Filtros directos a la tabla users
+    if (opts?.estado === 'activo') query = query.eq('activo', true)
+    if (opts?.estado === 'inactivo') query = query.eq('activo', false)
+    if (opts?.tenant_id) query = query.eq('tenant_id', opts.tenant_id)
+    if (opts?.fecha_desde) query = query.gte('fecha_creacion', opts.fecha_desde)
+    if (opts?.fecha_hasta) query = query.lte('fecha_creacion', opts.fecha_hasta)
+
     const { data, error } = await query
     if (error) throw error
 
-    return { success: true, data }
+    let filteredData = data
+
+    // Filtros sobre relaciones
+    if (opts?.plan_id) {
+      filteredData = filteredData.filter((u: any) => {
+        const orgs = Array.isArray(u.organizaciones) ? u.organizaciones[0] : u.organizaciones
+        return orgs?.plan_id === opts.plan_id
+      })
+    }
+
+    if (opts?.rol_empresa && opts.rol_empresa !== 'todos') {
+      filteredData = filteredData.filter((u: any) => {
+        const customRole = Array.isArray(u.roles_personalizados) ? u.roles_personalizados[0] : u.roles_personalizados
+        if (opts.rol_empresa === 'propietario') {
+          return customRole?.es_propietario === true
+        } else {
+          return customRole?.es_propietario !== true
+        }
+      })
+    }
+
+    return { success: true, data: filteredData }
   } catch (err: any) {
     return { success: false, error: err.message }
   }

@@ -45,6 +45,7 @@ const GRUPOS = [
       { id: 'skills', label: 'Skills de IA' },
       { id: 'errores', label: 'Errores del sistema' },
       { id: 'gestion_superadmins', label: 'Gestión de Superadmins' },
+      { id: 'usuarios_globales', label: 'Usuarios Globales' },
     ]
   }
 ]

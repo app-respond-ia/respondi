@@ -261,7 +261,13 @@ export async function getOrganizaciones(filtro?: string) {
 }
 
 export async function entrarComoOrganizacion(organizacionId: string) {
-  const { supabase, userId } = await requireSuperAdmin()
+  const auth = await requireSuperAdmin()
+  
+  if (!superadminHasPermission(auth, 'organizaciones', 'escritura')) {
+    return { success: false, error: 'No tienes permiso de escritura para impersonar' }
+  }
+
+  const { supabase, userId } = auth
   
   await setImpersonatedTenantId(organizacionId)
   

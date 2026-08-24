@@ -1,11 +1,18 @@
 import Link from 'next/link'
-import { getDashboardData, getEvolucionNegocio } from '@/app/actions/superadmin'
+import { redirect } from 'next/navigation'
+import { getDashboardData, getEvolucionNegocio, requireSuperAdmin } from '@/app/actions/superadmin'
+import { superadminHasPermission } from '@/lib/permisosSuperadmin'
 import DateRangeSelector from './DateRangeSelector'
 import EvolucionChart from './EvolucionChart'
 
 export const dynamic = 'force-dynamic'
 
 export default async function SuperadminDashboardPage({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
+  const auth = await requireSuperAdmin()
+  if (!superadminHasPermission(auth, 'vision_general', 'lectura')) {
+    redirect('/superadmin/organizaciones')
+  }
+
   const from = typeof searchParams.from === 'string' ? searchParams.from : undefined
   const to = typeof searchParams.to === 'string' ? searchParams.to : undefined
   

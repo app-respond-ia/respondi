@@ -12,6 +12,12 @@ type PermisoUI = {
 
 const GRUPOS = [
   {
+    label: 'Principal',
+    secciones: [
+      { id: 'vision_general', label: 'Visión general' },
+    ]
+  },
+  {
     label: 'Plataforma y Clientes',
     secciones: [
       { id: 'organizaciones', label: 'Organizaciones' },

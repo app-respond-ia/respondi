@@ -2,26 +2,26 @@
 
 import { useState } from 'react'
 import { cambiarContrasenaVendedor } from '@/app/actions/vendedor'
+import { useToast } from '@/components/ui/Toast'
 
 export default function PasswordForm() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isSaving, setIsSaving] = useState(false)
-  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+  const { showToast } = useToast()
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setIsSaving(true)
-    setMessage(null)
 
     if (password.length < 8) {
-      setMessage({ type: 'error', text: 'La contraseña debe tener al menos 8 caracteres.' })
+      showToast('La contraseña debe tener al menos 8 caracteres.', 'error')
       setIsSaving(false)
       return
     }
 
     if (password !== confirmPassword) {
-      setMessage({ type: 'error', text: 'Las contraseñas no coinciden.' })
+      showToast('Las contraseñas no coinciden.', 'error')
       setIsSaving(false)
       return
     }
@@ -30,11 +30,11 @@ export default function PasswordForm() {
     setIsSaving(false)
 
     if (res.success) {
-      setMessage({ type: 'success', text: 'Contraseña actualizada correctamente.' })
+      showToast('Contraseña actualizada correctamente.', 'success')
       setPassword('')
       setConfirmPassword('')
     } else {
-      setMessage({ type: 'error', text: res.error || 'Error al actualizar la contraseña.' })
+      showToast(res.error || 'Error al actualizar la contraseña.', 'error')
     }
   }
 
@@ -70,12 +70,6 @@ export default function PasswordForm() {
             />
           </div>
         </div>
-
-        {message && (
-          <div className={`p-4 rounded-xl text-sm font-500 ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-rose-50 text-rose-700 border border-rose-100'}`}>
-            {message.text}
-          </div>
-        )}
 
         <div className="flex justify-end pt-4 border-t border-slate-100">
           <button

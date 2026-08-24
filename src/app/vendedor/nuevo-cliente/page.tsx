@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { crearCuentaTrial } from '@/app/actions/vendedor'
+import { useToast } from '@/components/ui/Toast'
 
 export default function NuevoClientePage() {
   const [formData, setFormData] = useState({
@@ -10,20 +11,19 @@ export default function NuevoClientePage() {
     nombre_admin: ''
   })
   const [loading, setLoading] = useState(false)
-  const [resultado, setResultado] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
+  const { showToast } = useToast()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    setResultado(null)
 
     const res = await crearCuentaTrial(formData)
 
     if (res.success) {
-      setResultado({ tipo: 'exito', texto: `Cuenta trial creada para ${formData.nombre_organizacion}. Se ha enviado un email de acceso a ${formData.email_admin}.` })
+      showToast(`Cuenta trial creada para ${formData.nombre_organizacion}. Se ha enviado un email de acceso a ${formData.email_admin}.`, 'success')
       setFormData({ nombre_organizacion: '', email_admin: '', nombre_admin: '' })
     } else {
-      setResultado({ tipo: 'error', texto: res.error || 'Error al crear la cuenta' })
+      showToast(res.error || 'Error al crear la cuenta', 'error')
     }
     setLoading(false)
   }
@@ -34,12 +34,6 @@ export default function NuevoClientePage() {
         <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Nuevo cliente</h1>
         <p className="text-ink-500 mt-1">Crea una cuenta trial de 14 días para tu cliente. Quedará vinculada a ti automáticamente.</p>
       </div>
-
-      {resultado && (
-        <div className={`p-4 rounded-xl text-sm font-500 border ${resultado.tipo === 'exito' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
-          {resultado.texto}
-        </div>
-      )}
 
       <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-5">
         <div>

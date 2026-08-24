@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import { actualizarPerfilVendedor } from '@/app/actions/vendedor'
 import { createClient } from '@/utils/supabase/client'
+import { useToast } from '@/components/ui/Toast'
 
 type VendedorData = {
   nombre: string
@@ -15,7 +16,7 @@ type VendedorData = {
 export default function PerfilForm({ vendedor, avatarUrl }: { vendedor: VendedorData, avatarUrl?: string }) {
   const [nombre, setNombre] = useState(vendedor.nombre || '')
   const [isSaving, setIsSaving] = useState(false)
-  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+  const { showToast } = useToast()
   
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string>(avatarUrl || '')
@@ -24,7 +25,6 @@ export default function PerfilForm({ vendedor, avatarUrl }: { vendedor: Vendedor
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setIsSaving(true)
-    setMessage(null)
 
     let finalAvatarUrl = avatarUrl
 
@@ -39,7 +39,7 @@ export default function PerfilForm({ vendedor, avatarUrl }: { vendedor: Vendedor
             .upload(filePath, avatarFile, { upsert: true, contentType: avatarFile.type })
           
           if (uploadError) {
-            setMessage({ type: 'error', text: 'Error al subir la imagen de perfil: ' + uploadError.message })
+            showToast('Error al subir la imagen de perfil: ' + uploadError.message, 'error')
             setIsSaving(false)
             return
           }
@@ -52,13 +52,13 @@ export default function PerfilForm({ vendedor, avatarUrl }: { vendedor: Vendedor
       setIsSaving(false)
 
       if (res.success) {
-        setMessage({ type: 'success', text: 'Perfil actualizado correctamente.' })
+        showToast('Perfil actualizado correctamente.', 'success')
       } else {
-        setMessage({ type: 'error', text: res.error || 'Error al actualizar el perfil.' })
+        showToast(res.error || 'Error al actualizar el perfil.', 'error')
       }
     } catch (e: any) {
       setIsSaving(false)
-      setMessage({ type: 'error', text: 'Ocurrió un error inesperado.' })
+      showToast('Ocurrió un error inesperado.', 'error')
     }
   }
 
@@ -93,7 +93,7 @@ export default function PerfilForm({ vendedor, avatarUrl }: { vendedor: Vendedor
                   const file = e.target.files?.[0]
                   if (file) {
                     if (file.size > 5 * 1024 * 1024) {
-                      setMessage({ type: 'error', text: 'La imagen debe pesar menos de 5MB' })
+                      showToast('La imagen debe pesar menos de 5MB', 'error')
                       return
                     }
                     setAvatarFile(file)
@@ -136,12 +136,6 @@ export default function PerfilForm({ vendedor, avatarUrl }: { vendedor: Vendedor
               <p className="text-xs text-ink-400 mt-1.5">El correo electrónico se usa para iniciar sesión y no se puede cambiar aquí.</p>
             </div>
           </div>
-
-          {message && (
-            <div className={`p-4 rounded-xl text-sm font-500 ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-rose-50 text-rose-700 border border-rose-100'}`}>
-              {message.text}
-            </div>
-          )}
 
           <div className="flex justify-end pt-4 border-t border-slate-100">
             <button

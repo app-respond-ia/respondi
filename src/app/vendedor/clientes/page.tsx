@@ -3,6 +3,7 @@ import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
 import { getVendedorClientes, actualizarClienteSeguimiento } from '@/app/actions/vendedor'
+import { useToast } from '@/components/ui/Toast'
 
 const ESTADOS = ['trial', 'negociacion', 'activo', 'en_riesgo', 'perdido'] as const
 type EstadoSeguimiento = typeof ESTADOS[number]
@@ -23,8 +24,7 @@ export default function VendedorClientesPage() {
   const [editEstado, setEditEstado] = useState<EstadoSeguimiento>('trial')
   const [editNotas, setEditNotas] = useState('')
   const [saving, setSaving] = useState(false)
-  const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
-
+  const { showToast } = useToast()
   useEffect(() => { cargar() }, [])
 
   const cargar = async () => {
@@ -49,12 +49,11 @@ export default function VendedorClientesPage() {
     })
     if (res.success) {
       setSelectedCliente(null)
-      setMensaje({ tipo: 'exito', texto: 'Cliente actualizado ✓' })
+      showToast('Cliente actualizado ✓', 'success')
       cargar()
     } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al actualizar' })
+      showToast(res.error || 'Error al actualizar', 'error')
     }
-    setTimeout(() => setMensaje(null), 3000)
     setSaving(false)
   }
 
@@ -66,12 +65,6 @@ export default function VendedorClientesPage() {
 
   return (
     <div className="space-y-6">
-      {mensaje && (
-        <div className={`p-4 rounded-xl font-500 text-sm border ${mensaje.tipo === 'exito' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
-          {mensaje.texto}
-        </div>
-      )}
-
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Mis clientes</h1>

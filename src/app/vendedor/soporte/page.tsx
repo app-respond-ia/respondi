@@ -7,6 +7,7 @@ import Loading from '@/components/Loading'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { useToast } from '@/components/ui/Toast'
 
 export default function VendedorSoportePage() {
   const [tickets, setTickets] = useState<any[]>([])
@@ -16,7 +17,7 @@ export default function VendedorSoportePage() {
   
   const [asunto, setAsunto] = useState('')
   const [mensaje, setMensaje] = useState('')
-  const [errorMsg, setErrorMsg] = useState('')
+  const { showToast } = useToast()
 
   const [filtroBusqueda, setFiltroBusqueda] = useState('')
   const [filtroEstatus, setFiltroEstatus] = useState('')
@@ -36,7 +37,6 @@ export default function VendedorSoportePage() {
 
   const handleCrearTicket = async (e: React.FormEvent) => {
     e.preventDefault()
-    setErrorMsg('')
     setIsSubmitting(true)
     
     const res = await crearTicketSoporte(asunto, mensaje)
@@ -45,9 +45,10 @@ export default function VendedorSoportePage() {
       setAsunto('')
       setMensaje('')
       setIsModalOpen(false)
+      showToast('Ticket creado ✓', 'success')
       cargarTickets()
     } else {
-      setErrorMsg(res.error || 'Error al crear el ticket')
+      showToast(res.error || 'Error al crear el ticket', 'error')
     }
     setIsSubmitting(false)
   }
@@ -171,12 +172,6 @@ export default function VendedorSoportePage() {
             </div>
             
             <form onSubmit={handleCrearTicket} className="p-6 space-y-4">
-              {errorMsg && (
-                <div className="p-3 bg-red-50 text-red-700 text-sm font-500 rounded-lg">
-                  {errorMsg}
-                </div>
-              )}
-              
               <div>
                 <label className="block text-sm font-600 text-ink-900 mb-1.5">Asunto</label>
                 <input 

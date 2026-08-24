@@ -12,6 +12,7 @@ import { ActivityLog } from '@/components/ui/ActivityLog'
 import { AIToggle } from '@/components/ui/AIToggle'
 import { getConversacionDetalle, pausarIA, reanudarIA } from '@/app/actions/conversaciones'
 import { getAgentesParaCasos, crearCasoDesdeConversacion } from '@/app/actions/casos'
+import { useToast } from '@/components/ui/Toast'
 import { getLogsAuditoria } from '@/app/actions/audit-log'
 import { getMisPermisos } from '@/app/actions/permisos'
 
@@ -23,6 +24,7 @@ export default function ConversacionDetallePage() {
 
   const [conv, setConv] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const { showToast } = useToast()
   const [cambiandoIA, setCambiandoIA] = useState(false)
   const [agentes, setAgentes] = useState<any[]>([])
   const [procesandoCaso, setProcesandoCaso] = useState(false)
@@ -105,7 +107,7 @@ export default function ConversacionDetallePage() {
       setCambiandoIA(false)
       return true
     } catch (e) {
-      alert('Error al modificar estado de la IA')
+      showToast('Error al modificar estado de la IA', 'error')
       setCambiandoIA(false)
       return false
     }

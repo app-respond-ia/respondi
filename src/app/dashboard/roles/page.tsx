@@ -4,6 +4,7 @@ import Loading from '@/components/Loading'
 import { useState, useEffect } from 'react'
 import { getRolesPersonalizados, crearRolPersonalizado, actualizarRolPersonalizado, eliminarRolPersonalizado } from '@/app/actions/roles'
 import { getMisPermisos } from '@/app/actions/permisos'
+import { useToast } from '@/components/ui/Toast'
 
 type PermisoUI = {
   seccion: string
@@ -51,7 +52,7 @@ export default function RolesPage() {
   const [loading, setLoading] = useState(true)
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
   const [myLevel, setMyLevel] = useState<number>(5)
-  const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
+  const { showToast } = useToast()
   const [searchQuery, setSearchQuery] = useState('')
   const [filterNivel, setFilterNivel] = useState<string>('todos')
 
@@ -112,8 +113,7 @@ export default function RolesPage() {
 
   const handleGuardar = async () => {
     if (!nombre.trim()) {
-      setMensaje({ tipo: 'error', texto: 'El nombre del rol es obligatorio' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast('El nombre del rol es obligatorio', 'error')
       return
     }
     setSaving(true)
@@ -134,12 +134,11 @@ export default function RolesPage() {
 
     if (res.success) {
       setIsModalOpen(false)
-      setMensaje({ tipo: 'exito', texto: modalMode === 'crear' ? 'Rol creado ✓' : 'Rol actualizado ✓' })
+      showToast(modalMode === 'crear' ? 'Rol creado ✓' : 'Rol actualizado ✓', 'success')
       cargar()
     } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al guardar' })
+      showToast(res.error || 'Error al guardar', 'error')
     }
-    setTimeout(() => setMensaje(null), 3000)
     setSaving(false)
   }
 
@@ -201,13 +200,6 @@ export default function RolesPage() {
 
   return (
     <div className="p-6 sm:p-10 max-w-4xl w-full mx-auto pb-20">
-      {mensaje && (
-        <div className={`mb-6 p-4 rounded-xl font-500 text-sm border flex items-center gap-2 ${
-          mensaje.tipo === 'exito' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'
-        }`}>
-          {mensaje.texto}
-        </div>
-      )}
 
       <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
         <div>

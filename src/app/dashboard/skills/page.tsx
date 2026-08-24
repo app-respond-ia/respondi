@@ -4,6 +4,7 @@ import Loading from '@/components/Loading'
 import { useState, useEffect } from 'react'
 import { getMisPermisos } from '@/app/actions/permisos'
 import { getSkillsParaCliente, toggleSkillCliente } from '@/app/actions/skills-globales'
+import { useToast } from '@/components/ui/Toast'
 
 export default function SkillsPage() {
   const [loading, setLoading] = useState(true)
@@ -11,7 +12,7 @@ export default function SkillsPage() {
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
   const [branchId, setBranchId] = useState<string | null>(null)
   const [tenantId, setTenantId] = useState<string | null>(null)
-  const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
+  const { showToast } = useToast()
 
   useEffect(() => { cargar() }, [])
 
@@ -50,8 +51,7 @@ export default function SkillsPage() {
     const res = await toggleSkillCliente(branchId, tenantId, item.nombre, nuevoEstado)
     if (!res.success) {
       setItems(prev => prev.map(s => s.id === item.id ? { ...s, activo: item.activo } : s))
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al actualizar' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast(res.error || 'Error al actualizar', 'error')
     }
   }
 
@@ -69,11 +69,6 @@ export default function SkillsPage() {
 
   return (
     <div className="p-6 sm:p-10 max-w-4xl w-full mx-auto pb-20">
-      {mensaje && (
-        <div className={`mb-6 p-4 rounded-xl font-500 text-sm border ${mensaje.tipo === 'exito' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
-          {mensaje.texto}
-        </div>
-      )}
 
       <div className="mb-6">
         <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Skills de IA</h1>

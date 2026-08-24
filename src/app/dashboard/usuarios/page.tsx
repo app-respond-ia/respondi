@@ -12,6 +12,7 @@ import {
 } from '@/app/actions/usuarios'
 import { getMisPermisos, getPermisosUsuario } from '@/app/actions/permisos'
 import { getRolesPersonalizados } from '@/app/actions/roles'
+import { useToast } from '@/components/ui/Toast'
 
 import Link from 'next/link'
 
@@ -25,7 +26,7 @@ export default function UsuariosPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [sucursales, setSucursales] = useState<any[]>([])
 
-  const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
+  const { showToast } = useToast()
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterRol, setFilterRol] = useState<string>('todos')
@@ -39,7 +40,6 @@ export default function UsuariosPage() {
     email: '', nombre: '', branch_ids: []
   })
   const [inviteRolId, setInviteRolId] = useState<string>('')
-  const [inviteError, setInviteError] = useState<string | null>(null)
 
   // Editar Modal
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
@@ -75,7 +75,7 @@ export default function UsuariosPage() {
       setCurrentUserId(res.data.current_user_id)
       setSucursales(res.data.sucursales)
     } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al cargar usuarios' })
+      showToast(res.error || 'Error al cargar usuarios', 'error')
     }
 
     if (rolesRes.success && rolesRes.data) {
@@ -92,18 +92,16 @@ export default function UsuariosPage() {
   const handleOpenInvite = () => {
     setInviteData({ email: '', nombre: '', branch_ids: [] })
     setInviteRolId('')
-    setInviteError(null)
     setIsInviteModalOpen(true)
   }
 
   const handleInvitar = async (e: React.FormEvent) => {
     e.preventDefault()
     if (inviteData.branch_ids.length === 0) {
-      setInviteError('Debes seleccionar al menos una sucursal')
+      showToast('Debes seleccionar al menos una sucursal', 'error')
       return
     }
     setInviteLoading(true)
-    setInviteError(null)
 
     const res = await invitarUsuario({
       email: inviteData.email,
@@ -114,11 +112,10 @@ export default function UsuariosPage() {
 
     if (res.success) {
       setIsInviteModalOpen(false)
-      setMensaje({ tipo: 'exito', texto: `Invitación enviada a ${inviteData.email} ✓` })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast(`Invitación enviada a ${inviteData.email} ✓`, 'success')
       cargar()
     } else {
-      setInviteError(res.error || 'Error al invitar usuario')
+      showToast(res.error || 'Error al invitar usuario', 'error')
     }
     setInviteLoading(false)
   }
@@ -138,7 +135,7 @@ export default function UsuariosPage() {
     e.preventDefault()
     if (!selectedUser) return
     if (editData.branch_ids.length === 0) {
-      setMensaje({ tipo: 'error', texto: 'Debes seleccionar al menos una sucursal' })
+      showToast('Debes seleccionar al menos una sucursal', 'error')
       return
     }
     setEditLoading(true)
@@ -151,12 +148,10 @@ export default function UsuariosPage() {
 
     if (res.success) {
       setIsEditModalOpen(false)
-      setMensaje({ tipo: 'exito', texto: 'Usuario actualizado correctamente ✓' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast('Usuario actualizado correctamente ✓', 'success')
       cargar()
     } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al actualizar usuario' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast(res.error || 'Error al actualizar usuario', 'error')
     }
     setEditLoading(false)
   }
@@ -165,11 +160,10 @@ export default function UsuariosPage() {
     if (!selectedUser) return
     const res = await reenviarInvitacion(selectedUser.email)
     if (res.success) {
-      setMensaje({ tipo: 'exito', texto: `Invitación reenviada a ${selectedUser.email} ✓` })
+      showToast(`Invitación reenviada a ${selectedUser.email} ✓`, 'success')
     } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al reenviar invitación' })
+      showToast(res.error || 'Error al reenviar invitación', 'error')
     }
-    setTimeout(() => setMensaje(null), 3000)
   }
 
   const handleToggleActivo = async () => {
@@ -184,12 +178,10 @@ export default function UsuariosPage() {
 
     if (res.success) {
       setIsEditModalOpen(false)
-      setMensaje({ tipo: 'exito', texto: `Usuario ${selectedUser.activo ? 'desactivado' : 'reactivado'} correctamente ✓` })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast(`Usuario ${selectedUser.activo ? 'desactivado' : 'reactivado'} correctamente ✓`, 'success')
       cargar()
     } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al cambiar estado del usuario' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast(res.error || 'Error al cambiar estado del usuario', 'error')
     }
     setEditLoading(false)
   }
@@ -280,15 +272,6 @@ export default function UsuariosPage() {
 
   return (
     <div className="p-6 sm:p-10 max-w-4xl w-full mx-auto pb-20">
-      {/* Mensaje global */}
-      {mensaje && (
-        <div className={`mb-6 p-4 rounded-xl font-500 text-sm border flex items-center gap-2 ${
-          mensaje.tipo === 'exito' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'
-        }`}>
-          {mensaje.texto}
-        </div>
-      )}
-
       {/* Encabezado */}
       <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
         <div>
@@ -494,11 +477,6 @@ export default function UsuariosPage() {
                 </div>
         
                 <div className="px-6 py-5 space-y-6 overflow-y-auto">
-                  {inviteError && (
-                    <div className="p-3 bg-red-50 border border-red-200 text-red-800 rounded-xl text-sm font-500">
-                      {inviteError}
-                    </div>
-                  )}
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>

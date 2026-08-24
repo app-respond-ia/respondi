@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { getTicketsCliente, crearTicketCliente } from '@/app/actions/soporte-cliente'
 import { toggleFijarTicket } from '@/app/actions/soporte-fijar'
 import Loading from '@/components/Loading'
+import { useToast } from '@/components/ui/Toast'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -16,7 +17,7 @@ export default function DashboardSoportePage() {
   
   const [asunto, setAsunto] = useState('')
   const [mensaje, setMensaje] = useState('')
-  const [errorMsg, setErrorMsg] = useState('')
+  const { showToast } = useToast()
 
   const [filtroBusqueda, setFiltroBusqueda] = useState('')
   const [filtroEstatus, setFiltroEstatus] = useState('')
@@ -36,7 +37,6 @@ export default function DashboardSoportePage() {
 
   const handleCrearTicket = async (e: React.FormEvent) => {
     e.preventDefault()
-    setErrorMsg('')
     setIsSubmitting(true)
     
     const res = await crearTicketCliente(asunto, mensaje)
@@ -45,9 +45,10 @@ export default function DashboardSoportePage() {
       setAsunto('')
       setMensaje('')
       setIsModalOpen(false)
+      showToast('Ticket creado exitosamente', 'success')
       cargarTickets()
     } else {
-      setErrorMsg(res.error || 'Error al crear el ticket')
+      showToast(res.error || 'Error al crear el ticket', 'error')
     }
     setIsSubmitting(false)
   }
@@ -64,6 +65,7 @@ export default function DashboardSoportePage() {
     const res = await toggleFijarTicket(id, 'cliente', !currentlyPinned)
     if (!res.success) {
       setTickets(prev => prev.map(t => t.id === id ? { ...t, fijado: currentlyPinned } : t))
+      showToast(res.error || 'Error al fijar ticket', 'error')
     }
   }
 
@@ -177,11 +179,6 @@ export default function DashboardSoportePage() {
             </div>
             
             <form onSubmit={handleCrearTicket} className="p-6 space-y-4">
-              {errorMsg && (
-                <div className="p-3 bg-red-50 text-red-700 text-sm font-500 rounded-lg">
-                  {errorMsg}
-                </div>
-              )}
               
               <div>
                 <label className="block text-sm font-600 text-ink-900 mb-1.5">Asunto</label>

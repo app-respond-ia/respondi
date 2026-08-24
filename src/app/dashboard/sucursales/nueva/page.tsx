@@ -4,6 +4,7 @@ import Loading from '@/components/Loading'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { getSucursales, getDatosSucursalParaCopiar, crearSucursalConDatos } from '@/app/actions/sucursales'
+import { useToast } from '@/components/ui/Toast'
 
 // CAMBIO 1: Husos horarios completos LATAM + España, ordenados de GMT-6 a GMT+1
 const TIMEZONES = [
@@ -63,7 +64,7 @@ export default function NuevaSucursalPage() {
   const [sucursales, setSucursales] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
+  const { showToast } = useToast()
 
   // Config inicial
   const [nombre, setNombre] = useState('')
@@ -240,8 +241,7 @@ export default function NuevaSucursalPage() {
 
   const handleIniciarOnboarding = () => {
     if (!nombre.trim()) {
-      setMensaje({ tipo: 'error', texto: 'El nombre de la sucursal es obligatorio' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast('El nombre de la sucursal es obligatorio', 'error')
       return
     }
     setStep('onboarding')
@@ -274,8 +274,7 @@ export default function NuevaSucursalPage() {
       router.push('/dashboard/sucursales')
       router.refresh()
     } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al crear la sucursal' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast(res.error || 'Error al crear la sucursal', 'error')
     }
     setSaving(false)
   }
@@ -294,12 +293,6 @@ export default function NuevaSucursalPage() {
           <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Nueva sucursal</h1>
           <p className="text-ink-500 mt-1">Configura los datos básicos y elige qué copiar de otras sucursales.</p>
         </div>
-
-        {mensaje && (
-          <div className={`mb-6 p-4 rounded-xl font-500 text-sm border ${mensaje.tipo === 'exito' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
-            {mensaje.texto}
-          </div>
-        )}
 
         <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-5 mb-6">
           <h2 className="font-600 text-ink-900 text-lg">Datos básicos</h2>
@@ -442,12 +435,6 @@ export default function NuevaSucursalPage() {
           <div className="h-full rounded-full bg-brand-600 transition-all duration-500" style={{ width: `${pct}%` }} />
         </div>
       </div>
-
-      {mensaje && (
-        <div className={`mb-6 p-4 rounded-xl font-500 text-sm border ${mensaje.tipo === 'exito' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
-          {mensaje.texto}
-        </div>
-      )}
 
       <div className="bg-white rounded-2xl border border-slate-200">
         <div className="p-6 sm:p-8">

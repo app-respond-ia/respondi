@@ -4,6 +4,8 @@ import Loading from '@/components/Loading'
 import { useState, useEffect } from 'react'
 import { getCanales, conectarCanal, desconectarCanal } from '@/app/actions/canales'
 import { getMisPermisos } from '@/app/actions/permisos'
+import { useToast } from '@/components/ui/Toast'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 type TipoCanal = 'instagram' | 'whatsapp' | 'facebook'
 type MetodoCanal = 'whaticket' | 'meta_oficial'
@@ -24,7 +26,10 @@ export default function CanalesPage() {
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
   const [canalesMax, setCanalesMax] = useState<number | null>(null)
   const [canalesActivosCount, setCanalesActivosCount] = useState<number>(0)
-  const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
+  const { showToast } = useToast()
+  
+  // Modal confirmación desconectar
+  const [canalADesconectar, setCanalADesconectar] = useState<string | null>(null)
 
   // Modal de Conexión
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -42,7 +47,7 @@ export default function CanalesPage() {
       setCanalesMax(res.data.canales_max)
       setCanalesActivosCount(res.data.canales_activos_count || 0)
     } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al cargar canales' })
+      showToast(res.error || 'Error al cargar canales', 'error')
     }
 
     const permisosRes = await getMisPermisos()
@@ -83,8 +88,7 @@ export default function CanalesPage() {
       setConexionConfirmada(true)
       cargar()
     } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al conectar canal' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast(res.error || 'Error al conectar canal', 'error')
     }
     setModalLoading(false)
   }
@@ -94,18 +98,20 @@ export default function CanalesPage() {
     setConexionConfirmada(false)
   }
 
-  const handleDesconectar = async (id: string) => {
-    if (confirm('¿Desconectar este canal? Dejarás de recibir mensajes por aquí.')) {
-      const res = await desconectarCanal(id)
-      if (res.success) {
-        setMensaje({ tipo: 'exito', texto: 'Canal desconectado.' })
-        setTimeout(() => setMensaje(null), 3000)
-        cargar()
-      } else {
-        setMensaje({ tipo: 'error', texto: res.error || 'Error al desconectar canal' })
-        setTimeout(() => setMensaje(null), 3000)
-      }
+  const handleDesconectar = (id: string) => {
+    setCanalADesconectar(id)
+  }
+
+  const handleConfirmarDesconectar = async () => {
+    if (!canalADesconectar) return
+    const res = await desconectarCanal(canalADesconectar)
+    if (res.success) {
+      showToast('Canal desconectado.', 'success')
+      cargar()
+    } else {
+      showToast(res.error || 'Error al desconectar canal', 'error')
     }
+    setCanalADesconectar(null)
   }
 
   if (loading || nivelPermiso === null) {
@@ -233,14 +239,6 @@ export default function CanalesPage() {
 
   return (
     <div className="p-6 sm:p-10 max-w-4xl w-full mx-auto pb-20">
-      {/* Mensaje global */}
-      {mensaje && (
-        <div className={`mb-6 p-4 rounded-xl font-500 text-sm border flex items-center gap-2 ${
-          mensaje.tipo === 'exito' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'
-        }`}>
-          {mensaje.texto}
-        </div>
-      )}
 
       {/* Encabezado */}
       <div className="mb-6">
@@ -367,6 +365,17 @@ export default function CanalesPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={!!canalADesconectar}
+        title="Desconectar canal"
+        message="¿Desconectar este canal? Dejarás de recibir mensajes por aquí."
+        confirmText="Desconectar"
+        cancelText="Cancelar"
+        type="danger"
+        onConfirm={handleConfirmarDesconectar}
+        onClose={() => setCanalADesconectar(null)}
+      />
     </div>
   )
 }

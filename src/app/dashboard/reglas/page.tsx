@@ -29,6 +29,8 @@ import {
   useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { useToast } from '@/components/ui/Toast'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 function ReglaRow({ item, onToggle, onEdit, onDelete, dragHandleProps, disableDrag, soloLectura }: {
   item: any,
@@ -177,8 +179,10 @@ export default function ReglasPage() {
   const [modalMode, setModalMode] = useState<'añadir' | 'editar'>('añadir')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
+  const { showToast } = useToast()
   const [busqueda, setBusqueda] = useState('')
+  
+  const [reglaAEliminar, setReglaAEliminar] = useState<string | null>(null)
   const [filtro, setFiltro] = useState<'todas' | 'activas' | 'inactivas'>('todas')
   const [activeId, setActiveId] = useState<string | null>(null)
 
@@ -245,18 +249,21 @@ export default function ReglasPage() {
     setIsModalOpen(true)
   }
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('¿Estás seguro de que quieres eliminar esta regla?')) return
+  const handleDelete = (id: string) => {
+    setReglaAEliminar(id)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!reglaAEliminar) return
     
-    const res = await eliminarRegla(id)
+    const res = await eliminarRegla(reglaAEliminar)
     if (res.success) {
-      setItems(prev => prev.filter(it => it.id !== id))
-      setMensaje({ tipo: 'exito', texto: 'Regla eliminada correctamente ✓' })
-      setTimeout(() => setMensaje(null), 3000)
+      setItems(prev => prev.filter(it => it.id !== reglaAEliminar))
+      showToast('Regla eliminada correctamente ✓', 'success')
     } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al eliminar la regla' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast(res.error || 'Error al eliminar la regla', 'error')
     }
+    setReglaAEliminar(null)
   }
 
   const handleToggleActiva = async (item: any) => {
@@ -266,8 +273,7 @@ export default function ReglasPage() {
     const res = await actualizarRegla(item.id, { activa: newActiva })
     if (!res.success) {
       setItems(prev => prev.map(it => it.id === item.id ? { ...it, activa: item.activa } : it))
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al actualizar el estado' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast(res.error || 'Error al actualizar el estado', 'error')
     }
   }
 
@@ -287,8 +293,7 @@ export default function ReglasPage() {
     const res = await reordenarReglas(ids)
     if (!res.success) {
       setItems(items) // Revert
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al reordenar las reglas' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast(res.error || 'Error al reordenar las reglas', 'error')
     }
   }
 
@@ -312,11 +317,9 @@ export default function ReglasPage() {
         setItems(prev => prev.map(it => it.id === editingId ? { ...it, ...res.data } : it).sort((a, b) => a.orden - b.orden))
       }
       setIsModalOpen(false)
-      setMensaje({ tipo: 'exito', texto: modalMode === 'añadir' ? 'Regla añadida correctamente ✓' : 'Regla actualizada correctamente ✓' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast(modalMode === 'añadir' ? 'Regla añadida correctamente ✓' : 'Regla actualizada correctamente ✓', 'success')
     } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al guardar la regla' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast(res.error || 'Error al guardar la regla', 'error')
     }
     setSaving(false)
   }
@@ -326,11 +329,9 @@ export default function ReglasPage() {
     const res = await crearReglasPlantilla()
     if (res.success && res.data) {
       setItems(res.data)
-      setMensaje({ tipo: 'exito', texto: 'Reglas sugeridas cargadas correctamente ✓' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast('Reglas sugeridas cargadas correctamente ✓', 'success')
     } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al cargar sugerencias' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast(res.error || 'Error al cargar sugerencias', 'error')
     }
     setSaving(false)
   }
@@ -366,12 +367,6 @@ export default function ReglasPage() {
 
   return (
     <div className="p-6 sm:p-10 max-w-4xl w-full mx-auto pb-20">
-      
-      {mensaje && (
-        <div className={`mb-6 text-sm font-semibold px-4 py-3 rounded-xl ${mensaje.tipo === 'exito' ? 'text-emerald-700 bg-emerald-50' : 'text-red-700 bg-red-50'}`}>
-          {mensaje.texto}
-        </div>
-      )}
 
       {/* Encabezado + acciones */}
       <div className="flex items-start justify-between gap-4 flex-wrap mb-8">
@@ -600,6 +595,17 @@ export default function ReglasPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={!!reglaAEliminar}
+        title="Eliminar regla"
+        message="¿Estás seguro de que quieres eliminar esta regla?"
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        type="danger"
+        onConfirm={handleConfirmDelete}
+        onClose={() => setReglaAEliminar(null)}
+      />
     </div>
   )
 }

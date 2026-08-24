@@ -5,13 +5,15 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { getSucursales, crearSucursal, desactivarSucursal, reactivarSucursal } from '@/app/actions/sucursales'
 import { getMisPermisos } from '@/app/actions/permisos'
+import { useToast } from '@/components/ui/Toast'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 export default function SucursalesPage() {
   const [loading, setLoading] = useState(true)
   const [sucursales, setSucursales] = useState<any[]>([])
   const [sucursalesMax, setSucursalesMax] = useState<number | null>(null)
   const [sucursalesActivasCount, setSucursalesActivasCount] = useState<number>(0)
-  const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
+  const { showToast } = useToast()
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
   // CAMBIO 6: Modal de confirmación para desactivar
   const [confirmarDesactivar, setConfirmarDesactivar] = useState<any | null>(null)
@@ -22,7 +24,6 @@ export default function SucursalesPage() {
   const [modalData, setModalData] = useState<{ nombre: string, direccion: string, copiarDesdeId: string }>({
     nombre: '', direccion: '', copiarDesdeId: ''
   })
-  const [modalError, setModalError] = useState<string | null>(null)
 
   const cargar = async () => {
     setLoading(true)
@@ -45,7 +46,7 @@ export default function SucursalesPage() {
       setSucursalesMax(res.data.sucursales_max)
       setSucursalesActivasCount(res.data.sucursales_activas_count || 0)
     } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al cargar sucursales' })
+      showToast(res.error || 'Error al cargar sucursales', 'error')
     }
     setLoading(false)
   }
@@ -56,24 +57,21 @@ export default function SucursalesPage() {
 
   const handleOpenModal = () => {
     setModalData({ nombre: '', direccion: '', copiarDesdeId: '' })
-    setModalError(null)
     setIsModalOpen(true)
   }
 
   const handleCrear = async (e: React.FormEvent) => {
     e.preventDefault()
     setModalLoading(true)
-    setModalError(null)
 
     const res = await crearSucursal(modalData.nombre, modalData.direccion, modalData.copiarDesdeId || undefined)
 
     if (res.success && res.data) {
       setIsModalOpen(false)
-      setMensaje({ tipo: 'exito', texto: 'Sucursal creada correctamente ✓' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast('Sucursal creada correctamente ✓', 'success')
       setSucursales([...sucursales, res.data])
     } else {
-      setModalError(res.error || 'Error al crear sucursal')
+      showToast(res.error || 'Error al crear sucursal', 'error')
     }
     setModalLoading(false)
   }
@@ -87,12 +85,10 @@ export default function SucursalesPage() {
     // Reactivar directamente sin confirmación
     const res = await reactivarSucursal(sucursal.id)
     if (res.success) {
-      setMensaje({ tipo: 'exito', texto: 'Sucursal reactivada correctamente ✓' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast('Sucursal reactivada correctamente ✓', 'success')
       cargar()
     } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al reactivar la sucursal' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast(res.error || 'Error al reactivar la sucursal', 'error')
     }
   }
 
@@ -102,12 +98,10 @@ export default function SucursalesPage() {
     setConfirmarDesactivar(null)
     const res = await desactivarSucursal(sucursal.id)
     if (res.success) {
-      setMensaje({ tipo: 'exito', texto: 'Sucursal desactivada correctamente ✓' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast('Sucursal desactivada correctamente ✓', 'success')
       cargar()
     } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al desactivar la sucursal' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast(res.error || 'Error al desactivar la sucursal', 'error')
     }
   }
 
@@ -128,15 +122,6 @@ export default function SucursalesPage() {
 
   return (
     <div className="p-6 sm:p-10 max-w-4xl w-full mx-auto pb-20">
-      {/* Mensaje global */}
-      {mensaje && (
-        <div className={`mb-6 p-4 rounded-xl font-500 text-sm border flex items-center gap-2 ${
-          mensaje.tipo === 'exito' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'
-        }`}>
-          {mensaje.texto}
-        </div>
-      )}
-
       {/* Encabezado */}
       <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
         <div>
@@ -252,12 +237,7 @@ export default function SucursalesPage() {
                 </div>
         
                 <div className="px-6 py-5 space-y-4 overflow-y-auto">
-                  {modalError && (
-                    <div className="p-3 bg-red-50 border border-red-200 text-red-800 rounded-xl text-sm font-500">
-                      {modalError}
-                    </div>
-                  )}
-
+                  
                   <div>
                     <label className="block text-sm font-500 text-ink-700 mb-1.5">Nombre</label>
                     <input type="text" placeholder="Ej: Sucursal Centro" required
@@ -301,36 +281,16 @@ export default function SucursalesPage() {
         </div>
       )}
 
-      {/* CAMBIO 6: Modal de confirmación para desactivar sucursal */}
-      {confirmarDesactivar && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-ink-900/50 backdrop-blur-sm">
-          <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-6">
-            <div className="w-12 h-12 rounded-2xl bg-red-100 flex items-center justify-center mx-auto mb-4">
-              <svg className="w-6 h-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-              </svg>
-            </div>
-            <h3 className="font-display font-700 text-lg text-ink-900 text-center mb-2">¿Desactivar sucursal?</h3>
-            <p className="text-sm text-ink-500 text-center mb-6">
-              Vas a desactivar <span className="font-600 text-ink-800">{confirmarDesactivar.nombre}</span>. La sucursal no se eliminará y podrás reactivarla cuando quieras.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setConfirmarDesactivar(null)}
-                className="flex-1 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleConfirmarDesactivar}
-                className="flex-1 h-11 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-600 transition shadow-lg shadow-red-600/30"
-              >
-                Sí, desactivar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmModal
+        isOpen={!!confirmarDesactivar}
+        title="¿Desactivar sucursal?"
+        message={confirmarDesactivar ? `Vas a desactivar ${confirmarDesactivar.nombre}. La sucursal no se eliminará y podrás reactivarla cuando quieras.` : ''}
+        confirmText="Sí, desactivar"
+        cancelText="Cancelar"
+        type="danger"
+        onConfirm={handleConfirmarDesactivar}
+        onClose={() => setConfirmarDesactivar(null)}
+      />
     </div>
   )
 }

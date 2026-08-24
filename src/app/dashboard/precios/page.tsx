@@ -5,6 +5,8 @@ import { useState, useEffect } from 'react'
 import { getPrecios, crearPrecio, actualizarPrecio, eliminarPrecio, importarPreciosMasivo, PrecioData } from '@/app/actions/precios'
 import { getCategorias, crearCategoria, actualizarCategoria, eliminarCategoria } from '@/app/actions/categorias-precios'
 import { getMisPermisos } from '@/app/actions/permisos'
+import { useToast } from '@/components/ui/Toast'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 export default function ListaPreciosPage() {
   const [loading, setLoading] = useState(true)
@@ -17,7 +19,7 @@ export default function ListaPreciosPage() {
   const [modalMode, setModalMode] = useState<'añadir' | 'editar'>('añadir')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
+  const { showToast } = useToast()
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [isAyudaModalOpen, setIsAyudaModalOpen] = useState(false)
   const [importando, setImportando] = useState(false)
@@ -33,6 +35,9 @@ export default function ListaPreciosPage() {
   const [nuevoNombreSubcategoria, setNuevoNombreSubcategoria] = useState('')
   const [editandoCatId, setEditandoCatId] = useState<string | null>(null)
   const [editandoCatNombre, setEditandoCatNombre] = useState('')
+
+  const [itemAEliminar, setItemAEliminar] = useState<string | null>(null)
+  const [catAEliminar, setCatAEliminar] = useState<string | null>(null)
 
   const [formData, setFormData] = useState<PrecioData>({
     nombre: '',
@@ -104,18 +109,21 @@ export default function ListaPreciosPage() {
     setIsModalOpen(true)
   }
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('¿Estás seguro de que quieres eliminar este ítem?')) return
+  const handleDelete = (id: string) => {
+    setItemAEliminar(id)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!itemAEliminar) return
     
-    const res = await eliminarPrecio(id)
+    const res = await eliminarPrecio(itemAEliminar)
     if (res.success) {
-      setItems(prev => prev.filter(it => it.id !== id))
-      setMensaje({ tipo: 'exito', texto: 'Ítem eliminado correctamente ✓' })
-      setTimeout(() => setMensaje(null), 3000)
+      setItems(prev => prev.filter(it => it.id !== itemAEliminar))
+      showToast('Ítem eliminado correctamente ✓', 'success')
     } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al eliminar el ítem' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast(res.error || 'Error al eliminar el ítem', 'error')
     }
+    setItemAEliminar(null)
   }
 
   const cargarCategorias = async () => {
@@ -147,13 +155,18 @@ export default function ListaPreciosPage() {
     }
   }
 
-  const handleEliminarCategoria = async (id: string) => {
-    if (!window.confirm('¿Eliminar esta categoría? Si tiene subcategorías, también se eliminarán.')) return
-    const res = await eliminarCategoria(id)
+  const handleEliminarCategoria = (id: string) => {
+    setCatAEliminar(id)
+  }
+
+  const handleConfirmEliminarCategoria = async () => {
+    if (!catAEliminar) return
+    const res = await eliminarCategoria(catAEliminar)
     if (res.success) {
-      if (categoriaSeleccionada === id) setCategoriaSeleccionada(null)
+      if (categoriaSeleccionada === catAEliminar) setCategoriaSeleccionada(null)
       cargarCategorias()
     }
+    setCatAEliminar(null)
   }
 
   const iniciarEdicion = (cat: any) => {
@@ -311,12 +324,11 @@ export default function ListaPreciosPage() {
     if (res.success) {
       setIsImportModalOpen(false)
       setImportPreview(null)
-      setMensaje({ tipo: 'exito', texto: `${res.total} producto${res.total === 1 ? '' : 's'} importado${res.total === 1 ? '' : 's'} correctamente ✓` })
+      showToast(`${res.total} producto${res.total === 1 ? '' : 's'} importado${res.total === 1 ? '' : 's'} correctamente ✓`, 'success')
       cargar()
     } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al importar' })
+      showToast(res.error || 'Error al importar', 'error')
     }
-    setTimeout(() => setMensaje(null), 4000)
     setImportando(false)
   }
 
@@ -350,11 +362,9 @@ export default function ListaPreciosPage() {
         setItems(prev => prev.map(it => it.id === editingId ? res.data : it))
       }
       setIsModalOpen(false)
-      setMensaje({ tipo: 'exito', texto: modalMode === 'añadir' ? 'Ítem añadido correctamente ✓' : 'Ítem actualizado correctamente ✓' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast(modalMode === 'añadir' ? 'Ítem añadido correctamente ✓' : 'Ítem actualizado correctamente ✓', 'success')
     } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al guardar el ítem' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast(res.error || 'Error al guardar el ítem', 'error')
     }
     setSaving(false)
   }
@@ -380,12 +390,6 @@ export default function ListaPreciosPage() {
 
   return (
     <div className="p-6 sm:p-10 max-w-6xl w-full mx-auto pb-20">
-      
-      {mensaje && (
-        <div className={`mb-6 text-sm font-semibold px-4 py-3 rounded-xl ${mensaje.tipo === 'exito' ? 'text-emerald-700 bg-emerald-50' : 'text-red-700 bg-red-50'}`}>
-          {mensaje.texto}
-        </div>
-      )}
 
       {/* Encabezado + acciones */}
       <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
@@ -918,6 +922,28 @@ export default function ListaPreciosPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={!!itemAEliminar}
+        title="Eliminar ítem"
+        message="¿Estás seguro de que quieres eliminar este ítem?"
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        type="danger"
+        onConfirm={handleConfirmDelete}
+        onClose={() => setItemAEliminar(null)}
+      />
+
+      <ConfirmModal
+        isOpen={!!catAEliminar}
+        title="Eliminar categoría"
+        message="¿Eliminar esta categoría? Si tiene subcategorías, también se eliminarán."
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        type="danger"
+        onConfirm={handleConfirmEliminarCategoria}
+        onClose={() => setCatAEliminar(null)}
+      />
     </div>
   )
 }

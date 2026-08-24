@@ -8,6 +8,8 @@ import {
 } from '@/app/actions/contactos'
 import { getMisPermisos } from '@/app/actions/permisos'
 import { formatChannelId } from '@/lib/formatters'
+import { useToast } from '@/components/ui/Toast'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 const CANAL_CONFIG = {
   instagram: {
@@ -77,12 +79,15 @@ export default function ContactosPage() {
   const [filtroTrato, setFiltroTrato] = useState<'todos' | 'normal' | 'sin_ia' | 'bloqueado'>('todos')
   const [filtroModo, setFiltroModo] = useState<'todos' | ModoContacto>('todos')
   
-  const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
+  const { showToast } = useToast()
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
   
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [savingContacto, setSavingContacto] = useState(false)
+  
+  // Modal confirmación
+  const [contactoADesbloquear, setContactoADesbloquear] = useState<any>(null)
   
   const [modalFormData, setModalFormData] = useState<{
     id?: string
@@ -203,32 +208,35 @@ export default function ContactosPage() {
     if (res.success && res.data) {
       setContactos(prev => [res.data, ...prev.filter(c => c.id !== res.data.id)])
       setIsModalOpen(false)
-      setMensaje({ tipo: 'exito', texto: 'Contacto guardado correctamente ✓' })
+      showToast('Contacto guardado correctamente ✓', 'success')
     } else {
-      setMensaje({ tipo: 'error', texto: 'Error al guardar contacto: ' + res.error })
+      showToast('Error al guardar contacto: ' + res.error, 'error')
     }
-    setTimeout(() => setMensaje(null), 3000)
     setSavingContacto(false)
   }
 
-  const handleDesbloquear = async (contacto: any) => {
-    if (!window.confirm('¿Cambiar el trato de este contacto a Normal? La IA volverá a responderle.')) return
+  const handleDesbloquear = (contacto: any) => {
+    setContactoADesbloquear(contacto)
+  }
+
+  const handleConfirmarDesbloquear = async () => {
+    if (!contactoADesbloquear) return
 
     const res = await actualizarTratoContacto({
-      canal: contacto.canal,
-      identificador_canal: contacto.identificador_canal,
-      nombre: contacto.nombre || null,
+      canal: contactoADesbloquear.canal,
+      identificador_canal: contactoADesbloquear.identificador_canal,
+      nombre: contactoADesbloquear.nombre || null,
       trato: 'normal',
       nota: 'Restaurado a normal'
     })
     
     if (res.success && res.data) {
-      setContactos(prev => [res.data, ...prev.filter(c => c.id !== contacto.id)])
-      setMensaje({ tipo: 'exito', texto: 'Contacto restaurado a estado normal ✓' })
+      setContactos(prev => [res.data, ...prev.filter(c => c.id !== contactoADesbloquear.id)])
+      showToast('Contacto restaurado a estado normal ✓', 'success')
     } else {
-      setMensaje({ tipo: 'error', texto: 'Error al actualizar contacto: ' + res.error })
+      showToast('Error al actualizar contacto: ' + res.error, 'error')
     }
-    setTimeout(() => setMensaje(null), 3000)
+    setContactoADesbloquear(null)
   }
 
   const contactosFiltrados = contactos.filter(c => {
@@ -251,15 +259,6 @@ export default function ContactosPage() {
 
   return (
     <div className="p-6 sm:p-10 max-w-4xl w-full mx-auto pb-20">
-      
-      {/* Mensaje global */}
-      {mensaje && (
-        <div className={`mb-6 p-4 rounded-xl font-500 text-sm border flex items-center gap-2 ${
-          mensaje.tipo === 'exito' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'
-        }`}>
-          {mensaje.texto}
-        </div>
-      )}
 
       {/* Encabezado + acciones */}
       <div className="flex items-start justify-between gap-4 flex-wrap mb-8">
@@ -523,6 +522,17 @@ export default function ContactosPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={!!contactoADesbloquear}
+        title="Hacer normal"
+        message="¿Cambiar el trato de este contacto a Normal? La IA volverá a responderle."
+        confirmText="Confirmar"
+        cancelText="Cancelar"
+        type="info"
+        onConfirm={handleConfirmarDesbloquear}
+        onClose={() => setContactoADesbloquear(null)}
+      />
     </div>
   )
 }

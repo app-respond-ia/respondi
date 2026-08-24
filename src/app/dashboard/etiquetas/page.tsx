@@ -29,6 +29,8 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { getMisPermisos } from '@/app/actions/permisos'
+import { useToast } from '@/components/ui/Toast'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 const COLORS = [
   { id: 'amber', bg: 'bg-amber-100', text: 'text-amber-700', square: 'bg-amber-500', ring: 'ring-amber-500' },
@@ -179,8 +181,10 @@ export default function EtiquetasPage() {
   const [modalMode, setModalMode] = useState<'añadir' | 'editar'>('añadir')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
+  const { showToast } = useToast()
   const [busqueda, setBusqueda] = useState('')
+  
+  const [etiquetaAEliminar, setEtiquetaAEliminar] = useState<string | null>(null)
 
   const [formData, setFormData] = useState<EtiquetaData>({
     nombre: '',
@@ -242,18 +246,21 @@ export default function EtiquetasPage() {
     setIsModalOpen(true)
   }
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('¿Estás seguro de que quieres eliminar esta etiqueta?')) return
+  const handleDelete = (id: string) => {
+    setEtiquetaAEliminar(id)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!etiquetaAEliminar) return
     
-    const res = await eliminarEtiqueta(id)
+    const res = await eliminarEtiqueta(etiquetaAEliminar)
     if (res.success) {
-      setItems(prev => prev.filter(it => it.id !== id))
-      setMensaje({ tipo: 'exito', texto: 'Etiqueta eliminada correctamente ✓' })
-      setTimeout(() => setMensaje(null), 3000)
+      setItems(prev => prev.filter(it => it.id !== etiquetaAEliminar))
+      showToast('Etiqueta eliminada correctamente ✓', 'success')
     } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al eliminar la etiqueta' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast(res.error || 'Error al eliminar la etiqueta', 'error')
     }
+    setEtiquetaAEliminar(null)
   }
 
   const handleToggleActiva = async (item: any) => {
@@ -263,8 +270,7 @@ export default function EtiquetasPage() {
     const res = await actualizarEtiqueta(item.id, { activa: newActiva })
     if (!res.success) {
       setItems(prev => prev.map(it => it.id === item.id ? { ...it, activa: item.activa } : it))
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al actualizar el estado' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast(res.error || 'Error al actualizar el estado', 'error')
     }
   }
 
@@ -284,8 +290,7 @@ export default function EtiquetasPage() {
     const res = await reordenarEtiquetas(ids)
     if (!res.success) {
       setItems(items) // Revert
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al reordenar las etiquetas' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast(res.error || 'Error al reordenar las etiquetas', 'error')
     }
   }
 
@@ -309,11 +314,9 @@ export default function EtiquetasPage() {
         setItems(prev => prev.map(it => it.id === editingId ? { ...it, ...res.data } : it))
       }
       setIsModalOpen(false)
-      setMensaje({ tipo: 'exito', texto: modalMode === 'añadir' ? 'Etiqueta añadida correctamente ✓' : 'Etiqueta actualizada correctamente ✓' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast(modalMode === 'añadir' ? 'Etiqueta añadida correctamente ✓' : 'Etiqueta actualizada correctamente ✓', 'success')
     } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al guardar la etiqueta' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast(res.error || 'Error al guardar la etiqueta', 'error')
     }
     setSaving(false)
   }
@@ -323,11 +326,9 @@ export default function EtiquetasPage() {
     const res = await crearEtiquetasPlantilla()
     if (res.success && res.data) {
       setItems(res.data)
-      setMensaje({ tipo: 'exito', texto: 'Etiquetas sugeridas cargadas correctamente ✓' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast('Etiquetas sugeridas cargadas correctamente ✓', 'success')
     } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al cargar sugerencias' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast(res.error || 'Error al cargar sugerencias', 'error')
     }
     setSaving(false)
   }
@@ -368,12 +369,6 @@ export default function EtiquetasPage() {
 
   return (
     <div className="p-6 sm:p-10 max-w-4xl w-full mx-auto pb-20">
-      
-      {mensaje && (
-        <div className={`mb-6 text-sm font-semibold px-4 py-3 rounded-xl ${mensaje.tipo === 'exito' ? 'text-emerald-700 bg-emerald-50' : 'text-red-700 bg-red-50'}`}>
-          {mensaje.texto}
-        </div>
-      )}
 
       {/* Encabezado + acciones */}
       <div className="flex items-start justify-between gap-4 flex-wrap mb-8">
@@ -601,6 +596,17 @@ export default function EtiquetasPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={!!etiquetaAEliminar}
+        title="Eliminar etiqueta"
+        message="¿Estás seguro de que quieres eliminar esta etiqueta?"
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        type="danger"
+        onConfirm={handleConfirmDelete}
+        onClose={() => setEtiquetaAEliminar(null)}
+      />
     </div>
   )
 }

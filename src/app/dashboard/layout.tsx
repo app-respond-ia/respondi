@@ -5,6 +5,7 @@ import { getMisPermisos } from '@/app/actions/permisos'
 import { resolveBranchId } from '@/lib/active-branch'
 import { getImpersonatedTenantId } from '@/lib/impersonate'
 import ImpersonationBanner from '@/components/ImpersonationBanner'
+import { ToastProvider } from '@/components/ui/Toast'
 
 export const dynamic = 'force-dynamic'
 
@@ -80,18 +81,20 @@ export default async function DashboardLayout({
   return (
     <>
       {isImpersonating && <ImpersonationBanner orgName={orgName} />}
-      <AdminLayout
-        esAdmin={esAdmin}
-        permisos={permisos}
-        nombreUsuario={userData.nombre || user.email || ''}
-        branches={branches}
-        activeBranchId={activeBranchId}
-        creditos={creditos}
-        isImpersonating={isImpersonating}
-        userId={user.id}
-      >
-        {children}
-      </AdminLayout>
+      <ToastProvider>
+        <AdminLayout
+          esAdmin={esAdmin}
+          permisos={permisos}
+          nombreUsuario={userData.nombre || user.email || ''}
+          branches={branches}
+          activeBranchId={activeBranchId}
+          creditos={creditos}
+          isImpersonating={isImpersonating}
+          userId={user.id}
+        >
+          {children}
+        </AdminLayout>
+      </ToastProvider>
     </>
   )
 }

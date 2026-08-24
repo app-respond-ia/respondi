@@ -14,6 +14,7 @@ import { MessageBubble } from '@/components/ui/MessageBubble'
 import { ActivityLog } from '@/components/ui/ActivityLog'
 import { NotesSection } from '@/components/ui/NotesSection'
 import { AIToggle } from '@/components/ui/AIToggle'
+import { useToast } from '@/components/ui/Toast'
 import Link from 'next/link'
 
 function ChatsContent() {
@@ -56,7 +57,6 @@ function ChatsContent() {
   
   const [loadingChats, setLoadingChats] = useState(true)
   const [loadingMsgs, setLoadingMsgs] = useState(false)
-  const [mensajeGlobal, setMensajeGlobal] = useState<{tipo: string, texto: string} | null>(null)
   
   const [mensajeText, setMensajeText] = useState('')
   const [enviando, setEnviando] = useState(false)
@@ -64,13 +64,14 @@ function ChatsContent() {
   const [procesando, setProcesando] = useState(false)
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
-    action: 'reabrir_caso' | 'reabrir_conv' | 'asignar_mi' | 'asignar_otro' | 'cola' | 'asignar_mi_existente' | 'asignar_otro_existente' | 'soltar_existente' | null;
+    action: 'reabrir_caso' | 'reabrir_conv' | 'cerrar_conv' | 'asignar_mi' | 'asignar_otro' | 'cola' | 'asignar_mi_existente' | 'asignar_otro_existente' | 'soltar_existente' | null;
     targetAgenteId?: string;
   }>({ isOpen: false, action: null })
   
   const [agentSearch, setAgentSearch] = useState('')
   const [showAgentDropdown, setShowAgentDropdown] = useState(false)
   const [canDeleteNotes, setCanDeleteNotes] = useState(false)
+  const { showToast } = useToast()
   const [showMobileContext, setShowMobileContext] = useState(false)
   const agentDropdownRef = useRef<HTMLDivElement>(null)
 
@@ -147,7 +148,7 @@ function ChatsContent() {
     if (res.success && res.data) {
       setConversaciones(res.data.conversaciones || [])
     } else {
-      setMensajeGlobal({ tipo: 'error', texto: res.error || 'Error al cargar chats' })
+      showToast(res.error || 'Error al cargar chats', 'error')
     }
 
     if (permisosRes.success) {
@@ -223,7 +224,7 @@ function ChatsContent() {
     if (res.success && res.data) {
       setMensajes(res.data.mensajes || [])
     } else {
-      setMensajeGlobal({ tipo: 'error', texto: res.error || 'Error al cargar mensajes' })
+      showToast(res.error || 'Error al cargar mensajes', 'error')
     }
     setLoadingMsgs(false)
   }
@@ -235,12 +236,7 @@ function ChatsContent() {
 
 
   const handleCerrar = async (conv: any) => {
-    if (confirm('¿Cerrar esta conversación?')) {
-      const res = await cerrarConversacion(conv.id)
-      if (res.success && res.data) {
-        setConversaciones(prev => prev.map(c => c.id === conv.id ? { ...c, estado: res.data.estado } : c))
-      }
-    }
+    setModalState({ isOpen: true, action: 'cerrar_conv' })
   }
 
   const handleConfirmAction = async () => {
@@ -248,7 +244,13 @@ function ChatsContent() {
     setProcesando(true)
     let success = false
 
-    if (modalState.action === 'reabrir_conv') {
+    if (modalState.action === 'cerrar_conv') {
+      const res = await cerrarConversacion(selectedConvId)
+      if (res.success && res.data) {
+        setConversaciones(prev => prev.map(c => c.id === selectedConvId ? { ...c, estado: res.data.estado } : c))
+        success = true
+      }
+    } else if (modalState.action === 'reabrir_conv') {
       const res = await reabrirConversacion(selectedConvId)
       if (res.success && res.data) {
         setConversaciones(prev => prev.map(c => c.id === selectedConvId ? { ...c, estado: res.data.estado } : c))
@@ -284,7 +286,7 @@ function ChatsContent() {
         cargarContexto(selectedConvId)
         success = true
       } else {
-        alert(res.error || 'Error al generar el caso')
+        showToast(res.error || 'Error al generar el caso', 'error')
       }
     } else if (modalState.action === 'asignar_mi_existente' || modalState.action === 'asignar_otro_existente' || modalState.action === 'soltar_existente') {
       const casoId = contexto?.caso_asociado?.id
@@ -308,7 +310,7 @@ function ChatsContent() {
           cargarContexto(selectedConvId)
           success = true
         } else {
-          alert(res?.error || 'Error al actualizar el caso')
+          showToast(res?.error || 'Error al actualizar el caso', 'error')
         }
       }
     }
@@ -327,7 +329,7 @@ function ChatsContent() {
       cargarContexto(selectedConvId)
       return true
     } else {
-      alert(res?.error || 'Error al modificar estado de la IA')
+      showToast(res?.error || 'Error al modificar estado de la IA', 'error')
       return false
     }
   }
@@ -342,7 +344,7 @@ function ChatsContent() {
       setMensajeText('')
       cargarMensajes(selectedConvId)
     } else {
-      setMensajeGlobal({ tipo: 'error', texto: res.error || 'Error al enviar mensaje' })
+      showToast(res.error || 'Error al enviar mensaje', 'error')
     }
     setEnviando(false)
   }
@@ -954,6 +956,7 @@ function ChatsContent() {
           title={
             modalState.action === 'reabrir_caso' ? '¿Reabrir este caso?' :
             modalState.action === 'reabrir_conv' ? '¿Reabrir esta conversación?' : 
+            modalState.action === 'cerrar_conv' ? '¿Cerrar esta conversación?' : 
             modalState.action === 'asignar_mi' ? '¿Crear caso y asignártelo?' :
             modalState.action === 'asignar_otro' ? '¿Crear caso y asignar a otro?' :
             modalState.action === 'asignar_mi_existente' ? '¿Asignarte este caso?' :
@@ -964,6 +967,7 @@ function ChatsContent() {
           message={
             modalState.action === 'reabrir_caso' ? 'El caso asociado volverá a estar activo (se te asignará si ya lo tenías, o irá a la cola).' :
             modalState.action === 'reabrir_conv' ? 'La conversación volverá a estar activa y podrás enviar mensajes.' : 
+            modalState.action === 'cerrar_conv' ? 'La conversación se cerrará.' : 
             modalState.action === 'asignar_mi' ? 'Se creará un nuevo caso para esta conversación y quedarás como el agente responsable.' :
             modalState.action === 'asignar_otro' ? 'Se creará un nuevo caso para esta conversación y será asignado al agente seleccionado.' :
             modalState.action === 'asignar_mi_existente' ? 'Pasarás a ser el agente responsable de este caso.' :
@@ -973,6 +977,7 @@ function ChatsContent() {
           }
           confirmText={
             modalState.action === 'reabrir_caso' || modalState.action === 'reabrir_conv' ? 'Sí, reabrir' :
+            modalState.action === 'cerrar_conv' ? 'Sí, cerrar' :
             'Sí, confirmar'
           }
         type="info"

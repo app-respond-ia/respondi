@@ -7,6 +7,8 @@ import { getHorarios, saveHorarios } from '@/app/actions/horarios'
 import { getMisPermisos } from '@/app/actions/permisos'
 import { getTiposNovedad, crearTipoNovedad, actualizarTipoNovedad, eliminarTipoNovedad, TipoNovedadData } from '@/app/actions/tipos-novedad'
 import { getIconSvg } from '@/components/novedades/NovedadesManager'
+import { useToast } from '@/components/ui/Toast'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 const AVAILABLE_ICONS = [
   'campana', 'reloj', 'caja', 'estrella', 'calendario', 'informacion',
@@ -61,7 +63,7 @@ export default function PerfilSucursalPage() {
   }, [])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
+  const { showToast } = useToast()
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
 
   const [formData, setFormData] = useState({
@@ -88,6 +90,7 @@ export default function PerfilSucursalPage() {
   const [tipoFormData, setTipoFormData] = useState({ nombre: '', icono: 'campana', color: 'slate' })
   const [isIconSelectorOpen, setIsIconSelectorOpen] = useState(false)
   const [savingTipo, setSavingTipo] = useState(false)
+  const [tipoToDelete, setTipoToDelete] = useState<string | null>(null)
 
   const [politicaModalOpen, setPoliticaModalOpen] = useState(false)
   const [politicaEditIndex, setPoliticaEditIndex] = useState<number | null>(null)
@@ -275,21 +278,25 @@ export default function PerfilSucursalPage() {
       }
       setTipoModalOpen(false)
     } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al guardar tipo' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast(res.error || 'Error al guardar tipo', 'error')
     }
     setSavingTipo(false)
   }
 
-  const handleDeleteTipo = async (id: string) => {
-    if (!confirm('¿Estás seguro? Las novedades asociadas a este tipo también se eliminarán.')) return
-    const res = await eliminarTipoNovedad(id)
+  const handleDeleteTipo = (id: string) => {
+    setTipoToDelete(id)
+  }
+
+  const handleConfirmDeleteTipo = async () => {
+    if (!tipoToDelete) return
+    const res = await eliminarTipoNovedad(tipoToDelete)
     if (res.success) {
-      setTiposNovedad(prev => prev.filter(t => t.id !== id))
+      setTiposNovedad(prev => prev.filter(t => t.id !== tipoToDelete))
+      showToast('Tipo de novedad eliminado', 'success')
     } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al eliminar tipo' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast(res.error || 'Error al eliminar tipo', 'error')
     }
+    setTipoToDelete(null)
   }
 
   const normalizeTime = (timeValue: string | null | undefined) => {
@@ -301,7 +308,6 @@ export default function PerfilSucursalPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
-    setMensaje(null)
     
     const [resPerfil, resHorarios] = await Promise.all([
       savePerfilSucursal(formData),
@@ -309,10 +315,9 @@ export default function PerfilSucursalPage() {
     ])
     
     if (resPerfil.success && resHorarios.success) {
-      setMensaje({ tipo: 'exito', texto: 'Cambios guardados correctamente ✓' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast('Cambios guardados correctamente ✓', 'success')
     } else {
-      setMensaje({ tipo: 'error', texto: resPerfil.error || resHorarios.error || 'Error al guardar los cambios' })
+      showToast(resPerfil.error || resHorarios.error || 'Error al guardar los cambios', 'error')
     }
     setSaving(false)
   }
@@ -821,11 +826,6 @@ export default function PerfilSucursalPage() {
 
         {/* CONTROLES / GUARDAR */}
         <div className="flex items-center justify-end gap-4 pt-4">
-          {mensaje && (
-            <div className={`text-sm font-semibold px-4 py-2 rounded-lg ${mensaje.tipo === 'exito' ? 'text-emerald-700 bg-emerald-50' : 'text-red-700 bg-red-50'}`}>
-              {mensaje.texto}
-            </div>
-          )}
           
           <button 
             type="submit" 
@@ -844,6 +844,17 @@ export default function PerfilSucursalPage() {
           </button>
         </div>
       </form>
+
+      <ConfirmModal
+        isOpen={!!tipoToDelete}
+        title="Eliminar tipo"
+        message="¿Estás seguro? Las novedades asociadas a este tipo también se eliminarán."
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        type="danger"
+        onConfirm={handleConfirmDeleteTipo}
+        onClose={() => setTipoToDelete(null)}
+      />
     </div>
   )
 }

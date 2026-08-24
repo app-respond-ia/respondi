@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
+import { supabaseAdmin } from '@/utils/supabase/admin'
 import SuperadminLayout from '@/components/layout/SuperadminLayout'
 import { ToastProvider } from '@/components/ui/Toast'
 
@@ -12,8 +13,8 @@ export default async function Layout({ children }: { children: React.ReactNode }
     redirect('/login')
   }
 
-  // 2. Verificar rol super_admin
-  const { data: userData, error: userError } = await supabase
+  // 2. Verificar rol super_admin usando Admin para bypassear RLS en superadmin_roles
+  const { data: userData, error: userError } = await supabaseAdmin
     .from('users')
     .select('rol, nombre, avatar_url, email, superadmin_roles(*)')
     .eq('id', session.user.id)

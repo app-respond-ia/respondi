@@ -14,7 +14,7 @@ export async function requireSuperAdmin() {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) throw new Error('No autorizado')
 
-  const { data: userData } = await supabase
+  const { data: userData } = await supabaseAdmin
     .from('users')
     .select('rol, superadmin_rol_id, superadmin_roles(*)')
     .eq('id', session.user.id)

@@ -2266,3 +2266,157 @@ export async function getCalidadSoporte(from?: string, to?: string, superadminId
     return { success: false, error: err.message, data: null }
   }
 }
+
+
+export async function getConsumoIA(from?: string, to?: string) {
+  try {
+    const { supabase } = await requireSuperAdmin()
+    
+    // Fetch ai_logs
+    const { data: logs, error } = await supabase
+      .from('ai_logs')
+      .select(`
+        timestamp,
+        tokens_input,
+        tokens_output,
+        costo_estimado_usd,
+        modelo_ia,
+        tenant_id,
+        organizaciones(nombre)
+      `)
+      .order('timestamp', { ascending: true })
+      
+    if (error) throw error
+
+    // filter by dates
+    const now = new Date()
+    const fromDate = from ? new Date(from) : new Date(now.getFullYear(), now.getMonth() - 1, now.getDate())
+    const toDate = to ? new Date(to) : now
+    toDate.setHours(23, 59, 59, 999)
+
+    const validLogs = (logs || []).filter((l: any) => {
+      const d = new Date(l.timestamp)
+      return d >= fromDate && d <= toDate
+    })
+
+    // Resumen
+    let tokens_totales = 0
+    let costo_total_usd = 0
+
+    validLogs.forEach((l: any) => {
+      tokens_totales += (l.tokens_input || 0) + (l.tokens_output || 0)
+      costo_total_usd += Number(l.costo_estimado_usd || 0)
+    })
+
+    const costo_medio_mensaje_usd = validLogs.length > 0 ? costo_total_usd / validLogs.length : 0
+
+    // Top Organizaciones
+    const orgMap: Record<string, { nombre: string, tokens_totales: number, costo_usd: number }> = {}
+    
+    // Desglose Modelos
+    const modelMap: Record<string, { modelo_ia: string, tokens_totales: number, costo_usd: number }> = {}
+
+    validLogs.forEach((l: any) => {
+      // org
+      const orgId = l.tenant_id
+      if (orgId) {
+        if (!orgMap[orgId]) {
+          orgMap[orgId] = { 
+            nombre: l.organizaciones ? (Array.isArray(l.organizaciones) ? l.organizaciones[0]?.nombre : l.organizaciones.nombre) : 'Desconocida', 
+            tokens_totales: 0, 
+            costo_usd: 0 
+          }
+        }
+        orgMap[orgId].tokens_totales += (l.tokens_input || 0) + (l.tokens_output || 0)
+        orgMap[orgId].costo_usd += Number(l.costo_estimado_usd || 0)
+      }
+
+      // model
+      const mod = l.modelo_ia || 'desconocido'
+      if (!modelMap[mod]) {
+        modelMap[mod] = { modelo_ia: mod, tokens_totales: 0, costo_usd: 0 }
+      }
+      modelMap[mod].tokens_totales += (l.tokens_input || 0) + (l.tokens_output || 0)
+      modelMap[mod].costo_usd += Number(l.costo_estimado_usd || 0)
+    })
+
+    const top_organizaciones = Object.values(orgMap).sort((a, b) => b.costo_usd - a.costo_usd).slice(0, 10)
+    
+    const desglose_modelos = Object.values(modelMap).map(m => ({
+      modelo_ia: m.modelo_ia,
+      porcentaje_tokens: tokens_totales > 0 ? (m.tokens_totales / tokens_totales) * 100 : 0,
+      costo_usd: m.costo_usd
+    })).sort((a, b) => b.costo_usd - a.costo_usd)
+
+    // Grafico
+    const diffDays = (toDate.getTime() - fromDate.getTime()) / (1000 * 3600 * 24)
+    let granularity: 'dia' | 'semana' | 'mes' = 'dia'
+    if (diffDays > 60) granularity = 'semana'
+    if (diffDays > 180) granularity = 'mes'
+
+    const dataPoints: { fecha: string; timestamp: number; coste_usd: number }[] = []
+    let current = new Date(fromDate)
+
+    while (current <= toDate) {
+      let bucketEnd = new Date(current)
+      if (granularity === 'dia') {
+        bucketEnd.setHours(23, 59, 59, 999)
+      } else if (granularity === 'semana') {
+        bucketEnd.setDate(bucketEnd.getDate() + 6)
+        bucketEnd.setHours(23, 59, 59, 999)
+      } else {
+        bucketEnd.setMonth(bucketEnd.getMonth() + 1)
+        bucketEnd.setDate(0)
+        bucketEnd.setHours(23, 59, 59, 999)
+      }
+
+      const bucketLogs = validLogs.filter((l: any) => {
+        const d = new Date(l.timestamp)
+        return d >= current && d <= bucketEnd
+      })
+
+      const bucketCost = bucketLogs.reduce((acc: number, l: any) => acc + Number(l.costo_estimado_usd || 0), 0)
+
+      let label = ''
+      if (granularity === 'dia') {
+        label = current.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
+      } else if (granularity === 'semana') {
+        label = `${current.getDate()} - ${bucketEnd.getDate()} ${bucketEnd.toLocaleDateString('es-ES', { month: 'short' })}`
+      } else {
+        label = current.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })
+      }
+
+      dataPoints.push({
+        fecha: label,
+        timestamp: current.getTime(),
+        coste_usd: bucketCost
+      })
+
+      if (granularity === 'dia') {
+        current.setDate(current.getDate() + 1)
+      } else if (granularity === 'semana') {
+        current.setDate(current.getDate() + 7)
+      } else {
+        current.setMonth(current.getMonth() + 1)
+        current.setDate(1)
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        resumen: {
+          tokens_totales,
+          costo_total_usd,
+          costo_medio_mensaje_usd
+        },
+        grafico: dataPoints,
+        top_organizaciones,
+        desglose_modelos
+      }
+    }
+
+  } catch (err: any) {
+    return { success: false, error: err.message, data: null }
+  }
+}

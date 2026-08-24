@@ -1,11 +1,12 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { getDashboardData, getEvolucionNegocio, getRendimientoVendedores, getSuperadmins, getCalidadSoporte, requireSuperAdmin } from '@/app/actions/superadmin'
+import { getDashboardData, getEvolucionNegocio, getRendimientoVendedores, getSuperadmins, getCalidadSoporte, requireSuperAdmin, getConsumoIA } from '@/app/actions/superadmin'
 import { superadminHasPermission } from '@/lib/permisosSuperadmin'
 import DateRangeSelector from './DateRangeSelector'
 import EvolucionChart from './EvolucionChart'
 import RendimientoVendedores from './RendimientoVendedores'
 import CalidadSoporte from './CalidadSoporte'
+import ConsumoIA from './ConsumoIA'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,12 +19,13 @@ export default async function SuperadminDashboardPage({ searchParams }: { search
   const from = typeof searchParams.from === 'string' ? searchParams.from : undefined
   const to = typeof searchParams.to === 'string' ? searchParams.to : undefined
   
-  const [dashboardRes, evolucionRes, rendimientoRes, superadminsRes, calidadSoporteRes] = await Promise.all([
+  const [dashboardRes, evolucionRes, rendimientoRes, superadminsRes, calidadSoporteRes, consumoIARes] = await Promise.all([
     getDashboardData(from, to),
     getEvolucionNegocio(from, to),
     getRendimientoVendedores(from, to),
     getSuperadmins(),
-    getCalidadSoporte(from, to)
+    getCalidadSoporte(from, to),
+    getConsumoIA(from, to)
   ])
 
   if (!dashboardRes.success || !dashboardRes.data) {
@@ -113,6 +115,15 @@ export default async function SuperadminDashboardPage({ searchParams }: { search
         <CalidadSoporte 
           initialData={calidadSoporteRes.data} 
           superadmins={superadminsRes.data} 
+          from={from} 
+          to={to} 
+        />
+      )}
+
+      {/* Fase 4: Consumo y Costes de IA */}
+      {consumoIARes.success && consumoIARes.data && (
+        <ConsumoIA 
+          initialData={consumoIARes.data} 
           from={from} 
           to={to} 
         />

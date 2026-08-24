@@ -5,9 +5,12 @@ import { useState, useEffect } from 'react'
 import { getErrores, resolverError } from '@/app/actions/superadmin'
 import { useSuperadminPermisos } from '@/components/layout/SuperadminPermisosContext'
 
+import { useToast } from '@/components/ui/Toast'
+
 export default function ErroresPage() {
   const [errores, setErrores] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const { showToast } = useToast()
   
   // Filtros
   const [filtroEstado, setFiltroEstado] = useState<'todos' | 'sin_resolver' | 'resuelto'>('sin_resolver')
@@ -25,8 +28,12 @@ export default function ErroresPage() {
   async function loadErrores() {
     setLoading(true)
     const backendFiltro = filtroEstado === 'todos' ? undefined : filtroEstado
-    const { success, errores: data } = await getErrores(backendFiltro)
-    if (success && data) setErrores(data)
+    const { success, errores: data, error } = await getErrores(backendFiltro)
+    if (success && data) {
+      setErrores(data)
+    } else if (error) {
+      showToast(error, 'error')
+    }
     setLoading(false)
   }
 
@@ -47,9 +54,14 @@ export default function ErroresPage() {
 
   const markResolved = async () => {
     if (modalData) {
-      await resolverError(modalData.id)
-      closeModal()
-      loadErrores()
+      const res = await resolverError(modalData.id)
+      if (res && res.success) {
+        showToast('Error marcado como resuelto ✓', 'success')
+        closeModal()
+        loadErrores()
+      } else {
+        showToast(res?.error || 'Error al actualizar', 'error')
+      }
     }
   }
 

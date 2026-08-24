@@ -122,7 +122,7 @@ export default function OrganizacionesPage() {
       window.location.href = '/dashboard'
     } else {
       setImpersonatingId(null)
-      alert('Error al intentar impersonar la organización')
+      showToast(res.error || 'Error al intentar impersonar la organización', 'error')
     }
   }
 

@@ -4,11 +4,12 @@ import Loading from '@/components/Loading'
 import { useState, useEffect } from 'react'
 import { getSkillsGlobales, crearSkillGlobal, actualizarSkillGlobal, eliminarSkillGlobal } from '@/app/actions/skills-globales'
 import { useSuperadminPermisos } from '@/components/layout/SuperadminPermisosContext'
+import { useToast } from '@/components/ui/Toast'
 
 export default function SuperadminSkillsPage() {
   const [skills, setSkills] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
+  const { showToast } = useToast()
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [modalMode, setModalMode] = useState<'crear' | 'editar'>('crear')
@@ -54,8 +55,7 @@ export default function SuperadminSkillsPage() {
 
   const handleGuardar = async () => {
     if (!formData.nombre.trim()) {
-      setMensaje({ tipo: 'error', texto: 'El nombre es obligatorio' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast('El nombre es obligatorio', 'error')
       return
     }
     setSaving(true)
@@ -67,12 +67,11 @@ export default function SuperadminSkillsPage() {
     }
     if (res.success) {
       setIsModalOpen(false)
-      setMensaje({ tipo: 'exito', texto: modalMode === 'crear' ? 'Skill creada ✓' : 'Skill actualizada ✓' })
+      showToast(modalMode === 'crear' ? 'Skill creada ✓' : 'Skill actualizada ✓', 'success')
       cargar()
     } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al guardar' })
+      showToast(res.error || 'Error al guardar', 'error')
     }
-    setTimeout(() => setMensaje(null), 3000)
     setSaving(false)
   }
 
@@ -81,23 +80,14 @@ export default function SuperadminSkillsPage() {
     const res = await eliminarSkillGlobal(id)
     if (res.success) {
       setSkills(prev => prev.filter(s => s.id !== id))
-      setMensaje({ tipo: 'exito', texto: 'Skill eliminada ✓' })
+      showToast('Skill eliminada ✓', 'success')
     } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al eliminar' })
+      showToast(res.error || 'Error al eliminar', 'error')
     }
-    setTimeout(() => setMensaje(null), 3000)
   }
 
   return (
     <>
-      {mensaje && (
-        <div className={`mb-6 p-4 rounded-xl font-500 text-sm border flex items-center gap-2 ${
-          mensaje.tipo === 'exito' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'
-        }`}>
-          {mensaje.texto}
-        </div>
-      )}
-
       <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
         <div>
           <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Skills de IA</h1>

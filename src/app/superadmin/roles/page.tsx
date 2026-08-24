@@ -4,6 +4,7 @@ import Loading from '@/components/Loading'
 import { useState, useEffect } from 'react'
 import { getSuperadminRoles, crearSuperadminRol, actualizarSuperadminRol, eliminarSuperadminRol } from '@/app/actions/superadmin'
 import { useSuperadminPermisos } from '@/components/layout/SuperadminPermisosContext'
+import { useToast } from '@/components/ui/Toast'
 
 type PermisoUI = {
   seccion: string
@@ -55,7 +56,7 @@ const SECCIONES_DEFAULT: PermisoUI[] = GRUPOS.flatMap(g =>
 export default function SuperadminRolesPage() {
   const [roles, setRoles] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error', texto: string } | null>(null)
+  const { showToast } = useToast()
   const [searchQuery, setSearchQuery] = useState('')
 
   // Modal
@@ -79,7 +80,7 @@ export default function SuperadminRolesPage() {
     if (res.success && res.data) {
       setRoles(res.data)
     } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al cargar los roles' })
+      showToast(res.error || 'Error al cargar los roles', 'error')
     }
     setLoading(false)
   }
@@ -110,8 +111,7 @@ export default function SuperadminRolesPage() {
 
   const handleGuardar = async () => {
     if (!nombre.trim()) {
-      setMensaje({ tipo: 'error', texto: 'El nombre del rol es obligatorio' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast('El nombre del rol es obligatorio', 'error')
       return
     }
     setSaving(true)
@@ -131,11 +131,10 @@ export default function SuperadminRolesPage() {
 
     if (res.success) {
       setIsModalOpen(false)
-      setMensaje({ tipo: 'exito', texto: modalMode === 'crear' ? 'Rol creado ✓' : 'Rol actualizado ✓' })
+      showToast(modalMode === 'crear' ? 'Rol creado ✓' : 'Rol actualizado ✓', 'success')
       cargar()
     } else {
-      setMensaje({ tipo: 'error', texto: res.error || 'Error al guardar' })
-      setTimeout(() => setMensaje(null), 3000)
+      showToast(res.error || 'Error al guardar', 'error')
     }
     setSaving(false)
   }
@@ -174,14 +173,6 @@ export default function SuperadminRolesPage() {
 
   return (
     <div className="p-6 sm:p-10 max-w-4xl w-full mx-auto pb-20">
-      {mensaje && (
-        <div className={`mb-6 p-4 rounded-xl font-500 text-sm border flex items-center gap-2 ${
-          mensaje.tipo === 'exito' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'
-        }`}>
-          {mensaje.texto}
-        </div>
-      )}
-
       <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
         <div>
           <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Roles de Superadmin</h1>

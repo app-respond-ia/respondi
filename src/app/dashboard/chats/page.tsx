@@ -16,6 +16,7 @@ import { NotesSection } from '@/components/ui/NotesSection'
 import { AIToggle } from '@/components/ui/AIToggle'
 import { useToast } from '@/components/ui/Toast'
 import Link from 'next/link'
+import { createClient } from '@/utils/supabase/client'
 
 function ChatsContent() {
   const router = useRouter()
@@ -25,6 +26,12 @@ function ChatsContent() {
   const [conversaciones, setConversaciones] = useState<any[]>([])
   const [mensajes, setMensajes] = useState<any[]>([])
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null)
+  const selectedConvIdRef = useRef<string | null>(null)
+  
+  useEffect(() => {
+    selectedConvIdRef.current = selectedConvId
+  }, [selectedConvId])
+
   const [isFetching, setIsFetching] = useState(false)
   const isFirstMount = useRef(true)
   
@@ -232,6 +239,86 @@ function ChatsContent() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [mensajes])
+
+  // Setup Supabase Realtime
+  useEffect(() => {
+    const supabase = createClient()
+    let channel: any
+
+    const setupRealtime = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.access_token) {
+        supabase.realtime.setAuth(session.access_token)
+      }
+
+      channel = supabase
+        .channel('chats_realtime')
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'messages' },
+          (payload) => {
+            const newMsg = payload.new
+            const currentSelected = selectedConvIdRef.current
+
+            // 1. Si es de la conversación abierta
+            if (currentSelected && newMsg.conversation_id === currentSelected) {
+              setMensajes(prev => {
+                // Evitar duplicados si nosotros mismos enviamos el mensaje
+                if (prev.some(m => m.id === newMsg.id)) return prev
+                return [...prev, newMsg]
+              })
+            }
+
+            // 2. En cualquier caso, actualizar la lista de conversaciones
+            setConversaciones(prev => {
+              const idx = prev.findIndex(c => c.id === newMsg.conversation_id)
+              if (idx === -1) return prev // Conversación no está en memoria actual
+
+              const updatedConvs = [...prev]
+              const target = { ...updatedConvs[idx] }
+              
+              target.fecha_ultimo_mensaje = newMsg.created_at
+              // Actualizar el previo
+              if (target.messages) {
+                target.messages = [{ contenido: newMsg.contenido }]
+              } else {
+                target.messages = [{ contenido: newMsg.contenido }]
+              }
+              
+              // Si no es la activa, marcar como no leída
+              if (target.id !== currentSelected) {
+                target.tieneNovedad = true
+              }
+
+              // Remover de la posición actual y colocar de primera
+              updatedConvs.splice(idx, 1)
+              updatedConvs.unshift(target)
+              
+              return updatedConvs
+            })
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'conversations' },
+          (payload) => {
+            const updatedConv = payload.new
+            setConversaciones(prev => {
+              return prev.map(c => c.id === updatedConv.id ? { ...c, estado: updatedConv.estado, ia_pausada: updatedConv.ia_pausada } : c)
+            })
+          }
+        )
+        .subscribe()
+    }
+
+    setupRealtime()
+
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel)
+      }
+    }
+  }, [])
 
 
 
@@ -781,7 +868,13 @@ function ChatsContent() {
               }
 
               return (
-                <button key={conv.id} onClick={() => setSelectedConvId(conv.id)} className={`w-full text-left flex items-start gap-3 p-3 transition relative ${isSelected ? 'bg-brand-50' : 'hover:bg-slate-50'} ${conv.estado === 'cerrada' ? 'opacity-70' : ''}`}>
+                <button key={conv.id} onClick={() => {
+                  setSelectedConvId(conv.id)
+                  // Quitar novedad si la abrimos
+                  if (conv.tieneNovedad) {
+                    setConversaciones(prev => prev.map(c => c.id === conv.id ? { ...c, tieneNovedad: false } : c))
+                  }
+                }} className={`w-full text-left flex items-start gap-3 p-3 transition relative ${isSelected ? 'bg-brand-50' : 'hover:bg-slate-50'} ${conv.estado === 'cerrada' ? 'opacity-70' : ''}`}>
                   {isSelected && <span className="absolute left-0 top-0 bottom-0 w-1 bg-brand-600"></span>}
                   <div className="relative shrink-0">
                     <div className={`w-11 h-11 rounded-full flex items-center justify-center font-600 text-sm ${bgAvatar}`}>
@@ -790,6 +883,9 @@ function ChatsContent() {
                     <span className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center ring-2 ring-white ${badgeColor}`}>
                       {badgeIcon}
                     </span>
+                    {conv.tieneNovedad && !isSelected && (
+                      <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">

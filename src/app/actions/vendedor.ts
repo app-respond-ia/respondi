@@ -274,7 +274,7 @@ export async function actualizarPerfilVendedor(nombre: string, apodo: string, co
 
     const { revalidatePath } = await import('next/cache')
     revalidatePath('/vendedor/perfil')
-    revalidatePath('/vendedor')
+    revalidatePath('/vendedor', 'layout')
     
     return { success: true, vendedor: result }
   } catch (err: any) {

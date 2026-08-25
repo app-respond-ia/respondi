@@ -54,6 +54,7 @@ export default async function VendedorLayout({ children }: { children: React.Rea
                 { href: '/vendedor/clientes', label: 'Clientes' },
                 { href: '/vendedor/comisiones', label: 'Comisiones' },
                 { href: '/vendedor/nuevo-cliente', label: 'Nuevo cliente' },
+                { href: '/vendedor/soporte', label: 'Soporte' },
               ].map(link => (
                 <a key={link.href} href={link.href}
                   className="px-3 py-1.5 rounded-lg text-sm font-500 text-ink-600 hover:bg-slate-100 hover:text-ink-900 transition">
@@ -63,9 +64,6 @@ export default async function VendedorLayout({ children }: { children: React.Rea
             </nav>
 
             <div className="flex items-center gap-2">
-              <Link href="/vendedor/soporte" className="relative p-2 rounded-lg hover:bg-slate-100 transition text-ink-700" title="Ayuda y soporte">
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
-              </Link>
               <NotificationBell userId={session.user.id} />
               <VendedorDropdown nombre={nombreUsuario} email={email} iniciales={iniciales} avatarUrl={avatarUrl} apodo={apodo} color={color} userId={session.user.id} />
             </div>
@@ -79,6 +77,7 @@ export default async function VendedorLayout({ children }: { children: React.Rea
                 { href: '/vendedor/clientes', label: 'Clientes' },
                 { href: '/vendedor/comisiones', label: 'Comisiones' },
                 { href: '/vendedor/nuevo-cliente', label: 'Nuevo cliente' },
+                { href: '/vendedor/soporte', label: 'Soporte' },
               ].map(link => (
                 <a key={link.href} href={link.href}
                   className="shrink-0 px-3 py-1.5 rounded-lg text-sm font-500 text-ink-600 hover:bg-slate-100 transition whitespace-nowrap">

@@ -32,6 +32,7 @@ export default function VendedorDropdown({ nombre, email, iniciales, avatarUrl, 
 
   const displayName = apodo || nombre || 'Usuario'
   const userColor = getUserColorObject(userId || nombre, color)
+  const hasAvatar = Boolean(avatarUrl && avatarUrl.trim() !== '')
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -39,9 +40,9 @@ export default function VendedorDropdown({ nombre, email, iniciales, avatarUrl, 
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 p-1.5 pr-3 rounded-full hover:bg-slate-100 transition border border-transparent hover:border-slate-200"
       >
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-600 text-sm overflow-hidden relative shadow-sm ${avatarUrl ? 'bg-transparent' : `${userColor.bg} text-white`}`}>
-          {avatarUrl ? (
-            <Image src={avatarUrl} alt="Avatar" fill className="object-cover" />
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-600 text-sm overflow-hidden relative shadow-sm ${hasAvatar ? 'bg-transparent' : `${userColor.bg} text-white`}`}>
+          {hasAvatar ? (
+            <Image src={avatarUrl!} alt="Avatar" fill className="object-cover" />
           ) : (
             iniciales
           )}

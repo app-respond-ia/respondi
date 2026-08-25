@@ -1542,7 +1542,7 @@ export async function actualizarPerfilSuperadmin(nombre: string, apodo: string, 
       valor_nuevo: updatePayload
     })
 
-    revalidatePath('/superadmin')
+    revalidatePath('/superadmin', 'layout')
     return { success: true }
   } catch (err: any) {
     return { success: false, error: err.message }

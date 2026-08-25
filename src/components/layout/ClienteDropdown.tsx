@@ -34,6 +34,7 @@ export default function ClienteDropdown({ user }: ClienteDropdownProps) {
 
   const displayName = user.apodo || user.nombre || 'Usuario'
   const userColor = getUserColorObject(user.userId || user.nombre, user.color)
+  const hasAvatar = Boolean(user.avatarUrl && user.avatarUrl.trim() !== '')
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -41,9 +42,9 @@ export default function ClienteDropdown({ user }: ClienteDropdownProps) {
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 p-1.5 pr-3 rounded-full hover:bg-slate-100 transition border border-transparent hover:border-slate-200"
       >
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-600 text-sm overflow-hidden relative shadow-sm ${user.avatarUrl ? 'bg-transparent' : `${userColor.bg} text-white`}`}>
-          {user.avatarUrl ? (
-            <Image src={user.avatarUrl} alt="Avatar" fill className="object-cover" />
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-600 text-sm overflow-hidden relative shadow-sm ${hasAvatar ? 'bg-transparent' : `${userColor.bg} text-white`}`}>
+          {hasAvatar ? (
+            <Image src={user.avatarUrl!} alt="Avatar" fill className="object-cover" />
           ) : (
             user.initials
           )}

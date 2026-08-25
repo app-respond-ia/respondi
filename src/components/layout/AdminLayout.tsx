@@ -49,7 +49,7 @@ export default function AdminLayout({
   return (
     <div className={`min-h-[100dvh] lg:h-screen lg:overflow-hidden lg:flex bg-slate-50 text-ink-900 ${isImpersonating ? 'pt-10' : ''}`}>
       {/* Sidebar Wrapper */}
-      <div className={`fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-out lg:translate-x-0 lg:static lg:z-auto h-full overflow-y-auto ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <div className={`fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-out lg:translate-x-0 lg:static lg:z-auto h-full ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <Sidebar user={user} onCloseMobile={() => setIsMobileMenuOpen(false)} permisos={permisos} esAdmin={esAdmin} collapsed={collapsed} onToggleCollapse={() => setCollapsed(c => !c)} />
       </div>
 

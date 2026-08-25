@@ -21,7 +21,7 @@ export default async function DashboardLayout({
 
   const { data: userData } = await supabase
     .from('users')
-    .select('rol, nombre, activo, tenant_id, apodo, avatar_url')
+    .select('rol, nombre, activo, tenant_id, apodo, avatar_url, color')
     .eq('id', user.id)
     .single()
 
@@ -93,6 +93,7 @@ export default async function DashboardLayout({
           userId={user.id}
           apodo={userData.apodo}
           avatarUrl={userData.avatar_url}
+          color={userData.color}
         >
           {children}
         </AdminLayout>

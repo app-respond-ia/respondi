@@ -12,7 +12,7 @@ async function requireVendedor() {
 
   const { data: userData } = await supabase
     .from('users')
-    .select('rol, avatar_url')
+    .select('rol, avatar_url, apodo, color')
     .eq('id', user.id)
     .single()
 
@@ -25,7 +25,7 @@ async function requireVendedor() {
     .single()
 
   if (!vendedor) throw new Error('Vendedor no encontrado')
-  return { supabase, vendedor, userId: user.id, avatarUrl: userData.avatar_url }
+  return { supabase, vendedor, userId: user.id, avatarUrl: userData.avatar_url, apodo: userData.apodo, color: userData.color }
 }
 
 export async function getVendedorClientes() {
@@ -112,7 +112,7 @@ export async function getVendedorComisiones() {
 
 export async function getVendedorDashboard() {
   try {
-    const { supabase, vendedor, avatarUrl } = await requireVendedor()
+    const { supabase, vendedor, avatarUrl, apodo, color } = await requireVendedor()
 
     const [{ data: clientes }, { data: comisiones }] = await Promise.all([
       supabase.from('vendedor_clientes')
@@ -136,7 +136,7 @@ export async function getVendedorDashboard() {
 
     return {
       success: true,
-      data: { vendedor, avatarUrl, totalClientes, clientesActivos, clientesTrial, mrrCartera, comisionesPendientes, comisionesAprobadas, comisionesPagadas }
+      data: { vendedor, avatarUrl, apodo, color, totalClientes, clientesActivos, clientesTrial, mrrCartera, comisionesPendientes, comisionesAprobadas, comisionesPagadas }
     }
   } catch (err: any) {
     return { success: false, error: err.message }
@@ -233,14 +233,14 @@ export async function crearCuentaTrial(data: {
   }
 }
 
-export async function actualizarPerfilVendedor(nombre: string, avatarUrl?: string) {
+export async function actualizarPerfilVendedor(nombre: string, apodo: string, color: string | null, avatarUrl?: string) {
   try {
     const { supabase, vendedor, userId } = await requireVendedor()
     if (!nombre || nombre.trim() === '') {
       return { success: false, error: 'El nombre no puede estar vacío' }
     }
 
-    const updatePayload: any = { nombre: nombre.trim() }
+    const updatePayload: any = { nombre: nombre.trim(), apodo: apodo.trim() || null, color }
     if (avatarUrl !== undefined) {
       updatePayload.avatar_url = avatarUrl
     }

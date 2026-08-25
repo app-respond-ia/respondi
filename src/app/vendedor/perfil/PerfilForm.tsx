@@ -4,6 +4,7 @@ import { useState, useRef } from 'react'
 import { actualizarPerfilVendedor } from '@/app/actions/vendedor'
 import { createClient } from '@/utils/supabase/client'
 import { useToast } from '@/components/ui/Toast'
+import { USER_COLORS } from '@/lib/userColor'
 
 type VendedorData = {
   nombre: string
@@ -13,8 +14,10 @@ type VendedorData = {
   activo: boolean
 }
 
-export default function PerfilForm({ vendedor, avatarUrl }: { vendedor: VendedorData, avatarUrl?: string }) {
+export default function PerfilForm({ vendedor, avatarUrl, apodo: initialApodo, color: initialColor }: { vendedor: VendedorData, avatarUrl?: string, apodo?: string, color?: string | null }) {
   const [nombre, setNombre] = useState(vendedor.nombre || '')
+  const [apodo, setApodo] = useState(initialApodo || '')
+  const [color, setColor] = useState<string | null>(initialColor || null)
   const [isSaving, setIsSaving] = useState(false)
   const { showToast } = useToast()
   
@@ -48,7 +51,7 @@ export default function PerfilForm({ vendedor, avatarUrl }: { vendedor: Vendedor
         }
       }
 
-      const res = await actualizarPerfilVendedor(nombre, finalAvatarUrl)
+      const res = await actualizarPerfilVendedor(nombre, apodo, color, finalAvatarUrl)
       setIsSaving(false)
 
       if (res.success) {
@@ -126,6 +129,17 @@ export default function PerfilForm({ vendedor, avatarUrl }: { vendedor: Vendedor
               />
             </div>
             <div>
+              <label className="block text-sm font-500 text-ink-700 mb-1.5">Apodo (nombre corto)</label>
+              <input
+                type="text"
+                value={apodo}
+                onChange={(e) => setApodo(e.target.value)}
+                placeholder="Ej. Jorge"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition outline-none"
+              />
+              <p className="text-xs text-ink-400 mt-1.5">Se mostrará en la cabecera para ahorrar espacio.</p>
+            </div>
+            <div className="md:col-span-2">
               <label className="block text-sm font-500 text-ink-700 mb-1.5">Email (solo lectura)</label>
               <input
                 type="email"
@@ -134,6 +148,30 @@ export default function PerfilForm({ vendedor, avatarUrl }: { vendedor: Vendedor
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-ink-500 cursor-not-allowed outline-none"
               />
               <p className="text-xs text-ink-400 mt-1.5">El correo electrónico se usa para iniciar sesión y no se puede cambiar aquí.</p>
+            </div>
+          </div>
+
+          <div className="pt-6 border-t border-slate-100">
+            <label className="block text-sm font-500 text-ink-700 mb-3">Color de perfil</label>
+            <p className="text-xs text-ink-500 mb-4">Elige un color para personalizar tu avatar y apodo cuando no tengas foto de perfil.</p>
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => setColor(null)}
+                className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition ${color === null ? 'border-ink-900' : 'border-transparent hover:border-slate-300'} bg-slate-100 text-slate-500`}
+                title="Color automático"
+              >
+                Auto
+              </button>
+              {USER_COLORS.map(c => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setColor(c.id)}
+                  className={`w-10 h-10 rounded-full border-2 transition ${color === c.id ? 'border-ink-900' : 'border-transparent hover:scale-110'} ${c.bg}`}
+                  title={`Color ${c.id}`}
+                />
+              ))}
             </div>
           </div>
 

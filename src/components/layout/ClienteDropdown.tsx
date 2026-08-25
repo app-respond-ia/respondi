@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { signOut } from '@/app/actions/auth'
 import Image from 'next/image'
+import { getUserColorObject } from '@/lib/userColor'
 
 type ClienteDropdownProps = {
   user: {
@@ -12,6 +13,8 @@ type ClienteDropdownProps = {
     roleName: string
     apodo?: string
     avatarUrl?: string
+    color?: string
+    userId?: string
   }
 }
 
@@ -30,6 +33,7 @@ export default function ClienteDropdown({ user }: ClienteDropdownProps) {
   }, [])
 
   const displayName = user.apodo || user.nombre || 'Usuario'
+  const userColor = getUserColorObject(user.userId || user.nombre, user.color)
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -37,7 +41,7 @@ export default function ClienteDropdown({ user }: ClienteDropdownProps) {
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 p-1.5 pr-3 rounded-full hover:bg-slate-100 transition border border-transparent hover:border-slate-200"
       >
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center font-600 text-sm text-white overflow-hidden relative shadow-sm">
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-600 text-sm overflow-hidden relative shadow-sm ${user.avatarUrl ? 'bg-transparent' : `${userColor.bg} text-white`}`}>
           {user.avatarUrl ? (
             <Image src={user.avatarUrl} alt="Avatar" fill className="object-cover" />
           ) : (
@@ -45,7 +49,13 @@ export default function ClienteDropdown({ user }: ClienteDropdownProps) {
           )}
         </div>
         <div className="hidden sm:block text-left min-w-0 max-w-[120px]">
-          <p className="text-sm font-500 text-ink-900 truncate">{displayName}</p>
+          {user.apodo ? (
+            <span className={`inline-block px-2 py-0.5 rounded-md text-xs font-600 truncate max-w-full ${userColor.bgLight} ${userColor.text}`}>
+              {user.apodo}
+            </span>
+          ) : (
+            <p className="text-sm font-500 text-ink-900 truncate">{displayName}</p>
+          )}
         </div>
         <svg className={`w-4 h-4 text-ink-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/>

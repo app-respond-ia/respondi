@@ -3,17 +3,20 @@
 import { useState, useRef } from 'react'
 import { actualizarPerfilSuperadmin } from '@/app/actions/superadmin'
 import { createClient } from '@/utils/supabase/client'
+import { USER_COLORS } from '@/lib/userColor'
 
 type SuperadminData = {
   nombre: string
   apodo: string
   email: string
   avatar_url?: string
+  color?: string | null
 }
 
 export default function PerfilForm({ superadmin }: { superadmin: SuperadminData }) {
   const [nombre, setNombre] = useState(superadmin.nombre || '')
   const [apodo, setApodo] = useState(superadmin.apodo || '')
+  const [color, setColor] = useState<string | null>(superadmin.color || null)
   const [isSaving, setIsSaving] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
   
@@ -48,7 +51,7 @@ export default function PerfilForm({ superadmin }: { superadmin: SuperadminData 
         }
       }
 
-      const res = await actualizarPerfilSuperadmin(nombre, apodo, finalAvatarUrl)
+      const res = await actualizarPerfilSuperadmin(nombre, apodo, color, finalAvatarUrl)
       setIsSaving(false)
 
       if (res.success) {
@@ -143,6 +146,30 @@ export default function PerfilForm({ superadmin }: { superadmin: SuperadminData 
                 className="w-full md:w-1/2 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-ink-500 cursor-not-allowed outline-none"
               />
               <p className="text-xs text-ink-400 mt-1.5">El correo electrónico se usa para iniciar sesión y no se puede cambiar aquí.</p>
+            </div>
+          </div>
+
+          <div className="pt-6 border-t border-slate-100">
+            <label className="block text-sm font-500 text-ink-700 mb-3">Color de perfil</label>
+            <p className="text-xs text-ink-500 mb-4">Elige un color para personalizar tu avatar y apodo cuando no tengas foto de perfil.</p>
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => setColor(null)}
+                className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition ${color === null ? 'border-ink-900' : 'border-transparent hover:border-slate-300'} bg-slate-100 text-slate-500`}
+                title="Color automático"
+              >
+                Auto
+              </button>
+              {USER_COLORS.map(c => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setColor(c.id)}
+                  className={`w-10 h-10 rounded-full border-2 transition ${color === c.id ? 'border-ink-900' : 'border-transparent hover:scale-110'} ${c.bg}`}
+                  title={`Color ${c.id}`}
+                />
+              ))}
             </div>
           </div>
 

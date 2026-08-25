@@ -138,7 +138,7 @@ export async function savePerfilSucursal(data: {
 }
 
 
-export async function actualizarPerfilCliente(nombre: string, apodo: string, avatarUrl: string) {
+export async function actualizarPerfilCliente(nombre: string, apodo: string, avatarUrl: string, color: string | null) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: 'No autorizado' }
@@ -148,7 +148,8 @@ export async function actualizarPerfilCliente(nombre: string, apodo: string, ava
     .update({ 
       nombre, 
       apodo, 
-      avatar_url: avatarUrl 
+      avatar_url: avatarUrl,
+      color
     })
     .eq('id', user.id)
 

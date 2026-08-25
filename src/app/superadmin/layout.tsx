@@ -16,7 +16,7 @@ export default async function Layout({ children }: { children: React.ReactNode }
   // 2. Verificar rol super_admin usando Admin para bypassear RLS en superadmin_roles
   const { data: userData, error: userError } = await supabaseAdmin
     .from('users')
-    .select('rol, nombre, avatar_url, email, superadmin_roles(*)')
+    .select('rol, nombre, apodo, avatar_url, email, color, superadmin_roles(*)')
     .eq('id', session.user.id)
     .single()
 
@@ -51,6 +51,8 @@ export default async function Layout({ children }: { children: React.ReactNode }
         ticketsClientesAbiertos={countClientes || 0}
         email={userData.email || session.user.email || ''}
         avatarUrl={userData.avatar_url || undefined}
+        apodo={userData.apodo || undefined}
+        color={userData.color || undefined}
         userId={session.user.id}
         permisos={permisosSuperadmin}
         esPropietario={esPropietarioSuperadmin}

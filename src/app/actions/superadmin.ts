@@ -1511,14 +1511,14 @@ export async function asignarTicket(ticketId: string, asignadoA: string | null) 
   }
 }
 
-export async function actualizarPerfilSuperadmin(nombre: string, apodo: string, avatarUrl?: string) {
+export async function actualizarPerfilSuperadmin(nombre: string, apodo: string, color: string | null, avatarUrl?: string) {
   try {
     const { userId } = await requireSuperAdmin()
     if (!nombre || nombre.trim() === '') {
       return { success: false, error: 'El nombre no puede estar vacío' }
     }
 
-    const updatePayload: any = { nombre: nombre.trim(), apodo: apodo.trim() }
+    const updatePayload: any = { nombre: nombre.trim(), apodo: apodo.trim() || null, color }
     if (avatarUrl !== undefined) {
       updatePayload.avatar_url = avatarUrl
     }

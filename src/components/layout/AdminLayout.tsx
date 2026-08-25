@@ -16,6 +16,7 @@ interface AdminLayoutProps {
   userId?: string
   apodo?: string
   avatarUrl?: string
+  color?: string
 }
 
 export default function AdminLayout({
@@ -29,7 +30,8 @@ export default function AdminLayout({
   isImpersonating = false,
   userId = '',
   apodo,
-  avatarUrl
+  avatarUrl,
+  color,
 }: AdminLayoutProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
@@ -40,7 +42,8 @@ export default function AdminLayout({
     initials: nombreUsuario ? nombreUsuario.substring(0, 2).toUpperCase() : 'U',
     roleName: isImpersonating ? 'Superadmin (viendo como)' : (esAdmin ? 'Administrador' : 'Usuario'),
     apodo,
-    avatarUrl
+    avatarUrl,
+    color
   }
 
   return (

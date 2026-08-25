@@ -72,7 +72,7 @@ export default function Sidebar({ user, onCloseMobile, permisos, esAdmin, collap
         </button>
       </div>
 
-      <nav className="flex-1 px-3 py-5 space-y-1 overflow-y-auto overflow-x-hidden sidebar-scroll">
+      <nav className="flex-1 px-3 py-5 space-y-1 overflow-y-auto">
         {!collapsed && <p className="px-3 pb-2 text-[10px] uppercase tracking-widest text-ink-500/70 font-600">General</p>}
         <Link href="/dashboard" onClick={onCloseMobile} className={navItemClass('/dashboard')} title={collapsed ? 'Dashboard' : undefined}>
               <span className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">

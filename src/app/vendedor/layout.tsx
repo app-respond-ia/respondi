@@ -3,6 +3,7 @@ import { createClient } from '@/utils/supabase/server'
 import VendedorDropdown from './VendedorDropdown'
 import NotificationBell from './NotificationBell'
 import { ToastProvider } from '@/components/ui/Toast'
+import Link from 'next/link'
 
 export default async function VendedorLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -12,7 +13,7 @@ export default async function VendedorLayout({ children }: { children: React.Rea
 
   const { data: userData } = await supabase
     .from('users')
-    .select('rol, nombre, avatar_url')
+    .select('rol, nombre, apodo, avatar_url, color')
     .eq('id', session.user.id)
     .single()
 
@@ -27,6 +28,8 @@ export default async function VendedorLayout({ children }: { children: React.Rea
   const iniciales = nombreUsuario.substring(0, 2).toUpperCase()
   const email = session.user.email || ''
   const avatarUrl = userData.avatar_url || ''
+  const apodo = userData.apodo || undefined
+  const color = userData.color || undefined
 
   return (
     <ToastProvider>
@@ -60,8 +63,11 @@ export default async function VendedorLayout({ children }: { children: React.Rea
             </nav>
 
             <div className="flex items-center gap-2">
+              <Link href="/vendedor/soporte" className="relative p-2 rounded-lg hover:bg-slate-100 transition text-ink-700" title="Ayuda y soporte">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+              </Link>
               <NotificationBell userId={session.user.id} />
-              <VendedorDropdown nombre={nombreUsuario} email={email} iniciales={iniciales} avatarUrl={avatarUrl} />
+              <VendedorDropdown nombre={nombreUsuario} email={email} iniciales={iniciales} avatarUrl={avatarUrl} apodo={apodo} color={color} userId={session.user.id} />
             </div>
           </div>
 

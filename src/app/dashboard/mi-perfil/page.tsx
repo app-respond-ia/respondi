@@ -13,7 +13,7 @@ export default async function MiPerfilPage() {
 
   const { data: userData } = await supabase
     .from('users')
-    .select('nombre, apodo, avatar_url, email')
+    .select('nombre, apodo, email, avatar_url, color')
     .eq('id', user.id)
     .single()
 

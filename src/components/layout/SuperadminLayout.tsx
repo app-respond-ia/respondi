@@ -17,6 +17,8 @@ export default function SuperadminLayout({
   ticketsClientesAbiertos,
   email,
   avatarUrl,
+  apodo,
+  color,
   userId,
   permisos,
   esPropietario
@@ -28,6 +30,8 @@ export default function SuperadminLayout({
   ticketsClientesAbiertos?: number
   email: string
   avatarUrl?: string
+  apodo?: string
+  color?: string
   userId: string
   permisos: any[]
   esPropietario: boolean
@@ -233,6 +237,9 @@ export default function SuperadminLayout({
                 email={email} 
                 iniciales={iniciales} 
                 avatarUrl={avatarUrl} 
+                apodo={apodo}
+                color={color}
+                userId={userId}
               />
             </div>
           </div>

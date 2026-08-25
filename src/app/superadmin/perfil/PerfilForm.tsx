@@ -4,6 +4,7 @@ import { useState, useRef } from 'react'
 import { actualizarPerfilSuperadmin } from '@/app/actions/superadmin'
 import { createClient } from '@/utils/supabase/client'
 import { USER_COLORS } from '@/lib/userColor'
+import { useToast } from '@/components/ui/Toast'
 
 type SuperadminData = {
   nombre: string
@@ -18,7 +19,7 @@ export default function PerfilForm({ superadmin }: { superadmin: SuperadminData 
   const [apodo, setApodo] = useState(superadmin.apodo || '')
   const [color, setColor] = useState<string | null>(superadmin.color || null)
   const [isSaving, setIsSaving] = useState(false)
-  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+  const { showToast } = useToast()
   
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string>(superadmin.avatar_url || '')
@@ -27,7 +28,6 @@ export default function PerfilForm({ superadmin }: { superadmin: SuperadminData 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setIsSaving(true)
-    setMessage(null)
 
     let finalAvatarUrl = superadmin.avatar_url
 
@@ -42,7 +42,7 @@ export default function PerfilForm({ superadmin }: { superadmin: SuperadminData 
             .upload(filePath, avatarFile, { upsert: true, contentType: avatarFile.type })
           
           if (uploadError) {
-            setMessage({ type: 'error', text: 'Error al subir la imagen de perfil: ' + uploadError.message })
+            showToast('Error al subir la imagen de perfil: ' + uploadError.message, 'error')
             setIsSaving(false)
             return
           }
@@ -55,13 +55,13 @@ export default function PerfilForm({ superadmin }: { superadmin: SuperadminData 
       setIsSaving(false)
 
       if (res.success) {
-        setMessage({ type: 'success', text: 'Perfil actualizado correctamente.' })
+        showToast('Perfil actualizado correctamente.', 'success')
       } else {
-        setMessage({ type: 'error', text: res.error || 'Error al actualizar el perfil.' })
+        showToast(res.error || 'Error al actualizar el perfil.', 'error')
       }
     } catch (e: any) {
       setIsSaving(false)
-      setMessage({ type: 'error', text: 'Ocurrió un error inesperado.' })
+      showToast('Ocurrió un error inesperado.', 'error')
     }
   }
 
@@ -96,7 +96,7 @@ export default function PerfilForm({ superadmin }: { superadmin: SuperadminData 
                   const file = e.target.files?.[0]
                   if (file) {
                     if (file.size > 5 * 1024 * 1024) {
-                      setMessage({ type: 'error', text: 'La imagen debe pesar menos de 5MB' })
+                      showToast('La imagen debe pesar menos de 5MB', 'error')
                       return
                     }
                     setAvatarFile(file)
@@ -173,11 +173,7 @@ export default function PerfilForm({ superadmin }: { superadmin: SuperadminData 
             </div>
           </div>
 
-          {message && (
-            <div className={`p-4 rounded-xl text-sm font-500 ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-rose-50 text-rose-700 border border-rose-100'}`}>
-              {message.text}
-            </div>
-          )}
+
 
           <div className="flex justify-end pt-4 border-t border-slate-100">
             <button

@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { signOut } from '@/app/actions/auth'
-import Image from 'next/image'
+// import Image from 'next/image'
 import { getUserColorObject } from '@/lib/userColor'
 
 type VendedorDropdownProps = {
@@ -42,7 +42,7 @@ export default function VendedorDropdown({ nombre, email, iniciales, avatarUrl, 
       >
         <div className={`w-8 h-8 rounded-full flex items-center justify-center font-600 text-sm overflow-hidden relative shadow-sm ${hasAvatar ? 'bg-transparent' : `${userColor.bg} text-white`}`}>
           {hasAvatar ? (
-            <Image src={avatarUrl!} alt="Avatar" fill className="object-cover" />
+            <img src={avatarUrl!} alt="Avatar" className="w-full h-full object-cover" />
           ) : (
             iniciales
           )}

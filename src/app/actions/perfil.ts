@@ -5,6 +5,7 @@ import { resolveBranchId } from '@/lib/active-branch'
 import { registrarAuditoria } from '@/lib/auditoria'
 import { getAuthContext } from '@/lib/auth-context'
 import { revalidatePath } from 'next/cache'
+import { supabaseAdmin } from '@/utils/supabase/admin'
 
 export async function getPerfilSucursal() {
   const supabase = await createClient()
@@ -143,11 +144,11 @@ export async function actualizarPerfilCliente(nombre: string, apodo: string, ava
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: 'No autorizado' }
 
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
     .from('users')
     .update({ 
-      nombre, 
-      apodo, 
+      nombre: nombre.trim(), 
+      apodo: apodo.trim() || null, 
       avatar_url: avatarUrl,
       color
     })

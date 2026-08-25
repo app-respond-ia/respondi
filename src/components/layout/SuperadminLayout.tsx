@@ -132,7 +132,7 @@ export default function SuperadminLayout({
           )}
         </div>
 
-        <nav className="flex-1 px-3 py-5 space-y-1 overflow-y-auto">
+        <nav className="flex-1 px-3 py-5 space-y-1 overflow-y-auto scrollbar-hide">
           {visibleLinks.map((link: any) => {
             if (link.subLinks) {
               const isGroupActive = link.subLinks.some((sub: any) => sub.exact ? pathname === sub.href : (pathname === sub.href || pathname.startsWith(sub.href + '/')))

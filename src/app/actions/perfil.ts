@@ -135,3 +135,32 @@ export async function savePerfilSucursal(data: {
 
   return { success: true }
 }
+
+
+export async function actualizarPerfilCliente(nombre: string, apodo: string, avatarUrl: string) {
+  const supabase = await createClient()
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+
+  const { error } = await supabase
+    .from('users')
+    .update({ 
+      nombre, 
+      apodo, 
+      avatar_url: avatarUrl 
+    })
+    .eq('id', auth.user_id)
+
+  if (error) return { success: false, error: error.message }
+  return { success: true }
+}
+
+export async function cambiarContrasenaCliente(password: string) {
+  const supabase = await createClient()
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+
+  const { error } = await supabase.auth.updateUser({ password })
+  if (error) return { success: false, error: error.message }
+  return { success: true }
+}

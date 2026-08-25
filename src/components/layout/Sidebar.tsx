@@ -338,32 +338,7 @@ export default function Sidebar({ user, onCloseMobile, permisos, esAdmin, collap
         )}
       </nav>
 
-      <div className="px-3 py-4 border-t border-white/10 shrink-0">
-        <div className={`flex items-center gap-3 py-2 rounded-xl group relative transition hover:bg-white/5 ${collapsed ? 'justify-center px-0' : 'px-3'}`}>
-          <div className="relative shrink-0">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center font-600 text-sm ring-2 ring-white/10" title={collapsed ? user.nombre : undefined}>
-              {user.initials}
-            </div>
-            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-ink-900"></span>
-          </div>
-          {!collapsed && (
-            <>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-500 truncate">{user.nombre}</p>
-                <p className="text-[11px] text-ink-400 truncate">{user.roleName}</p>
-              </div>
-              
-              <form action={signOut}>
-                <button title="Cerrar sesión" className="p-1.5 text-ink-400 hover:text-red-400 hover:bg-white/5 rounded-lg transition">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                  </svg>
-                </button>
-              </form>
-            </>
-          )}
-        </div>
-      </div>
+
       <button onClick={onToggleCollapse}
         className="hidden lg:flex absolute top-1/2 -translate-y-1/2 -right-3 w-6 h-14 rounded-full bg-ink-800 border border-white/10 shadow-lg items-center justify-center text-ink-400 hover:text-white hover:bg-brand-600 hover:border-brand-600 transition z-20">
         <svg className={`w-3.5 h-3.5 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">

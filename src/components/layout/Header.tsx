@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { setActiveBranch } from '@/app/actions/branch'
 import ClienteNotificationBell from '@/components/layout/ClienteNotificationBell'
+import ClienteDropdown from '@/components/layout/ClienteDropdown'
 
 type Branch = {
   id: string
@@ -16,9 +17,10 @@ type HeaderProps = {
   userInitials: string
   creditos?: { saldo: number; max: number } | null
   userId?: string
+  user: any
 }
 
-export default function Header({ branches, activeBranchId, onOpenMobile, userInitials, creditos, userId }: HeaderProps) {
+export default function Header({ branches, activeBranchId, onOpenMobile, userInitials, creditos, userId, user }: HeaderProps) {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -117,8 +119,9 @@ export default function Header({ branches, activeBranchId, onOpenMobile, userIni
             </button>
           )}
         </div>
-        <div className="lg:hidden w-9 h-9 rounded-full bg-brand-500 text-white flex items-center justify-center font-600 text-sm">
-          {userInitials}
+        
+        <div className="flex items-center">
+          <ClienteDropdown user={user} />
         </div>
       </div>
     </header>

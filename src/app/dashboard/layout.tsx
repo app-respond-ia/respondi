@@ -21,7 +21,7 @@ export default async function DashboardLayout({
 
   const { data: userData } = await supabase
     .from('users')
-    .select('rol, nombre, activo, tenant_id')
+    .select('rol, nombre, activo, tenant_id, apodo, avatar_url')
     .eq('id', user.id)
     .single()
 
@@ -91,6 +91,8 @@ export default async function DashboardLayout({
           creditos={creditos}
           isImpersonating={isImpersonating}
           userId={user.id}
+          apodo={userData.apodo}
+          avatarUrl={userData.avatar_url}
         >
           {children}
         </AdminLayout>

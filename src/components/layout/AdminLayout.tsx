@@ -14,6 +14,8 @@ interface AdminLayoutProps {
   creditos?: { saldo: number; max: number } | null
   isImpersonating?: boolean
   userId?: string
+  apodo?: string
+  avatarUrl?: string
 }
 
 export default function AdminLayout({
@@ -25,7 +27,9 @@ export default function AdminLayout({
   activeBranchId = '',
   creditos = null,
   isImpersonating = false,
-  userId = ''
+  userId = '',
+  apodo,
+  avatarUrl
 }: AdminLayoutProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
@@ -34,7 +38,9 @@ export default function AdminLayout({
     nombre: nombreUsuario,
     email: '',
     initials: nombreUsuario ? nombreUsuario.substring(0, 2).toUpperCase() : 'U',
-    roleName: isImpersonating ? 'Superadmin (viendo como)' : (esAdmin ? 'Administrador' : 'Usuario')
+    roleName: isImpersonating ? 'Superadmin (viendo como)' : (esAdmin ? 'Administrador' : 'Usuario'),
+    apodo,
+    avatarUrl
   }
 
   return (
@@ -61,6 +67,7 @@ export default function AdminLayout({
           userInitials={user.initials}
           creditos={creditos}
           userId={userId}
+          user={user}
         />
         <main className="flex-1 flex flex-col min-h-0 px-4 sm:px-6 lg:px-8 py-6">
           {children}

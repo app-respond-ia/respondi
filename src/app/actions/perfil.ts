@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { resolveBranchId } from '@/lib/active-branch'
 import { registrarAuditoria } from '@/lib/auditoria'
 import { getAuthContext } from '@/lib/auth-context'
+import { revalidatePath } from 'next/cache'
 
 export async function getPerfilSucursal() {
   const supabase = await createClient()
@@ -139,8 +140,8 @@ export async function savePerfilSucursal(data: {
 
 export async function actualizarPerfilCliente(nombre: string, apodo: string, avatarUrl: string) {
   const supabase = await createClient()
-  const auth = await getAuthContext(supabase)
-  if (auth.error) return { success: false, error: auth.error }
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'No autorizado' }
 
   const { error } = await supabase
     .from('users')
@@ -149,16 +150,19 @@ export async function actualizarPerfilCliente(nombre: string, apodo: string, ava
       apodo, 
       avatar_url: avatarUrl 
     })
-    .eq('id', auth.user_id)
+    .eq('id', user.id)
 
   if (error) return { success: false, error: error.message }
+  
+  revalidatePath('/dashboard', 'layout')
+  
   return { success: true }
 }
 
 export async function cambiarContrasenaCliente(password: string) {
   const supabase = await createClient()
-  const auth = await getAuthContext(supabase)
-  if (auth.error) return { success: false, error: auth.error }
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'No autorizado' }
 
   const { error } = await supabase.auth.updateUser({ password })
   if (error) return { success: false, error: error.message }

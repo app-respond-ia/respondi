@@ -225,8 +225,12 @@ export default function ListaPreciosPage() {
     categoriasRaiz.forEach((cat, index) => {
       const subs = subcategoriasDe(cat.id)
       if (subs.length > maxSubcats) maxSubcats = subs.length
+      const colLetter = wsData.getColumn(index + 1).letter
       const col = wsData.getColumn(index + 1)
       col.values = [cat.nombre, ...subs.map(s => s.nombre)]
+      
+      const numRows = Math.max(subs.length, 1)
+      wb.definedNames.add(`SUBCAT_${index + 1}`, `'DatosOcultos'!$${colLetter}$2:$${colLetter}$${numRows + 1}`)
     })
 
     const startRow = items.length > 0 ? items.length + 2 : 2
@@ -259,9 +263,8 @@ export default function ListaPreciosPage() {
         
         if (maxSubcats > 0) {
           const headerRange = `'DatosOcultos'!$A$1:$${lastColLetter}$1`
-          const matrixRange = `'DatosOcultos'!$A$2:$${lastColLetter}$${maxSubcats + 1}`
           ws.getCell(`F${i}`).dataValidation = {
-            type: 'list', allowBlank: true, formulae: [`INDEX(${matrixRange}, 0, MATCH($E${i}, ${headerRange}, 0))`],
+            type: 'list', allowBlank: true, formulae: [`INDIRECT("SUBCAT_"&MATCH($E${i}, ${headerRange}, 0))`],
             showErrorMessage: false
           }
         }

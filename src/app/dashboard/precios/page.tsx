@@ -230,7 +230,7 @@ export default function ListaPreciosPage() {
       col.values = [cat.nombre, ...subs.map(s => s.nombre)]
       
       const numRows = Math.max(subs.length, 1)
-      wb.definedNames.add(`SUBCAT_${index + 1}`, `'DatosOcultos'!$${colLetter}$2:$${colLetter}$${numRows + 1}`)
+      wb.definedNames.add(`'DatosOcultos'!$${colLetter}$2:$${colLetter}$${numRows + 1}`, `SUBCAT_${index + 1}`)
     })
 
     const startRow = items.length > 0 ? items.length + 2 : 2

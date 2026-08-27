@@ -204,22 +204,43 @@ export default function ListaPreciosPage() {
     ws.getRow(1).font = { bold: true }
     ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEDE9FE' } }
 
-    ws.addRow({ nombre: 'Café espresso', tipo: 'producto', precio: 2.50, precio_tipo: 'exacto', categoria: 'Bebidas', subcategoria: 'Cafés', descripcion: 'Café solo corto' })
-    ws.addRow({ nombre: 'Consultoría hora', tipo: 'servicio', precio: 80, precio_tipo: 'desde', categoria: 'Servicios', subcategoria: '', descripcion: 'Precio mínimo por hora' })
-    ws.addRow({ nombre: 'Menú del día', tipo: 'producto', precio: '', precio_tipo: 'consultar', categoria: 'Menús', subcategoria: '', descripcion: 'Pregunta por el menú' })
+    if (items.length > 0) {
+      items.forEach(item => {
+        ws.addRow({
+          nombre: item.nombre,
+          tipo: item.tipo,
+          precio: item.precio ?? '',
+          precio_tipo: item.precio_tipo,
+          categoria: item.categoria || '',
+          subcategoria: item.subcategoria || '',
+          descripcion: item.descripcion || ''
+        })
+      })
+    }
 
     const wsData = wb.addWorksheet('DatosOcultos', { state: 'hidden' })
     const categoriasNombres = categoriasRaiz.map(c => c.nombre)
-    const subcategoriasNombres = categorias.filter(c => c.parent_id).map(c => c.nombre)
+    
+    // Preparar pares Categoría-Subcategoría
+    const catSubPairs: { cat: string, sub: string }[] = []
+    categoriasRaiz.forEach(cat => {
+      const subs = subcategoriasDe(cat.id)
+      if (subs.length > 0) {
+        subs.forEach(sub => catSubPairs.push({ cat: cat.nombre, sub: sub.nombre }))
+      }
+    })
 
     if (categoriasNombres.length > 0) {
-      wsData.getColumn('A').values = categoriasNombres
+      wsData.getColumn('C').values = categoriasNombres // Columna C para la lista simple de categorías
     }
-    if (subcategoriasNombres.length > 0) {
-      wsData.getColumn('B').values = subcategoriasNombres
+    
+    if (catSubPairs.length > 0) {
+      wsData.getColumn('A').values = catSubPairs.map(p => p.cat)
+      wsData.getColumn('B').values = catSubPairs.map(p => p.sub)
     }
 
-    for (let i = 2; i <= 500; i++) {
+    const startRow = items.length > 0 ? items.length + 2 : 2
+    for (let i = 2; i <= (startRow + 500); i++) {
       ws.getCell(`B${i}`).dataValidation = {
         type: 'list', allowBlank: false, formulae: ['"producto,servicio"'],
         showErrorMessage: true, errorTitle: 'Valor inválido',
@@ -233,13 +254,15 @@ export default function ListaPreciosPage() {
       
       if (categoriasNombres.length > 0) {
         ws.getCell(`E${i}`).dataValidation = {
-          type: 'list', allowBlank: true, formulae: [`DatosOcultos!$A$1:$A$${categoriasNombres.length}`],
+          type: 'list', allowBlank: true, formulae: [`DatosOcultos!$C$1:$C$${categoriasNombres.length}`],
           showErrorMessage: false
         }
       }
-      if (subcategoriasNombres.length > 0) {
+      
+      if (catSubPairs.length > 0) {
+        const catRange = `DatosOcultos!$A$1:$A$${catSubPairs.length}`
         ws.getCell(`F${i}`).dataValidation = {
-          type: 'list', allowBlank: true, formulae: [`DatosOcultos!$B$1:$B$${subcategoriasNombres.length}`],
+          type: 'list', allowBlank: true, formulae: [`OFFSET(DatosOcultos!$B$1, MATCH($E${i}, ${catRange}, 0)-1, 0, COUNTIF(${catRange}, $E${i}), 1)`],
           showErrorMessage: false
         }
       }
@@ -791,7 +814,7 @@ export default function ListaPreciosPage() {
                     </div>
                     <p className="text-sm font-600 text-ink-900">Categorías</p>
                   </div>
-                  <div className="flex-1 overflow-y-auto p-3 space-y-1">
+                  <div className="flex-1 overflow-y-auto p-3 space-y-1 max-h-[360px]">
                     {categoriasRaiz.length === 0 && (
                       <div className="text-center py-8 px-4">
                         <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3 text-slate-300">
@@ -867,7 +890,7 @@ export default function ListaPreciosPage() {
                       )}
                     </div>
                   </div>
-                  <div className="flex-1 overflow-y-auto p-4 space-y-1.5">
+                  <div className="flex-1 overflow-y-auto p-4 space-y-1.5 max-h-[360px]">
                     {!categoriaSeleccionada && (
                       <div className="h-full flex flex-col items-center justify-center text-center px-4 opacity-60">
                         <svg className="w-8 h-8 text-slate-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" /></svg>

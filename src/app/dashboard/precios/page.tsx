@@ -194,8 +194,8 @@ export default function ListaPreciosPage() {
     ws.columns = [
       { header: 'nombre', key: 'nombre', width: 30 },
       { header: 'tipo', key: 'tipo', width: 14 },
-      { header: 'precio', key: 'precio', width: 10 },
       { header: 'precio_tipo', key: 'precio_tipo', width: 14 },
+      { header: 'precio', key: 'precio', width: 10 },
       { header: 'categoria', key: 'categoria', width: 20 },
       { header: 'subcategoria', key: 'subcategoria', width: 20 },
       { header: 'descripcion', key: 'descripcion', width: 40 },
@@ -209,8 +209,8 @@ export default function ListaPreciosPage() {
         ws.addRow({
           nombre: item.nombre,
           tipo: item.tipo,
-          precio: item.precio ?? '',
           precio_tipo: item.precio_tipo,
+          precio: item.precio ?? '',
           categoria: item.categoria || '',
           subcategoria: item.subcategoria || '',
           descripcion: item.descripcion || ''
@@ -246,23 +246,31 @@ export default function ListaPreciosPage() {
         showErrorMessage: true, errorTitle: 'Valor inválido',
         error: 'Selecciona "producto" o "servicio" de la lista.'
       }
-      ws.getCell(`D${i}`).dataValidation = {
+      ws.getCell(`C${i}`).dataValidation = {
         type: 'list', allowBlank: false, formulae: ['"exacto,desde,consultar"'],
         showErrorMessage: true, errorTitle: 'Valor inválido',
         error: 'Selecciona "exacto", "desde" o "consultar" de la lista.'
       }
+      ws.getCell(`D${i}`).dataValidation = {
+        type: 'custom',
+        allowBlank: true,
+        formulae: [`C${i}<>"consultar"`],
+        showErrorMessage: true,
+        errorTitle: 'Valor inválido',
+        error: 'No puedes indicar un precio si el tipo es "consultar".'
+      }
       
       if (categoriasNombres.length > 0) {
         ws.getCell(`E${i}`).dataValidation = {
-          type: 'list', allowBlank: true, formulae: [`DatosOcultos!$C$1:$C$${categoriasNombres.length}`],
+          type: 'list', allowBlank: true, formulae: [`'DatosOcultos'!$C$1:$C$${categoriasNombres.length}`],
           showErrorMessage: false
         }
       }
       
       if (catSubPairs.length > 0) {
-        const catRange = `DatosOcultos!$A$1:$A$${catSubPairs.length}`
+        const catRange = `'DatosOcultos'!$A$1:$A$${catSubPairs.length}`
         ws.getCell(`F${i}`).dataValidation = {
-          type: 'list', allowBlank: true, formulae: [`OFFSET(DatosOcultos!$B$1, MATCH($E${i}, ${catRange}, 0)-1, 0, COUNTIF(${catRange}, $E${i}), 1)`],
+          type: 'list', allowBlank: true, formulae: [`OFFSET('DatosOcultos'!$B$1, MATCH($E${i}, ${catRange}, 0)-1, 0, COUNTIF(${catRange}, $E${i}), 1)`],
           showErrorMessage: false
         }
       }
@@ -298,8 +306,8 @@ export default function ListaPreciosPage() {
         const fila = i + 1
         const nombre = row[0]?.toString().trim()
         const tipo = row[1]?.toString().trim().toLowerCase() || 'producto'
-        const precioRaw = row[2]?.toString().trim()
-        const precio_tipo = row[3]?.toString().trim().toLowerCase() || 'exacto'
+        const precio_tipo = row[2]?.toString().trim().toLowerCase() || 'exacto'
+        const precioRaw = row[3]?.toString().trim()
         const categoria = row[4]?.toString().trim() || null
         const subcategoria = row[5]?.toString().trim() || null
         const descripcion = row[6]?.toString().trim() || null

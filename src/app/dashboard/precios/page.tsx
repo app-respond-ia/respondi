@@ -7,6 +7,7 @@ import { getCategorias, crearCategoria, actualizarCategoria, eliminarCategoria }
 import { getMisPermisos } from '@/app/actions/permisos'
 import { useToast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
+import { HelpPopover } from '@/components/ui/HelpPopover'
 
 export default function ListaPreciosPage() {
   const [loading, setLoading] = useState(true)
@@ -21,7 +22,6 @@ export default function ListaPreciosPage() {
   const [saving, setSaving] = useState(false)
   const { showToast } = useToast()
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
-  const [isAyudaModalOpen, setIsAyudaModalOpen] = useState(false)
   const [importando, setImportando] = useState(false)
   const [importPreview, setImportPreview] = useState<{
     validos: any[],
@@ -208,16 +208,40 @@ export default function ListaPreciosPage() {
     ws.addRow({ nombre: 'Consultoría hora', tipo: 'servicio', precio: 80, precio_tipo: 'desde', categoria: 'Servicios', subcategoria: '', descripcion: 'Precio mínimo por hora' })
     ws.addRow({ nombre: 'Menú del día', tipo: 'producto', precio: '', precio_tipo: 'consultar', categoria: 'Menús', subcategoria: '', descripcion: 'Pregunta por el menú' })
 
+    const wsData = wb.addWorksheet('DatosOcultos', { state: 'hidden' })
+    const categoriasNombres = categoriasRaiz.map(c => c.nombre)
+    const subcategoriasNombres = categorias.filter(c => c.parent_id).map(c => c.nombre)
+
+    if (categoriasNombres.length > 0) {
+      wsData.getColumn('A').values = categoriasNombres
+    }
+    if (subcategoriasNombres.length > 0) {
+      wsData.getColumn('B').values = subcategoriasNombres
+    }
+
     for (let i = 2; i <= 500; i++) {
       ws.getCell(`B${i}`).dataValidation = {
-        type: 'list', allowBlank: false, formulae: ['producto,servicio'],
+        type: 'list', allowBlank: false, formulae: ['"producto,servicio"'],
         showErrorMessage: true, errorTitle: 'Valor inválido',
         error: 'Selecciona "producto" o "servicio" de la lista.'
       }
       ws.getCell(`D${i}`).dataValidation = {
-        type: 'list', allowBlank: false, formulae: ['exacto,desde,consultar'],
+        type: 'list', allowBlank: false, formulae: ['"exacto,desde,consultar"'],
         showErrorMessage: true, errorTitle: 'Valor inválido',
         error: 'Selecciona "exacto", "desde" o "consultar" de la lista.'
+      }
+      
+      if (categoriasNombres.length > 0) {
+        ws.getCell(`E${i}`).dataValidation = {
+          type: 'list', allowBlank: true, formulae: [`DatosOcultos!$A$1:$A$${categoriasNombres.length}`],
+          showErrorMessage: false
+        }
+      }
+      if (subcategoriasNombres.length > 0) {
+        ws.getCell(`F${i}`).dataValidation = {
+          type: 'list', allowBlank: true, formulae: [`DatosOcultos!$B$1:$B$${subcategoriasNombres.length}`],
+          showErrorMessage: false
+        }
       }
     }
 
@@ -394,7 +418,21 @@ export default function ListaPreciosPage() {
       {/* Encabezado + acciones */}
       <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
         <div>
-          <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Lista de precios</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Lista de precios</h1>
+            <HelpPopover content={
+              <div className="space-y-3">
+                <p><strong className="text-brand-300">Formatos aceptados:</strong> .xlsx o .csv. Recomendamos descargar y usar nuestra plantilla.</p>
+                <div className="space-y-1.5 opacity-90">
+                  <p><strong>nombre:</strong> Obligatorio. Texto libre.</p>
+                  <p><strong>tipo:</strong> producto o servicio.</p>
+                  <p><strong>precio / precio_tipo:</strong> exacto, desde o consultar.</p>
+                  <p><strong>categoria / subcategoria:</strong> Opcionales.</p>
+                  <p><strong>descripcion:</strong> Ayuda a la IA a responder mejor sobre este ítem.</p>
+                </div>
+              </div>
+            } />
+          </div>
           <p className="text-ink-500 mt-1">Productos y servicios que tu agente conoce.</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -413,11 +451,6 @@ export default function ListaPreciosPage() {
             Importar Excel
             <input type="file" accept=".xlsx,.xls,.csv" onChange={handleArchivoExcel} className="sr-only" />
           </label>
-          <button onClick={() => setIsAyudaModalOpen(true)}
-            title="Cómo rellenar el Excel"
-            className="w-11 h-11 shrink-0 inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-ink-600 transition">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-          </button>
           <button
             disabled={nivelPermiso !== 'escritura'}
             onClick={openAñadir}
@@ -738,7 +771,7 @@ export default function ListaPreciosPage() {
         <div className="fixed inset-0 z-50">
           <div className="absolute inset-0 bg-ink-900/50 backdrop-blur-sm" onClick={() => setIsCategoriasModalOpen(false)}></div>
           <div className="relative min-h-full flex items-center justify-center p-4 pointer-events-none">
-            <div className="w-full max-w-3xl bg-white rounded-2xl shadow-2xl pointer-events-auto flex flex-col max-h-[85vh]">
+            <div className="w-full max-w-4xl bg-white rounded-2xl shadow-2xl pointer-events-auto flex flex-col max-h-[85vh]">
               <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
                 <div>
                   <h2 className="font-display font-700 text-lg text-ink-900">Categorías y subcategorías</h2>
@@ -749,173 +782,156 @@ export default function ListaPreciosPage() {
                 </button>
               </div>
 
-              <div className="flex-1 overflow-hidden grid grid-cols-2 divide-x divide-slate-100">
+              <div className="flex-1 overflow-hidden flex bg-slate-50/50">
                 {/* Columna izquierda: categorías */}
-                <div className="flex flex-col overflow-hidden">
-                  <div className="px-5 py-3 border-b border-slate-100 shrink-0">
-                    <p className="text-xs font-600 uppercase tracking-wide text-ink-500">Categorías</p>
+                <div className="w-1/2 flex flex-col border-r border-slate-100 bg-white shadow-sm z-10">
+                  <div className="px-5 py-4 border-b border-slate-100 shrink-0 flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
+                    </div>
+                    <p className="text-sm font-600 text-ink-900">Categorías</p>
                   </div>
-                  <div className="flex-1 overflow-y-auto px-5 py-3 space-y-1.5">
+                  <div className="flex-1 overflow-y-auto p-3 space-y-1">
                     {categoriasRaiz.length === 0 && (
-                      <p className="text-sm text-ink-400 py-4 text-center">Aún no hay categorías.</p>
+                      <div className="text-center py-8 px-4">
+                        <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3 text-slate-300">
+                          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
+                        </div>
+                        <p className="text-sm text-ink-500 font-500">Aún no hay categorías.</p>
+                      </div>
                     )}
-                    {categoriasRaiz.map(cat => (
+                    {categoriasRaiz.map(cat => {
+                      const itemCount = items.filter(i => i.categoria === cat.nombre).length;
+                      return (
                       <div key={cat.id}
                         onClick={() => setCategoriaSeleccionada(cat.id)}
-                        className={`flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl border cursor-pointer transition ${categoriaSeleccionada === cat.id ? 'border-brand-300 bg-brand-50' : 'border-slate-200 hover:border-slate-300'}`}>
-                        {editandoCatId === cat.id ? (
-                          <input autoFocus value={editandoCatNombre} onChange={e => setEditandoCatNombre(e.target.value)}
-                            onClick={e => e.stopPropagation()}
-                            onKeyDown={e => { if (e.key === 'Enter') guardarEdicion(); if (e.key === 'Escape') setEditandoCatId(null) }}
-                            onBlur={guardarEdicion}
-                            className="flex-1 h-8 px-2 rounded-lg border border-brand-300 text-sm focus:outline-none" />
-                        ) : (
-                          <span className="text-sm font-500 text-ink-800 flex-1 truncate">{cat.nombre}</span>
-                        )}
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button onClick={e => { e.stopPropagation(); iniciarEdicion(cat) }} className="p-1 rounded text-ink-400 hover:text-brand-600 hover:bg-brand-100 transition">
+                        className={`group relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-200 ${categoriaSeleccionada === cat.id ? 'bg-indigo-50 shadow-sm border border-indigo-100/50' : 'bg-transparent border border-transparent hover:bg-slate-50'}`}>
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <svg className={`w-4 h-4 shrink-0 transition-colors ${categoriaSeleccionada === cat.id ? 'text-indigo-500' : 'text-slate-400 group-hover:text-slate-500'}`} fill="currentColor" viewBox="0 0 24 24"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+                          {editandoCatId === cat.id ? (
+                            <input autoFocus value={editandoCatNombre} onChange={e => setEditandoCatNombre(e.target.value)}
+                              onClick={e => e.stopPropagation()}
+                              onKeyDown={e => { if (e.key === 'Enter') guardarEdicion(); if (e.key === 'Escape') setEditandoCatId(null) }}
+                              onBlur={guardarEdicion}
+                              className="flex-1 min-w-0 h-8 px-2 rounded-lg border-2 border-indigo-500 text-sm focus:outline-none" />
+                          ) : (
+                            <div className="flex-1 min-w-0 flex items-center gap-2">
+                              <span className={`text-sm font-500 truncate ${categoriaSeleccionada === cat.id ? 'text-indigo-900' : 'text-ink-700 group-hover:text-ink-900'}`}>{cat.nombre}</span>
+                              {itemCount > 0 && (
+                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-600 ${categoriaSeleccionada === cat.id ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>
+                                  {itemCount}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <div className={`flex items-center gap-1 shrink-0 transition-opacity ${categoriaSeleccionada === cat.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                          <button onClick={e => { e.stopPropagation(); iniciarEdicion(cat) }} className="p-1.5 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-100/50 transition">
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                           </button>
-                          <button onClick={e => { e.stopPropagation(); handleEliminarCategoria(cat.id) }} className="p-1 rounded text-ink-400 hover:text-red-500 hover:bg-red-50 transition">
+                          <button onClick={e => { e.stopPropagation(); handleEliminarCategoria(cat.id) }} className="p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition">
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                           </button>
                         </div>
+                        {categoriaSeleccionada === cat.id && (
+                          <div className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-white border border-slate-100 rounded-full flex items-center justify-center shadow-sm z-20">
+                            <svg className="w-3 h-3 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+                          </div>
+                        )}
                       </div>
-                    ))}
+                    )})}
                   </div>
-                  <div className="px-5 py-3 border-t border-slate-100 shrink-0 flex gap-2">
-                    <input value={nuevoNombreCategoria} onChange={e => setNuevoNombreCategoria(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') handleCrearCategoria() }}
-                      placeholder="Nueva categoría..."
-                      className="flex-1 h-10 px-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition" />
-                    <button onClick={handleCrearCategoria} className="px-3 h-10 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-sm font-600 transition shrink-0">
-                      Añadir
-                    </button>
+                  <div className="p-4 border-t border-slate-100 bg-slate-50/50 shrink-0">
+                    <div className="flex gap-2">
+                      <input value={nuevoNombreCategoria} onChange={e => setNuevoNombreCategoria(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') handleCrearCategoria() }}
+                        placeholder="Nueva categoría..."
+                        className="flex-1 h-10 px-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition shadow-sm" />
+                      <button onClick={handleCrearCategoria} className="px-3 h-10 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-sm font-600 transition shadow-sm shrink-0">
+                        Añadir
+                      </button>
+                    </div>
                   </div>
                 </div>
 
                 {/* Columna derecha: subcategorías */}
-                <div className="flex flex-col overflow-hidden">
-                  <div className="px-5 py-3 border-b border-slate-100 shrink-0">
-                    <p className="text-xs font-600 uppercase tracking-wide text-ink-500">
-                      {categoriaSeleccionada ? `Subcategorías de "${categorias.find(c => c.id === categoriaSeleccionada)?.nombre}"` : 'Subcategorías'}
-                    </p>
+                <div className="w-1/2 flex flex-col bg-slate-50/30">
+                  <div className="px-6 py-4 border-b border-slate-100 shrink-0 flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-600 text-ink-900 truncate">Subcategorías</p>
+                      {categoriaSeleccionada && (
+                        <p className="text-xs text-ink-500 mt-0.5 truncate max-w-[200px]">de {categorias.find(c => c.id === categoriaSeleccionada)?.nombre}</p>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex-1 overflow-y-auto px-5 py-3 space-y-1.5">
+                  <div className="flex-1 overflow-y-auto p-4 space-y-1.5">
                     {!categoriaSeleccionada && (
-                      <p className="text-sm text-ink-400 py-4 text-center">Selecciona una categoría a la izquierda.</p>
+                      <div className="h-full flex flex-col items-center justify-center text-center px-4 opacity-60">
+                        <svg className="w-8 h-8 text-slate-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" /></svg>
+                        <p className="text-sm text-slate-500 font-500">Selecciona una categoría<br/>para ver sus subcategorías.</p>
+                      </div>
                     )}
                     {categoriaSeleccionada && subcategoriasDe(categoriaSeleccionada).length === 0 && (
-                      <p className="text-sm text-ink-400 py-4 text-center">Sin subcategorías todavía.</p>
+                      <div className="text-center py-6 px-4">
+                        <p className="text-sm text-slate-400 font-500">Sin subcategorías todavía.</p>
+                      </div>
                     )}
-                    {categoriaSeleccionada && subcategoriasDe(categoriaSeleccionada).map(sub => (
-                      <div key={sub.id} className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl border border-slate-200">
-                        {editandoCatId === sub.id ? (
-                          <input autoFocus value={editandoCatNombre} onChange={e => setEditandoCatNombre(e.target.value)}
-                            onKeyDown={e => { if (e.key === 'Enter') guardarEdicion(); if (e.key === 'Escape') setEditandoCatId(null) }}
-                            onBlur={guardarEdicion}
-                            className="flex-1 h-8 px-2 rounded-lg border border-brand-300 text-sm focus:outline-none" />
-                        ) : (
-                          <span className="text-sm font-500 text-ink-800 flex-1 truncate">{sub.nombre}</span>
-                        )}
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button onClick={() => iniciarEdicion(sub)} className="p-1 rounded text-ink-400 hover:text-brand-600 hover:bg-brand-100 transition">
+                    {categoriaSeleccionada && subcategoriasDe(categoriaSeleccionada).map(sub => {
+                      const itemCount = items.filter(i => i.subcategoria === sub.nombre).length;
+                      return (
+                      <div key={sub.id} className="group flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl bg-white border border-slate-200 hover:border-slate-300 hover:shadow-sm transition-all duration-200">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <svg className="w-3.5 h-3.5 shrink-0 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
+                          {editandoCatId === sub.id ? (
+                            <input autoFocus value={editandoCatNombre} onChange={e => setEditandoCatNombre(e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Enter') guardarEdicion(); if (e.key === 'Escape') setEditandoCatId(null) }}
+                              onBlur={guardarEdicion}
+                              className="flex-1 min-w-0 h-8 px-2 rounded-lg border-2 border-emerald-500 text-sm focus:outline-none" />
+                          ) : (
+                            <div className="flex-1 min-w-0 flex items-center gap-2">
+                              <span className="text-sm font-500 text-ink-700 group-hover:text-ink-900 truncate">{sub.nombre}</span>
+                              {itemCount > 0 && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-600 bg-slate-100 text-slate-500">
+                                  {itemCount}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => iniciarEdicion(sub)} className="p-1.5 rounded-md text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition">
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                           </button>
-                          <button onClick={() => handleEliminarCategoria(sub.id)} className="p-1 rounded text-ink-400 hover:text-red-500 hover:bg-red-50 transition">
+                          <button onClick={() => handleEliminarCategoria(sub.id)} className="p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition">
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                           </button>
                         </div>
                       </div>
-                    ))}
+                    )})}
                   </div>
-                  <div className="px-5 py-3 border-t border-slate-100 shrink-0 flex gap-2">
-                    <input value={nuevoNombreSubcategoria} onChange={e => setNuevoNombreSubcategoria(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') handleCrearSubcategoria() }}
-                      disabled={!categoriaSeleccionada}
-                      placeholder={categoriaSeleccionada ? 'Nueva subcategoría...' : 'Selecciona una categoría'}
-                      className="flex-1 h-10 px-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition disabled:bg-slate-50 disabled:text-ink-400" />
-                    <button onClick={handleCrearSubcategoria} disabled={!categoriaSeleccionada}
-                      className="px-3 h-10 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-600 transition shrink-0">
-                      Añadir
-                    </button>
+                  <div className="p-4 border-t border-slate-100 bg-slate-50/50 shrink-0">
+                    <div className="flex gap-2">
+                      <input value={nuevoNombreSubcategoria} onChange={e => setNuevoNombreSubcategoria(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') handleCrearSubcategoria() }}
+                        disabled={!categoriaSeleccionada}
+                        placeholder={categoriaSeleccionada ? 'Nueva subcategoría...' : 'Selecciona una categoría'}
+                        className="flex-1 h-10 px-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition shadow-sm disabled:bg-slate-100 disabled:text-ink-400" />
+                      <button onClick={handleCrearSubcategoria} disabled={!categoriaSeleccionada}
+                        className="px-3 h-10 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-600 transition shadow-sm shrink-0">
+                        Añadir
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="flex justify-end px-6 py-4 border-t border-slate-100 shrink-0">
+              <div className="flex justify-end px-6 py-4 border-t border-slate-100 shrink-0 bg-slate-50/50 rounded-b-2xl">
                 <button onClick={() => setIsCategoriasModalOpen(false)}
-                  className="px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 transition">
+                  className="px-6 h-11 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-600 shadow-sm transition">
                   Listo
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* MODAL AYUDA */}
-      {isAyudaModalOpen && (
-        <div className="fixed inset-0 z-50">
-          <div className="absolute inset-0 bg-ink-900/50 backdrop-blur-sm" onClick={() => setIsAyudaModalOpen(false)}></div>
-          <div className="relative min-h-full flex items-center justify-center p-4 pointer-events-none">
-            <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl pointer-events-auto flex flex-col max-h-[85vh]">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
-                <h2 className="font-display font-700 text-lg text-ink-900">Cómo rellenar el Excel de precios</h2>
-                <button onClick={() => setIsAyudaModalOpen(false)} className="p-1.5 rounded-lg text-ink-400 hover:bg-slate-100 transition">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-                <div className="p-4 rounded-xl bg-brand-50 border border-brand-200">
-                  <p className="text-sm text-brand-800">
-                    <span className="font-600">Formatos aceptados:</span> puedes subir un archivo <span className="font-600">.xlsx</span> (Excel) o <span className="font-600">.csv</span>. Te recomendamos descargar la plantilla y rellenarla directamente, sin cambiar el orden de las columnas.
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-sm font-600 text-ink-900 mb-3">Columnas del archivo:</p>
-                  <div className="space-y-3">
-                    <div className="flex gap-3">
-                      <span className="shrink-0 w-28 text-xs font-600 text-ink-500 pt-0.5">nombre</span>
-                      <p className="text-sm text-ink-700"><span className="font-600">Obligatorio.</span> Nombre del producto o servicio. Texto libre, ej. "Café espresso".</p>
-                    </div>
-                    <div className="flex gap-3">
-                      <span className="shrink-0 w-28 text-xs font-600 text-ink-500 pt-0.5">tipo</span>
-                      <p className="text-sm text-ink-700"><span className="font-600">Obligatorio.</span> Debe ser exactamente <span className="font-mono bg-slate-100 px-1 rounded">producto</span> o <span className="font-mono bg-slate-100 px-1 rounded">servicio</span>.</p>
-                    </div>
-                    <div className="flex gap-3">
-                      <span className="shrink-0 w-28 text-xs font-600 text-ink-500 pt-0.5">precio</span>
-                      <p className="text-sm text-ink-700">Un número (ej. 2.50 o 2,50). <span className="font-600">Obligatorio</span> salvo que precio_tipo sea "consultar".</p>
-                    </div>
-                    <div className="flex gap-3">
-                      <span className="shrink-0 w-28 text-xs font-600 text-ink-500 pt-0.5">precio_tipo</span>
-                      <p className="text-sm text-ink-700"><span className="font-600">Obligatorio.</span> Debe ser <span className="font-mono bg-slate-100 px-1 rounded">exacto</span>, <span className="font-mono bg-slate-100 px-1 rounded">desde</span> o <span className="font-mono bg-slate-100 px-1 rounded">consultar</span>.</p>
-                    </div>
-                    <div className="flex gap-3">
-                      <span className="shrink-0 w-28 text-xs font-600 text-ink-500 pt-0.5">categoria</span>
-                      <p className="text-sm text-ink-700">Opcional. Texto libre, ej. "Bebidas". Si quieres reutilizar tus categorías ya creadas, escribe el nombre exacto tal como aparece en "Categorías".</p>
-                    </div>
-                    <div className="flex gap-3">
-                      <span className="shrink-0 w-28 text-xs font-600 text-ink-500 pt-0.5">subcategoria</span>
-                      <p className="text-sm text-ink-700">Opcional. Texto libre, ej. "Cafés".</p>
-                    </div>
-                    <div className="flex gap-3">
-                      <span className="shrink-0 w-28 text-xs font-600 text-ink-500 pt-0.5">descripcion</span>
-                      <p className="text-sm text-ink-700">Opcional. Texto libre que ayuda a la IA a responder mejor sobre este ítem.</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-                  <p className="text-sm text-ink-600">Si alguna fila tiene un error, se te mostrará antes de importar y podrás corregirla en tu archivo y volver a subirlo — las filas con errores no se importan, pero el resto sí.</p>
-                </div>
-              </div>
-
-              <div className="flex justify-end px-6 py-4 border-t border-slate-100 shrink-0">
-                <button onClick={() => setIsAyudaModalOpen(false)}
-                  className="px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 transition">
-                  Entendido
                 </button>
               </div>
             </div>

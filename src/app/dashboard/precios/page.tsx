@@ -221,23 +221,13 @@ export default function ListaPreciosPage() {
     const wsData = wb.addWorksheet('DatosOcultos', { state: 'hidden' })
     const categoriasNombres = categoriasRaiz.map(c => c.nombre)
     
-    // Preparar pares Categoría-Subcategoría
-    const catSubPairs: { cat: string, sub: string }[] = []
-    categoriasRaiz.forEach(cat => {
+    let maxSubcats = 0
+    categoriasRaiz.forEach((cat, index) => {
       const subs = subcategoriasDe(cat.id)
-      if (subs.length > 0) {
-        subs.forEach(sub => catSubPairs.push({ cat: cat.nombre, sub: sub.nombre }))
-      }
+      if (subs.length > maxSubcats) maxSubcats = subs.length
+      const col = wsData.getColumn(index + 1)
+      col.values = [cat.nombre, ...subs.map(s => s.nombre)]
     })
-
-    if (categoriasNombres.length > 0) {
-      wsData.getColumn('C').values = categoriasNombres // Columna C para la lista simple de categorías
-    }
-    
-    if (catSubPairs.length > 0) {
-      wsData.getColumn('A').values = catSubPairs.map(p => p.cat)
-      wsData.getColumn('B').values = catSubPairs.map(p => p.sub)
-    }
 
     const startRow = items.length > 0 ? items.length + 2 : 2
     for (let i = 2; i <= (startRow + 500); i++) {
@@ -261,17 +251,19 @@ export default function ListaPreciosPage() {
       }
       
       if (categoriasNombres.length > 0) {
+        const lastColLetter = wsData.getColumn(categoriasNombres.length).letter
         ws.getCell(`E${i}`).dataValidation = {
-          type: 'list', allowBlank: true, formulae: [`'DatosOcultos'!$C$1:$C$${categoriasNombres.length}`],
+          type: 'list', allowBlank: true, formulae: [`'DatosOcultos'!$A$1:$${lastColLetter}$1`],
           showErrorMessage: false
         }
-      }
-      
-      if (catSubPairs.length > 0) {
-        const catRange = `'DatosOcultos'!$A$1:$A$${catSubPairs.length}`
-        ws.getCell(`F${i}`).dataValidation = {
-          type: 'list', allowBlank: true, formulae: [`OFFSET('DatosOcultos'!$B$1, MATCH($E${i}, ${catRange}, 0)-1, 0, COUNTIF(${catRange}, $E${i}), 1)`],
-          showErrorMessage: false
+        
+        if (maxSubcats > 0) {
+          const headerRange = `'DatosOcultos'!$A$1:$${lastColLetter}$1`
+          const matrixRange = `'DatosOcultos'!$A$2:$${lastColLetter}$${maxSubcats + 1}`
+          ws.getCell(`F${i}`).dataValidation = {
+            type: 'list', allowBlank: true, formulae: [`INDEX(${matrixRange}, 0, MATCH($E${i}, ${headerRange}, 0))`],
+            showErrorMessage: false
+          }
         }
       }
     }

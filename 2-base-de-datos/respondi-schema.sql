@@ -1063,3 +1063,44 @@ select cron.schedule(
   '0 11 * * *',
   $$ select check_casos_estancados(); $$
 );
+
+-- ============================================================================
+-- PLANTILLAS DE WHATSAPP
+-- ============================================================================
+
+-- Función genérica para el trigger de updated_at (si no existe)
+create or replace function update_updated_at_column()
+returns trigger as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$ language plpgsql;
+
+create table whatsapp_templates (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references organizaciones(id) on delete cascade,
+  branch_id uuid not null references sucursales(id) on delete cascade,
+  channel_id uuid not null references channels(id) on delete cascade,
+  nombre text not null check (nombre ~ '^[a-z0-9_]+$'),
+  contenido text not null,
+  idioma text not null default 'es_ES',
+  categoria text not null check (categoria in ('marketing', 'utilidad', 'autenticacion')),
+  estado text not null default 'pendiente' check (estado in ('pendiente', 'aprobada', 'rechazada')),
+  motivo_rechazo text,
+  meta_template_id text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint whatsapp_templates_channel_nombre_idioma_key unique (channel_id, nombre, idioma)
+);
+
+create trigger update_whatsapp_templates_updated_at
+  before update on whatsapp_templates
+  for each row
+  execute function update_updated_at_column();
+
+alter table whatsapp_templates enable row level security;
+
+create policy whatsapp_templates_tenant on whatsapp_templates for all
+  using (is_super_admin() or tenant_id = auth_tenant_id())
+  with check (is_super_admin() or tenant_id = auth_tenant_id());

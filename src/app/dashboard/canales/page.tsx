@@ -2,6 +2,7 @@
 import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { getCanales, conectarCanal, desconectarCanal } from '@/app/actions/canales'
 import { getMisPermisos } from '@/app/actions/permisos'
 import { useToast } from '@/components/ui/Toast'
@@ -227,6 +228,11 @@ export default function CanalesPage() {
           {/* Acciones */}
           {isActivo && (
             <div className="flex items-center justify-end gap-2 px-5 py-3.5 bg-slate-50 border-t border-slate-200">
+              {tipo === 'whatsapp' && (
+                <Link href="/dashboard/canales/whatsapp-plantillas" className="text-sm font-600 text-brand-600 hover:text-brand-700 hover:underline underline-offset-2 transition mr-auto">
+                  Gestionar plantillas
+                </Link>
+              )}
               <button onClick={() => handleDesconectar(canal.id)} disabled={nivelPermiso !== 'escritura'} className="text-sm font-600 text-red-600 hover:text-red-700 hover:underline underline-offset-2 transition disabled:opacity-50 disabled:cursor-not-allowed">Desconectar</button>
             </div>
           )}

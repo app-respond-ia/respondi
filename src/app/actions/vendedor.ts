@@ -155,6 +155,7 @@ export async function crearCuentaTrial(data: {
     const { data: planTrial } = await supabase.from('plans').select('id').eq('nombre', 'Trial').single()
     if (!planTrial) return { success: false, error: 'Plan Trial no encontrado' }
 
+    console.log('[DEBUG INVITACION] redirectTo usado:', `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/auth/callback`)
     const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(data.email_admin, {
       redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/auth/callback`
     })

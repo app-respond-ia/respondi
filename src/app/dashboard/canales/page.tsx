@@ -38,6 +38,7 @@ export default function CanalesPage() {
   const [modalLoading, setModalLoading] = useState(false)
   const [aceptaRiesgo, setAceptaRiesgo] = useState(false)
   const [conexionConfirmada, setConexionConfirmada] = useState(false)
+  const [mostrarRequisitos, setMostrarRequisitos] = useState(false)
 
   const cargar = async () => {
     setLoading(true)
@@ -74,10 +75,11 @@ export default function CanalesPage() {
     setModalTipo(tipo)
     setModalMetodo('oficial')
     setAceptaRiesgo(false)
+    setConexionConfirmada(false)
     if (tipo !== 'whatsapp') {
-      setConexionConfirmada(true)
+      setMostrarRequisitos(true)
     } else {
-      setConexionConfirmada(false)
+      setMostrarRequisitos(false)
     }
     setIsModalOpen(true)
   }
@@ -100,6 +102,12 @@ export default function CanalesPage() {
   const handleCerrarConfirmacion = () => {
     setIsModalOpen(false)
     setConexionConfirmada(false)
+    setMostrarRequisitos(false)
+  }
+
+  const handleContinuarRequisitos = () => {
+    setMostrarRequisitos(false)
+    setConexionConfirmada(true)
   }
 
   const handleDesconectar = (id: string) => {
@@ -337,7 +345,7 @@ export default function CanalesPage() {
                 <h2 className="font-display font-700 text-lg text-ink-900 capitalize">
                   {`Conectar ${modalTipo}`}
                 </h2>
-                <button onClick={() => !modalLoading && (conexionConfirmada ? handleCerrarConfirmacion() : setIsModalOpen(false))} className="p-1.5 rounded-lg text-ink-400 hover:text-ink-700 hover:bg-slate-100 transition" aria-label="Cerrar">
+                <button onClick={() => !modalLoading && ((conexionConfirmada || mostrarRequisitos) ? handleCerrarConfirmacion() : setIsModalOpen(false))} className="p-1.5 rounded-lg text-ink-400 hover:text-ink-700 hover:bg-slate-100 transition" aria-label="Cerrar">
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
               </div>
@@ -358,6 +366,59 @@ export default function CanalesPage() {
                   <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100">
                     <button onClick={handleCerrarConfirmacion} className="px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition">
                       Cerrar
+                    </button>
+                  </div>
+                </>
+              ) : mostrarRequisitos ? (
+                <>
+                  <div className="px-6 py-6">
+                    <p className="text-ink-600 mb-6">
+                      Antes de conectar {modalTipo === 'instagram' ? 'Instagram' : 'Facebook'}, asegúrate de cumplir estos requisitos de Meta:
+                    </p>
+                    
+                    <ul className="space-y-4 mb-6">
+                      {modalTipo === 'instagram' ? (
+                        <>
+                          <li className="flex items-start gap-3">
+                            <svg className="w-5 h-5 text-brand-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+                            <span className="text-ink-700 text-sm">Tu cuenta de Instagram tiene que ser de tipo <strong>Business o Creator</strong> (no personal). Se cambia gratis desde la propia app de Instagram, en Configuración → Cuenta.</span>
+                          </li>
+                          <li className="flex items-start gap-3">
+                            <svg className="w-5 h-5 text-brand-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+                            <span className="text-ink-700 text-sm">Esa cuenta tiene que estar <strong>vinculada a una Página de Facebook</strong> (no a un perfil personal).</span>
+                          </li>
+                          <li className="flex items-start gap-3">
+                            <svg className="w-5 h-5 text-brand-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+                            <span className="text-ink-700 text-sm">Tienes que ser <strong>administrador</strong> de esa Página.</span>
+                          </li>
+                        </>
+                      ) : (
+                        <>
+                          <li className="flex items-start gap-3">
+                            <svg className="w-5 h-5 text-brand-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+                            <span className="text-ink-700 text-sm">Tienes que tener una <strong>Página de Facebook</strong> (no un perfil personal).</span>
+                          </li>
+                          <li className="flex items-start gap-3">
+                            <svg className="w-5 h-5 text-brand-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+                            <span className="text-ink-700 text-sm">Tienes que ser <strong>administrador</strong> de esa Página.</span>
+                          </li>
+                        </>
+                      )}
+                    </ul>
+
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-start gap-3">
+                      <svg className="w-5 h-5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                      <p className="text-xs text-slate-500 leading-relaxed">
+                        <strong>¿No sabes si cumples esto?</strong> Puedes verificar tu rol y el tipo de cuenta desde la configuración de tu página en Facebook o en la app de Instagram.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100">
+                    <button onClick={handleCerrarConfirmacion} className="px-5 h-11 rounded-xl font-600 text-sm text-ink-600 hover:bg-slate-100 transition">
+                      Cancelar
+                    </button>
+                    <button onClick={handleContinuarRequisitos} className="px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition">
+                      Ya lo tengo listo, continuar
                     </button>
                   </div>
                 </>

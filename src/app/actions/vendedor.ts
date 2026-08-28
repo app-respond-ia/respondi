@@ -204,11 +204,19 @@ export async function crearCuentaTrial(data: {
       await supabaseAdmin.from('user_branches').insert([{ user_id: inviteData.user.id, branch_id: sucursal.id }])
     }
 
-    await supabase.from('vendedor_clientes').insert([{
+    const { error: vendedorClientesError } = await supabaseAdmin.from('vendedor_clientes').insert([{
       vendedor_id: vendedor.id,
       organizacion_id: org.id,
       estado_seguimiento: 'trial'
     }])
+
+    if (vendedorClientesError) {
+      console.error('Error al vincular cliente con vendedor:', vendedorClientesError)
+      return { 
+        success: false, 
+        error: `El cliente fue creado correctamente, pero hubo un error al vincularlo a tu cuenta de vendedor. Error interno: ${vendedorClientesError.message}` 
+      }
+    }
 
     await registrarAuditoria({
       tenant_id: org.id,

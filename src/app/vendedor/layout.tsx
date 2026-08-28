@@ -51,9 +51,9 @@ export default async function VendedorLayout({ children }: { children: React.Rea
             <nav className="hidden sm:flex items-center gap-1">
               {[
                 { href: '/vendedor', label: 'Inicio' },
+                { href: '/vendedor/nuevo-cliente', label: 'Nuevo cliente' },
                 { href: '/vendedor/clientes', label: 'Clientes' },
                 { href: '/vendedor/comisiones', label: 'Comisiones' },
-                { href: '/vendedor/nuevo-cliente', label: 'Nuevo cliente' },
                 { href: '/vendedor/soporte', label: 'Soporte' },
               ].map(link => (
                 <a key={link.href} href={link.href}
@@ -74,9 +74,9 @@ export default async function VendedorLayout({ children }: { children: React.Rea
             <div className="flex items-center gap-1 px-4 py-2">
               {[
                 { href: '/vendedor', label: 'Inicio' },
+                { href: '/vendedor/nuevo-cliente', label: 'Nuevo cliente' },
                 { href: '/vendedor/clientes', label: 'Clientes' },
                 { href: '/vendedor/comisiones', label: 'Comisiones' },
-                { href: '/vendedor/nuevo-cliente', label: 'Nuevo cliente' },
                 { href: '/vendedor/soporte', label: 'Soporte' },
               ].map(link => (
                 <a key={link.href} href={link.href}

@@ -199,13 +199,22 @@ export async function updatePasswordAndAcceptInvite(formData: FormData) {
 
   const { data: { user } } = await supabase.auth.getUser()
   
+  let redirectUrl = '/dashboard'
+
   if (user) {
-    // Marcar invitación como aceptada y activo: true en tabla users
-    await supabaseAdmin
+    const updateData: any = { invitacion_aceptada: true, activo: true }
+    if (nombre) updateData.nombre = nombre
+
+    const { data: userData } = await supabaseAdmin
       .from('users')
-      .update({ nombre, invitacion_aceptada: true, activo: true })
+      .update(updateData)
       .eq('id', user.id)
+      .select('rol')
+      .single()
+      
+    if (userData?.rol === 'super_admin') redirectUrl = '/superadmin'
+    else if (userData?.rol === 'vendedor') redirectUrl = '/vendedor'
   }
 
-  return { success: true }
+  return { success: true, redirectUrl }
 }

@@ -25,6 +25,7 @@ export default async function AceptarInvitacionPage() {
 
   const roleLabels: Record<string, string> = {
     super_admin: 'Super Administrador',
+    vendedor: 'Vendedor/Partner',
     admin: 'Administrador de la Tienda',
     agente: 'Agente de Atención',
     operario: 'Operario',

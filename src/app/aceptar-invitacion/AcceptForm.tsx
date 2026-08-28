@@ -24,6 +24,8 @@ export default function AcceptForm({ userEmail }: { userEmail: string }) {
     if (result?.error) {
       setError(result.error)
       setIsLoading(false)
+    } else if (result?.success) {
+      window.location.href = result.redirectUrl || '/'
     }
   }
 

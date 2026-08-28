@@ -288,7 +288,8 @@ create table channels (
   identificador_externo text,
   fecha_conexion      timestamptz,
   ultima_actividad    timestamptz,
-  created_at          timestamptz not null default now()
+  created_at          timestamptz not null default now(),
+  constraint channels_tenant_branch_tipo_key unique (tenant_id, branch_id, tipo)
 );
 
 -- ============================================================================

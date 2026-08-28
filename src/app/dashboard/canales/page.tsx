@@ -130,15 +130,15 @@ export default function CanalesPage() {
     )
   }
 
-  const getCanal = (tipo: TipoCanal) => canales.find(c => c.tipo === tipo)
+  const getCanal = (tipo: TipoCanal) => [...canales].reverse().find(c => c.tipo === tipo)
 
   const renderCard = (tipo: TipoCanal, titulo: string, Icono: any, descSinConectar: string, bgClass: string) => {
     const canal = getCanal(tipo)
     const isActivo = canal?.estado === 'activo'
     const isPendiente = canal?.estado === 'pendiente'
     const isError = canal?.estado === 'error'
-    const isDesconectado = !canal || canal.estado === 'desconectado'
-
+    const isDesconectado = canal?.estado === 'desconectado'
+    const isSinConectar = !canal
     if (isError) {
       return (
         <article className="bg-white rounded-2xl border border-red-200 overflow-hidden mb-4">
@@ -222,6 +222,33 @@ export default function CanalesPage() {
               <button onClick={() => handleDesconectar(canal.id)} disabled={nivelPermiso !== 'escritura'} className="text-sm font-600 text-red-600 hover:text-red-700 hover:underline underline-offset-2 transition disabled:opacity-50 disabled:cursor-not-allowed">Desconectar</button>
             </div>
           )}
+        </article>
+      )
+    }
+
+    if (isDesconectado) {
+      return (
+        <article className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden mb-4 opacity-80 hover:opacity-100 transition">
+          <div className="p-5">
+            <div className="flex items-start gap-4">
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 bg-slate-200 text-slate-500 shadow-sm">
+                {Icono}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <h3 className="font-display font-600 text-lg text-slate-700">{titulo}</h3>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 text-xs font-600">
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                    Desconectado
+                  </span>
+                </div>
+                <p className="text-sm text-slate-500">Este canal fue desconectado. {canal.identificador_externo ? `Anteriormente asociado a ${canal.identificador_externo}.` : ''}</p>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center justify-end gap-2 px-5 py-3.5 bg-slate-100/50 border-t border-slate-200">
+            <button onClick={() => handleOpenModal(tipo)} disabled={limitReached || nivelPermiso !== 'escritura'} className={`px-4 py-1.5 rounded-lg bg-slate-800 text-white text-sm font-600 transition ${limitReached || nivelPermiso !== 'escritura' ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-900'}`}>Volver a conectar</button>
+          </div>
         </article>
       )
     }

@@ -42,12 +42,14 @@ export async function conectarCanal(dataOrTipo: any, argMetodo?: any) {
 
   const { data: newCanal, error: canalError } = await supabase
     .from('channels')
-    .insert({
+    .upsert({
       tenant_id: auth.tenant_id,
       branch_id: auth.branch_id,
       tipo: data.tipo,
       metodo: data.metodo || argMetodo || 'whaticket',
       estado: data.estado || 'pendiente'
+    }, {
+      onConflict: 'tenant_id, branch_id, tipo'
     })
     .select()
     .single()

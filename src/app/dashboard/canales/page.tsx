@@ -74,7 +74,11 @@ export default function CanalesPage() {
     setModalTipo(tipo)
     setModalMetodo('oficial')
     setAceptaRiesgo(false)
-    setConexionConfirmada(false)
+    if (tipo !== 'whatsapp') {
+      setConexionConfirmada(true)
+    } else {
+      setConexionConfirmada(false)
+    }
     setIsModalOpen(true)
   }
 
@@ -132,7 +136,36 @@ export default function CanalesPage() {
     const canal = getCanal(tipo)
     const isActivo = canal?.estado === 'activo'
     const isPendiente = canal?.estado === 'pendiente'
-    const isDesconectado = !canal || canal.estado === 'desconectado' || canal.estado === 'error'
+    const isError = canal?.estado === 'error'
+    const isDesconectado = !canal || canal.estado === 'desconectado'
+
+    if (isError) {
+      return (
+        <article className="bg-white rounded-2xl border border-red-200 overflow-hidden mb-4">
+          <div className="p-5">
+            <div className="flex items-start gap-4">
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 text-white shadow-lg ${bgClass}`}>
+                {Icono}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <h3 className="font-display font-600 text-lg text-ink-900">{titulo}</h3>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-xs font-600">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                    Error de conexión
+                  </span>
+                </div>
+                <p className="text-sm text-ink-600">Hubo un problema al conectar este canal o la sesión ha expirado.</p>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center justify-end gap-2 px-5 py-3.5 bg-red-50 border-t border-red-100">
+            <button onClick={() => handleDesconectar(canal.id)} disabled={nivelPermiso !== 'escritura'} className="text-sm font-600 text-red-700 hover:text-red-800 hover:underline underline-offset-2 transition disabled:opacity-50 disabled:cursor-not-allowed">Eliminar conexión</button>
+            <button onClick={() => handleOpenModal(tipo)} disabled={limitReached || nivelPermiso !== 'escritura'} className={`px-4 py-1.5 rounded-lg bg-red-600 text-white text-sm font-600 transition ${limitReached || nivelPermiso !== 'escritura' ? 'opacity-50 cursor-not-allowed' : 'hover:bg-red-700'}`}>Reconectar</button>
+          </div>
+        </article>
+      )
+    }
 
     if (isActivo || isPendiente) {
       return (
@@ -274,8 +307,8 @@ export default function CanalesPage() {
           <div className="relative min-h-full flex items-center justify-center p-4">
             <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl z-10">
               <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-                <h2 className="font-display font-700 text-lg text-ink-900">
-                  {conexionConfirmada ? 'Solicitud enviada' : `Conectar ${modalTipo}`}
+                <h2 className="font-display font-700 text-lg text-ink-900 capitalize">
+                  {`Conectar ${modalTipo}`}
                 </h2>
                 <button onClick={() => !modalLoading && (conexionConfirmada ? handleCerrarConfirmacion() : setIsModalOpen(false))} className="p-1.5 rounded-lg text-ink-400 hover:text-ink-700 hover:bg-slate-100 transition" aria-label="Cerrar">
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -284,18 +317,20 @@ export default function CanalesPage() {
 
               {conexionConfirmada ? (
                 <>
-                  <div className="px-6 py-8 text-center">
-                    <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4">
-                      <svg className="w-8 h-8 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+                  <div className="px-6 py-10 text-center">
+                    <div className="w-16 h-16 rounded-full bg-brand-100 flex items-center justify-center mx-auto mb-5">
+                      <svg className="w-8 h-8 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                     </div>
-                    <p className="font-600 text-ink-900 mb-2">¡Todo listo por tu parte!</p>
+                    <p className="font-600 text-ink-900 mb-2 text-lg">
+                      Próximamente: conexión con {modalTipo === 'whatsapp' ? `WhatsApp vía ${modalMetodo === 'oficial' ? 'Meta oficial' : 'Whaticket'}` : modalTipo === 'instagram' ? 'Instagram' : 'Facebook'}
+                    </p>
                     <p className="text-sm text-ink-600 max-w-sm mx-auto">
-                      En breve, nuestro equipo de soporte se pondrá en contacto contigo para activar la conexión de este canal. No necesitas hacer nada más por ahora.
+                      La integración automática con este canal estará disponible muy pronto.
                     </p>
                   </div>
                   <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100">
                     <button onClick={handleCerrarConfirmacion} className="px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition">
-                      Entendido
+                      Cerrar
                     </button>
                   </div>
                 </>

@@ -18,6 +18,8 @@ interface Canal {
   metodo: MetodoCanal
   estado: EstadoCanal
   identificador_externo?: string
+  calidad_mensajeria?: 'GREEN' | 'YELLOW' | 'RED' | 'UNKNOWN' | null
+  calidad_actualizada_en?: string | null
   fecha_conexion?: string
 }
 
@@ -222,6 +224,25 @@ export default function CanalesPage() {
               <div className="mt-4 flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200">
                 <svg className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0L3.16 16.25A2 2 0 005 19z"/></svg>
                 <p className="text-xs text-ink-700"><strong>Conexión vía Whaticket.</strong> Más económica pero con riesgo de baneo por parte de Meta. Aceptaste el riesgo al conectar este canal.</p>
+              </div>
+            )}
+
+            {/* Indicador de calidad de mensajería (solo Meta Oficial) */}
+            {isActivo && tipo === 'whatsapp' && canal.metodo === 'meta_oficial' && canal.calidad_mensajeria && ['YELLOW', 'RED'].includes(canal.calidad_mensajeria) && (
+              <div className={`mt-4 p-4 rounded-xl border flex items-start gap-3 ${
+                canal.calidad_mensajeria === 'RED' 
+                  ? 'bg-red-50 border-red-200' 
+                  : 'bg-amber-50 border-amber-200'
+              }`}>
+                <svg className={`w-5 h-5 shrink-0 mt-0.5 ${canal.calidad_mensajeria === 'RED' ? 'text-red-600' : 'text-amber-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0L3.16 16.25A2 2 0 005 19z"/></svg>
+                <div>
+                  <p className={`text-sm font-600 ${canal.calidad_mensajeria === 'RED' ? 'text-red-900' : 'text-amber-900'}`}>
+                    La calidad de tu número ha bajado
+                  </p>
+                  <p className={`text-sm mt-1 leading-relaxed ${canal.calidad_mensajeria === 'RED' ? 'text-red-800' : 'text-amber-800'}`}>
+                    Revisa cómo están reaccionando tus clientes a tus mensajes. Los bloqueos o reportes frecuentes reducen la calidad y pueden limitar tu capacidad de envío.
+                  </p>
+                </div>
               </div>
             )}
           </div>

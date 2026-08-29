@@ -31,10 +31,23 @@ export async function getCanales() {
   return { success: true, data: { canales, canales_max, canales_activos_count } }
 }
 
+import { getMisPermisos } from '@/app/actions/permisos'
+
 export async function conectarCanal(dataOrTipo: any, argMetodo?: any) {
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
+
+  // 1. Verificamos permisos (solo escritura puede conectar canales)
+  const misPermisos = await getMisPermisos()
+  if (!misPermisos.success) return { success: false, error: 'Error verificando permisos.' }
+  
+  const tienePermiso = (misPermisos as any).esAdmin || 
+                       (misPermisos.data || []).some((p: any) => p.seccion === 'canales' && p.nivel === 'escritura')
+
+  if (!tienePermiso) {
+    return { success: false, error: 'No tienes permiso de escritura en canales.' }
+  }
 
   const data = typeof dataOrTipo === 'string'
     ? { tipo: dataOrTipo, metodo: argMetodo }
@@ -75,16 +88,35 @@ export async function desconectarCanal(id: string) {
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
-  const { data: anterior } = await supabase
+  // 1. Verificamos permisos (solo escritura puede desconectar canales)
+  const misPermisos = await getMisPermisos()
+  if (!misPermisos.success) return { success: false, error: 'Error verificando permisos.' }
+  
+  const tienePermiso = (misPermisos as any).esAdmin || 
+                       (misPermisos.data || []).some((p: any) => p.seccion === 'canales' && p.nivel === 'escritura')
+
+  if (!tienePermiso) {
+    return { success: false, error: 'No tienes permiso de escritura en canales.' }
+  }
+
+  // Prevención IDOR: Confirmamos que el canal pertenece a este tenant y branch
+  const { data: anterior, error: authError } = await supabase
     .from('channels')
     .select('*')
     .eq('id', id)
+    .eq('tenant_id', auth.tenant_id)
+    .eq('branch_id', auth.branch_id)
     .single()
+
+  if (authError || !anterior) {
+    return { success: false, error: 'Canal no encontrado o no autorizado.' }
+  }
 
   const { data, error } = await supabase
     .from('channels')
     .update({ estado: 'desconectado' })
     .eq('id', id)
+    .eq('tenant_id', auth.tenant_id)
     .eq('branch_id', auth.branch_id)
     .select()
     .single()

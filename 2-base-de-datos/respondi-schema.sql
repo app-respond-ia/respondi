@@ -286,6 +286,7 @@ create table channels (
   metodo              metodo_canal not null default 'whaticket',
   estado              estado_canal not null default 'pendiente',
   identificador_externo text,
+  meta_user_id        text,
   calidad_mensajeria  text check (calidad_mensajeria in ('GREEN', 'YELLOW', 'RED', 'UNKNOWN')),
   calidad_actualizada_en timestamptz,
   fecha_conexion      timestamptz,

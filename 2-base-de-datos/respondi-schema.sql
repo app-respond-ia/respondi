@@ -42,6 +42,7 @@ create type remitente_msg      as enum ('cliente', 'ia', 'agente');
 create type tipo_caso          as enum ('normal', 'fallo_llm', 'fallo_entrega', 'blacklist_sugerida');
 create type estatus_caso       as enum ('pendiente', 'atendiendo', 'resuelto', 'cerrado');
 create type blacklist_modo     as enum ('ignorar', 'respuesta_automatica', 'derivar');
+
 create type tipo_comision      as enum ('recurrente', 'puntual');
 create type tipo_movimiento    as enum ('abono', 'debito');
 create type estado_pago        as enum ('pendiente', 'confirmado', 'fallido');
@@ -305,9 +306,14 @@ create table contacts (
   canal                tipo_canal not null,
   identificador_canal  text not null,
   nombre               text,
+  modo                 text check (modo in ('ignorar', 'respuesta_automatica', 'derivar')),
+  respuesta_auto       text,
+  trato                text default 'normal' check (trato in ('normal', 'sin_ia', 'bloqueado')),
   blacklist            boolean not null default false,
   blacklist_razon      text,
   fecha_blacklist      timestamptz,
+  nota                 text,
+  fecha_actualizacion  timestamptz,
   fecha_primer_contacto timestamptz not null default now(),
   created_at           timestamptz not null default now()
 );
@@ -324,7 +330,9 @@ create table conversations (
   fecha_inicio         timestamptz not null default now(),
   fecha_ultimo_mensaje timestamptz,
   fecha_cierre         timestamptz,
-  resumen              text
+  resumen              text,
+  ia_procesando_desde  timestamptz default null,
+  ia_intentos_fallidos integer not null default 0
 );
 
 create table messages (
@@ -829,6 +837,8 @@ create policy categorias_delete on ticket_categorias for delete
 -- ============================================================================
 
 create extension if not exists pg_cron;
+create extension if not exists pg_net;
+create extension if not exists "supabase_vault";
 
 select cron.schedule(
   'archivar-novedades-caducadas',
@@ -1066,6 +1076,117 @@ select cron.schedule(
   '0 11 * * *',
   $$ select check_casos_estancados(); $$
 );
+
+-- Deducción de cuota de IA
+CREATE OR REPLACE FUNCTION descontar_cuota_ia(
+  p_tenant_id uuid,
+  p_cantidad integer,
+  p_descripcion text
+)
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_ultimo_saldo integer;
+  v_nuevo_saldo integer;
+BEGIN
+  -- 1. Candado de concurrencia a nivel transaccional
+  PERFORM 1 FROM public.organizaciones WHERE id = p_tenant_id FOR UPDATE;
+  
+  -- 2. Lectura del saldo
+  SELECT saldo INTO v_ultimo_saldo
+  FROM public.message_quotas
+  WHERE tenant_id = p_tenant_id
+  ORDER BY timestamp DESC
+  LIMIT 1;
+
+  IF v_ultimo_saldo IS NULL THEN
+    v_ultimo_saldo := 0;
+  END IF;
+
+  v_nuevo_saldo := v_ultimo_saldo - p_cantidad;
+
+  -- 3. Deducción de cuota
+  INSERT INTO public.message_quotas (
+    tenant_id, tipo, cantidad, saldo, descripcion
+  ) VALUES (
+    p_tenant_id, 'debito', p_cantidad, v_nuevo_saldo, p_descripcion
+  );
+
+  RETURN v_nuevo_saldo;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.descontar_cuota_ia(uuid, integer, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.descontar_cuota_ia(uuid, integer, text) TO service_role, postgres;
+
+-- Disparador del Webhook IA
+CREATE OR REPLACE FUNCTION disparar_webhook_ia()
+RETURNS void 
+LANGUAGE plpgsql 
+SECURITY DEFINER 
+SET search_path = public
+AS $$
+DECLARE
+  r record;
+  req_id bigint;
+  v_secret text;
+BEGIN
+  -- Lectura segura del Vault
+  SELECT decrypted_secret INTO v_secret 
+  FROM vault.decrypted_secrets 
+  WHERE name = 'cron_webhook_secret' LIMIT 1;
+
+  IF v_secret IS NULL THEN
+    RAISE EXCEPTION 'El secreto cron_webhook_secret no está configurado en Vault';
+  END IF;
+
+  -- Selección de conversaciones candidatas
+  FOR r IN
+    SELECT 
+      c.id as conversation_id,
+      s.tiempo_agrupacion_seg
+    FROM public.conversations c
+    JOIN public.sucursales s ON s.id = c.branch_id
+    WHERE c.estado = 'activa'
+      AND c.ia_pausada = false
+      AND (c.ia_procesando_desde IS NULL OR c.ia_procesando_desde < now() - interval '2 minutes')
+      -- Condición 1: Ya pasó el tiempo de espera desde el último mensaje
+      AND c.fecha_ultimo_mensaje < now() - (s.tiempo_agrupacion_seg || ' seconds')::interval
+      -- Condición 2: El último mensaje absoluto de la conversación es del cliente
+      AND (
+        SELECT remitente 
+        FROM public.messages m 
+        WHERE m.conversation_id = c.id 
+        ORDER BY m.timestamp DESC, m.id DESC 
+        LIMIT 1
+      ) = 'cliente'
+  LOOP
+    -- Bloqueo inmediato anti-condición de carrera
+    UPDATE public.conversations 
+    SET ia_procesando_desde = now() 
+    WHERE id = r.conversation_id;
+
+    -- Petición segura a Vercel con pg_net y URL de producción real
+    SELECT net.http_post(
+        url := 'https://respondi.vercel.app/api/ai/process',
+        headers := jsonb_build_object(
+          'Content-Type', 'application/json',
+          'Authorization', 'Bearer ' || v_secret
+        ),
+        body := json_build_object('conversation_id', r.conversation_id)::jsonb
+    ) INTO req_id;
+  END LOOP;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.disparar_webhook_ia() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.disparar_webhook_ia() TO service_role, postgres;
+
+-- Programación del cron del Agrupador (cada 10 segundos)
+SELECT cron.schedule('disparador-ia-agrupador', '10 seconds', 'SELECT disparar_webhook_ia();');
 
 -- ============================================================================
 -- PLANTILLAS DE WHATSAPP

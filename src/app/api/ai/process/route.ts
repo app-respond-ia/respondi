@@ -5,52 +5,7 @@ import { notificarAAdminsDeOrganizacion } from '@/lib/notificaciones'
 
 export const dynamic = 'force-dynamic'
 
-// Helper interno: Recrea crearCasoDesdeConversacion pero para llamadas de sistema (sin sesión)
-async function crearCasoDesdeSistema(conversationId: string, tenantId: string, branchId: string, contactId: string, motivo: string) {
-  // Verificar si ya existe un caso ACTIVO (no cerrado) para evitar conflictos con unique_active_case
-  const { data: existingCase } = await supabaseAdmin
-    .from('cases')
-    .select('id')
-    .eq('conversation_id', conversationId)
-    .eq('tenant_id', tenantId)
-    .neq('estatus', 'cerrado')
-    .maybeSingle()
-
-  if (existingCase) return existingCase.id
-
-  const { data: nuevoCaso, error } = await supabaseAdmin
-    .from('cases')
-    .insert([{
-      tenant_id: tenantId,
-      branch_id: branchId,
-      contact_id: contactId,
-      conversation_id: conversationId,
-      tipo: 'normal',
-      descripcion: motivo,
-      estatus: 'pendiente',
-      agente_id: null,
-      fecha_apertura: new Date().toISOString()
-    }])
-    .select('id')
-    .single()
-
-  if (error) {
-    console.error('Error insertando caso derivado automáticamente:', error)
-    return null
-  }
-
-  if (nuevoCaso) {
-    await notificarAAdminsDeOrganizacion(supabaseAdmin, tenantId, {
-      tipo: 'conversacion_escalada',
-      titulo: 'Conversación derivada a soporte',
-      cuerpo: 'Se ha creado un nuevo caso automáticamente que requiere atención humana.',
-      url: `/dashboard/casos/${nuevoCaso.id}`,
-      entidadId: nuevoCaso.id
-    })
-    return nuevoCaso.id
-  }
-  return null
-}
+import { crearCasoDesdeSistema } from '@/lib/casos/crearCasoDesdeSistema'
 
 // Comprobador de huso horario basado en Intl (nativo)
 function isFueraDeHorario(timezone: string, horarios: any[]) {
@@ -120,7 +75,7 @@ export async function POST(req: Request) {
   const { data: conv, error: fetchError } = await supabaseAdmin
     .from('conversations')
     .select(`
-      id, tenant_id, branch_id, contact_id, ia_pausada,
+      id, tenant_id, branch_id, contact_id, ia_pausada, ia_intentos_fallidos,
       contacts:contact_id (trato, modo, respuesta_auto),
       sucursales:branch_id (
         modo_pausa, timezone, trato_contactos_respuesta_auto,
@@ -213,11 +168,40 @@ export async function POST(req: Request) {
     // ============================================================================
     // 5. FLUJO LIBRE PARA LA IA
     // ============================================================================
-    
-    // TODO: aquí va la llamada a la IA (siguiente prompt)
+    const { generarRespuesta } = await import('@/lib/ai/generarRespuesta')
+    const aiResult = await generarRespuesta(conv)
+
+    if (!aiResult.success) {
+      // Manejo de intentos fallidos
+      const intentos = (conv.ia_intentos_fallidos || 0) + 1
+      if (intentos >= 3) {
+        // Escalar por error de sistema
+        await crearCasoDesdeSistema(
+          conversationId, 
+          conv.tenant_id, 
+          conv.branch_id, 
+          conv.contact_id, 
+          'Escalado automático: La IA ha fallado 3 veces consecutivas.'
+        )
+        await supabaseAdmin.from('conversations').update({ 
+          ia_intentos_fallidos: 0, 
+          ia_pausada: true 
+        }).eq('id', conversationId)
+      } else {
+        await supabaseAdmin.from('conversations').update({ 
+          ia_intentos_fallidos: intentos 
+        }).eq('id', conversationId)
+      }
+      throw new Error(aiResult.error || 'Fallo en la generación de IA')
+    }
+
+    // Si tuvo éxito, reseteamos fallos a 0
+    if (conv.ia_intentos_fallidos > 0) {
+      await supabaseAdmin.from('conversations').update({ ia_intentos_fallidos: 0 }).eq('id', conversationId)
+    }
 
     await liberarCandado()
-    return NextResponse.json({ status: 'Exito (Listo para integrar IA)' })
+    return NextResponse.json({ status: 'Exito (Proceso IA finalizado)' })
 
   } catch (error: any) {
     await liberarCandado()

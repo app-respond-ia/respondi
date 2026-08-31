@@ -1,0 +1,364 @@
+import OpenAI from 'openai'
+import { supabaseAdmin } from '@/utils/supabase/admin'
+import { crearCasoDesdeSistema } from '@/lib/casos/crearCasoDesdeSistema'
+
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || 'sk-test-placeholder'
+const openai = new OpenAI({ apiKey: OPENAI_API_KEY })
+
+const PRICING = {
+  input: 0.20 / 1000000,
+  output: 1.20 / 1000000
+}
+
+export async function generarRespuesta(conv: any) {
+  const conversationId = conv.id
+  const tenantId = conv.tenant_id
+  const branchId = conv.branch_id
+  const contactId = conv.contact_id
+  
+  const branch = Array.isArray(conv.sucursales) ? conv.sucursales[0] : conv.sucursales
+  const profile = Array.isArray(branch?.business_profiles) ? branch?.business_profiles[0] : branch?.business_profiles
+
+  // 1. Obtener mensajes sin agrupar
+  const { data: ungrouped } = await supabaseAdmin
+    .from('messages')
+    .select('*')
+    .eq('conversation_id', conversationId)
+    .eq('agrupado', false)
+    .order('timestamp', { ascending: true })
+
+  if (!ungrouped || ungrouped.length === 0) {
+    return { success: true, reason: 'No_New_Messages' }
+  }
+
+  const hasClient = ungrouped.some(m => m.remitente === 'cliente')
+  if (!hasClient) {
+    // Si solo hay mensajes de IA o agente, los marcamos como agrupados y no respondemos
+    const ids = ungrouped.map(m => m.id)
+    if (ids.length > 0) {
+      await supabaseAdmin.from('messages').update({ agrupado: true }).in('id', ids)
+    }
+    return { success: true, reason: 'No_Client_Messages' }
+  }
+
+  // 2. Obtener historial (últimos 40 agrupados)
+  const { data: history } = await supabaseAdmin
+    .from('messages')
+    .select('*')
+    .eq('conversation_id', conversationId)
+    .eq('agrupado', true)
+    .order('timestamp', { ascending: false })
+    .limit(40)
+
+  const allMessages = [...(history || []).reverse(), ...ungrouped]
+
+  // 3. Obtener Categorías y Reglas de Caso de la sucursal
+  const { data: categories } = await supabaseAdmin
+    .from('message_categories')
+    .select('id, nombre, descripcion_intencion')
+    .eq('branch_id', branchId)
+    .eq('activa', true)
+
+  const { data: rules } = await supabaseAdmin
+    .from('case_rules')
+    .select('id, nombre, descripcion_intencion, tipo_caso, prioridad_default')
+    .eq('branch_id', branchId)
+    .eq('activa', true)
+
+  // 4. Preparar Prompt del Sistema
+  let systemPrompt = `Eres el asistente virtual del negocio.\n`
+  if (profile) {
+    systemPrompt += `Descripción: ${profile.descripcion || ''}\nServicios: ${profile.servicios || ''}\nPolíticas: ${profile.politicas || ''}\nIdioma: ${profile.idioma_base || 'es'}\n`
+  }
+  systemPrompt += `\nINSTRUCCIONES ESTRICTAS:\n`
+  systemPrompt += `- No inventes información. Si no lo sabes, indícalo o usa escalar_humano.\n`
+  systemPrompt += `- Eres un asistente, responde de manera concisa y natural.\n`
+  systemPrompt += `- Si el usuario envía un archivo no soportado (ej. PDF o Word), invoca escalar_humano.\n`
+  systemPrompt += `- Usa las herramientas disponibles de etiquetado o escalado cuando corresponda a la intención del cliente.\n`
+  systemPrompt += `- IMPORTANTE: Si un mensaje incluye una imagen, SIEMPRE DEBES llamar a la herramienta guardar_descripcion_imagen inmediatamente, para guardar un resumen textual de lo que se ve.\n\n`
+  
+  systemPrompt += `Etiquetas (Categorías) Disponibles:\n`
+  categories?.forEach(c => {
+    systemPrompt += `- ID: ${c.id} | Nombre: ${c.nombre} | Info: ${c.descripcion_intencion || ''}\n`
+  })
+  
+  systemPrompt += `\nReglas de Caso (Escalar a humano) Disponibles:\n`
+  rules?.forEach(r => {
+    systemPrompt += `- ID: ${r.id} | Nombre: ${r.nombre} | Tipo: ${r.tipo_caso} | Info: ${r.descripcion_intencion || ''}\n`
+  })
+
+  // 5. Preparar Mensajes para OpenAI
+  const openAiMessages: any[] = [{ role: 'system', content: systemPrompt }]
+  let hasImage = false
+
+  for (const m of allMessages) {
+    let role = m.remitente === 'cliente' ? 'user' : 'assistant'
+    if (m.media_tipo === 'image') {
+      hasImage = true
+      const path = m.media_url?.replace(/.*?\/storage\/v1\/object\/public\/whatsapp_media\//, '')
+      let finalUrl = m.media_url
+      if (path) {
+        const { data: signed } = await supabaseAdmin.storage.from('whatsapp_media').createSignedUrl(path, 60)
+        if (signed?.signedUrl) finalUrl = signed.signedUrl
+      }
+      openAiMessages.push({
+        role,
+        content: [
+          { type: 'text', text: `[ID_Mensaje_Imagen: ${m.id}] ${m.contenido || ''}` },
+          { type: 'image_url', image_url: { url: finalUrl } }
+        ]
+      })
+    } else if (m.media_tipo === 'audio' && m.agrupado === false && m.media_url) {
+      // Transcripción de audio con Whisper
+      try {
+        const path = m.media_url.replace(/.*?\/storage\/v1\/object\/public\/whatsapp_media\//, '')
+        let finalUrl = m.media_url
+        if (path) {
+          const { data: signed } = await supabaseAdmin.storage.from('whatsapp_media').createSignedUrl(path, 60)
+          if (signed?.signedUrl) finalUrl = signed.signedUrl
+        }
+
+        const audioResponse = await fetch(finalUrl)
+        const audioBlob = await audioResponse.blob()
+        const file = new File([audioBlob], 'audio.ogg', { type: audioBlob.type || 'audio/ogg' })
+        
+        const transcription = await openai.audio.transcriptions.create({
+          file: file,
+          model: 'whisper-1',
+          language: profile?.idioma_base || 'es'
+        })
+        
+        const textoExtraido = transcription.text
+        await supabaseAdmin.from('messages').update({ contenido: textoExtraido }).eq('id', m.id)
+        openAiMessages.push({ role, content: textoExtraido })
+      } catch (err) {
+        console.error(`Error transcribiendo audio (ID: ${m.id}):`, err)
+        openAiMessages.push({ role, content: '[Nota: Audio ininteligible o fallo en transcripción]' })
+      }
+    } else {
+      openAiMessages.push({ role, content: m.contenido || '' })
+    }
+  }
+
+  // 6. Definición de Herramientas
+  const tools = [
+    {
+      type: "function" as const,
+      function: {
+        name: "etiquetar_conversacion",
+        description: "Etiqueta la conversación en base a la intención del cliente.",
+        parameters: {
+          type: "object",
+          properties: {
+            category_id: { type: "string", description: "UUID de la categoría elegida (debe existir en la lista provista)." }
+          },
+          required: ["category_id"]
+        }
+      }
+    },
+    {
+      type: "function" as const,
+      function: {
+        name: "escalar_humano",
+        description: "Deriva el caso a un agente humano y detiene el bot automático.",
+        parameters: {
+          type: "object",
+          properties: {
+            rule_id: { type: "string", description: "UUID de la regla de escalado (debe existir en la lista provista)." },
+            resumen_problema: { type: "string", description: "Breve explicación de por qué se escala el caso." }
+          },
+          required: ["rule_id", "resumen_problema"]
+        }
+      }
+    },
+    {
+      type: "function" as const,
+      function: {
+        name: "guardar_descripcion_imagen",
+        description: "Guarda la descripción en texto de la imagen recibida, para recordarla en el futuro.",
+        parameters: {
+          type: "object",
+          properties: {
+            message_id: { type: "string", description: "ID_Mensaje_Imagen del mensaje que contenía la foto." },
+            descripcion: { type: "string", description: "Descripción detallada y útil de lo que muestra la imagen." }
+          },
+          required: ["message_id", "descripcion"]
+        }
+      }
+    }
+  ]
+
+  let tokensInput = 0
+  let tokensOutput = 0
+
+  // 7. Llamada a OpenAI (Paso 1)
+  let responseMsg
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-5.6-luna',
+      messages: openAiMessages,
+      tools: tools
+    })
+
+    responseMsg = response.choices[0].message
+    tokensInput += response.usage?.prompt_tokens || 0
+    tokensOutput += response.usage?.completion_tokens || 0
+
+  } catch (error) {
+    console.error('Error OpenAI Paso 1:', error)
+    return { success: false, error: 'OpenAI API Error' }
+  }
+
+  openAiMessages.push(responseMsg)
+
+  // 8. Manejo de Tool Calls
+  if (responseMsg.tool_calls) {
+    for (const toolCall of responseMsg.tool_calls) {
+      if (toolCall.type !== 'function') continue
+      
+      const args = JSON.parse(toolCall.function.arguments)
+      let toolResult = ''
+
+      if (toolCall.function.name === 'etiquetar_conversacion') {
+        const valid = categories?.some(c => c.id === args.category_id)
+        if (!valid) {
+          toolResult = 'Error: category_id no válido para esta sucursal.'
+        } else {
+          const { error } = await supabaseAdmin.from('conversation_tags').insert({
+            conversation_id: conversationId,
+            category_id: args.category_id,
+            aplicada_por: 'ia'
+          })
+          if (error) {
+            console.error('Error etiquetando conversación:', error)
+          }
+          toolResult = error ? `Error en DB: ${error.message}` : 'Conversación etiquetada con éxito.'
+        }
+      } 
+      else if (toolCall.function.name === 'escalar_humano') {
+        const rule = rules?.find(r => r.id === args.rule_id)
+        if (!rule) {
+          toolResult = 'Error: rule_id no válido para esta sucursal.'
+        } else {
+          await crearCasoDesdeSistema(
+            conversationId,
+            tenantId,
+            branchId,
+            contactId,
+            args.resumen_problema,
+            rule.tipo_caso,
+            rule.prioridad_default
+          )
+          const { error } = await supabaseAdmin.from('conversations').update({ ia_pausada: true }).eq('id', conversationId)
+          if (error) {
+            console.error('Error pausando IA al escalar:', error)
+          }
+          toolResult = 'Caso escalado a humano y respuestas automáticas pausadas.'
+        }
+      }
+      else if (toolCall.function.name === 'guardar_descripcion_imagen') {
+        const msgExists = allMessages.some(m => m.id === args.message_id)
+        if (!msgExists) {
+          toolResult = 'Error: message_id no pertenece a la conversación actual.'
+        } else {
+          const { error } = await supabaseAdmin.from('messages').update({ contenido: args.descripcion }).eq('id', args.message_id)
+          if (error) {
+            console.error('Error actualizando descripción de imagen:', error)
+          }
+          toolResult = error ? `Error DB: ${error.message}` : 'Descripción de imagen guardada en base de datos correctamente.'
+        }
+      }
+
+      openAiMessages.push({
+        role: "tool",
+        tool_call_id: toolCall.id,
+        content: toolResult
+      })
+    }
+
+    // 9. Llamada a OpenAI (Paso 2)
+    try {
+      const secondResponse = await openai.chat.completions.create({
+        model: 'gpt-5.6-luna',
+        messages: openAiMessages
+      })
+      responseMsg = secondResponse.choices[0].message
+      tokensInput += secondResponse.usage?.prompt_tokens || 0
+      tokensOutput += secondResponse.usage?.completion_tokens || 0
+    } catch (error) {
+      console.error('Error OpenAI Paso 2:', error)
+      return { success: false, error: 'OpenAI API Error Step 2' }
+    }
+  }
+
+  // 10. Guardar respuesta final en messages
+  let insertId = null
+  let isFallback = false
+  let finalContent = responseMsg?.content
+  
+  if (!finalContent) {
+    finalContent = 'Dame un momento, estoy revisando tu consulta.'
+    isFallback = true
+  }
+
+  const { data: newMsg, error: errorMsg } = await supabaseAdmin.from('messages').insert({
+    tenant_id: tenantId,
+    conversation_id: conversationId,
+    remitente: 'ia',
+    contenido: finalContent,
+    agrupado: true
+  }).select('id').single()
+  
+  if (errorMsg) {
+    console.error('Error insertando mensaje IA en base de datos:', errorMsg)
+  }
+  if (newMsg) insertId = newMsg.id
+
+  // Marcar los mensajes origen como agrupados
+  const ungroupedIds = ungrouped.map(m => m.id)
+  if (ungroupedIds.length > 0) {
+    await supabaseAdmin.from('messages').update({ agrupado: true }).in('id', ungroupedIds)
+  }
+
+  // 11. Registrar Coste
+  const costeTotal = (tokensInput * PRICING.input) + (tokensOutput * PRICING.output)
+  
+  const { error: errorLog } = await supabaseAdmin.from('ai_logs').insert({
+    tenant_id: tenantId,
+    branch_id: branchId,
+    message_id: insertId, 
+    modelo_ia: 'gpt-5.6-luna',
+    tokens_input: tokensInput,
+    tokens_output: tokensOutput,
+    costo_estimado_usd: costeTotal,
+    resultado: isFallback ? 'fallback' : 'exito'
+  })
+  if (errorLog) console.error('Error insertando ai_log:', errorLog)
+
+  // Descontar cuota IA (1 unidad)
+  const { error: errorRpc } = await supabaseAdmin.rpc('descontar_cuota_ia', {
+    p_tenant_id: tenantId,
+    p_cantidad: 1,
+    p_descripcion: 'consumo por agrupacion de mensajes'
+  })
+  if (errorRpc) console.error('Error al descontar cuota:', errorRpc)
+
+  // 12. Simular N8N webhook
+  if (finalContent) {
+    const { error: errorAudit } = await supabaseAdmin.from('audit_log').insert({
+      tenant_id: tenantId,
+      user_id: null,
+      accion: 'SIMULACION_N8N_WEBHOOK',
+      tabla_afectada: 'messages',
+      registro_id: insertId || conversationId,
+      valor_nuevo: {
+        event: 'message.sent',
+        conversation_id: conversationId,
+        content: finalContent
+      }
+    })
+    if (errorAudit) console.error('Error insertando audit_log n8n:', errorAudit)
+  }
+
+  return { success: true }
+}

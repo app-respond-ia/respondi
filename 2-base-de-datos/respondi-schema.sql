@@ -115,20 +115,20 @@ create table organizaciones (
 
 -- Sucursales (branch). Cada organización tiene N sucursales.
 create table sucursales (
-  id                       uuid primary key default gen_random_uuid(),
-  tenant_id                uuid not null references organizaciones(id) on delete cascade,
-  nombre                   text not null,
-  direccion                text,
-  activa                   boolean not null default true,
-  modo_pausa               modo_pausa not null default 'ninguna',
-  timezone                 text not null default 'America/Caracas',
-  tiempo_agrupacion_seg    integer not null default 30,
-  blacklist_modo           blacklist_modo not null default 'ignorar',
-  blacklist_respuesta_auto text,
-  -- Nuevas columnas de onboarding trasladadas
-  onboarding_paso          integer not null default 0,
-  onboarding_completado    boolean not null default false,
-  created_at               timestamptz not null default now()
+  id                             uuid primary key default gen_random_uuid(),
+  tenant_id                      uuid not null references organizaciones(id) on delete cascade,
+  nombre                         text not null,
+  direccion                      text,
+  activa                         boolean not null default true,
+  modo_pausa                     modo_pausa not null default 'ninguna',
+  timezone                       text not null default 'America/Caracas',
+  tiempo_agrupacion_seg          integer not null default 30,
+  trato_contactos_modo           blacklist_modo not null default 'ignorar',
+  trato_contactos_respuesta_auto text,
+  moneda                         text,
+  onboarding_paso                integer not null default 0,
+  onboarding_completado          boolean not null default false,
+  created_at                     timestamptz not null default now()
 );
 
 create table business_profiles (

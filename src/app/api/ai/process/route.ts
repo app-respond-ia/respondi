@@ -3,6 +3,8 @@ import crypto from 'crypto'
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { notificarAAdminsDeOrganizacion } from '@/lib/notificaciones'
 
+export const dynamic = 'force-dynamic'
+
 // Helper interno: Recrea crearCasoDesdeConversacion pero para llamadas de sistema (sin sesión)
 async function crearCasoDesdeSistema(conversationId: string, tenantId: string, branchId: string, contactId: string, motivo: string) {
   // Verificar si ya existe un caso ACTIVO (no cerrado) para evitar conflictos con unique_active_case
@@ -115,13 +117,13 @@ export async function POST(req: Request) {
   const conversationId = body.conversation_id
   if (!conversationId) return NextResponse.json({ error: 'conversation_id faltante' }, { status: 400 })
 
-  const { data: conv } = await supabaseAdmin
+  const { data: conv, error: fetchError } = await supabaseAdmin
     .from('conversations')
     .select(`
       id, tenant_id, branch_id, contact_id, ia_pausada,
       contacts:contact_id (trato, modo, respuesta_auto),
       sucursales:branch_id (
-        modo_pausa, timezone, blacklist_respuesta_auto,
+        modo_pausa, timezone, trato_contactos_respuesta_auto,
         business_profiles (ia_activa_fuera_horario, msg_fuera_horario, msg_cuota_agotada, msg_pausa_automatica, abrir_caso_fuera_horario),
         business_hours (dia_semana, apertura, cierre, cerrado)
       )
@@ -130,7 +132,8 @@ export async function POST(req: Request) {
     .single()
 
   if (!conv) {
-    return NextResponse.json({ error: 'Conversación no encontrada' }, { status: 404 })
+    console.error('Fetch error:', fetchError)
+    return NextResponse.json({ error: 'Conversación no encontrada', details: fetchError }, { status: 404 })
   }
 
   const liberarCandado = async () => {
@@ -155,7 +158,7 @@ export async function POST(req: Request) {
       if (contact.modo === 'derivar') {
         await crearCasoDesdeSistema(conversationId, conv.tenant_id, conv.branch_id, conv.contact_id, 'Contacto configurado para derivar a humano sin pasar por IA.')
       } else if (contact.modo === 'respuesta_automatica') {
-        const msg = contact.respuesta_auto || branch?.blacklist_respuesta_auto || 'En este momento no podemos atenderte.'
+        const msg = contact.respuesta_auto || branch?.trato_contactos_respuesta_auto || 'En este momento no podemos atenderte.'
         await supabaseAdmin.from('messages').insert({
           tenant_id: conv.tenant_id, conversation_id: conversationId, remitente: 'ia', contenido: msg
         })

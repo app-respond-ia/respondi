@@ -331,7 +331,7 @@ export async function generarRespuesta(conv: any) {
     tokens_input: tokensInput,
     tokens_output: tokensOutput,
     costo_estimado_usd: costeTotal,
-    resultado: isFallback ? 'fallback' : 'exito'
+    resultado: isFallback ? 'fallo' : 'respondio'
   })
   if (errorLog) console.error('Error insertando ai_log:', errorLog)
 

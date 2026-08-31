@@ -1228,3 +1228,58 @@ alter table whatsapp_templates enable row level security;
 create policy whatsapp_templates_tenant on whatsapp_templates for all
   using (is_super_admin() or tenant_id = auth_tenant_id())
   with check (is_super_admin() or tenant_id = auth_tenant_id());
+
+-- ==============================================================================
+-- [NUEVO] TAREA DE RESUMEN DE INACTIVIDAD (>24H)
+-- ==============================================================================
+CREATE OR REPLACE FUNCTION disparar_webhook_resumen_ia()
+RETURNS void 
+LANGUAGE plpgsql 
+SECURITY DEFINER 
+SET search_path = public
+AS $$
+DECLARE
+  r record;
+  req_id bigint;
+  v_secret text;
+BEGIN
+  -- Lectura segura del Vault
+  SELECT decrypted_secret INTO v_secret 
+  FROM vault.decrypted_secrets 
+  WHERE name = 'cron_webhook_secret' LIMIT 1;
+
+  IF v_secret IS NULL THEN
+    RAISE EXCEPTION 'El secreto cron_webhook_secret no está configurado en Vault';
+  END IF;
+
+  -- Selección de conversaciones inactivas > 24h
+  FOR r IN
+    SELECT id 
+    FROM public.conversations
+    WHERE estado = 'activa'
+      AND fecha_ultimo_mensaje < now() - interval '24 hours'
+      AND (fecha_ultimo_resumen IS NULL OR fecha_ultimo_resumen < fecha_ultimo_mensaje)
+      AND (ia_procesando_desde IS NULL OR ia_procesando_desde < now() - interval '2 minutes')
+  LOOP
+    -- Bloqueo inmediato anti-condición de carrera
+    UPDATE public.conversations 
+    SET ia_procesando_desde = now() 
+    WHERE id = r.id;
+
+    -- Petición segura a Vercel con pg_net
+    SELECT net.http_post(
+        url := 'https://respondi.vercel.app/api/ai/summarize',
+        headers := jsonb_build_object(
+          'Content-Type', 'application/json',
+          'Authorization', 'Bearer ' || v_secret
+        ),
+        body := json_build_object('conversation_id', r.id)::jsonb
+    ) INTO req_id;
+  END LOOP;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.disparar_webhook_resumen_ia() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.disparar_webhook_resumen_ia() TO service_role, postgres;
+
+SELECT cron.schedule('job_resumen_inactividad', '*/30 * * * *', 'SELECT disparar_webhook_resumen_ia();');

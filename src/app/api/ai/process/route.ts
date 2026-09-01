@@ -79,8 +79,8 @@ export async function POST(req: Request) {
       contacts:contact_id (trato, modo, respuesta_auto),
       sucursales:branch_id (
         modo_pausa, timezone, trato_contactos_respuesta_auto,
-        business_profiles (ia_activa_fuera_horario, msg_fuera_horario, msg_cuota_agotada, msg_pausa_automatica, abrir_caso_fuera_horario),
-        business_hours (dia_semana, apertura, cierre, cerrado)
+        business_profiles (ia_activa_fuera_horario, msg_fuera_horario, msg_cuota_agotada, msg_pausa_automatica, abrir_caso_fuera_horario, modo_horario_ia),
+        business_hours (dia_semana, apertura, cierre, cerrado, tipo)
       )
     `)
     .eq('id', conversationId)
@@ -127,18 +127,25 @@ export async function POST(req: Request) {
       return NextResponse.json({ status: 'Ignorado (Sucursal pausada/apagada)' })
     }
     
-    if (branch && profile && isFueraDeHorario(branch.timezone, hours)) {
-      if (profile.ia_activa_fuera_horario === false) {
-        if (profile.msg_fuera_horario) {
-          await supabaseAdmin.from('messages').insert({
-            tenant_id: conv.tenant_id, conversation_id: conversationId, remitente: 'ia', contenido: profile.msg_fuera_horario
-          })
+    if (branch && profile) {
+      const modo = profile.modo_horario_ia || 'mismo_negocio'
+      
+      if (modo !== 'siempre_activa') {
+        const targetTipo = modo === 'personalizado' ? 'ia' : 'negocio'
+        const horasAFiltrar = hours.filter((h: any) => h.tipo === targetTipo)
+        
+        if (isFueraDeHorario(branch.timezone, horasAFiltrar)) {
+          if (profile.msg_fuera_horario) {
+            await supabaseAdmin.from('messages').insert({
+              tenant_id: conv.tenant_id, conversation_id: conversationId, remitente: 'ia', contenido: profile.msg_fuera_horario
+            })
+          }
+          if (profile.abrir_caso_fuera_horario) {
+            await crearCasoDesdeSistema(conversationId, conv.tenant_id, conv.branch_id, conv.contact_id, 'Contacto fuera de horario comercial.')
+          }
+          await liberarCandado()
+          return NextResponse.json({ status: 'Ignorado (Fuera de horario comercial)' })
         }
-        if (profile.abrir_caso_fuera_horario) {
-          await crearCasoDesdeSistema(conversationId, conv.tenant_id, conv.branch_id, conv.contact_id, 'Contacto fuera de horario comercial.')
-        }
-        await liberarCandado()
-        return NextResponse.json({ status: 'Ignorado (Fuera de horario comercial)' })
       }
     }
 

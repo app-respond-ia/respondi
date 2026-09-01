@@ -6,9 +6,11 @@ import { getPerfilSucursal, savePerfilSucursal } from '@/app/actions/perfil'
 import { getHorarios, saveHorarios } from '@/app/actions/horarios'
 import { getMisPermisos } from '@/app/actions/permisos'
 import { getTiposNovedad, crearTipoNovedad, actualizarTipoNovedad, eliminarTipoNovedad, TipoNovedadData } from '@/app/actions/tipos-novedad'
+import { EditorHorarios } from '@/components/sucursales/EditorHorarios'
 import { getIconSvg } from '@/components/novedades/NovedadesManager'
 import { useToast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
+import { DIAS_SEMANA } from '@/lib/dias-semana'
 
 const AVAILABLE_ICONS = [
   'campana', 'reloj', 'caja', 'estrella', 'calendario', 'informacion',
@@ -29,16 +31,6 @@ const TAILWIND_SAFELIST = [
   'bg-sky-500 bg-sky-100 text-sky-600', 'bg-indigo-500 bg-indigo-100 text-indigo-600',
   'bg-violet-500 bg-violet-100 text-violet-600', 'bg-fuchsia-500 bg-fuchsia-100 text-fuchsia-600',
   'bg-red-500 bg-red-100 text-red-600', 'bg-lime-500 bg-lime-100 text-lime-600'
-]
-
-const DIAS_SEMANA = [
-  { id: 1, label: 'Lunes' },
-  { id: 2, label: 'Martes' },
-  { id: 3, label: 'Miércoles' },
-  { id: 4, label: 'Jueves' },
-  { id: 5, label: 'Viernes' },
-  { id: 6, label: 'Sábado' },
-  { id: 0, label: 'Domingo' }
 ]
 
 export default function PerfilSucursalPage() {
@@ -76,12 +68,11 @@ export default function PerfilSucursalPage() {
     tono: 'cercano',
     msg_fuera_horario: '',
     ia_activa_fuera_horario: false,
-    caso_fuera_horario: false
+    caso_fuera_horario: false,
+    modo_horario_ia: 'mismo_negocio'
   })
   const [horarios, setHorarios] = useState<any[]>([])
-
-  const [copyPopoverOpen, setCopyPopoverOpen] = useState<number | null>(null)
-  const [copyTargets, setCopyTargets] = useState<number[]>([])
+  const [horariosIA, setHorariosIA] = useState<any[]>([])
 
   // Tipos de novedad
   const [tiposNovedad, setTiposNovedad] = useState<TipoNovedadData[]>([])
@@ -144,9 +135,10 @@ export default function PerfilSucursalPage() {
     const cargar = async () => {
       setLoading(true)
       try {
-        const [resPerfil, resHorarios, permisosRes] = await Promise.all([
+        const [resPerfil, resHorarios, resHorariosIA, permisosRes] = await Promise.all([
           getPerfilSucursal(),
-          getHorarios(),
+          getHorarios('negocio'),
+          getHorarios('ia'),
           getMisPermisos()
         ])
       
@@ -170,7 +162,8 @@ export default function PerfilSucursalPage() {
           tono: resPerfil.data.perfil?.tono || 'cercano',
           msg_fuera_horario: resPerfil.data.perfil?.msg_fuera_horario || '',
           ia_activa_fuera_horario: resPerfil.data.perfil?.ia_activa_fuera_horario ?? false,
-          caso_fuera_horario: resPerfil.data.perfil?.caso_fuera_horario ?? false
+          caso_fuera_horario: resPerfil.data.perfil?.caso_fuera_horario ?? false,
+          modo_horario_ia: resPerfil.data.perfil?.modo_horario_ia || 'mismo_negocio'
         })
       }
       
@@ -180,6 +173,14 @@ export default function PerfilSucursalPage() {
           return bd ? { ...bd } : { dia_semana: d.id, apertura: '09:00', cierre: '18:00', cerrado: true }
         })
         setHorarios(ordenados)
+      }
+
+      if (resHorariosIA.success && resHorariosIA.data) {
+        const ordenadosIA = DIAS_SEMANA.map(d => {
+          const bd = resHorariosIA.data.find((h: any) => h.dia_semana === d.id)
+          return bd ? { ...bd } : { dia_semana: d.id, apertura: '09:00', cierre: '18:00', cerrado: true }
+        })
+        setHorariosIA(ordenadosIA)
       }
 
       const resTipos = await getTiposNovedad()
@@ -200,51 +201,7 @@ export default function PerfilSucursalPage() {
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
-  const handleToggleCerrado = (diaId: number, cerrado: boolean) => {
-    setHorarios(prev => prev.map(h =>
-      h.dia_semana === diaId ? { ...h, cerrado } : h
-    ))
-  }
 
-  const handleChangeFranja = (diaId: number, idx: number, field: 'apertura' | 'cierre', value: string) => {
-    setHorarios(prev => prev.map(h => {
-      if (h.dia_semana !== diaId) return h
-      const franjas = [...h.franjas]
-      franjas[idx] = { ...franjas[idx], [field]: value }
-      return { ...h, franjas }
-    }))
-  }
-
-  const handleAddFranja = (diaId: number) => {
-    setHorarios(prev => prev.map(h => {
-      if (h.dia_semana !== diaId) return h
-      const franjas = [...h.franjas, { apertura: '09:00', cierre: '18:00', orden: h.franjas.length }]
-      return { ...h, franjas }
-    }))
-  }
-
-  const handleRemoveFranja = (diaId: number, idx: number) => {
-    setHorarios(prev => prev.map(h => {
-      if (h.dia_semana !== diaId) return h
-      const franjas = h.franjas.filter((_: any, i: number) => i !== idx)
-      return { ...h, franjas: franjas.length > 0 ? franjas : [{ apertura: '09:00', cierre: '18:00', orden: 0 }] }
-    }))
-  }
-
-  const applyCopyHorario = (sourceDiaId: number) => {
-    const source = horarios.find(h => h.dia_semana === sourceDiaId)
-    if (!source || !source.franjas || source.franjas.length === 0) return
-    setHorarios(prev => prev.map(h => {
-      if (!copyTargets.includes(h.dia_semana)) return h
-      return {
-        ...h,
-        cerrado: false,
-        franjas: source.franjas.map((f: any) => ({ apertura: f.apertura, cierre: f.cierre }))
-      }
-    }))
-    setCopyPopoverOpen(null)
-    setCopyTargets([])
-  }
 
   // Manejo de Tipos de Novedad
   const openNewTipo = () => {
@@ -309,12 +266,13 @@ export default function PerfilSucursalPage() {
     e.preventDefault()
     setSaving(true)
     
-    const [resPerfil, resHorarios] = await Promise.all([
+    const [resPerfil, resHorarios, resHorariosIA] = await Promise.all([
       savePerfilSucursal(formData),
-      saveHorarios(horarios)
+      saveHorarios(horarios, 'negocio'),
+      saveHorarios(horariosIA, 'ia')
     ])
     
-    if (resPerfil.success && resHorarios.success) {
+    if (resPerfil.success && resHorarios.success && resHorariosIA.success) {
       showToast('Cambios guardados correctamente ✓', 'success')
     } else {
       showToast(resPerfil.error || resHorarios.error || 'Error al guardar los cambios', 'error')
@@ -485,129 +443,15 @@ export default function PerfilSucursalPage() {
         {/* SECCIÓN: HORARIOS DE ATENCIÓN */}
         <section className="bg-white rounded-2xl shadow-sm border border-slate-200">
           <div className="p-6 sm:p-8 border-b border-slate-100 rounded-t-2xl">
-            <h2 className="text-xl font-bold text-ink-900">Horarios de atención</h2>
-            <p className="text-sm text-ink-500 mt-1">Puedes añadir varias franjas por día para horarios partidos.</p>
+            <h2 className="text-xl font-bold text-ink-900">Horarios del negocio</h2>
+            <p className="text-sm text-ink-500 mt-1">Configura las horas físicas en las que el negocio está abierto. La IA usará esto por defecto para saber si estás fuera de horario, a menos que configures un horario distinto para ella más abajo.</p>
           </div>
           
-          <div className="divide-y divide-slate-100">
-            {horarios.map(h => {
-              const diaObj = DIAS_SEMANA.find(d => d.id === h.dia_semana)
-              return (
-                <div key={h.dia_semana} className={`p-4 sm:p-5 transition ${h.cerrado ? 'bg-slate-50' : 'bg-white'}`}>
-                  {/* Fila de cabecera del día */}
-                  <div className="flex items-center gap-4 mb-3">
-                    <label className="flex items-center gap-3 cursor-pointer min-w-[130px]">
-                      <div className="relative flex items-center justify-center w-6 h-6">
-                        <input
-                          type="checkbox"
-                          checked={!h.cerrado}
-                          onChange={e => handleToggleCerrado(h.dia_semana, !e.target.checked)}
-                          disabled={nivelPermiso !== 'escritura'}
-                          className="peer sr-only"
-                        />
-                        <div className="w-6 h-6 border-2 border-slate-300 rounded bg-white peer-checked:bg-brand-600 peer-checked:border-brand-600 transition"></div>
-                        <svg className="absolute w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition pointer-events-none" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
-                        </svg>
-                      </div>
-                      <span className={`font-semibold text-sm ${h.cerrado ? 'text-slate-400' : 'text-ink-900'}`}>{diaObj?.label}</span>
-                    </label>
-                    {h.cerrado && <span className="text-xs text-slate-400 font-500">Cerrado</span>}
-                  </div>
-        
-                  {/* Franjas horarias */}
-                  {!h.cerrado && (
-                    <div className="ml-9 space-y-2">
-                      {h.franjas.map((franja: any, idx: number) => (
-                        <div key={idx} className="flex items-center gap-2 flex-wrap">
-                          <input
-                            type="time"
-                            value={franja.apertura ? franja.apertura.substring(0, 5) : ''}
-                            onChange={e => handleChangeFranja(h.dia_semana, idx, 'apertura', e.target.value)}
-                            disabled={nivelPermiso !== 'escritura'}
-                            className="w-32 h-10 px-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition outline-none disabled:bg-slate-100 disabled:text-slate-400 text-sm font-medium"
-                          />
-                          <span className="text-slate-400 text-sm">a</span>
-                          <input
-                            type="time"
-                            value={franja.cierre ? franja.cierre.substring(0, 5) : ''}
-                            onChange={e => handleChangeFranja(h.dia_semana, idx, 'cierre', e.target.value)}
-                            disabled={nivelPermiso !== 'escritura'}
-                            className="w-32 h-10 px-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition outline-none disabled:bg-slate-100 disabled:text-slate-400 text-sm font-medium"
-                          />
-                          {nivelPermiso === 'escritura' && h.franjas.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveFranja(h.dia_semana, idx)}
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition"
-                              aria-label="Eliminar franja"
-                            >
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                      {nivelPermiso === 'escritura' && (
-                        <button
-                          type="button"
-                          onClick={() => handleAddFranja(h.dia_semana)}
-                          className="flex items-center gap-1.5 text-xs font-600 text-brand-600 hover:text-brand-700 transition mt-1"
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
-                          Añadir franja
-                        </button>
-                      )}
-                      {nivelPermiso === 'escritura' && (
-                        <div className="relative pt-1">
-                          <button type="button" onClick={() => {
-                            setCopyPopoverOpen(copyPopoverOpen === h.dia_semana ? null : h.dia_semana)
-                            setCopyTargets([])
-                          }} className="text-xs font-semibold text-ink-500 hover:text-ink-700 transition flex items-center gap-1">
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-                            Copiar a...
-                          </button>
-
-                          {copyPopoverOpen === h.dia_semana && (
-                            <div className="absolute z-10 mt-2 w-56 bg-white rounded-xl shadow-lg border border-slate-200 p-3">
-                              <p className="text-xs font-semibold text-ink-700 mb-2">Copiar horario de {DIAS_SEMANA.find(d => d.id === h.dia_semana)?.label} a:</p>
-                              <div className="space-y-1.5 mb-3">
-                                {horarios.map(otherDay => otherDay.dia_semana !== h.dia_semana && (
-                                  <label key={otherDay.dia_semana} className="flex items-center gap-2 text-sm text-ink-700 cursor-pointer">
-                                    <input type="checkbox"
-                                      checked={copyTargets.includes(otherDay.dia_semana)}
-                                      onChange={e => {
-                                        if (e.target.checked) {
-                                          setCopyTargets(prev => [...prev, otherDay.dia_semana])
-                                        } else {
-                                          setCopyTargets(prev => prev.filter(id => id !== otherDay.dia_semana))
-                                        }
-                                      }}
-                                      className="w-3.5 h-3.5 rounded border-slate-300 text-brand-600 focus:ring-brand-400" />
-                                    {DIAS_SEMANA.find(d => d.id === otherDay.dia_semana)?.label}
-                                  </label>
-                                ))}
-                              </div>
-                              <div className="flex gap-2">
-                                <button type="button" onClick={() => { setCopyPopoverOpen(null); setCopyTargets([]) }}
-                                  className="flex-1 h-8 rounded-lg text-xs font-600 text-ink-600 hover:bg-slate-100 transition">
-                                  Cancelar
-                                </button>
-                                <button type="button" onClick={() => applyCopyHorario(h.dia_semana)}
-                                  disabled={copyTargets.length === 0}
-                                  className="flex-1 h-8 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-600 transition">
-                                  Aplicar
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
+          <EditorHorarios 
+            horarios={horarios}
+            onChange={setHorarios}
+            nivelPermiso={nivelPermiso}
+          />
         </section>
 
         {/* SECCIÓN: TIPOS DE NOVEDADES */}
@@ -777,50 +621,65 @@ export default function PerfilSucursalPage() {
               ></textarea>
             </div>
 
-            {/* Comportamiento fuera de horario */}
-            <div className="space-y-3">
-              <label className="block text-sm font-semibold text-slate-700">Comportamiento fuera de horario</label>
+            {/* Horario de la IA */}
+            <div className="space-y-3 pt-4 border-t border-slate-100">
+              <label className="block text-sm font-semibold text-slate-700">Horario de atención de la IA</label>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {[
+                  { id: 'mismo_negocio', label: 'Mismo que el negocio' },
+                  { id: 'siempre_activa', label: 'Siempre activa (24/7)' },
+                  { id: 'personalizado', label: 'Horario personalizado' }
+                ].map(opt => (
+                  <label key={opt.id} className={`flex items-center gap-3 p-4 rounded-xl border transition cursor-pointer ${formData.modo_horario_ia === opt.id ? 'bg-brand-50 border-brand-300' : 'bg-white border-slate-200 hover:border-slate-300'}`}>
+                    <input 
+                      type="radio" 
+                      name="modo_horario_ia" 
+                      value={opt.id} 
+                      checked={formData.modo_horario_ia === opt.id}
+                      onChange={handleChange}
+                      disabled={nivelPermiso !== 'escritura'}
+                      className="text-brand-600 focus:ring-brand-500"
+                    />
+                    <span className="text-sm font-500 text-ink-900">{opt.label}</span>
+                  </label>
+                ))}
+              </div>
               
-              <label className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition">
-                <div>
-                  <p className="text-sm font-500 text-ink-900">La IA sigue respondiendo fuera de horario</p>
-                  <p className="text-xs text-ink-500 mt-0.5">Si está desactivado, solo se enviará el mensaje de fuera de horario.</p>
-                </div>
-                <div className="relative ml-4 shrink-0">
-                  <input
-                    type="checkbox"
-                    checked={formData.ia_activa_fuera_horario}
-                    onChange={e => setFormData({
-                      ...formData,
-                      ia_activa_fuera_horario: e.target.checked,
-                      caso_fuera_horario: e.target.checked ? false : formData.caso_fuera_horario
-                    })}
-                    disabled={nivelPermiso !== 'escritura'}
-                    className="peer sr-only"
+              {formData.modo_horario_ia === 'personalizado' && (
+                <div className="mt-4 border border-slate-200 rounded-xl overflow-hidden">
+                  <EditorHorarios 
+                    horarios={horariosIA}
+                    onChange={setHorariosIA}
+                    nivelPermiso={nivelPermiso}
                   />
-                  <div className={`w-11 h-6 rounded-full transition-colors ${formData.ia_activa_fuera_horario ? 'bg-brand-600' : 'bg-slate-300'} peer-disabled:opacity-50`}></div>
-                  <div className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${formData.ia_activa_fuera_horario ? 'translate-x-5' : 'translate-x-0'}`}></div>
                 </div>
-              </label>
-
-              <label className={`flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50 transition ${formData.ia_activa_fuera_horario ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100'}`}>
-                <div>
-                  <p className="text-sm font-500 text-ink-900">Abrir caso automáticamente fuera de horario</p>
-                  <p className="text-xs text-ink-500 mt-0.5">Se crea un caso para que un agente lo atienda cuando vuelva a haber horario.</p>
-                </div>
-                <div className="relative ml-4 shrink-0">
-                  <input
-                    type="checkbox"
-                    checked={formData.caso_fuera_horario}
-                    onChange={e => setFormData({...formData, caso_fuera_horario: e.target.checked})}
-                    disabled={nivelPermiso !== 'escritura' || formData.ia_activa_fuera_horario}
-                    className="peer sr-only"
-                  />
-                  <div className={`w-11 h-6 rounded-full transition-colors ${formData.caso_fuera_horario ? 'bg-brand-600' : 'bg-slate-300'} peer-disabled:opacity-50`}></div>
-                  <div className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${formData.caso_fuera_horario ? 'translate-x-5' : 'translate-x-0'}`}></div>
-                </div>
-              </label>
+              )}
             </div>
+
+            {/* Comportamiento fuera de horario */}
+            {formData.modo_horario_ia !== 'siempre_activa' && (
+              <div className="space-y-3 pt-4 border-t border-slate-100">
+                <label className="block text-sm font-semibold text-slate-700">Comportamiento fuera de horario</label>
+                
+                <label className={`flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50 transition cursor-pointer hover:bg-slate-100`}>
+                  <div>
+                    <p className="text-sm font-500 text-ink-900">Abrir caso automáticamente fuera de horario</p>
+                    <p className="text-xs text-ink-500 mt-0.5">Se crea un caso para que un agente lo atienda cuando vuelva a haber horario.</p>
+                  </div>
+                  <div className="relative ml-4 shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={formData.caso_fuera_horario}
+                      onChange={e => setFormData({...formData, caso_fuera_horario: e.target.checked})}
+                      disabled={nivelPermiso !== 'escritura'}
+                      className="peer sr-only"
+                    />
+                    <div className={`w-11 h-6 rounded-full transition-colors ${formData.caso_fuera_horario ? 'bg-brand-600' : 'bg-slate-300'} peer-disabled:opacity-50`}></div>
+                    <div className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${formData.caso_fuera_horario ? 'translate-x-5' : 'translate-x-0'}`}></div>
+                  </div>
+                </label>
+              </div>
+            )}
           </div>
         </section>
 

@@ -17,7 +17,7 @@ export type HorarioDia = {
   franjas: Franja[]
 }
 
-export async function getHorarios() {
+export async function getHorarios(tipo: 'negocio' | 'ia' = 'negocio') {
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
@@ -28,6 +28,7 @@ export async function getHorarios() {
     .from('business_hours')
     .select('*')
     .eq('branch_id', branchId)
+    .eq('tipo', tipo)
     .order('dia_semana', { ascending: true })
     .order('orden', { ascending: true })
 
@@ -81,7 +82,7 @@ export async function getHorarios() {
   return { success: true, data: result }
 }
 
-export async function saveHorarios(horarios: HorarioDia[]) {
+export async function saveHorarios(horarios: HorarioDia[], tipo: 'negocio' | 'ia' = 'negocio') {
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
@@ -105,12 +106,14 @@ export async function saveHorarios(horarios: HorarioDia[]) {
     .from('business_hours')
     .select('*')
     .eq('branch_id', branchId)
+    .eq('tipo', tipo)
 
   // Borrar horarios actuales
   const { error: errorDelete } = await supabase
     .from('business_hours')
     .delete()
     .eq('branch_id', branchId)
+    .eq('tipo', tipo)
 
   if (errorDelete) return { success: false, error: errorDelete.message }
 
@@ -125,7 +128,8 @@ export async function saveHorarios(horarios: HorarioDia[]) {
         apertura: null,
         cierre: null,
         cerrado: true,
-        orden: 0
+        orden: 0,
+        tipo
       })
     } else {
       h.franjas.forEach((f, idx) => {
@@ -135,7 +139,8 @@ export async function saveHorarios(horarios: HorarioDia[]) {
           apertura: f.apertura.length === 5 ? `${f.apertura}:00` : f.apertura,
           cierre: f.cierre.length === 5 ? `${f.cierre}:00` : f.cierre,
           cerrado: false,
-          orden: idx
+          orden: idx,
+          tipo
         })
       })
     }

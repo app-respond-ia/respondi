@@ -5,6 +5,8 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { getSucursales, getDatosSucursalParaCopiar, crearSucursalConDatos } from '@/app/actions/sucursales'
 import { useToast } from '@/components/ui/Toast'
+import { EditorHorarios } from '@/components/sucursales/EditorHorarios'
+import { DIAS_SEMANA } from '@/lib/dias-semana'
 
 // CAMBIO 1: Husos horarios completos LATAM + España, ordenados de GMT-6 a GMT+1
 const TIMEZONES = [
@@ -38,16 +40,7 @@ const MODULOS = [
   { id: 'tipos_novedad', label: 'Tipos de novedades' },
 ]
 
-// CAMBIO 4: Días ordenados igual que el onboarding principal
-const DIAS_SEMANA = [
-  { id: 1, label: 'Lunes' },
-  { id: 2, label: 'Martes' },
-  { id: 3, label: 'Miércoles' },
-  { id: 4, label: 'Jueves' },
-  { id: 5, label: 'Viernes' },
-  { id: 6, label: 'Sábado' },
-  { id: 0, label: 'Domingo' },
-]
+
 
 import { getSkillsGlobalesBase } from '@/app/actions/skills-globales'
 
@@ -91,14 +84,9 @@ export default function NuevaSucursalPage() {
     DIAS_SEMANA.map(d => ({
       dia_semana: d.id,
       cerrado: d.id === 0 || d.id === 6,
-      apertura: '09:00',
-      cierre: '18:00',
-      orden: 0
+      franjas: [{ apertura: '09:00', cierre: '18:00', orden: 0 }]
     }))
   )
-  // CAMBIO 4: Estados para "Copiar a..." en horarios
-  const [copyPopoverOpen, setCopyPopoverOpen] = useState<number | null>(null)
-  const [copyTargets, setCopyTargets] = useState<number[]>([])
 
   // Onboarding — skills, precios, etiquetas, reglas
   const [skills, setSkills] = useState<any[]>([])
@@ -146,14 +134,16 @@ export default function NuevaSucursalPage() {
         if (d.horarios && d.horarios.length > 0) {
           const mapped = DIAS_SEMANA.map(def => {
             const filas = d.horarios.filter((h: any) => h.dia_semana === def.id)
-            if (filas.length === 0) return { dia_semana: def.id, cerrado: true, apertura: '09:00', cierre: '18:00', orden: 0 }
+            if (filas.length === 0) return { dia_semana: def.id, cerrado: true, franjas: [{apertura: '09:00', cierre: '18:00', orden: 0}] }
             const primera = filas[0]
             return {
               dia_semana: def.id,
               cerrado: primera.cerrado,
-              apertura: primera.apertura ? primera.apertura.substring(0, 5) : '09:00',
-              cierre: primera.cierre ? primera.cierre.substring(0, 5) : '18:00',
-              orden: 0
+              franjas: filas.map((f: any, idx: number) => ({
+                apertura: f.apertura ? f.apertura.substring(0, 5) : '09:00',
+                cierre: f.cierre ? f.cierre.substring(0, 5) : '18:00',
+                orden: idx
+              }))
             }
           })
           setHorarios(mapped)
@@ -208,17 +198,7 @@ export default function NuevaSucursalPage() {
     if (branchId) cargarDatosCopia(branchId, modulo)
   }
 
-  // CAMBIO 4: Función "Copiar a..." para horarios
-  const applyCopyHorario = (sourceDiaId: number) => {
-    const source = horarios.find(h => h.dia_semana === sourceDiaId)
-    if (!source) return
-    setHorarios(prev => prev.map(h => {
-      if (!copyTargets.includes(h.dia_semana)) return h
-      return { ...h, cerrado: false, apertura: source.apertura, cierre: source.cierre }
-    }))
-    setCopyPopoverOpen(null)
-    setCopyTargets([])
-  }
+
 
   // CAMBIO 4: Gestión del modal de políticas
   const openNewPolitica = () => {
@@ -270,7 +250,17 @@ export default function NuevaSucursalPage() {
       msg_fuera_horario: msgFueraHorario,
       ia_activa_fuera_horario: iaActivaFueraHorario,
       caso_fuera_horario: casoFueraHorario,
-      horarios,
+      modo_horario_ia: 'mismo_negocio',
+      horarios: horarios.flatMap(h => {
+        if (h.cerrado) return [{ dia_semana: h.dia_semana, apertura: null, cierre: null, cerrado: true, orden: 0 }] as { dia_semana: number, apertura: string | null, cierre: string | null, cerrado: boolean, orden: number }[]
+        return h.franjas.map((f, i) => ({
+          dia_semana: h.dia_semana,
+          apertura: f.apertura.length === 5 ? `${f.apertura}:00` : f.apertura,
+          cierre: f.cierre.length === 5 ? `${f.cierre}:00` : f.cierre,
+          cerrado: false,
+          orden: i
+        })) as { dia_semana: number, apertura: string | null, cierre: string | null, cerrado: boolean, orden: number }[]
+      }),
       // Enviamos solo nombre y activo para no incluir el campo 'fija' interno
       skills: skills.map(s => ({ skill_global_id: s.skill_global_id, nombre: s.nombre, activo: s.activo })),
       precios,
@@ -576,93 +566,12 @@ export default function NuevaSucursalPage() {
               <h2 className="font-display font-700 text-xl text-ink-900 mb-1">¿Cuándo atiende esta sucursal?</h2>
               <p className="text-ink-500 text-sm mb-6">Añade los horarios para esta sucursal. Puedes copiar franjas entre días.</p>
 
-              <div className="space-y-2">
-                {DIAS_SEMANA.map(d => {
-                  const h = horarios.find(x => x.dia_semana === d.id)!
-                  const idx = horarios.findIndex(x => x.dia_semana === d.id)
-                  return (
-                    <div key={d.id} className={`p-4 rounded-xl border transition ${h.cerrado ? 'border-slate-200 bg-slate-50' : 'border-brand-200 bg-white shadow-sm'}`}>
-                      <label className="flex items-center gap-2.5 mb-3 cursor-pointer">
-                        <input type="checkbox" checked={!h.cerrado}
-                          onChange={e => {
-                            const n = [...horarios]
-                            n[idx] = { ...n[idx], cerrado: !e.target.checked }
-                            setHorarios(n)
-                          }}
-                          className="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-400" />
-                        <span className={`font-600 text-sm ${h.cerrado ? 'text-ink-400' : 'text-ink-900'}`}>{d.label}</span>
-                        {h.cerrado && <span className="text-xs text-slate-400 font-500">Cerrado</span>}
-                      </label>
-
-                      {!h.cerrado && (
-                        <div className="pl-6 space-y-2">
-                          <div className="flex items-center gap-2">
-                            <input type="time" value={h.apertura}
-                              onChange={e => {
-                                const n = [...horarios]
-                                n[idx] = { ...n[idx], apertura: e.target.value }
-                                setHorarios(n)
-                              }}
-                              className="w-32 h-10 px-3 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition" />
-                            <span className="text-slate-400 text-sm">a</span>
-                            <input type="time" value={h.cierre}
-                              onChange={e => {
-                                const n = [...horarios]
-                                n[idx] = { ...n[idx], cierre: e.target.value }
-                                setHorarios(n)
-                              }}
-                              className="w-32 h-10 px-3 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition" />
-                          </div>
-
-                          {/* "Copiar a..." — igual que el onboarding principal */}
-                          <div className="relative pt-1">
-                            <button type="button" onClick={() => {
-                              setCopyPopoverOpen(copyPopoverOpen === d.id ? null : d.id)
-                              setCopyTargets([])
-                            }} className="text-xs font-600 text-ink-500 hover:text-ink-700 transition flex items-center gap-1">
-                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-                              Copiar a...
-                            </button>
-
-                            {copyPopoverOpen === d.id && (
-                              <div className="absolute z-10 mt-2 w-56 bg-white rounded-xl shadow-lg border border-slate-200 p-3">
-                                <p className="text-xs font-600 text-ink-700 mb-2">Copiar horario de {d.label} a:</p>
-                                <div className="space-y-1.5 mb-3">
-                                  {DIAS_SEMANA.map(otherD => otherD.id !== d.id && (
-                                    <label key={otherD.id} className="flex items-center gap-2 text-sm text-ink-700 cursor-pointer">
-                                      <input type="checkbox"
-                                        checked={copyTargets.includes(otherD.id)}
-                                        onChange={e => {
-                                          if (e.target.checked) {
-                                            setCopyTargets(prev => [...prev, otherD.id])
-                                          } else {
-                                            setCopyTargets(prev => prev.filter(id => id !== otherD.id))
-                                          }
-                                        }}
-                                        className="w-3.5 h-3.5 rounded border-slate-300 text-brand-600 focus:ring-brand-400" />
-                                      {otherD.label}
-                                    </label>
-                                  ))}
-                                </div>
-                                <div className="flex gap-2">
-                                  <button type="button" onClick={() => { setCopyPopoverOpen(null); setCopyTargets([]) }}
-                                    className="flex-1 h-8 rounded-lg text-xs font-600 text-ink-600 hover:bg-slate-100 transition">
-                                    Cancelar
-                                  </button>
-                                  <button type="button" onClick={() => applyCopyHorario(d.id)}
-                                    disabled={copyTargets.length === 0}
-                                    className="flex-1 h-8 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-600 transition">
-                                    Aplicar
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
+              <div className="mt-4 border border-slate-200 rounded-xl overflow-hidden">
+                <EditorHorarios 
+                  horarios={horarios}
+                  onChange={setHorarios}
+                  nivelPermiso="escritura"
+                />
               </div>
             </div>
           )}

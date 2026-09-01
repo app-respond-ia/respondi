@@ -12,8 +12,9 @@ export interface PrecioData {
   moneda: string
   descripcion: string | null
   disponible: boolean
-  categoria: string | null
-  subcategoria: string | null
+  categoria_id: string | null
+  etiquetas: string[]
+  visible_ia: boolean
 }
 
 import { getAuthContext } from '@/lib/auth-context'
@@ -50,8 +51,9 @@ export async function crearPrecio(data: PrecioData) {
       moneda: data.moneda,
       descripcion: data.descripcion,
       disponible: data.disponible,
-      categoria: data.categoria || null,
-      subcategoria: data.subcategoria || null
+      categoria_id: data.categoria_id || null,
+      etiquetas: data.etiquetas || [],
+      visible_ia: data.visible_ia ?? true
     }])
     .select()
     .single()
@@ -151,32 +153,112 @@ export async function importarPreciosMasivo(items: {
 
   if (!items || items.length === 0) return { success: false, error: 'No hay ítems para importar' }
 
-  const rows = items.map(item => ({
-    tenant_id: auth.tenant_id,
-    branch_id: auth.branch_id,
-    nombre: item.nombre,
-    tipo: item.tipo || 'producto',
-    precio: item.precio,
-    precio_tipo: item.precio_tipo || 'exacto',
-    categoria: item.categoria || null,
-    subcategoria: item.subcategoria || null,
-    descripcion: item.descripcion || null,
-    disponible: true
-  }))
+  // 1. Cargar las categorías existentes de la sucursal en memoria
+  const { data: categoriasActuales, error: catError } = await supabase
+    .from('categorias_precios')
+    .select('id, nombre, parent_id')
+    .eq('branch_id', auth.branch_id)
+    
+  if (catError) return { success: false, error: catError.message }
 
-  const { error } = await supabase
+  // Mapa en memoria para búsquedas rápidas ignorando mayúsculas/minúsculas
+  // Clave: "parent_id|nombre_en_minusculas" (usamos "root" para categorías padre)
+  const categoryCache = new Map<string, string>()
+  for (const cat of (categoriasActuales || [])) {
+    const parentKey = cat.parent_id || 'root'
+    categoryCache.set(`${parentKey}|${cat.nombre.toLowerCase().trim()}`, cat.id)
+  }
+
+  const rowsToInsert = []
+
+  // 2. Iterar sobre los ítems para procesar y crear categorías on-the-fly
+  for (const item of items) {
+    let finalCategoriaId = null
+
+    // Si tiene categoría definida
+    if (item.categoria?.trim()) {
+      const rootCatName = item.categoria.trim()
+      const rootCatKey = `root|${rootCatName.toLowerCase()}`
+      let rootCatId = categoryCache.get(rootCatKey)
+      
+      // Si la categoría raíz no existe en memoria, la creamos en BD
+      if (!rootCatId) {
+        const { data: newRootCat, error: insertRootErr } = await supabase
+          .from('categorias_precios')
+          .insert([{ 
+            tenant_id: auth.tenant_id, 
+            branch_id: auth.branch_id, 
+            nombre: rootCatName, 
+            parent_id: null 
+          }])
+          .select('id')
+          .single()
+
+        if (insertRootErr) return { success: false, error: insertRootErr.message }
+        rootCatId = newRootCat.id
+        categoryCache.set(rootCatKey, rootCatId!) // Actualizamos caché
+      }
+
+      finalCategoriaId = rootCatId
+
+      // Si también tiene subcategoría definida
+      if (item.subcategoria?.trim()) {
+        const subCatName = item.subcategoria.trim()
+        const subCatKey = `${rootCatId}|${subCatName.toLowerCase()}`
+        let subCatId = categoryCache.get(subCatKey)
+        
+        // Si la subcategoría no existe en memoria, la creamos en BD
+        if (!subCatId) {
+          const { data: newSubCat, error: insertSubErr } = await supabase
+            .from('categorias_precios')
+            .insert([{ 
+              tenant_id: auth.tenant_id, 
+              branch_id: auth.branch_id, 
+              nombre: subCatName, 
+              parent_id: rootCatId 
+            }])
+            .select('id')
+            .single()
+
+          if (insertSubErr) return { success: false, error: insertSubErr.message }
+          subCatId = newSubCat.id
+          categoryCache.set(subCatKey, subCatId!) // Actualizamos caché
+        }
+
+        finalCategoriaId = subCatId
+      }
+    }
+
+    // Añadimos la fila lista para insertar en price_list
+    rowsToInsert.push({
+      tenant_id: auth.tenant_id,
+      branch_id: auth.branch_id,
+      nombre: item.nombre,
+      tipo: item.tipo || 'producto',
+      precio: item.precio,
+      precio_tipo: item.precio_tipo || 'exacto',
+      categoria_id: finalCategoriaId,
+      etiquetas: [],
+      visible_ia: true,
+      descripcion: item.descripcion || null,
+      disponible: true
+    })
+  }
+
+  // 3. Insertar todos los productos masivamente con sus UUIDs
+  const { error: insertError } = await supabase
     .from('price_list')
-    .insert(rows)
+    .insert(rowsToInsert)
 
-  if (error) return { success: false, error: error.message }
+  if (insertError) return { success: false, error: insertError.message }
 
   await registrarAuditoria({
     tenant_id: auth.tenant_id,
     user_id: auth.user_id,
-    accion: `importó ${rows.length} ítems a la lista de precios desde un archivo`,
+    accion: `importó ${rowsToInsert.length} ítems a la lista de precios desde un archivo`,
     tabla_afectada: 'precios',
-    valor_nuevo: { total_importados: rows.length }
+    valor_nuevo: { total_importados: rowsToInsert.length }
   })
 
-  return { success: true, total: rows.length }
+  return { success: true, total: rowsToInsert.length }
 }

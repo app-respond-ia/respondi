@@ -45,9 +45,13 @@ export default function ListaPreciosPage() {
     precio: null,
     precio_tipo: 'exacto',
     descripcion: '',
-    categoria: null,
-    subcategoria: null
+    disponible: true,
+    categoria_id: null,
+    etiquetas: [],
+    visible_ia: true
   } as any)
+
+  const [etiquetaInput, setEtiquetaInput] = useState('')
 
   const cargar = async () => {
     setLoading(true)
@@ -88,9 +92,12 @@ export default function ListaPreciosPage() {
       precio: null,
       precio_tipo: 'exacto',
       descripcion: '',
-      categoria: null,
-      subcategoria: null
+      disponible: true,
+      categoria_id: null,
+      etiquetas: [],
+      visible_ia: true
     } as any)
+    setEtiquetaInput('')
     setIsModalOpen(true)
   }
 
@@ -103,9 +110,12 @@ export default function ListaPreciosPage() {
       precio: item.precio,
       precio_tipo: item.precio_tipo,
       descripcion: item.descripcion || '',
-      categoria: item.categoria || null,
-      subcategoria: item.subcategoria || null
+      disponible: item.disponible !== false,
+      categoria_id: item.categoria_id || null,
+      etiquetas: item.etiquetas || [],
+      visible_ia: item.visible_ia !== false
     } as any)
+    setEtiquetaInput('')
     setIsModalOpen(true)
   }
 
@@ -186,6 +196,17 @@ export default function ListaPreciosPage() {
   const categoriasRaiz = categorias.filter(c => !c.parent_id)
   const subcategoriasDe = (parentId: string) => categorias.filter(c => c.parent_id === parentId)
 
+  const getCategoryName = (id: string | null) => {
+    if (!id) return { cat: '', sub: '' }
+    const cat = categorias.find(c => c.id === id)
+    if (!cat) return { cat: '', sub: '' }
+    if (cat.parent_id) {
+      const parent = categorias.find(c => c.id === cat.parent_id)
+      return { cat: parent?.nombre || '', sub: cat.nombre }
+    }
+    return { cat: cat.nombre, sub: '' }
+  }
+
   const descargarPlantilla = async () => {
     const ExcelJS = await import('exceljs')
     const wb = new ExcelJS.Workbook()
@@ -211,8 +232,8 @@ export default function ListaPreciosPage() {
           tipo: item.tipo,
           precio_tipo: item.precio_tipo,
           precio: item.precio ?? '',
-          categoria: item.categoria || '',
-          subcategoria: item.subcategoria || '',
+          categoria: getCategoryName(item.categoria_id).cat,
+          subcategoria: getCategoryName(item.categoria_id).sub,
           descripcion: item.descripcion || ''
         })
       })
@@ -532,11 +553,14 @@ export default function ListaPreciosPage() {
                         </span>
                       </td>
                       <td className="px-5 py-3.5 text-ink-600 text-sm">
-                        {item.categoria ? (
-                          <span>{item.categoria}{item.subcategoria ? ` › ${item.subcategoria}` : ''}</span>
-                        ) : (
-                          <span className="text-ink-300">—</span>
-                        )}
+                        {(() => {
+                          const names = getCategoryName(item.categoria_id)
+                          return names.cat ? (
+                            <span>{names.cat}{names.sub ? ` › ${names.sub}` : ''}</span>
+                          ) : (
+                            <span className="text-ink-300">—</span>
+                          )
+                        })()}
                       </td>
                       <td className="px-5 py-3.5 font-600 text-ink-900">
                         {formatearPrecio(item)}
@@ -654,27 +678,88 @@ export default function ListaPreciosPage() {
                   </div>
         
                   <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-500 text-ink-700 mb-1.5">Categoría <span className="text-ink-400 font-400">· opcional</span></label>
-                      <select value={formData.categoria || ''} onChange={e => setFormData({...formData, categoria: e.target.value, subcategoria: ''})}
-                        className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition">
-                        <option value="">Sin categoría</option>
-                        {categoriasRaiz.map(cat => (
-                          <option key={cat.id} value={cat.nombre}>{cat.nombre}</option>
+                    {(() => {
+                      const selectedCatObj = categorias.find(c => c.id === formData.categoria_id)
+                      const isSubcat = selectedCatObj?.parent_id != null
+                      const parentCatId = isSubcat ? selectedCatObj.parent_id : (selectedCatObj ? selectedCatObj.id : '')
+                      const subCatId = isSubcat ? selectedCatObj.id : ''
+                      return (
+                        <>
+                          <div>
+                            <label className="block text-sm font-500 text-ink-700 mb-1.5">Categoría <span className="text-ink-400 font-400">· opcional</span></label>
+                            <select value={parentCatId} onChange={e => setFormData({...formData, categoria_id: e.target.value || null})}
+                              className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition">
+                              <option value="">Sin categoría</option>
+                              {categoriasRaiz.map(cat => (
+                                <option key={cat.id} value={cat.id}>{cat.nombre}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-500 text-ink-700 mb-1.5">Subcategoría <span className="text-ink-400 font-400">· opcional</span></label>
+                            <select value={subCatId} 
+                              onChange={e => {
+                                if (e.target.value) {
+                                  setFormData({...formData, categoria_id: e.target.value})
+                                } else {
+                                  setFormData({...formData, categoria_id: parentCatId || null})
+                                }
+                              }}
+                              disabled={!parentCatId}
+                              className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition disabled:bg-slate-50 disabled:text-ink-400">
+                              <option value="">Sin subcategoría</option>
+                              {parentCatId && subcategoriasDe(parentCatId).map(sub => (
+                                <option key={sub.id} value={sub.id}>{sub.nombre}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </>
+                      )
+                    })()}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-500 text-ink-700 mb-1.5">Etiquetas <span className="text-ink-400 font-400">· opcional</span></label>
+                    <input type="text" placeholder="Escribe y presiona Enter..."
+                      value={etiquetaInput}
+                      onChange={e => setEtiquetaInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          if (etiquetaInput.trim()) {
+                            setFormData({...formData, etiquetas: [...(formData.etiquetas || []), etiquetaInput.trim()]})
+                            setEtiquetaInput('')
+                          }
+                        }
+                      }}
+                      className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition" 
+                    />
+                    {formData.etiquetas && formData.etiquetas.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {formData.etiquetas.map(tag => (
+                          <span key={tag} className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-sm font-500">
+                            {tag}
+                            <button type="button" onClick={() => setFormData({...formData, etiquetas: formData.etiquetas.filter(t => t !== tag)})} className="text-slate-400 hover:text-red-500 transition">
+                              &times;
+                            </button>
+                          </span>
                         ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-500 text-ink-700 mb-1.5">Subcategoría <span className="text-ink-400 font-400">· opcional</span></label>
-                      <select value={formData.subcategoria || ''} onChange={e => setFormData({...formData, subcategoria: e.target.value})}
-                        disabled={!formData.categoria}
-                        className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition disabled:bg-slate-50 disabled:text-ink-400">
-                        <option value="">Sin subcategoría</option>
-                        {formData.categoria && subcategoriasDe(categoriasRaiz.find(c => c.nombre === formData.categoria)?.id || '').map(sub => (
-                          <option key={sub.id} value={sub.nombre}>{sub.nombre}</option>
-                        ))}
-                      </select>
-                    </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer">
+                      <div>
+                        <span className="block text-sm font-600 text-ink-900">Visible para la IA</span>
+                        <span className="block text-xs text-ink-500 mt-0.5">Si lo apagas, la IA actuará como si este ítem no existiera en tu catálogo.</span>
+                      </div>
+                      <div className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 shrink-0"
+                        style={{ backgroundColor: formData.visible_ia ? '#10b981' : '#e2e8f0' }}>
+                        <input type="checkbox" className="sr-only" checked={formData.visible_ia} onChange={(e) => setFormData({...formData, visible_ia: e.target.checked})} />
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.visible_ia ? 'translate-x-6' : 'translate-x-1'}`} />
+                      </div>
+                    </label>
                   </div>
                 </div>
         

@@ -181,6 +181,21 @@ export async function generarRespuesta(conv: any) {
     }
   ]
 
+  if (activeSkills.has('consultar_horario')) {
+    tools.push({
+      type: "function" as const,
+      function: {
+        name: "consultar_horario",
+        description: "Consulta el horario comercial físico de la sucursal y la fecha/hora actual. Útil para responder qué días abren, horarios, o si actualmente están abiertos.",
+        parameters: {
+          type: "object",
+          properties: {},
+          required: []
+        }
+      }
+    })
+  }
+
   if (activeSkills.has('etiquetar_conversacion')) {
     tools.push({
       type: "function" as const,
@@ -247,7 +262,44 @@ export async function generarRespuesta(conv: any) {
       const args = JSON.parse(toolCall.function.arguments)
       let toolResult = ''
 
-      if (toolCall.function.name === 'etiquetar_conversacion') {
+      if (toolCall.function.name === 'consultar_horario') {
+        const timezone = branch?.timezone || 'UTC'
+        const hours = branch?.business_hours || []
+        const physicalHours = hours.filter((h: any) => h.tipo === 'negocio')
+        
+        let formatted = `Horario comercial físico del local (Zona horaria: ${timezone}):\n`
+        
+        if (physicalHours.length === 0) {
+          formatted += "Este negocio no ha configurado un horario específico todavía, puedes asumir que está disponible.\n"
+        } else {
+          const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+          for (let i = 0; i <= 6; i++) {
+            const franjas = physicalHours.filter((h: any) => h.dia_semana === i)
+            if (franjas.length === 0 || franjas.some((h: any) => h.cerrado)) {
+              formatted += `- ${days[i]}: Cerrado\n`
+            } else {
+              const franjasOrdenadas = franjas.sort((a: any, b: any) => (a.orden || 0) - (b.orden || 0))
+              const times = franjasOrdenadas.map((f: any) => `${f.apertura?.substring(0,5) || '??'} a ${f.cierre?.substring(0,5) || '??'}`).join(', ')
+              formatted += `- ${days[i]}: ${times}\n`
+            }
+          }
+        }
+        
+        try {
+          const current = new Date().toLocaleString('es-ES', { 
+            timeZone: timezone, 
+            hour12: false, 
+            dateStyle: 'full', 
+            timeStyle: 'short' 
+          })
+          formatted += `\nFecha y hora actual en la sucursal: ${current}`
+        } catch (e) {
+          formatted += `\nFecha y hora actual en la sucursal: No disponible`
+        }
+        
+        toolResult = formatted
+      }
+      else if (toolCall.function.name === 'etiquetar_conversacion') {
         const valid = categories?.some(c => c.id === args.category_id)
         if (!valid) {
           toolResult = 'Error: category_id no válido para esta sucursal.'

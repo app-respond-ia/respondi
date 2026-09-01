@@ -196,6 +196,25 @@ export async function generarRespuesta(conv: any) {
     })
   }
 
+  if (activeSkills.has('consultar_catalogo')) {
+    tools.push({
+      type: "function" as const,
+      function: {
+        name: "consultar_catalogo",
+        description: "Consulta el catálogo de productos y servicios del negocio. Úsala cuando el cliente pregunte por precios, menú, servicios ofrecidos, o busque algo específico.",
+        parameters: {
+          type: "object",
+          properties: {
+            busqueda: { type: "string", description: "Texto libre para buscar en el nombre o descripción." },
+            categoria: { type: "string", description: "Nombre de la categoría de productos que busca el cliente." },
+            etiquetas: { type: "array", items: { type: "string" }, description: "Características mencionadas (ej. 'vegano', 'frio', 'madera')." },
+            precio_maximo: { type: "number", description: "Precio máximo en caso de que el cliente especifique un presupuesto." }
+          }
+        }
+      }
+    })
+  }
+
   if (activeSkills.has('etiquetar_conversacion')) {
     tools.push({
       type: "function" as const,
@@ -346,6 +365,73 @@ export async function generarRespuesta(conv: any) {
             console.error('Error actualizando descripción de imagen:', error)
           }
           toolResult = error ? `Error DB: ${error.message}` : 'Descripción de imagen guardada en base de datos correctamente.'
+        }
+      }
+      else if (toolCall.function.name === 'consultar_catalogo') {
+        let query = supabaseAdmin.from('price_list').select(`
+          id, nombre, tipo, precio, precio_tipo, moneda, descripcion,
+          categorias_precios (id, nombre, parent_id)
+        `).eq('branch_id', branchId).eq('visible_ia', true).eq('disponible', true)
+        
+        if (args.busqueda) {
+          query = query.or(`nombre.ilike.%${args.busqueda}%,descripcion.ilike.%${args.busqueda}%`)
+        }
+        
+        if (args.categoria) {
+          const { data: cats } = await supabaseAdmin.from('categorias_precios')
+            .select('id, parent_id')
+            .eq('branch_id', branchId)
+            .ilike('nombre', `%${args.categoria}%`)
+            
+          if (cats && cats.length > 0) {
+            const catIds = new Set<string>()
+            for (const c of cats) {
+              catIds.add(c.id)
+              if (!c.parent_id) {
+                const { data: subs } = await supabaseAdmin.from('categorias_precios')
+                  .select('id')
+                  .eq('branch_id', branchId)
+                  .eq('parent_id', c.id)
+                if (subs) subs.forEach(s => catIds.add(s.id))
+              }
+            }
+            query = query.in('categoria_id', Array.from(catIds))
+          } else {
+             query = query.eq('categoria_id', '00000000-0000-0000-0000-000000000000') 
+          }
+        }
+        
+        if (args.etiquetas && args.etiquetas.length > 0) {
+          query = query.overlaps('etiquetas', args.etiquetas)
+        }
+        
+        if (args.precio_maximo !== undefined) {
+          query = query.lte('precio', args.precio_maximo)
+        }
+        
+        query = query.limit(15)
+        
+        const { data: productos, error } = await query
+        
+        if (error) {
+          console.error("Error consultando catálogo:", error)
+          toolResult = "Error interno al consultar el catálogo."
+        } else if (!productos || productos.length === 0) {
+          toolResult = "No se encontraron productos o servicios que coincidan con la búsqueda."
+        } else {
+          toolResult = "Catálogo encontrado:\n"
+          for (const p of productos) {
+            const catObj = p.categorias_precios as any
+            const catStr = catObj?.nombre ? ` [Categoría: ${catObj.nombre}]` : ''
+            let priceStr = ''
+            if (p.precio_tipo === 'consultar') priceStr = 'Precio: A consultar'
+            else if (p.precio_tipo === 'desde') priceStr = `Precio: Desde ${p.precio} ${p.moneda}`
+            else priceStr = `Precio: ${p.precio} ${p.moneda}`
+            
+            toolResult += `- ${p.nombre}${catStr} | ${priceStr}`
+            if (p.descripcion) toolResult += `\n  Descripción: ${p.descripcion}`
+            toolResult += '\n'
+          }
         }
       }
 

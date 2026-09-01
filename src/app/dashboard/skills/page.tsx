@@ -48,7 +48,7 @@ export default function SkillsPage() {
     const nuevoEstado = !item.activo
     setItems(prev => prev.map(s => s.id === item.id ? { ...s, activo: nuevoEstado } : s))
 
-    const res = await toggleSkillCliente(branchId, tenantId, item.nombre, nuevoEstado)
+    const res = await toggleSkillCliente(branchId, tenantId, item.id, nuevoEstado)
     if (!res.success) {
       setItems(prev => prev.map(s => s.id === item.id ? { ...s, activo: item.activo } : s))
       showToast(res.error || 'Error al actualizar', 'error')

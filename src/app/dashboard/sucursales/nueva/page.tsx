@@ -49,14 +49,7 @@ const DIAS_SEMANA = [
   { id: 0, label: 'Domingo' },
 ]
 
-// CAMBIO 4: Skills con las 3 fijas iguales que el onboarding principal
-const SKILLS_DEFAULT = [
-  { idName: 'idioma_multi', nombre: 'Idioma multi', descripcion: 'La IA detecta y responde en el idioma en que le escribe el cliente.', activo: true, fija: true },
-  { idName: 'precio', nombre: 'Preguntas de precio', descripcion: 'Responder dudas sobre tarifas o cotizaciones.', activo: false, fija: false },
-  { idName: 'reclamos', nombre: 'Escalado a humanos', descripcion: 'Derivar a un agente humano cuando el cliente tiene un problema o queja.', activo: true, fija: true },
-  { idName: 'presupuestos', nombre: 'Hacer presupuestos', descripcion: 'Armar presupuestos a medida según lo que pide el cliente.', activo: false, fija: false },
-  { idName: 'politicas', nombre: 'Políticas del negocio', descripcion: 'Informar sobre reglas, envíos, devoluciones, garantías, etc.', activo: true, fija: true },
-]
+import { getSkillsGlobalesBase } from '@/app/actions/skills-globales'
 
 export default function NuevaSucursalPage() {
   const router = useRouter()
@@ -108,7 +101,7 @@ export default function NuevaSucursalPage() {
   const [copyTargets, setCopyTargets] = useState<number[]>([])
 
   // Onboarding — skills, precios, etiquetas, reglas
-  const [skills, setSkills] = useState(SKILLS_DEFAULT)
+  const [skills, setSkills] = useState<any[]>([])
   const [precios, setPrecios] = useState<any[]>([])
   const [etiquetas, setEtiquetas] = useState<any[]>([])
   const [reglas, setReglas] = useState<any[]>([])
@@ -118,8 +111,24 @@ export default function NuevaSucursalPage() {
   const [prodPrecio, setProdPrecio] = useState('')
 
   useEffect(() => {
-    getSucursales().then(res => {
-      if (res.success && res.data?.sucursales) setSucursales(res.data.sucursales)
+    Promise.all([
+      getSucursales(),
+      getSkillsGlobalesBase()
+    ]).then(([sucursalesRes, skillsRes]) => {
+      if (sucursalesRes.success && sucursalesRes.data?.sucursales) {
+        setSucursales(sucursalesRes.data.sucursales)
+      }
+      if (skillsRes.success && skillsRes.data) {
+        const base = skillsRes.data.map((g: any) => ({
+          skill_global_id: g.id,
+          idName: g.slug,
+          nombre: g.nombre,
+          descripcion: g.descripcion,
+          activo: g.activa_por_defecto,
+          fija: !g.cliente_puede_toggle
+        }))
+        setSkills(base)
+      }
       setLoading(false)
     })
   }, [])
@@ -152,9 +161,9 @@ export default function NuevaSucursalPage() {
       }
       if (!modulo || modulo === 'skills') {
         if (d.skills && d.skills.length > 0) {
-          setSkills(SKILLS_DEFAULT.map(def => {
+          setSkills(prev => prev.map(def => {
             if (def.fija) return def
-            const loaded = d.skills.find((s: any) => s.nombre === def.nombre)
+            const loaded = d.skills.find((s: any) => s.skill_global_id === def.skill_global_id)
             return loaded ? { ...def, activo: loaded.activo } : def
           }))
         }
@@ -263,7 +272,7 @@ export default function NuevaSucursalPage() {
       caso_fuera_horario: casoFueraHorario,
       horarios,
       // Enviamos solo nombre y activo para no incluir el campo 'fija' interno
-      skills: skills.map(s => ({ idName: s.idName, nombre: s.nombre, activo: s.activo })),
+      skills: skills.map(s => ({ skill_global_id: s.skill_global_id, nombre: s.nombre, activo: s.activo })),
       precios,
       etiquetas,
       reglas,

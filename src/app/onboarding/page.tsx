@@ -12,6 +12,7 @@ import {
   saveStep4,
   saveStep5
 } from '@/app/actions/onboarding'
+import { getSkillsGlobalesBase } from '@/app/actions/skills-globales'
 import { ErrorModal } from '@/components/ui/ErrorModal'
 import { useMemo, useRef } from 'react'
 import { createClient } from '@/utils/supabase/client'
@@ -94,13 +95,7 @@ export default function OnboardingPage() {
   }
 
   // Step 3
-  const [s3, setS3] = useState([
-    { idName: 'idioma_multi', nombre: 'Idioma multi', descripcion: 'La IA detecta y responde en el idioma en que le escribe el cliente.', activo: true },
-    { idName: 'precio', nombre: 'Preguntas de precio', descripcion: 'Responder dudas sobre tarifas o cotizaciones (más adelante podrás añadir la lista completa de precios).', activo: false },
-    { idName: 'reclamos', nombre: 'Escalado a humanos', descripcion: 'Derivar a un agente humano cuando el cliente tiene un problema o queja.', activo: true },
-    { idName: 'presupuestos', nombre: 'Hacer presupuestos', descripcion: 'Armar presupuestos a medida según lo que pide el cliente.', activo: false },
-    { idName: 'politicas', nombre: 'Políticas del negocio', descripcion: 'Informar sobre reglas, envíos, devoluciones, garantías, etc.', activo: true }
-  ])
+  const [s3, setS3] = useState<{ idName?: string, skill_global_id: string, nombre: string, descripcion: string, activo: boolean, cliente_puede_toggle: boolean }[]>([])
 
   // Step 4
   const [s4Msg, setS4Msg] = useState('')
@@ -114,7 +109,10 @@ export default function OnboardingPage() {
   const [prodPrecio, setProdPrecio] = useState('')
 
   useEffect(() => {
-    getOnboardingState().then(res => {
+    Promise.all([
+      getOnboardingState(),
+      getSkillsGlobalesBase()
+    ]).then(([res, globalRes]) => {
       if (!res.success) {
         if (res.error === 'no_session') router.replace('/login')
         setLoading(false)
@@ -188,13 +186,23 @@ export default function OnboardingPage() {
         setS2(s2Array)
       }
 
-      if (d.s3 && d.s3.length > 0) {
-        setS3(prev => prev.map(skill => {
-          const isFija = skill.idName === 'idioma_multi' || skill.idName === 'politicas' || skill.idName === 'reclamos'
-          if (isFija) return { ...skill, activo: true }
-          const loadedSkill = d.s3.find((dbSkill: any) => dbSkill.nombre === skill.nombre)
-          return loadedSkill ? { ...skill, activo: loadedSkill.activo } : skill
+      if (globalRes.success && globalRes.data) {
+        const globales = globalRes.data.map((g: any) => ({
+          skill_global_id: g.id,
+          nombre: g.nombre,
+          descripcion: g.descripcion,
+          activo: g.activa_por_defecto,
+          cliente_puede_toggle: g.cliente_puede_toggle
         }))
+        
+        if (d.s3 && d.s3.length > 0) {
+          setS3(globales.map(g => {
+            const loadedSkill = d.s3.find((dbSkill: any) => dbSkill.skill_global_id === g.skill_global_id)
+            return loadedSkill ? { ...g, activo: loadedSkill.activo } : g
+          }))
+        } else {
+          setS3(globales)
+        }
       }
 
       if (d.s4 !== undefined && d.s4 !== null) {
@@ -345,7 +353,7 @@ export default function OnboardingPage() {
         const payload = {
             tenantId,
             branchId,
-            skills: s3.map(s => ({ idName: s.idName, nombre: s.nombre, activo: s.activo }))
+            skills: s3.map(s => ({ skill_global_id: s.skill_global_id, nombre: s.nombre, activo: s.activo }))
         }
         const res = await saveStep3(payload)
         if (res.success) setStep(4)
@@ -825,9 +833,9 @@ export default function OnboardingPage() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {s3.map((s, i) => {
-                      const isFija = s.idName === 'idioma_multi' || s.idName === 'politicas' || s.idName === 'reclamos';
+                      const isFija = !s.cliente_puede_toggle;
                       return (
-                        <label key={s.idName} className={`flex gap-3 p-4 rounded-xl border transition ${s.activo ? (isFija ? 'border-brand-200 bg-brand-50/30' : 'border-brand-200 bg-brand-50/50 shadow-sm') : 'border-slate-200 hover:border-slate-300 bg-white'} ${isFija ? 'cursor-default' : 'cursor-pointer'}`}>
+                        <label key={s.skill_global_id} className={`flex gap-3 p-4 rounded-xl border transition ${s.activo ? (isFija ? 'border-brand-200 bg-brand-50/30' : 'border-brand-200 bg-brand-50/50 shadow-sm') : 'border-slate-200 hover:border-slate-300 bg-white'} ${isFija ? 'cursor-default' : 'cursor-pointer'}`}>
                           <div className="pt-0.5 relative">
                             <input type="checkbox" checked={s.activo} disabled={isFija} onChange={e => {
                               if (isFija) return;

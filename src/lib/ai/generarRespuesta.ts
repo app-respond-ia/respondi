@@ -65,27 +65,49 @@ export async function generarRespuesta(conv: any) {
     .eq('branch_id', branchId)
     .eq('activa', true)
 
+  // 3.5. Obtener Skills Activas
+  const { data: branchSkills } = await supabaseAdmin
+    .from('skills')
+    .select('activo, skills_globales!inner(slug)')
+    .eq('branch_id', branchId)
+    .eq('activo', true)
+
+  const activeSkills = new Set(branchSkills?.map((s: any) => s.skills_globales.slug) || [])
+
   // 4. Preparar Prompt del Sistema
   let systemPrompt = `Eres el asistente virtual del negocio.\n`
   if (profile) {
-    systemPrompt += `Descripción: ${profile.descripcion || ''}\nServicios: ${profile.servicios || ''}\nPolíticas: ${profile.politicas || ''}\nIdioma: ${profile.idioma_base || 'es'}\n`
+    systemPrompt += `Descripción: ${profile.descripcion || ''}\nServicios: ${profile.servicios || ''}\nIdioma: ${profile.idioma_base || 'es'}\n`
   }
   systemPrompt += `\nINSTRUCCIONES ESTRICTAS:\n`
-  systemPrompt += `- No inventes información. Si no lo sabes, indícalo o usa escalar_humano.\n`
+  systemPrompt += `- No inventes información. Si no lo sabes, indícalo${activeSkills.has('escalar_humano') ? ' o usa escalar_humano' : ''}.\n`
   systemPrompt += `- Eres un asistente, responde de manera concisa y natural.\n`
-  systemPrompt += `- Si el usuario envía un archivo no soportado (ej. PDF o Word), invoca escalar_humano.\n`
-  systemPrompt += `- Usa las herramientas disponibles de etiquetado o escalado cuando corresponda a la intención del cliente.\n`
+  if (activeSkills.has('escalar_humano')) {
+    systemPrompt += `- Si el usuario envía un archivo no soportado (ej. PDF o Word), invoca escalar_humano.\n`
+  }
+  
+  if (activeSkills.has('etiquetar_conversacion') || activeSkills.has('escalar_humano')) {
+    const actions = []
+    if (activeSkills.has('etiquetar_conversacion')) actions.push('etiquetado')
+    if (activeSkills.has('escalar_humano')) actions.push('escalado')
+    systemPrompt += `- Usa las herramientas disponibles de ${actions.join(' o ')} cuando corresponda a la intención del cliente.\n`
+  }
+
   systemPrompt += `- IMPORTANTE: Si un mensaje incluye una imagen, SIEMPRE DEBES llamar a la herramienta guardar_descripcion_imagen inmediatamente, para guardar un resumen textual de lo que se ve.\n\n`
   
-  systemPrompt += `Etiquetas (Categorías) Disponibles:\n`
-  categories?.forEach(c => {
-    systemPrompt += `- ID: ${c.id} | Nombre: ${c.nombre} | Info: ${c.descripcion_intencion || ''}\n`
-  })
+  if (activeSkills.has('etiquetar_conversacion')) {
+    systemPrompt += `Etiquetas (Categorías) Disponibles:\n`
+    categories?.forEach(c => {
+      systemPrompt += `- ID: ${c.id} | Nombre: ${c.nombre} | Info: ${c.descripcion_intencion || ''}\n`
+    })
+  }
   
-  systemPrompt += `\nReglas de Caso (Escalar a humano) Disponibles:\n`
-  rules?.forEach(r => {
-    systemPrompt += `- ID: ${r.id} | Nombre: ${r.nombre} | Tipo: ${r.tipo_caso} | Info: ${r.descripcion_intencion || ''}\n`
-  })
+  if (activeSkills.has('escalar_humano')) {
+    systemPrompt += `\nReglas de Caso (Escalar a humano) Disponibles:\n`
+    rules?.forEach(r => {
+      systemPrompt += `- ID: ${r.id} | Nombre: ${r.nombre} | Tipo: ${r.tipo_caso} | Info: ${r.descripcion_intencion || ''}\n`
+    })
+  }
 
   // 5. Preparar Mensajes para OpenAI
   const openAiMessages: any[] = [{ role: 'system', content: systemPrompt }]
@@ -141,36 +163,7 @@ export async function generarRespuesta(conv: any) {
   }
 
   // 6. Definición de Herramientas
-  const tools = [
-    {
-      type: "function" as const,
-      function: {
-        name: "etiquetar_conversacion",
-        description: "Etiqueta la conversación en base a la intención del cliente.",
-        parameters: {
-          type: "object",
-          properties: {
-            category_id: { type: "string", description: "UUID de la categoría elegida (debe existir en la lista provista)." }
-          },
-          required: ["category_id"]
-        }
-      }
-    },
-    {
-      type: "function" as const,
-      function: {
-        name: "escalar_humano",
-        description: "Deriva el caso a un agente humano y detiene el bot automático.",
-        parameters: {
-          type: "object",
-          properties: {
-            rule_id: { type: "string", description: "UUID de la regla de escalado (debe existir en la lista provista)." },
-            resumen_problema: { type: "string", description: "Breve explicación de por qué se escala el caso." }
-          },
-          required: ["rule_id", "resumen_problema"]
-        }
-      }
-    },
+  const tools: any[] = [
     {
       type: "function" as const,
       function: {
@@ -187,6 +180,41 @@ export async function generarRespuesta(conv: any) {
       }
     }
   ]
+
+  if (activeSkills.has('etiquetar_conversacion')) {
+    tools.push({
+      type: "function" as const,
+      function: {
+        name: "etiquetar_conversacion",
+        description: "Etiqueta la conversación en base a la intención del cliente.",
+        parameters: {
+          type: "object",
+          properties: {
+            category_id: { type: "string", description: "UUID de la categoría elegida (debe existir en la lista provista)." }
+          },
+          required: ["category_id"]
+        }
+      }
+    })
+  }
+
+  if (activeSkills.has('escalar_humano')) {
+    tools.push({
+      type: "function" as const,
+      function: {
+        name: "escalar_humano",
+        description: "Deriva el caso a un agente humano y detiene el bot automático.",
+        parameters: {
+          type: "object",
+          properties: {
+            rule_id: { type: "string", description: "UUID de la regla de escalado (debe existir en la lista provista)." },
+            resumen_problema: { type: "string", description: "Breve explicación de por qué se escala el caso." }
+          },
+          required: ["rule_id", "resumen_problema"]
+        }
+      }
+    })
+  }
 
   let tokensInput = 0
   let tokensOutput = 0

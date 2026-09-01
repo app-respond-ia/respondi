@@ -133,7 +133,7 @@ export async function getOnboardingState() {
       supabaseAdmin.from('sucursales').select('nombre, direccion, timezone, moneda, onboarding_paso, onboarding_completado').eq('id', branchId).single(),
       supabaseAdmin.from('business_profiles').select('servicios, politicas, msg_fuera_horario, ia_activa_fuera_horario, abrir_caso_fuera_horario').eq('branch_id', branchId).limit(1).single(),
       supabaseAdmin.from('business_hours').select('dia_semana, apertura, cierre, cerrado, orden').eq('branch_id', branchId).order('orden', { ascending: true }),
-      supabaseAdmin.from('skills').select('nombre, activo').eq('branch_id', branchId),
+      supabaseAdmin.from('skills').select('skill_global_id, nombre, activo').eq('branch_id', branchId),
       supabaseAdmin.from('price_list').select('nombre, precio').eq('branch_id', branchId)
     ])
 
@@ -433,7 +433,7 @@ export async function saveStep2(data: {
 export async function saveStep3(data: {
   tenantId: string
   branchId: string
-  skills: { idName: string, nombre: string, activo: boolean }[]
+  skills: { idName?: string, skill_global_id: string, nombre: string, activo: boolean }[]
 }) {
   try {
     const supabase = await createClient()
@@ -450,12 +450,13 @@ export async function saveStep3(data: {
       throw delError
     }
 
-    const rows = data.skills.filter(s => s.activo).map((s, idx) => ({
+    const rows = data.skills.map((s, idx) => ({
       tenant_id: tenantId,
       branch_id: branchId,
+      skill_global_id: s.skill_global_id,
       nombre: s.nombre,
       descripcion: s.nombre,
-      activo: true,
+      activo: s.activo,
       orden: idx
     }))
 

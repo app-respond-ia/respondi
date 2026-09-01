@@ -13,6 +13,16 @@ export async function getSkillsGlobales() {
   return { success: true, data }
 }
 
+export async function getSkillsGlobalesBase() {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('skills_globales')
+    .select('id, slug, nombre, descripcion, activa_por_defecto, cliente_puede_toggle, orden')
+    .order('orden', { ascending: true })
+  if (error) return { success: false, error: error.message }
+  return { success: true, data }
+}
+
 export async function crearSkillGlobal(data: {
   nombre: string
   descripcion?: string
@@ -83,7 +93,7 @@ export async function eliminarSkillGlobal(id: string) {
   await supabase
     .from('skills')
     .delete()
-    .eq('nombre', skill.nombre)
+    .eq('skill_global_id', id)
 
   // Eliminar la skill global
   const { error } = await supabase.from('skills_globales').delete().eq('id', id)
@@ -106,14 +116,17 @@ export async function getSkillsParaCliente(branchId: string) {
   // Leer toggles del cliente (tabla skills existente)
   const { data: clienteSkills } = await supabase
     .from('skills')
-    .select('nombre, activo')
+    .select('skill_global_id, activo')
     .eq('branch_id', branchId)
 
   // Combinar: para cada skill global, ver si el cliente la tiene activada
   const resultado = (globales || []).map(g => {
-    const clienteSkill = (clienteSkills || []).find(s => s.nombre === g.nombre)
+    const clienteSkill = (clienteSkills || []).find(s => s.skill_global_id === g.id)
     return {
       ...g,
+      // For compatibility with the frontend that expects 'idName' which doesn't exist on skills_globales
+      idName: g.slug, 
+      fija: !g.cliente_puede_toggle,
       activo: clienteSkill ? clienteSkill.activo : g.activa_por_defecto
     }
   })
@@ -121,7 +134,7 @@ export async function getSkillsParaCliente(branchId: string) {
   return { success: true, data: resultado }
 }
 
-export async function toggleSkillCliente(branchId: string, tenantId: string, nombreSkill: string, activo: boolean) {
+export async function toggleSkillCliente(branchId: string, tenantId: string, skillGlobalId: string, activo: boolean) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: 'No autorizado' }
@@ -129,24 +142,20 @@ export async function toggleSkillCliente(branchId: string, tenantId: string, nom
   // Verificar que el cliente puede togglear esta skill
   const { data: skillGlobal } = await supabase
     .from('skills_globales')
-    .select('cliente_puede_toggle')
-    .eq('nombre', nombreSkill)
+    .select('id, cliente_puede_toggle')
+    .eq('id', skillGlobalId)
     .single()
 
   if (!skillGlobal?.cliente_puede_toggle) {
     return { success: false, error: 'Esta skill no se puede modificar' }
   }
 
-  // Upsert en tabla skills del cliente
+  // Actualizar tabla skills del cliente
   const { error } = await supabase
     .from('skills')
-    .upsert({
-      branch_id: branchId,
-      tenant_id: tenantId,
-      nombre: nombreSkill,
-      activo,
-      orden: 0
-    }, { onConflict: 'branch_id,nombre' })
+    .update({ activo })
+    .eq('branch_id', branchId)
+    .eq('skill_global_id', skillGlobalId)
 
   if (error) return { success: false, error: error.message }
   return { success: true }

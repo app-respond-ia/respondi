@@ -52,6 +52,10 @@ export async function savePerfilSucursal(data: {
   caso_fuera_horario: boolean,
   modo_horario_ia: string
 }) {
+  if (data.servicios && data.servicios.length > 500) {
+    return { success: false, error: 'La información del negocio no puede superar los 500 caracteres.' }
+  }
+
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }

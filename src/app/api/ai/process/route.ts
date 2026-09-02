@@ -79,7 +79,7 @@ export async function POST(req: Request) {
       contacts:contact_id (trato, modo, respuesta_auto, nota),
       sucursales:branch_id (
         modo_pausa, timezone, trato_contactos_respuesta_auto,
-        business_profiles (ia_activa_fuera_horario, msg_fuera_horario, msg_cuota_agotada, msg_pausa_automatica, abrir_caso_fuera_horario, modo_horario_ia),
+        business_profiles (ia_activa_fuera_horario, msg_fuera_horario, msg_cuota_agotada, msg_pausa_automatica, abrir_caso_fuera_horario, modo_horario_ia, tono, servicios),
         business_hours (dia_semana, apertura, cierre, cerrado, tipo)
       )
     `)

@@ -96,7 +96,18 @@ export async function generarRespuesta(conv: any) {
   // 4. Preparar Prompt del Sistema
   let systemPrompt = `Eres el asistente virtual del negocio.\n`
   if (profile) {
-    systemPrompt += `Descripción: ${profile.descripcion || ''}\nServicios: ${profile.servicios || ''}\n`
+    if (profile.tono) {
+      systemPrompt += `Tono: ${profile.tono}\n`
+    }
+    
+    if (profile.servicios) {
+      let infoLimpia = profile.servicios;
+      if (infoLimpia.length > 500) {
+        const cutPoint = infoLimpia.substring(0, 500).lastIndexOf(' ');
+        infoLimpia = infoLimpia.substring(0, cutPoint > 0 ? cutPoint : 500) + '...';
+      }
+      systemPrompt += `Información del negocio: ${infoLimpia}\n`
+    }
   }
 
   // --- CONTEXTO ESPECÍFICO DEL CLIENTE ---

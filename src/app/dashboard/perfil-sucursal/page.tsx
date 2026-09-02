@@ -350,16 +350,21 @@ export default function PerfilSucursalPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Servicios o Productos (Resumen para la IA)</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Información del negocio</label>
+              <p className="text-xs text-slate-500 mb-2">Describe qué ofreces o datos clave para que la IA entienda el negocio. La IA usará esto como contexto general, pero dará prioridad al catálogo, políticas y reglas.</p>
               <textarea 
                 name="servicios"
                 value={formData.servicios}
                 onChange={handleChange}
                 disabled={nivelPermiso !== 'escritura'}
                 rows={4}
+                maxLength={500}
                 className="w-full p-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition outline-none resize-y"
                 placeholder="Describe qué vendes o qué servicios ofreces para que la IA sepa de qué trata el negocio..."
               ></textarea>
+              <div className="text-xs text-right text-slate-500 mt-1">
+                {formData.servicios.length}/500
+              </div>
             </div>
 
             <div>

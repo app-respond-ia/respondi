@@ -17,6 +17,7 @@
     "@types/papaparse": "^5.5.2",
     "date-fns": "^4.4.0",
     "exceljs": "^4.4.0",
+    "lucide-react": "^1.39.0",
     "mammoth": "^1.12.2",
     "next": "16.2.7",
     "openai": "^6.49.0",

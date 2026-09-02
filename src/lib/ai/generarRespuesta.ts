@@ -74,12 +74,67 @@ export async function generarRespuesta(conv: any) {
 
   const activeSkills = new Set(branchSkills?.map((s: any) => s.skills_globales.slug) || [])
 
+  // 3.6. Contexto CRM (Historial y Novedades)
+  const { data: pastConvs } = await supabaseAdmin
+    .from('conversations')
+    .select('id, fecha_cierre, resumen')
+    .eq('contact_id', contactId)
+    .eq('estado', 'cerrada')
+    .neq('id', conversationId)
+    .not('resumen', 'is', null)
+    .order('fecha_cierre', { ascending: false })
+    .limit(5)
+
+  const { data: dailyUpdates } = await supabaseAdmin
+    .from('daily_updates')
+    .select('*, tipos_novedad:tipo_id(nombre)')
+    .eq('branch_id', branchId)
+    .eq('activo', true)
+    .lte('fecha_vigencia_inicio', new Date().toISOString())
+    .or(`fecha_vigencia_fin.is.null,fecha_vigencia_fin.gte.${new Date().toISOString()}`)
+
   // 4. Preparar Prompt del Sistema
   let systemPrompt = `Eres el asistente virtual del negocio.\n`
   if (profile) {
-    systemPrompt += `Descripción: ${profile.descripcion || ''}\nServicios: ${profile.servicios || ''}\nIdioma: ${profile.idioma_base || 'es'}\n`
+    systemPrompt += `Descripción: ${profile.descripcion || ''}\nServicios: ${profile.servicios || ''}\n`
   }
+
+  // --- CONTEXTO ESPECÍFICO DEL CLIENTE ---
+  let contextAdded = false;
+  
+  if (conv.contacts?.nota) {
+    if (!contextAdded) { systemPrompt += `\n--- CONTEXTO ESPECÍFICO DEL CLIENTE ---\n`; contextAdded = true; }
+    let notaLimpia = conv.contacts.nota;
+    if (notaLimpia.length > 300) {
+      const cutPoint = notaLimpia.substring(0, 300).lastIndexOf(' ');
+      notaLimpia = notaLimpia.substring(0, cutPoint > 0 ? cutPoint : 300) + '...';
+    }
+    systemPrompt += `Nota interna sobre este cliente:\n${notaLimpia}\n\n`;
+  }
+
+  if (pastConvs && pastConvs.length > 0) {
+    if (!contextAdded) { systemPrompt += `\n--- CONTEXTO ESPECÍFICO DEL CLIENTE ---\n`; contextAdded = true; }
+    systemPrompt += `Historial reciente de conversaciones CERRADAS con este mismo cliente (para tener contexto, NO respondas a esto, es solo informativo):\n`;
+    pastConvs.forEach(c => {
+      const fechaCierre = new Date(c.fecha_cierre).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+      systemPrompt += `- [${fechaCierre}]: ${c.resumen}\n`;
+    });
+    systemPrompt += `\n`;
+  }
+
+  // --- NOVEDADES DEL DÍA ---
+  if (dailyUpdates && dailyUpdates.length > 0) {
+    systemPrompt += `\n--- NOVEDADES Y AVISOS ACTIVOS HOY ---\n`;
+    systemPrompt += `Ten en cuenta esta información temporal al responder:\n`;
+    dailyUpdates.forEach((u: any) => {
+      const tipo = u.tipos_novedad?.nombre || 'Aviso';
+      systemPrompt += `- [${tipo}]: ${u.descripcion}\n`;
+    });
+    systemPrompt += `\n`;
+  }
+
   systemPrompt += `\nINSTRUCCIONES ESTRICTAS:\n`
+  systemPrompt += `- Responde SIEMPRE en el mismo idioma en el que el cliente te escribe, sea cual sea, sin excepción.\n`
   systemPrompt += `- No inventes información. Si no lo sabes, indícalo${activeSkills.has('escalar_humano') ? ' o usa escalar_humano' : ''}.\n`
   systemPrompt += `- Eres un asistente, responde de manera concisa y natural.\n`
   if (activeSkills.has('escalar_humano')) {
@@ -146,8 +201,7 @@ export async function generarRespuesta(conv: any) {
         
         const transcription = await openai.audio.transcriptions.create({
           file: file,
-          model: 'whisper-1',
-          language: profile?.idioma_base || 'es'
+          model: 'whisper-1'
         })
         
         const textoExtraido = transcription.text

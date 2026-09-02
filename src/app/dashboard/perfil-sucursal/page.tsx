@@ -593,6 +593,7 @@ export default function PerfilSucursalPage() {
               
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Idioma base</label>
+                <p className="text-xs text-slate-500 mb-2">Este dato es para uso interno del equipo (para saber en qué idioma se comunica la sucursal). La IA responderá automáticamente en el idioma en que escriba cada cliente.</p>
                 <select 
                   name="idioma_base"
                   value={formData.idioma_base}

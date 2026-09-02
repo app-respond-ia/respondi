@@ -76,7 +76,7 @@ export async function POST(req: Request) {
     .from('conversations')
     .select(`
       id, tenant_id, branch_id, contact_id, ia_pausada, ia_intentos_fallidos,
-      contacts:contact_id (trato, modo, respuesta_auto),
+      contacts:contact_id (trato, modo, respuesta_auto, nota),
       sucursales:branch_id (
         modo_pausa, timezone, trato_contactos_respuesta_auto,
         business_profiles (ia_activa_fuera_horario, msg_fuera_horario, msg_cuota_agotada, msg_pausa_automatica, abrir_caso_fuera_horario, modo_horario_ia),

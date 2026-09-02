@@ -95,12 +95,21 @@ export async function POST(req: Request) {
     await supabaseAdmin.from('conversations').update({ ia_procesando_desde: null }).eq('id', conversationId)
   }
 
+  const logRechazo = async (resultado: string) => {
+    await supabaseAdmin.from('ai_logs').insert({
+      tenant_id: conv.tenant_id,
+      branch_id: conv.branch_id,
+      resultado
+    })
+  }
+
   // ============================================================================
   // 3. JERARQUÍA DE REGLAS
   // ============================================================================
   try {
     if (conv.ia_pausada) {
       await liberarCandado()
+      await logRechazo('pausa')
       return NextResponse.json({ status: 'Ignorado (IA pausada por agente)' })
     }
 
@@ -119,11 +128,13 @@ export async function POST(req: Request) {
         })
       }
       await liberarCandado()
+      await logRechazo('blacklist')
       return NextResponse.json({ status: `Ignorado (Trato contacto: ${contact.trato}, Modo: ${contact.modo})` })
     }
 
     if (branch && branch.modo_pausa === 'apagada') {
       await liberarCandado()
+      await logRechazo('pausa_sucursal')
       return NextResponse.json({ status: 'Ignorado (Sucursal pausada/apagada)' })
     }
     
@@ -144,6 +155,7 @@ export async function POST(req: Request) {
             await crearCasoDesdeSistema(conversationId, conv.tenant_id, conv.branch_id, conv.contact_id, 'Contacto fuera de horario comercial.')
           }
           await liberarCandado()
+          await logRechazo('fuera_horario')
           return NextResponse.json({ status: 'Ignorado (Fuera de horario comercial)' })
         }
       }
@@ -169,6 +181,7 @@ export async function POST(req: Request) {
       })
       await crearCasoDesdeSistema(conversationId, conv.tenant_id, conv.branch_id, conv.contact_id, 'Cuota de mensajes agotada. Requiere atención manual.')
       await liberarCandado()
+      await logRechazo('sin_cuota')
       return NextResponse.json({ status: 'Ignorado (Cuota agotada)' })
     }
 

@@ -246,7 +246,7 @@ export default function NuevaSucursalPage() {
       servicios,
       politicas,
       idioma_base: idiomaBase,
-      tono: 'cercano',
+      tono,
       msg_fuera_horario: msgFueraHorario,
       caso_fuera_horario: casoFueraHorario,
       modo_horario_ia: iaActivaFueraHorario ? 'siempre_activa' : 'mismo_negocio',

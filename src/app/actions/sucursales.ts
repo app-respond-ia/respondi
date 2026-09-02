@@ -322,8 +322,8 @@ export async function getDatosSucursalParaCopiar(branchIdOrigen: string) {
       servicios: businessProfile?.servicios ?? null,
       politicas: businessProfile?.politicas ?? null,
       msg_fuera_horario: businessProfile?.msg_fuera_horario ?? null,
-      idioma_base: businessProfile?.idioma_base || 'es',
-      tono: businessProfile?.tono || 'cercano',
+      idioma_base: businessProfile?.idioma_base ?? null,
+      tono: businessProfile?.tono ?? null,
       caso_fuera_horario: businessProfile?.caso_fuera_horario ?? false,
       modo_horario_ia: businessProfile?.modo_horario_ia ?? 'mismo_negocio'
     }

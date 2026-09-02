@@ -150,12 +150,13 @@ export async function toggleSkillCliente(branchId: string, tenantId: string, ski
     return { success: false, error: 'Esta skill no se puede modificar' }
   }
 
-  // Actualizar tabla skills del cliente
+  // Actualizar o insertar en tabla skills del cliente
   const { error } = await supabase
     .from('skills')
-    .update({ activo })
-    .eq('branch_id', branchId)
-    .eq('skill_global_id', skillGlobalId)
+    .upsert(
+      { branch_id: branchId, skill_global_id: skillGlobalId, activo },
+      { onConflict: 'branch_id,skill_global_id' }
+    )
 
   if (error) return { success: false, error: error.message }
   return { success: true }

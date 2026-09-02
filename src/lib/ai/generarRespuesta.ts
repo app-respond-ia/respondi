@@ -215,6 +215,23 @@ export async function generarRespuesta(conv: any) {
     })
   }
 
+  if (activeSkills.has('consultar_politicas')) {
+    tools.push({
+      type: "function" as const,
+      function: {
+        name: "consultar_politicas",
+        description: "Consulta las políticas, normas o reglas del negocio. Úsala cuando el cliente pregunte por condiciones, devoluciones, garantías o políticas internas.",
+        parameters: {
+          type: "object",
+          properties: {
+            consulta: { type: "string", description: "Pregunta o duda del cliente formulada claramente para buscar su respuesta en las políticas." }
+          },
+          required: ["consulta"]
+        }
+      }
+    })
+  }
+
   if (activeSkills.has('etiquetar_conversacion')) {
     tools.push({
       type: "function" as const,
@@ -432,6 +449,38 @@ export async function generarRespuesta(conv: any) {
             if (p.descripcion) toolResult += `\n  Descripción: ${p.descripcion}`
             toolResult += '\n'
           }
+        }
+      }
+      else if (toolCall.function.name === 'consultar_politicas') {
+        try {
+          // Generar embedding de la consulta
+          const embeddingResponse = await openai.embeddings.create({
+            model: 'text-embedding-3-small',
+            input: args.consulta,
+          })
+          const queryEmbedding = embeddingResponse.data[0].embedding
+
+          // Llamar a RPC
+          const { data: fragmentos, error } = await supabaseAdmin.rpc('match_fragmentos_politicas', {
+            query_embedding: queryEmbedding,
+            match_branch_id: branchId,
+            match_limit: 5
+          })
+
+          if (error) {
+            console.error("Error consultando políticas:", error)
+            toolResult = "Error interno al consultar las políticas."
+          } else if (!fragmentos || fragmentos.length === 0) {
+            toolResult = "No se encontró información relevante en las políticas del negocio para esta consulta."
+          } else {
+            toolResult = "Fragmentos de políticas relevantes encontrados:\n"
+            for (const f of fragmentos) {
+              toolResult += `\n- ${f.contenido}`
+            }
+          }
+        } catch (err) {
+          console.error("Error procesando embedding para políticas:", err)
+          toolResult = "Error interno procesando la consulta."
         }
       }
 

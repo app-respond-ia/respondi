@@ -227,6 +227,7 @@ export async function crearEtiquetasPlantilla() {
     descripcion_intencion: p.descripcion_intencion,
     orden: p.orden,
     es_plantilla: true,
+    es_fallback: p.nombre === 'Otros',
     activa: true
   }))
 

@@ -55,7 +55,7 @@ export async function generarRespuesta(conv: any) {
   // 3. Obtener Categorías y Reglas de Caso de la sucursal
   const { data: categories } = await supabaseAdmin
     .from('message_categories')
-    .select('id, nombre, descripcion_intencion')
+    .select('id, nombre, descripcion_intencion, es_fallback')
     .eq('branch_id', branchId)
     .eq('activa', true)
 
@@ -73,6 +73,8 @@ export async function generarRespuesta(conv: any) {
     .eq('activo', true)
 
   const activeSkills = new Set(branchSkills?.map((s: any) => s.skills_globales.slug) || [])
+  const canEscalate = activeSkills.has('escalar_humano') && rules && rules.length > 0
+  const canTag = activeSkills.has('etiquetar_conversacion') && categories && categories.length > 0
 
   // 3.6. Contexto CRM (Historial y Novedades)
   const { data: pastConvs } = await supabaseAdmin
@@ -146,29 +148,34 @@ export async function generarRespuesta(conv: any) {
 
   systemPrompt += `\nINSTRUCCIONES ESTRICTAS:\n`
   systemPrompt += `- Responde SIEMPRE en el mismo idioma en el que el cliente te escribe, sea cual sea, sin excepción.\n`
-  systemPrompt += `- No inventes información. Si no lo sabes, indícalo${activeSkills.has('escalar_humano') ? ' o usa escalar_humano' : ''}.\n`
+  systemPrompt += `- No inventes información. Si no lo sabes, indícalo${canEscalate ? ' o usa escalar_humano' : ''}.\n`
   systemPrompt += `- Eres un asistente, responde de manera concisa y natural.\n`
-  if (activeSkills.has('escalar_humano')) {
+  if (canEscalate) {
     systemPrompt += `- Si el usuario envía un archivo no soportado (ej. PDF o Word), invoca escalar_humano.\n`
   }
   
-  if (activeSkills.has('etiquetar_conversacion') || activeSkills.has('escalar_humano')) {
+  if (canTag || canEscalate) {
     const actions = []
-    if (activeSkills.has('etiquetar_conversacion')) actions.push('etiquetado')
-    if (activeSkills.has('escalar_humano')) actions.push('escalado')
+    if (canTag) actions.push('etiquetado')
+    if (canEscalate) actions.push('escalado')
     systemPrompt += `- Usa las herramientas disponibles de ${actions.join(' o ')} cuando corresponda a la intención del cliente.\n`
   }
 
   systemPrompt += `- IMPORTANTE: Si un mensaje incluye una imagen, SIEMPRE DEBES llamar a la herramienta guardar_descripcion_imagen inmediatamente, para guardar un resumen textual de lo que se ve.\n\n`
   
-  if (activeSkills.has('etiquetar_conversacion')) {
+  if (canTag) {
     systemPrompt += `Etiquetas (Categorías) Disponibles:\n`
+    let fallbackName = null;
     categories?.forEach(c => {
+      if (c.es_fallback) fallbackName = c.nombre;
       systemPrompt += `- ID: ${c.id} | Nombre: ${c.nombre} | Info: ${c.descripcion_intencion || ''}\n`
     })
+    if (fallbackName) {
+      systemPrompt += `\nNota: La categoría '${fallbackName}' es la opción de respaldo y SOLO debe usarse cuando ninguna de las otras encaja claramente.\n`
+    }
   }
   
-  if (activeSkills.has('escalar_humano')) {
+  if (canEscalate) {
     systemPrompt += `\nReglas de Caso (Escalar a humano) Disponibles:\n`
     rules?.forEach(r => {
       systemPrompt += `- ID: ${r.id} | Nombre: ${r.nombre} | Tipo: ${r.tipo_caso} | Info: ${r.descripcion_intencion || ''}\n`
@@ -297,7 +304,7 @@ export async function generarRespuesta(conv: any) {
     })
   }
 
-  if (activeSkills.has('etiquetar_conversacion')) {
+  if (canTag) {
     tools.push({
       type: "function" as const,
       function: {
@@ -314,7 +321,7 @@ export async function generarRespuesta(conv: any) {
     })
   }
 
-  if (activeSkills.has('escalar_humano')) {
+  if (canEscalate) {
     tools.push({
       type: "function" as const,
       function: {
@@ -401,19 +408,63 @@ export async function generarRespuesta(conv: any) {
         toolResult = formatted
       }
       else if (toolCall.function.name === 'etiquetar_conversacion') {
-        const valid = categories?.some(c => c.id === args.category_id)
-        if (!valid) {
+        const targetCategory = categories?.find(c => c.id === args.category_id)
+        
+        if (!targetCategory) {
           toolResult = 'Error: category_id no válido para esta sucursal.'
         } else {
-          const { error } = await supabaseAdmin.from('conversation_tags').insert({
-            conversation_id: conversationId,
-            category_id: args.category_id,
-            aplicada_por: 'ia'
-          })
-          if (error) {
-            console.error('Error etiquetando conversación:', error)
+          // 1. Obtener estado actual de las etiquetas en esta conversación
+          const { data: currentTags } = await supabaseAdmin
+            .from('conversation_tags')
+            .select('category_id, message_categories!inner(es_fallback)')
+            .eq('conversation_id', conversationId)
+
+          const hasRealTags = currentTags?.some((t: any) => !t.message_categories.es_fallback)
+          const fallbackTag = currentTags?.find((t: any) => t.message_categories.es_fallback)
+
+          let abortInsert = false
+
+          // 2. Lógica bidireccional
+          if (targetCategory.es_fallback) {
+            if (hasRealTags) {
+              toolResult = 'Ignorado: La conversación ya tiene una etiqueta específica, no es necesario aplicar la opción de respaldo.'
+              abortInsert = true
+            }
+          } else {
+            if (fallbackTag) {
+              // 3. Borrado con chequeo explícito de error
+              const { error: deleteError } = await supabaseAdmin
+                .from('conversation_tags')
+                .delete()
+                .match({ conversation_id: conversationId, category_id: fallbackTag.category_id })
+              
+              if (deleteError) {
+                console.error('Error al borrar la etiqueta de fallback:', deleteError)
+                toolResult = 'Error del sistema: no se pudo limpiar la etiqueta anterior.'
+                abortInsert = true
+              }
+            }
           }
-          toolResult = error ? `Error en DB: ${error.message}` : 'Conversación etiquetada con éxito.'
+
+          // 4. Inserción final si no se abortó
+          if (!abortInsert) {
+            const { error: insertError } = await supabaseAdmin.from('conversation_tags').insert({
+              conversation_id: conversationId,
+              category_id: args.category_id,
+              aplicada_por: 'ia'
+            })
+            
+            if (insertError) {
+              if (insertError.code === '23505') {
+                toolResult = 'Ignorado: Esta etiqueta ya estaba aplicada a la conversación.'
+              } else {
+                console.error('Error etiquetando conversación:', insertError)
+                toolResult = 'Error del sistema: fallo al guardar la etiqueta.'
+              }
+            } else {
+              toolResult = 'Etiqueta aplicada correctamente.'
+            }
+          }
         }
       } 
       else if (toolCall.function.name === 'escalar_humano') {

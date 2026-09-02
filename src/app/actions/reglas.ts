@@ -227,6 +227,11 @@ export async function crearReglasPlantilla() {
       descripcion_intencion: "El tono del cliente es claramente molesto, agresivo, ofensivo, o muestra señales de mucha frustración.",
       tipo_caso: "atencion_urgente",
       prioridad_default: "alta"
+    },
+    {
+      nombre: "Documento no procesable",
+      descripcion_intencion: "El cliente envía un archivo PDF, Word, o documento similar que no podemos procesar automáticamente.",
+      tipo_caso: "documento_no_procesable"
     }
   ]
 

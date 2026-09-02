@@ -177,7 +177,7 @@ export default function NuevaSucursalPage() {
         if (d.politicas && Array.isArray(d.politicas) && d.politicas.length > 0) setPoliticas(d.politicas)
       }
       if (!modulo || modulo === 'configuracion_ia') {
-        if (d.ia_activa_fuera_horario !== undefined) setIaActivaFueraHorario(d.ia_activa_fuera_horario)
+        if (d.modo_horario_ia !== undefined) setIaActivaFueraHorario(d.modo_horario_ia === 'siempre_activa')
         if (d.caso_fuera_horario !== undefined) setCasoFueraHorario(d.caso_fuera_horario)
         if (d.msg_fuera_horario) setMsgFueraHorario(d.msg_fuera_horario)
         if (d.idioma_base) setIdiomaBase(d.idioma_base)
@@ -246,11 +246,10 @@ export default function NuevaSucursalPage() {
       servicios,
       politicas,
       idioma_base: idiomaBase,
-      tono,
+      tono: 'cercano',
       msg_fuera_horario: msgFueraHorario,
-      ia_activa_fuera_horario: iaActivaFueraHorario,
       caso_fuera_horario: casoFueraHorario,
-      modo_horario_ia: 'mismo_negocio',
+      modo_horario_ia: iaActivaFueraHorario ? 'siempre_activa' : 'mismo_negocio',
       horarios: horarios.flatMap(h => {
         if (h.cerrado) return [{ dia_semana: h.dia_semana, apertura: null, cierre: null, cerrado: true, orden: 0 }] as { dia_semana: number, apertura: string | null, cierre: string | null, cerrado: boolean, orden: number }[]
         return h.franjas.map((f, i) => ({

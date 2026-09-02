@@ -67,7 +67,6 @@ export default function PerfilSucursalPage() {
     idioma_base: 'es',
     tono: 'cercano',
     msg_fuera_horario: '',
-    ia_activa_fuera_horario: false,
     caso_fuera_horario: false,
     modo_horario_ia: 'mismo_negocio'
   })
@@ -161,7 +160,6 @@ export default function PerfilSucursalPage() {
           idioma_base: resPerfil.data.perfil?.idioma_base || 'es',
           tono: resPerfil.data.perfil?.tono || 'cercano',
           msg_fuera_horario: resPerfil.data.perfil?.msg_fuera_horario || '',
-          ia_activa_fuera_horario: resPerfil.data.perfil?.ia_activa_fuera_horario ?? false,
           caso_fuera_horario: resPerfil.data.perfil?.caso_fuera_horario ?? false,
           modo_horario_ia: resPerfil.data.perfil?.modo_horario_ia || 'mismo_negocio'
         })

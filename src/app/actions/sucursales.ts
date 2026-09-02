@@ -305,7 +305,7 @@ export async function getDatosSucursalParaCopiar(branchIdOrigen: string) {
   // Business profile (servicios, políticas, configuración IA)
   const { data: businessProfile } = await supabase
     .from('business_profiles')
-    .select('servicios, politicas, msg_fuera_horario, idioma_base, tono, ia_activa_fuera_horario, caso_fuera_horario, modo_horario_ia')
+    .select('servicios, politicas, msg_fuera_horario, idioma_base, tono, caso_fuera_horario, modo_horario_ia')
     .eq('branch_id', branchIdOrigen)
     .maybeSingle()
 
@@ -322,9 +322,8 @@ export async function getDatosSucursalParaCopiar(branchIdOrigen: string) {
       servicios: businessProfile?.servicios ?? null,
       politicas: businessProfile?.politicas ?? null,
       msg_fuera_horario: businessProfile?.msg_fuera_horario ?? null,
-      idioma_base: businessProfile?.idioma_base ?? null,
-      tono: businessProfile?.tono ?? null,
-      ia_activa_fuera_horario: businessProfile?.ia_activa_fuera_horario ?? false,
+      idioma_base: businessProfile?.idioma_base || 'es',
+      tono: businessProfile?.tono || 'cercano',
       caso_fuera_horario: businessProfile?.caso_fuera_horario ?? false,
       modo_horario_ia: businessProfile?.modo_horario_ia ?? 'mismo_negocio'
     }
@@ -340,7 +339,6 @@ export async function crearSucursalConDatos(data: {
   idioma_base?: string
   tono?: string
   msg_fuera_horario?: string
-  ia_activa_fuera_horario?: boolean
   caso_fuera_horario?: boolean
   modo_horario_ia?: string
   horarios?: { dia_semana: number, apertura: string | null, cierre: string | null, cerrado: boolean, orden: number }[]
@@ -391,7 +389,6 @@ export async function crearSucursalConDatos(data: {
       idioma_base: data.idioma_base || 'es',
       tono: data.tono || 'cercano',
       msg_fuera_horario: data.msg_fuera_horario || null,
-      ia_activa_fuera_horario: data.ia_activa_fuera_horario ?? false,
       caso_fuera_horario: data.caso_fuera_horario ?? false,
       modo_horario_ia: data.modo_horario_ia || 'mismo_negocio'
     })

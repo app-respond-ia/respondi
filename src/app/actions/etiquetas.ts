@@ -118,6 +118,8 @@ export async function actualizarEtiqueta(id: string, data: Partial<{ nombre: str
     .eq('id', id)
     .single()
 
+  if (anterior?.es_protegida) return { success: false, error: 'Esta etiqueta es del sistema y no se puede editar ni desactivar.' }
+
   const { data: updatedData, error } = await supabase
     .from('message_categories')
     .update(data)
@@ -151,6 +153,8 @@ export async function eliminarEtiqueta(id: string) {
     .select('*')
     .eq('id', id)
     .single()
+
+  if (anterior?.es_protegida) return { success: false, error: 'Esta etiqueta es del sistema y no se puede eliminar.' }
 
   const { error } = await supabase
     .from('message_categories')

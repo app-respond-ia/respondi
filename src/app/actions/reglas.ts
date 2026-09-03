@@ -101,6 +101,8 @@ export async function actualizarRegla(id: string, data: Partial<{ nombre: string
     .eq('id', id)
     .single()
 
+  if (anterior?.es_protegida) return { success: false, error: 'Esta regla es del sistema y no se puede editar ni desactivar.' }
+
   // Calculate new lowest order to place edited rule at the top
   const { data: currentRules } = await supabase
     .from('case_rules')
@@ -144,6 +146,8 @@ export async function eliminarRegla(id: string) {
     .select('*')
     .eq('id', id)
     .single()
+
+  if (anterior?.es_protegida) return { success: false, error: 'Esta regla es del sistema y no se puede eliminar.' }
 
   const { error } = await supabase
     .from('case_rules')

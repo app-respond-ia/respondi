@@ -469,6 +469,57 @@ export async function saveStep3(data: {
       }
     }
 
+    // --- Siembra Protegida ---
+    const { data: existingTags } = await supabaseAdmin.from('message_categories')
+      .select('id').eq('branch_id', branchId).eq('es_fallback', true)
+    
+    if (!existingTags || existingTags.length === 0) {
+      await supabaseAdmin.from('message_categories').insert({
+        tenant_id: tenantId,
+        branch_id: branchId,
+        nombre: "Otros",
+        descripcion_intencion: "El mensaje no encaja claramente en ninguna otra categoría.",
+        color: "slate-d",
+        es_plantilla: true,
+        es_fallback: true,
+        activa: true,
+        es_protegida: true,
+        orden: 0
+      })
+    }
+
+    const { data: existingRules } = await supabaseAdmin.from('case_rules')
+      .select('tipo_caso').eq('branch_id', branchId).in('tipo_caso', ['documento_no_procesable', 'derivacion_solicitada'])
+    
+    const existingRuleTypes = existingRules?.map(r => r.tipo_caso) || []
+    const rulesToInsert = []
+    
+    if (!existingRuleTypes.includes('documento_no_procesable')) {
+      rulesToInsert.push({
+        tenant_id: tenantId, branch_id: branchId,
+        nombre: "Documento no procesable",
+        descripcion_intencion: "El cliente envía un archivo PDF, Word, o documento similar que no podemos procesar automáticamente.",
+        tipo_caso: "documento_no_procesable",
+        es_plantilla: true, activa: true, es_protegida: true
+      })
+    }
+    
+    if (!existingRuleTypes.includes('derivacion_solicitada')) {
+      rulesToInsert.push({
+        tenant_id: tenantId, branch_id: branchId,
+        nombre: "Cliente quiere hablar con un humano",
+        descripcion_intencion: "El cliente solicita explícitamente ser atendido por un humano o que le pasen con un agente.",
+        tipo_caso: "derivacion_solicitada",
+        es_plantilla: true, activa: true, es_protegida: true
+      })
+    }
+    
+    if (rulesToInsert.length > 0) {
+      await supabaseAdmin.from('case_rules').insert(rulesToInsert)
+    }
+    // --- Fin Siembra Protegida ---
+
+
     const { error: updError } = await supabaseAdmin.from('sucursales').update({ onboarding_paso: 4 }).eq('id', branchId)
     if (updError) {
       console.error('Error actualizando sucursal en paso 3:', updError, JSON.stringify(updError))

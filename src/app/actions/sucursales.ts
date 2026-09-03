@@ -263,14 +263,14 @@ export async function getDatosSucursalParaCopiar(branchIdOrigen: string) {
   // Etiquetas
   const { data: etiquetas } = await supabase
     .from('message_categories')
-    .select('nombre, descripcion_intencion, color, activa, es_plantilla, orden')
+    .select('nombre, descripcion_intencion, color, activa, es_plantilla, orden, es_fallback, es_protegida')
     .eq('branch_id', branchIdOrigen)
     .eq('tenant_id', userData.tenant_id)
 
   // Reglas
   const { data: reglas } = await supabase
     .from('case_rules')
-    .select('nombre, descripcion_intencion, tipo_caso, activa, es_plantilla')
+    .select('nombre, descripcion_intencion, tipo_caso, activa, es_plantilla, es_protegida')
     .eq('branch_id', branchIdOrigen)
     .eq('tenant_id', userData.tenant_id)
 
@@ -344,8 +344,8 @@ export async function crearSucursalConDatos(data: {
   horarios?: { dia_semana: number, apertura: string | null, cierre: string | null, cerrado: boolean, orden: number }[]
   skills?: { idName?: string, skill_global_id: string, nombre: string, activo: boolean }[]
   precios?: { nombre: string, tipo: string, precio: number | null, precio_tipo: string, descripcion?: string }[]
-  etiquetas?: { nombre: string, descripcion_intencion?: string | null, color: string, activa: boolean, es_plantilla: boolean, orden: number }[]
-  reglas?: { nombre: string, descripcion_intencion?: string | null, tipo_caso: string, activa: boolean, es_plantilla: boolean }[]
+  etiquetas?: { nombre: string, descripcion_intencion?: string | null, color: string, activa: boolean, es_plantilla: boolean, orden: number, es_fallback?: boolean, es_protegida?: boolean }[]
+  reglas?: { nombre: string, descripcion_intencion?: string | null, tipo_caso: string, activa: boolean, es_plantilla: boolean, es_protegida?: boolean }[]
   tipos_novedad?: { nombre: string, icono: string, color: string }[]
 }) {
   const supabase = await createClient()
@@ -432,9 +432,27 @@ export async function crearSucursalConDatos(data: {
   }
 
   // Etiquetas
-  if (data.etiquetas && data.etiquetas!.length > 0) {
+  let finalEtiquetas = data.etiquetas ? [...data.etiquetas] : []
+  const hasFallback = finalEtiquetas.some(e => e.es_fallback)
+  
+  if (!hasFallback) {
+    finalEtiquetas.push({
+      nombre: "Otros",
+      descripcion_intencion: "El mensaje no encaja claramente en ninguna otra categoría.",
+      color: "slate-d",
+      es_plantilla: true,
+      es_fallback: true,
+      activa: true,
+      es_protegida: true
+    } as any)
+  } else {
+    const fb = finalEtiquetas.find(e => e.es_fallback)
+    if (fb) fb.es_protegida = true
+  }
+
+  if (finalEtiquetas.length > 0) {
     await supabase.from('message_categories').insert(
-      data.etiquetas!.map((e, idx) => ({
+      finalEtiquetas.map((e, idx) => ({
         ...e,
         branch_id: newBranch.id,
         tenant_id: userData!.tenant_id,
@@ -444,9 +462,42 @@ export async function crearSucursalConDatos(data: {
   }
 
   // Reglas
-  if (data.reglas && data.reglas!.length > 0) {
+  let finalReglas = data.reglas ? [...data.reglas] : []
+  
+  const hasDocRule = finalReglas.some(r => r.tipo_caso === 'documento_no_procesable')
+  const hasHumanoRule = finalReglas.some(r => r.tipo_caso === 'derivacion_solicitada')
+  
+  if (!hasDocRule) {
+    finalReglas.push({
+      nombre: "Documento no procesable",
+      descripcion_intencion: "El cliente envía un archivo PDF, Word, o documento similar que no podemos procesar automáticamente.",
+      tipo_caso: "documento_no_procesable",
+      es_plantilla: true,
+      activa: true,
+      es_protegida: true
+    } as any)
+  } else {
+    const r = finalReglas.find(r => r.tipo_caso === 'documento_no_procesable')
+    if (r) r.es_protegida = true
+  }
+
+  if (!hasHumanoRule) {
+    finalReglas.push({
+      nombre: "Cliente quiere hablar con un humano",
+      descripcion_intencion: "El cliente solicita explícitamente ser atendido por un humano o que le pasen con un agente.",
+      tipo_caso: "derivacion_solicitada",
+      es_plantilla: true,
+      activa: true,
+      es_protegida: true
+    } as any)
+  } else {
+    const r = finalReglas.find(r => r.tipo_caso === 'derivacion_solicitada')
+    if (r) r.es_protegida = true
+  }
+
+  if (finalReglas.length > 0) {
     await supabase.from('case_rules').insert(
-      data.reglas!.map(r => ({
+      finalReglas.map(r => ({
         ...r,
         branch_id: newBranch.id,
         tenant_id: userData!.tenant_id

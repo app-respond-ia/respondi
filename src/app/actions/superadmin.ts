@@ -387,7 +387,7 @@ export async function registrarPagoYRenovar(organizacionId: string, importe: num
       const { error: rpcError } = await supabaseAdmin.rpc('abonar_credito_ia', { 
         p_tenant_id: organizacionId, 
         p_cantidad: planActivo.creditos_mensuales, 
-        p_tipo: 'recarga_plan', 
+        p_origen: 'recarga_plan', 
         p_descripcion: 'Renovación mensual', 
         p_modo: planActivo.acumula_creditos ? 'sumar' : 'reset' 
       })
@@ -2443,7 +2443,7 @@ export async function recargarCreditosIA(organizacionId: string, cantidad: numbe
     const { error: rpcError } = await supabaseAdmin.rpc('abonar_credito_ia', {
       p_tenant_id: organizacionId,
       p_cantidad: cantidad,
-      p_tipo: 'recarga_manual',
+      p_origen: 'recarga_manual',
       p_descripcion: motivo,
       p_modo: 'sumar'
     })

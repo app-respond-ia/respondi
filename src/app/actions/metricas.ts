@@ -146,7 +146,7 @@ export async function getMetricas(periodo: 'hoy' | 'semana' | 'mes' | 'total' = 
     .from('message_quotas')
     .select('cantidad, timestamp')
     .eq('tenant_id', auth.tenant_id)
-    .eq('tipo', 'consumo')
+    .eq('origen', 'consumo_ia')
     .gte('timestamp', hace30dias.toISOString())
 
   const consumoReciente = Math.abs(
@@ -162,7 +162,7 @@ export async function getMetricas(periodo: 'hoy' | 'semana' | 'mes' | 'total' = 
     .from('message_quotas')
     .select('cantidad')
     .eq('tenant_id', auth.tenant_id)
-    .eq('tipo', 'consumo')
+    .eq('origen', 'consumo_ia')
 
   const creditosConsumidos = Math.abs(
     consumoTotalData?.reduce((acc, q) => acc + q.cantidad, 0) || 0

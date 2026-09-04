@@ -130,30 +130,43 @@ export async function getMetricas(periodo: 'hoy' | 'semana' | 'mes' | 'total' = 
   const contactosRecurrentes = Object.values(convsPerContact).filter(v => v > 1).length
 
   // ── CRÉDITOS ─────────────────────────────────────────────────
-  const { data: quotaData } = await supabase
+  // Saldo actual (fuente de verdad: última fila por timestamp)
+  const { data: quotaRow } = await supabase
     .from('message_quotas')
-    .select('cantidad, tipo, created_at')
-    .eq('branch_id', branchId)
+    .select('saldo')
+    .eq('tenant_id', auth.tenant_id)
+    .order('timestamp', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  const creditosDisponibles = quotaRow?.saldo ?? 0
 
-  const creditosDisponibles = quotaData
-    ?.filter(q => q.tipo === 'abono')
-    .reduce((acc, q) => acc + q.cantidad, 0) || 0
-
-  const creditosConsumidos = quotaData
-    ?.filter(q => q.tipo === 'consumo')
-    .reduce((acc, q) => acc + q.cantidad, 0) || 0
-
-  // Consumo diario promedio (últimos 30 días)
+  // Historial de consumo, para las métricas de proyección
   const hace30dias = new Date(now); hace30dias.setDate(hace30dias.getDate() - 30)
-  const consumoReciente = quotaData
-    ?.filter(q => q.tipo === 'consumo' && q.created_at >= hace30dias.toISOString())
-    .reduce((acc, q) => acc + q.cantidad, 0) || 0
+  const { data: consumoData } = await supabase
+    .from('message_quotas')
+    .select('cantidad, timestamp')
+    .eq('tenant_id', auth.tenant_id)
+    .eq('tipo', 'consumo')
+    .gte('timestamp', hace30dias.toISOString())
+
+  const consumoReciente = Math.abs(
+    consumoData?.reduce((acc, q) => acc + q.cantidad, 0) || 0
+  )
   const consumoDiarioPromedio = consumoReciente > 0 ? Math.round(consumoReciente / 30) : 0
 
-  // Proyección días restantes
   const diasRestantes = consumoDiarioPromedio > 0
     ? Math.round(creditosDisponibles / consumoDiarioPromedio)
     : null
+
+  const { data: consumoTotalData } = await supabase
+    .from('message_quotas')
+    .select('cantidad')
+    .eq('tenant_id', auth.tenant_id)
+    .eq('tipo', 'consumo')
+
+  const creditosConsumidos = Math.abs(
+    consumoTotalData?.reduce((acc, q) => acc + q.cantidad, 0) || 0
+  )
 
   // ── USUARIOS ─────────────────────────────────────────────────
   const { data: usuariosData } = await supabase

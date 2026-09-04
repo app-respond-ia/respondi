@@ -37,6 +37,10 @@ export async function getContactos() {
 }
 
 export async function actualizarTratoContacto(data: ActualizarTratoContactoData) {
+  if (data.nota && data.nota.length > 300) {
+    return { success: false, error: 'La nota no puede superar los 300 caracteres.' }
+  }
+
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }

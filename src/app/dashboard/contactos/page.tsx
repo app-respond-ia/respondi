@@ -502,9 +502,13 @@ export default function ContactosPage() {
                   <div>
                     <label className="block text-sm font-500 text-ink-700 mb-1.5">Nota / Razón</label>
                     <textarea rows={3} placeholder="Ej. Insultos repetidos, cliente que prefiere humano..." required
+                      maxLength={300}
                       value={modalFormData.nota}
                       onChange={e => setModalFormData({...modalFormData, nota: e.target.value})}
                       className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white resize-none placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm"></textarea>
+                    <div className="text-xs text-right text-slate-500 mt-1">
+                      {modalFormData.nota.length}/300
+                    </div>
                   </div>
                 </div>
         

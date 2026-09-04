@@ -22,7 +22,7 @@ export default function PlanesPage() {
   const defaultFormData = {
     nombre: '', precio_usd: 0, creditos_mensuales: 1000, canales_max: 1, sucursales_max: 1, 
     usuarios_max: 1, precio_credito_adicional: 0.005, precio_sucursal_extra: 15, 
-    dias_retencion_mensajes: 30, modelo_ia: 'gpt-4o-mini', activo: false
+    dias_retencion_mensajes: 30, modelo_ia: 'gpt-4o-mini', activo: false, acumula_creditos: false
   }
   
   const [formData, setFormData] = useState({ ...defaultFormData })
@@ -51,7 +51,8 @@ export default function PlanesPage() {
         precio_sucursal_extra: plan.precio_sucursal_extra || 0,
         dias_retencion_mensajes: plan.dias_retencion_mensajes || 30,
         modelo_ia: plan.modelo_ia || 'gpt-4o-mini',
-        activo: plan.activo ?? true
+        activo: plan.activo ?? true,
+        acumula_creditos: plan.acumula_creditos ?? false
       })
       setModalData(plan)
     } else {
@@ -241,6 +242,10 @@ export default function PlanesPage() {
                       <label className="flex items-center gap-2 mb-2 cursor-pointer">
                         <input type="checkbox" checked={formData.activo} onChange={e => setFormData({...formData, activo: e.target.checked})} className="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 border-slate-300" />
                         <span className="text-sm font-500 text-ink-700">Plan activo (visible)</span>
+                      </label>
+                      <label className="flex items-center gap-2 mb-2 cursor-pointer mt-2">
+                        <input type="checkbox" checked={formData.acumula_creditos} onChange={e => setFormData({...formData, acumula_creditos: e.target.checked})} className="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 border-slate-300" />
+                        <span className="text-sm font-500 text-ink-700">Acumular créditos no usados al renovar (por defecto, se resetean cada mes)</span>
                       </label>
                     </div>
                   </div>

@@ -3,7 +3,7 @@ import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { getOrganizaciones, actualizarEstadoOrganizacion, entrarComoOrganizacion, getPlanes, cambiarPlanOrganizacion, registrarPagoYRenovar } from '@/app/actions/superadmin'
+import { getOrganizaciones, actualizarEstadoOrganizacion, entrarComoOrganizacion, getPlanes, cambiarPlanOrganizacion, registrarPagoYRenovar, recargarCreditosIA } from '@/app/actions/superadmin'
 import { useToast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { useSuperadminPermisos } from '@/components/layout/SuperadminPermisosContext'
@@ -28,6 +28,10 @@ export default function OrganizacionesPage() {
   const [modalPago, setModalPago] = useState<any>(null)
   const [pagoForm, setPagoForm] = useState({ importe: '', moneda: 'USD', notas: '' })
   const [registrandoPago, setRegistrandoPago] = useState(false)
+
+  const [modalRecargaIA, setModalRecargaIA] = useState<any>(null)
+  const [recargaIAForm, setRecargaIAForm] = useState({ cantidad: '', motivo: '' })
+  const [recargandoIA, setRecargandoIA] = useState(false)
 
   const [confirmarEstado, setConfirmarEstado] = useState<{org: any, nuevoEstado: string} | null>(null)
   const [changingEstado, setChangingEstado] = useState(false)
@@ -174,6 +178,22 @@ export default function OrganizacionesPage() {
     setRegistrandoPago(false)
   }
 
+  const handleRecargarIA = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!recargaIAForm.cantidad || !recargaIAForm.motivo.trim()) return showToast('Cantidad y motivo son obligatorios', 'error')
+    
+    setRecargandoIA(true)
+    const res = await recargarCreditosIA(modalRecargaIA.id, Number(recargaIAForm.cantidad), recargaIAForm.motivo)
+    if (res.success) {
+      showToast('Créditos actualizados correctamente', 'success')
+      setModalRecargaIA(null)
+      loadOrganizaciones()
+    } else {
+      showToast(res.error || 'Error al recargar créditos', 'error')
+    }
+    setRecargandoIA(false)
+  }
+
   return (
     <>
       <div className="mb-5">
@@ -307,6 +327,13 @@ export default function OrganizacionesPage() {
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     Registrar pago y renovar
                   </button>
+                  <button onClick={() => {
+                    setModalRecargaIA(modalOrganizacion)
+                    setRecargaIAForm({ cantidad: '', motivo: '' })
+                  }} disabled={!canWrite} className="w-full flex items-center justify-center gap-2 h-11 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-600 transition mt-2 mb-2">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    Recarga manual de créditos IA
+                  </button>
                   <div className="grid grid-cols-2 gap-2">
                     <button disabled={!canWrite} onClick={() => {
                       setModalPlan(modalOrganizacion)
@@ -326,6 +353,56 @@ export default function OrganizacionesPage() {
       )}
 
       {/* MODAL CAMBIAR PLAN */}
+      {/* MODAL RECARGA IA */}
+      {modalRecargaIA && (
+        <div className="fixed inset-0 z-[60]">
+          <div className="absolute inset-0 bg-ink-900/50 backdrop-blur-sm" onClick={() => setModalRecargaIA(null)}></div>
+          <div className="relative min-h-full flex items-center justify-center p-4">
+            <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                <h2 className="font-display font-700 text-lg text-ink-900">Recarga manual de créditos IA</h2>
+                <button onClick={() => setModalRecargaIA(null)} className="p-1.5 rounded-lg text-ink-400 hover:text-ink-700 hover:bg-slate-100 transition" aria-label="Cerrar">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+              </div>
+              <form onSubmit={handleRecargarIA} className="px-6 py-5 space-y-4">
+                <p className="text-sm text-ink-500">
+                  Añade o resta créditos a la cuota mensual de la organización.
+                </p>
+                
+                <div>
+                  <label className="block text-sm font-500 text-ink-700 mb-1.5">Cantidad de créditos</label>
+                  <input 
+                    type="number" required
+                    value={recargaIAForm.cantidad} onChange={e => setRecargaIAForm({...recargaIAForm, cantidad: e.target.value})}
+                    className="w-full h-11 px-3 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
+                    placeholder="Ej. 500 o -200"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-500 text-ink-700 mb-1.5">Motivo (Obligatorio)</label>
+                  <textarea 
+                    required
+                    value={recargaIAForm.motivo} onChange={e => setRecargaIAForm({...recargaIAForm, motivo: e.target.value})}
+                    className="w-full h-20 px-3 py-2 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition resize-none"
+                    placeholder="Motivo de la recarga o corrección..."
+                  />
+                </div>
+
+                <button 
+                  type="submit"
+                  disabled={recargandoIA || !recargaIAForm.cantidad || !recargaIAForm.motivo.trim()}
+                  className="w-full h-11 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-600 transition flex items-center justify-center"
+                >
+                  {recargandoIA ? 'Aplicando...' : 'Aplicar créditos'}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
       {modalPlan && (
         <div className="fixed inset-0 z-[60]">
           <div className="absolute inset-0 bg-ink-900/50 backdrop-blur-sm" onClick={() => setModalPlan(null)}></div>

@@ -380,6 +380,21 @@ export async function registrarPagoYRenovar(organizacionId: string, importe: num
   const { error } = await supabase.from('organizaciones').update(updates).eq('id', organizacionId)
   if (error) return { success: false, error: error.message }
 
+  const finalPlanId = updates.plan_id || org.plan_id
+  if (finalPlanId) {
+    const { data: planActivo } = await supabase.from('plans').select('creditos_mensuales, acumula_creditos').eq('id', finalPlanId).single()
+    if (planActivo && planActivo.creditos_mensuales !== null) {
+      const { error: rpcError } = await supabaseAdmin.rpc('abonar_credito_ia', { 
+        p_tenant_id: organizacionId, 
+        p_cantidad: planActivo.creditos_mensuales, 
+        p_tipo: 'recarga_plan', 
+        p_descripcion: 'Renovación mensual', 
+        p_modo: planActivo.acumula_creditos ? 'sumar' : 'reset' 
+      })
+      if (rpcError) console.error('Error al abonar créditos en renovación:', rpcError)
+    }
+  }
+
   const { error: billingErr } = await supabase.from('billing').insert({
     tenant_id: organizacionId,
     plan_id: updates.plan_id || org.plan_id,
@@ -2418,5 +2433,42 @@ export async function getConsumoIA(from?: string, to?: string) {
 
   } catch (err: any) {
     return { success: false, error: err.message, data: null }
+  }
+}
+
+export async function recargarCreditosIA(organizacionId: string, cantidad: number, motivo: string) {
+  try {
+    const { userId } = await requireSuperAdmin()
+
+    const { error: rpcError } = await supabaseAdmin.rpc('abonar_credito_ia', {
+      p_tenant_id: organizacionId,
+      p_cantidad: cantidad,
+      p_tipo: 'recarga_manual',
+      p_descripcion: motivo,
+      p_modo: 'sumar'
+    })
+
+    if (rpcError) return { success: false, error: rpcError.message }
+
+    await supabaseAdmin.from('audit_log').insert({
+      tenant_id: organizacionId,
+      user_id: userId,
+      accion: 'recarga_manual_creditos_ia',
+      tabla_afectada: 'message_quotas',
+      registro_id: organizacionId,
+      valor_nuevo: { cantidad, motivo }
+    })
+
+    await notificarAAdminsDeOrganizacion(supabaseAdmin, organizacionId, {
+      tipo: 'recarga_creditos',
+      titulo: 'Créditos IA actualizados',
+      cuerpo: `Se han ${cantidad >= 0 ? 'añadido' : 'restado'} ${Math.abs(cantidad)} créditos IA a tu cuenta. Motivo: ${motivo}`,
+      url: '/dashboard'
+    })
+
+    revalidatePath('/superadmin/organizaciones')
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message }
   }
 }

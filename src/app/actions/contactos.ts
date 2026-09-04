@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { resolveBranchId } from '@/lib/active-branch'
 import { registrarAuditoria } from '@/lib/auditoria'
+import { after } from 'next/server'
 
 
 
@@ -84,6 +85,42 @@ export async function actualizarTratoContacto(data: ActualizarTratoContactoData)
       valor_anterior: existing,
       valor_nuevo: updated
     })
+
+    // Si devolvemos a trato normal, liberamos las conversaciones bloqueadas por derivacion_contacto
+    if (data.trato === 'normal') {
+      const { data: convsToUnlock } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('contact_id', updated.id)
+        .eq('estado', 'activa')
+        .eq('motivo_bloqueo', 'derivacion_contacto')
+      
+      if (convsToUnlock && convsToUnlock.length > 0) {
+        for (const c of convsToUnlock) {
+          const { error: unlockErr } = await supabase
+            .from('conversations')
+            .update({ 
+              motivo_bloqueo: null, 
+              bloqueada_desde: null, 
+              ia_procesando_desde: new Date().toISOString() 
+            })
+            .eq('id', c.id)
+
+          if (!unlockErr) {
+            after(() => {
+              fetch(`https://respondi.vercel.app/api/ai/process`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${process.env.CRON_INTERNAL_SECRET}`
+                },
+                body: JSON.stringify({ conversation_id: c.id })
+              }).catch(e => console.error('Error triggering webhook for unlocked conversation:', e))
+            })
+          }
+        }
+      }
+    }
 
     return { success: true, data: updated }
   } else {

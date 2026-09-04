@@ -258,22 +258,56 @@ export async function reabrirCaso(casoId: string) {
   if (auth.error) return { success: false, error: auth.error }
   const userData = { tenant_id: auth.tenant_id }
   const user = { id: auth.user_id }
-  const { data: caso } = await supabase.from('cases').select('agente_id, conversation_id').eq('id', casoId).single()
+  const { data: caso } = await supabase.from('cases').select(`
+    agente_id, 
+    conversation_id, 
+    contact_id, 
+    branch_id,
+    conversations ( canal )
+  `).eq('id', casoId).single()
   
   const nuevoEstatus = caso?.agente_id ? 'atendiendo' : 'pendiente'
 
+  // Buscar si el contacto ya tiene una conversación nueva y activa
+  let nuevaActiva = null
+  const canalViejo = Array.isArray(caso?.conversations) 
+    ? (caso?.conversations[0] as any)?.canal 
+    : (caso?.conversations as any)?.canal
+
+  if (caso?.contact_id && caso?.branch_id && canalViejo) {
+    const { data: activa } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('contact_id', caso.contact_id)
+      .eq('branch_id', caso.branch_id)
+      .eq('canal', canalViejo)
+      .eq('estado', 'activa')
+      .maybeSingle()
+    
+    if (activa) {
+      nuevaActiva = activa.id
+    }
+  }
+
+  const caseUpdatePayload: any = { estatus: nuevoEstatus, fecha_cierre: null }
+  if (nuevaActiva) {
+    caseUpdatePayload.conversation_id = nuevaActiva
+  }
+
   const { error } = await supabase
     .from('cases')
-    .update({ estatus: nuevoEstatus, fecha_cierre: null })
+    .update(caseUpdatePayload)
     .eq('id', casoId)
     .eq('tenant_id', userData?.tenant_id)
 
-  if (caso?.conversation_id) {
+  // Si reenganchamos a una nueva conversación activa, pausamos su IA para que el agente pueda trabajar
+  if (nuevaActiva) {
     await supabase
       .from('conversations')
       .update({ ia_pausada: true })
-      .eq('id', caso.conversation_id)
+      .eq('id', nuevaActiva)
   }
+  // IMPORTANTE: Si no había nuevaActiva, NO tocamos nada de la tabla conversations (la vieja se queda igual).
 
   if (!error) {
     const { registrarAuditoria } = await import('@/lib/auditoria')

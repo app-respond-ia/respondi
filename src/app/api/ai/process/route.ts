@@ -6,38 +6,7 @@ import { notificarAAdminsDeOrganizacion } from '@/lib/notificaciones'
 export const dynamic = 'force-dynamic'
 
 import { crearCasoDesdeSistema } from '@/lib/casos/crearCasoDesdeSistema'
-
-// Comprobador de huso horario basado en Intl (nativo)
-function isFueraDeHorario(timezone: string, horarios: any[]) {
-  // Si no hay horario configurado, asumimos abierto 24/7
-  if (!horarios || horarios.length === 0) return false 
-
-  try {
-    const dateStr = new Date().toLocaleString('en-US', { timeZone: timezone, hour12: false })
-    const dateInTz = new Date(dateStr) 
-    const dayOfWeek = dateInTz.getDay() // 0 = Domingo, 6 = Sábado
-    const currentMinutes = dateInTz.getHours() * 60 + dateInTz.getMinutes()
-
-    const franjasHoy = horarios.filter(h => h.dia_semana === dayOfWeek && !h.cerrado)
-    if (franjasHoy.length === 0) return true // Cerrado todo el día
-
-    for (const franja of franjasHoy) {
-      if (!franja.apertura || !franja.cierre) continue
-      const [apH, apM] = franja.apertura.split(':').map(Number)
-      const [ciH, ciM] = franja.cierre.split(':').map(Number)
-      const openMin = apH * 60 + apM
-      const closeMin = ciH * 60 + ciM
-      
-      if (currentMinutes >= openMin && currentMinutes <= closeMin) {
-        return false // Está abierto
-      }
-    }
-    return true // Fuera de todas las franjas
-  } catch (error) {
-    console.error('Error calculando timezone:', error)
-    return false
-  }
-}
+import { isFueraDeHorario } from '@/lib/horarios'
 
 export async function POST(req: Request) {
   // ============================================================================
@@ -95,6 +64,14 @@ export async function POST(req: Request) {
     await supabaseAdmin.from('conversations').update({ ia_procesando_desde: null }).eq('id', conversationId)
   }
 
+  const bloquearConversacion = async (motivo: string) => {
+    await supabaseAdmin.from('conversations').update({
+      motivo_bloqueo: motivo,
+      bloqueada_desde: new Date().toISOString(),
+      ia_procesando_desde: null
+    }).eq('id', conversationId)
+  }
+
   const logRechazo = async (resultado: string) => {
     await supabaseAdmin.from('ai_logs').insert({
       tenant_id: conv.tenant_id,
@@ -127,13 +104,13 @@ export async function POST(req: Request) {
           tenant_id: conv.tenant_id, conversation_id: conversationId, remitente: 'ia', contenido: msg
         })
       }
-      await liberarCandado()
+      await bloquearConversacion('derivacion_contacto')
       await logRechazo('blacklist')
       return NextResponse.json({ status: `Ignorado (Trato contacto: ${contact.trato}, Modo: ${contact.modo})` })
     }
 
     if (branch && branch.modo_pausa === 'apagada') {
-      await liberarCandado()
+      await bloquearConversacion('sucursal_apagada')
       await logRechazo('pausa_sucursal')
       return NextResponse.json({ status: 'Ignorado (Sucursal pausada/apagada)' })
     }
@@ -154,7 +131,7 @@ export async function POST(req: Request) {
           if (profile.abrir_caso_fuera_horario) {
             await crearCasoDesdeSistema(conversationId, conv.tenant_id, conv.branch_id, conv.contact_id, 'Contacto fuera de horario comercial.')
           }
-          await liberarCandado()
+          await bloquearConversacion('fuera_horario')
           await logRechazo('fuera_horario')
           return NextResponse.json({ status: 'Ignorado (Fuera de horario comercial)' })
         }
@@ -180,7 +157,7 @@ export async function POST(req: Request) {
         tenant_id: conv.tenant_id, conversation_id: conversationId, remitente: 'ia', contenido: msg
       })
       await crearCasoDesdeSistema(conversationId, conv.tenant_id, conv.branch_id, conv.contact_id, 'Cuota de mensajes agotada. Requiere atención manual.')
-      await liberarCandado()
+      await bloquearConversacion('sin_cuota')
       await logRechazo('sin_cuota')
       return NextResponse.json({ status: 'Ignorado (Cuota agotada)' })
     }

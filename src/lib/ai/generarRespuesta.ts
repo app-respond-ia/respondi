@@ -355,8 +355,15 @@ export async function generarRespuesta(conv: any) {
     tokensInput += response.usage?.prompt_tokens || 0
     tokensOutput += response.usage?.completion_tokens || 0
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error OpenAI Paso 1:', error)
+    await supabaseAdmin.from('ai_logs').insert({
+      tenant_id: tenantId,
+      branch_id: branchId,
+      modelo_ia: 'gpt-5.6-luna',
+      resultado: 'fallo',
+      contexto_snapshot: { step: 1, error: error?.message || 'OpenAI API Error' }
+    })
     return { success: false, error: 'OpenAI API Error' }
   }
 
@@ -616,8 +623,15 @@ export async function generarRespuesta(conv: any) {
       responseMsg = secondResponse.choices[0].message
       tokensInput += secondResponse.usage?.prompt_tokens || 0
       tokensOutput += secondResponse.usage?.completion_tokens || 0
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error OpenAI Paso 2:', error)
+      await supabaseAdmin.from('ai_logs').insert({
+        tenant_id: tenantId,
+        branch_id: branchId,
+        modelo_ia: 'gpt-5.6-luna',
+        resultado: 'fallo',
+        contexto_snapshot: { step: 2, error: error?.message || 'OpenAI API Error Step 2' }
+      })
       return { success: false, error: 'OpenAI API Error Step 2' }
     }
   }

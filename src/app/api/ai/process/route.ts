@@ -4,6 +4,8 @@ import { supabaseAdmin } from '@/utils/supabase/admin'
 import { notificarAAdminsDeOrganizacion } from '@/lib/notificaciones'
 
 export const dynamic = 'force-dynamic'
+export const fetchCache = 'force-no-store'
+export const revalidate = 0
 
 import { crearCasoDesdeSistema } from '@/lib/casos/crearCasoDesdeSistema'
 import { isFueraDeHorario } from '@/lib/horarios'

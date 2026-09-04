@@ -18,6 +18,7 @@ export type NotificacionTipo =
   | 'cambio_plan_aplicado'
   | 'pago_confirmado'
   | 'caso_asignado'
+  | 'recarga_creditos'
   | 'conversacion_escalada'
   | 'creditos_cliente_bajos'
   | 'caso_estancado'

@@ -181,7 +181,7 @@ export async function determinarRedireccionPostAuth(user: User, type: string | n
     const { manejado } = await resolverAltaUsuario(user.id, user.email!, nombre)
 
     if (!manejado) {
-      const { error: rpcError } = await supabaseAdmin.rpc('create_trial_account', {
+      const { error: rpcError } = await supabaseAdmin.rpc('crear_cuenta_completa', {
         p_user_id: user.id,
         p_email: user.email!,
         p_nombre: nombre,
@@ -189,7 +189,7 @@ export async function determinarRedireccionPostAuth(user: User, type: string | n
       })
 
       if (rpcError) {
-        console.error('Error en create_trial_account:', rpcError, JSON.stringify(rpcError))
+        console.error('Error en crear_cuenta_completa (OAuth):', rpcError, JSON.stringify(rpcError))
         return `${origin}/login?error=account_setup_failed`
       }
     }

@@ -49,7 +49,7 @@ export async function registroTrial(data: {
   const { manejado } = await resolverAltaUsuario(userId, data.email, data.nombre)
 
   if (!manejado) {
-    const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('create_trial_account', {
+    const { error: rpcError } = await supabaseAdmin.rpc('crear_cuenta_completa', {
       p_user_id: userId,
       p_email: data.email,
       p_nombre: data.nombre,

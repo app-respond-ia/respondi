@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { canManageRole } from './roles'
 import { registrarAuditoria } from '@/lib/auditoria'
 import { getAuthContext } from '@/lib/auth-context'
+import { registrarError } from '@/lib/errores'
 
 
 export async function getSucursales() {
@@ -385,7 +386,7 @@ export async function crearSucursalConDatos(data: {
 
   // Business profile
   if (data.servicios || data.politicas || data.msg_fuera_horario) {
-    await supabase.from('business_profiles').insert({
+    const { error } = await supabase.from('business_profiles').insert({
       branch_id: newBranch.id,
       servicios: data.servicios || null,
       politicas: data.politicas || null,
@@ -395,18 +396,24 @@ export async function crearSucursalConDatos(data: {
       caso_fuera_horario: data.caso_fuera_horario ?? false,
       modo_horario_ia: data.modo_horario_ia || 'mismo_negocio'
     })
+    if (error) {
+      await registrarError({ origen: 'app', descripcion: 'Fallo al crear business_profiles durante alta de sucursal', stacktrace: error.message, tenant_id: userData!.tenant_id })
+    }
   }
 
   // Horarios
   if (data.horarios && data.horarios!.length > 0) {
-    await supabase.from('business_hours').insert(
+    const { error } = await supabase.from('business_hours').insert(
       data.horarios!.map(h => ({ ...h, branch_id: newBranch.id }))
     )
+    if (error) {
+      await registrarError({ origen: 'app', descripcion: 'Fallo al crear business_hours durante alta de sucursal', stacktrace: error.message, tenant_id: userData!.tenant_id })
+    }
   }
 
   // Skills
   if (data.skills && data.skills!.length > 0) {
-    await supabase.from('skills').insert(
+    const { error } = await supabase.from('skills').insert(
       data.skills!.map((s, idx) => ({
         branch_id: newBranch.id,
         tenant_id: userData!.tenant_id,
@@ -416,11 +423,14 @@ export async function crearSucursalConDatos(data: {
         orden: idx
       }))
     )
+    if (error) {
+      await registrarError({ origen: 'app', descripcion: 'Fallo al crear skills durante alta de sucursal', stacktrace: error.message, tenant_id: userData!.tenant_id })
+    }
   }
 
   // Precios
   if (data.precios && data.precios!.length > 0) {
-    await supabase.from('price_list').insert(
+    const { error } = await supabase.from('price_list').insert(
       data.precios!.map(p => ({
         branch_id: newBranch.id,
         tenant_id: userData!.tenant_id,
@@ -432,6 +442,9 @@ export async function crearSucursalConDatos(data: {
         activo: true
       }))
     )
+    if (error) {
+      await registrarError({ origen: 'app', descripcion: 'Fallo al crear price_list durante alta de sucursal', stacktrace: error.message, tenant_id: userData!.tenant_id })
+    }
   }
 
   // Etiquetas
@@ -454,7 +467,7 @@ export async function crearSucursalConDatos(data: {
   }
 
   if (finalEtiquetas.length > 0) {
-    await supabase.from('message_categories').insert(
+    const { error } = await supabase.from('message_categories').insert(
       finalEtiquetas.map((e, idx) => ({
         ...e,
         branch_id: newBranch.id,
@@ -462,6 +475,9 @@ export async function crearSucursalConDatos(data: {
         orden: idx
       }))
     )
+    if (error) {
+      await registrarError({ origen: 'app', descripcion: 'Fallo al crear message_categories durante alta de sucursal', stacktrace: error.message, tenant_id: userData!.tenant_id })
+    }
   }
 
   // Reglas
@@ -499,24 +515,30 @@ export async function crearSucursalConDatos(data: {
   }
 
   if (finalReglas.length > 0) {
-    await supabase.from('case_rules').insert(
+    const { error } = await supabase.from('case_rules').insert(
       finalReglas.map(r => ({
         ...r,
         branch_id: newBranch.id,
         tenant_id: userData!.tenant_id
       }))
     )
+    if (error) {
+      await registrarError({ origen: 'app', descripcion: 'Fallo al crear case_rules durante alta de sucursal', stacktrace: error.message, tenant_id: userData!.tenant_id })
+    }
   }
 
   // Tipos de novedad
   if (data.tipos_novedad && data.tipos_novedad!.length > 0) {
-    await supabase.from('tipos_novedad').insert(
+    const { error } = await supabase.from('tipos_novedad').insert(
       data.tipos_novedad!.map(t => ({
         ...t,
         branch_id: newBranch.id,
         tenant_id: userData!.tenant_id
       }))
     )
+    if (error) {
+      await registrarError({ origen: 'app', descripcion: 'Fallo al crear tipos_novedad durante alta de sucursal', stacktrace: error.message, tenant_id: userData!.tenant_id })
+    }
   }
 
   await registrarAuditoria({

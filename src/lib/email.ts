@@ -24,8 +24,9 @@ export async function enviarEmailInvitacion(params: {
     html: `
       <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
         <h1 style="color: #1e1b4b; font-size: 24px;">Has sido invitado</h1>
-        <p style="color: #475569; font-size: 15px;">Se ha creado una cuenta para ti como <strong>${rolLabel}</strong> en Respondi.</p>
-        <a href="${params.actionLink}" style="display: inline-block; background: #7c3aed; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 16px;">Activar mi cuenta</a>
+        <p style="color: #475569; font-size: 15px;">Has sido invitado a formar parte de Respondi como <strong>${rolLabel}</strong>.</p>
+        <p style="color: #475569; font-size: 15px;">Para activar tu acceso, crea tu cuenta usando <strong>este mismo correo (${params.email})</strong>. En cuanto lo hagas, quedará vinculada automáticamente a tu rol.</p>
+        <a href="${params.actionLink}" style="display: inline-block; background: #7c3aed; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 16px;">Crear mi cuenta</a>
       </div>
     `
   })

@@ -7,8 +7,6 @@ import { revalidatePath } from 'next/cache'
 import { registrarAuditoria } from '@/lib/auditoria'
 import { crearNotificacion, notificarATodosLosSuperadmins, notificarAAdminsDeOrganizacion } from '@/lib/notificaciones'
 import { setImpersonatedTenantId, clearImpersonatedTenantId } from '@/lib/impersonate'
-import { enviarEmailInvitacion } from '@/lib/email'
-import { registrarError } from '@/lib/errores'
 
 // Helper de auth para asegurar que la action solo la ejecuta un super admin
 export async function requireSuperAdmin() {
@@ -517,9 +515,6 @@ export async function crearVendedor(data: {
   dni_nif?: string
   direccion?: any
 }) {
-  const resendKey = process.env.RESEND_API_KEY
-  console.log(`[DEBUG VERCEL ENV] RESEND_API_KEY definida: ${!!resendKey}, longitud: ${resendKey ? resendKey.length : 0}`)
-
   const { supabase, userId } = await requireSuperAdmin()
 
   // Verificar si el email ya existe en la tabla users
@@ -531,9 +526,9 @@ export async function crearVendedor(data: {
 
   if (userExistente) {
     if (userExistente.rol === 'vendedor') {
-      return { success: false, error: 'Este email ya tiene una cuenta de vendedor en Respondi.' }
+      return { success: false, error: 'Ya existe un vendedor con este email.' }
     }
-    return { success: false, error: 'Este email ya está registrado en Respondi con otro rol. Usa un email diferente.' }
+    return { success: false, error: 'Este email ya está registrado con otro rol en el sistema.' }
   }
 
   // Verificar si ya existe en vendedores
@@ -547,13 +542,9 @@ export async function crearVendedor(data: {
     return { success: false, error: 'Ya existe un vendedor con este email.' }
   }
 
-  // Generar link de invitación manual para enviarlo por Resend
-  const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.generateLink({
-    type: 'invite',
-    email: data.email,
-    options: {
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/auth/callback`
-    }
+  // Invitar al vendedor por email
+  const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(data.email, {
+    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/auth/callback`
   })
 
   if (inviteError || !inviteData?.user) {
@@ -561,27 +552,7 @@ export async function crearVendedor(data: {
     if (errMsg.includes('already been registered') || errMsg.includes('already exists')) {
       return { success: false, error: 'Este email ya tiene una cuenta en Respondi. Usa un email diferente.' }
     }
-    return { success: false, error: errMsg || 'Error al generar la invitación del vendedor.' }
-  }
-
-  console.log('--- DEBUG RESEND START ---')
-  console.log(`Intentando enviar email a: ${data.email} con action_link: ${inviteData.properties.action_link}`)
-
-  const { error: emailError } = await enviarEmailInvitacion({
-    email: data.email,
-    actionLink: inviteData.properties.action_link,
-    rol: 'vendedor'
-  })
-
-  console.log(`Resultado de Resend -> emailError:`, emailError ? JSON.stringify(emailError) : 'null (ÉXITO)')
-  console.log('--- DEBUG RESEND END ---')
-
-  if (emailError) {
-    await registrarError({
-      origen: 'app',
-      descripcion: 'Vendedor creado pero fallo al enviar email de invitación vía Resend',
-      stacktrace: JSON.stringify(emailError)
-    })
+    return { success: false, error: errMsg || 'Error al enviar la invitación al vendedor.' }
   }
 
   // Crear registro en users con rol vendedor

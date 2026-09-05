@@ -1,9 +1,11 @@
 'use client'
 import Loading from '@/components/Loading'
 import { useState, useEffect, Suspense } from 'react'
-import { getMovimientosCreditos, getResumenCreditos, getOrganizacionesBasico } from '@/app/actions/superadmin'
+import { getMovimientosCreditos, getResumenCreditos, getOrganizacionesBasico, getSucursalesPorOrganizaciones } from '@/app/actions/superadmin'
 import { useSuperadminPermisos } from '@/components/layout/SuperadminPermisosContext'
 import { useSearchParams } from 'next/navigation'
+import { MultiSelectBuscador } from '@/components/ui/MultiSelectBuscador'
+import { PAISES } from '@/lib/paises'
 
 function CreditosContent() {
   const searchParams = useSearchParams()
@@ -11,12 +13,14 @@ function CreditosContent() {
 
   const [movimientos, setMovimientos] = useState<any[]>([])
   const [organizaciones, setOrganizaciones] = useState<any[]>([])
+  const [sucursalesDisponibles, setSucursalesDisponibles] = useState<any[]>([])
   const [resumen, setResumen] = useState({ totalConsumido: 0, totalRecargaPlan: 0, totalRecargaManual: 0, saldoTotalPlataforma: 0 })
   const [loading, setLoading] = useState(true)
 
-  // Filtros
-  const [filtroTenant, setFiltroTenant] = useState(urlTenantId)
-  const [filtroSucursalId, setFiltroSucursalId] = useState('')
+  // Filtros Multiples
+  const [filtroTenants, setFiltroTenants] = useState<string[]>(urlTenantId ? [urlTenantId] : [])
+  const [filtroSucursales, setFiltroSucursales] = useState<string[]>([])
+  const [filtroPais, setFiltroPais] = useState('')
   const [filtroTipo, setFiltroTipo] = useState('')
   const [filtroOrigen, setFiltroOrigen] = useState('')
   const [filtroDesde, setFiltroDesde] = useState('')
@@ -26,14 +30,33 @@ function CreditosContent() {
   const canRead = hasPermission('organizaciones', 'lectura')
 
   useEffect(() => {
-    if (canRead) cargarFiltros()
+    if (canRead) cargarFiltrosBasicos()
   }, [canRead])
+
+  // Cargar sucursales cuando cambian los tenants seleccionados
+  useEffect(() => {
+    if (canRead) {
+      if (filtroTenants.length > 0) {
+        getSucursalesPorOrganizaciones(filtroTenants).then(res => {
+          if (res.success && res.sucursales) {
+            setSucursalesDisponibles(res.sucursales)
+            // Limpiar sucursales seleccionadas que ya no pertenecen a los tenants elegidos
+            const idsDisponibles = res.sucursales.map((s: any) => s.id)
+            setFiltroSucursales(prev => prev.filter(id => idsDisponibles.includes(id)))
+          }
+        })
+      } else {
+        setSucursalesDisponibles([])
+        setFiltroSucursales([])
+      }
+    }
+  }, [filtroTenants, canRead])
 
   useEffect(() => {
     if (canRead) cargarDatos()
-  }, [filtroTenant, filtroSucursalId, filtroTipo, filtroOrigen, filtroDesde, filtroHasta, canRead])
+  }, [filtroTenants, filtroSucursales, filtroPais, filtroTipo, filtroOrigen, filtroDesde, filtroHasta, canRead])
 
-  const cargarFiltros = async () => {
+  const cargarFiltrosBasicos = async () => {
     const resO = await getOrganizacionesBasico()
     if (resO.success && resO.organizaciones) setOrganizaciones(resO.organizaciones)
     const resR = await getResumenCreditos()
@@ -43,8 +66,9 @@ function CreditosContent() {
   const cargarDatos = async () => {
     setLoading(true)
     const res = await getMovimientosCreditos({
-      tenant_id: filtroTenant || undefined,
-      branch_id: filtroSucursalId || undefined,
+      tenant_ids: filtroTenants.length > 0 ? filtroTenants : undefined,
+      branch_ids: filtroSucursales.length > 0 ? filtroSucursales : undefined,
+      pais: filtroPais || undefined,
       tipo: (filtroTipo as 'abono' | 'debito') || undefined,
       origen: (filtroOrigen as 'consumo_ia' | 'recarga_manual' | 'recarga_plan') || undefined,
       fecha_desde: filtroDesde ? new Date(filtroDesde).toISOString() : undefined,
@@ -88,6 +112,9 @@ function CreditosContent() {
     return 'bg-slate-100 text-slate-600'
   }
 
+  const optsOrganizaciones = organizaciones.map(o => ({ id: o.id, label: o.nombre }))
+  const optsSucursales = sucursalesDisponibles.map(s => ({ id: s.id, label: s.nombre }))
+
   return (
     <>
       <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
@@ -118,15 +145,27 @@ function CreditosContent() {
       </div>
 
       {/* Filtros */}
-      <div className="flex flex-wrap gap-3 mb-5">
-        <select value={filtroTenant} onChange={e => setFiltroTenant(e.target.value)}
-          className="h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition w-full sm:w-auto">
-          <option value="">Todas las organizaciones</option>
-          {organizaciones.map(o => <option key={o.id} value={o.id}>{o.nombre}</option>)}
-        </select>
+      <div className="flex flex-wrap gap-3 mb-5 items-center">
+        <MultiSelectBuscador 
+          opciones={optsOrganizaciones} 
+          seleccionados={filtroTenants} 
+          onChange={setFiltroTenants} 
+          placeholder="Todas las organizaciones" 
+        />
         
-        <input type="text" placeholder="ID Sucursal (opcional)" value={filtroSucursalId} onChange={e => setFiltroSucursalId(e.target.value)}
-          className="h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition w-full sm:w-auto" />
+        <MultiSelectBuscador 
+          opciones={optsSucursales} 
+          seleccionados={filtroSucursales} 
+          onChange={setFiltroSucursales} 
+          placeholder={filtroTenants.length === 0 ? "Elige una organización primero" : "Todas las sucursales"} 
+          disabled={filtroTenants.length === 0}
+        />
+
+        <select value={filtroPais} onChange={e => setFiltroPais(e.target.value)}
+          className="h-10 px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition sm:w-auto">
+          <option value="">Todos los países</option>
+          {PAISES.map(p => <option key={p.codigo} value={p.codigo}>{p.bandera} {p.nombre}</option>)}
+        </select>
         
         <select value={filtroTipo} onChange={e => setFiltroTipo(e.target.value)}
           className="h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition">
@@ -143,7 +182,7 @@ function CreditosContent() {
           <option value="recarga_manual">Recarga Manual</option>
         </select>
         
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="flex items-center gap-2 w-full lg:w-auto">
           <input type="date" value={filtroDesde} onChange={e => setFiltroDesde(e.target.value)}
             className="h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm text-ink-600 focus:outline-none focus:border-brand-500 transition w-full" />
           <span className="text-ink-400">a</span>
@@ -160,42 +199,50 @@ function CreditosContent() {
           <div className="p-8 text-center text-ink-500">No hay movimientos con estos filtros.</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[900px]">
+            <table className="w-full text-sm min-w-[1000px]">
               <thead>
                 <tr className="border-b border-slate-200 text-left text-ink-500">
                   <th className="font-600 px-5 py-3">Fecha</th>
                   <th className="font-600 px-5 py-3">Organización</th>
                   <th className="font-600 px-5 py-3">Sucursal</th>
+                  <th className="font-600 px-5 py-3">País</th>
                   <th className="font-600 px-5 py-3">Tipo</th>
                   <th className="font-600 px-5 py-3">Origen</th>
-                  <th className="font-600 px-5 py-3">Cantidad</th>
-                  <th className="font-600 px-5 py-3">Saldo</th>
+                  <th className="font-600 px-5 py-3 text-right">Cantidad</th>
+                  <th className="font-600 px-5 py-3 text-right">Saldo</th>
                   <th className="font-600 px-5 py-3">Descripción</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {movimientos.map(m => (
-                  <tr key={m.id} className="hover:bg-slate-50 transition">
-                    <td className="px-5 py-3.5 text-ink-500 whitespace-nowrap">{formatFecha(m.timestamp)}</td>
-                    <td className="px-5 py-3.5 font-500 text-ink-900">{m.organizaciones?.nombre || '—'}</td>
-                    <td className="px-5 py-3.5 text-ink-600">{m.sucursales?.nombre || '—'}</td>
-                    <td className="px-5 py-3.5">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-600 capitalize ${getTipoBadge(m.tipo)}`}>
-                        {m.tipo}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-600 ${getOrigenBadge(m.origen)}`}>
-                        {formatOrigen(m.origen)}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3.5 font-600 text-ink-900">
-                      {m.tipo === 'abono' ? '+' : '-'}{Math.abs(Number(m.cantidad))}
-                    </td>
-                    <td className="px-5 py-3.5 font-600 text-ink-900">{m.saldo}</td>
-                    <td className="px-5 py-3.5 text-ink-500 truncate max-w-[200px]" title={m.descripcion}>{m.descripcion || '—'}</td>
-                  </tr>
-                ))}
+                {movimientos.map(m => {
+                  const paisObj = m.sucursales?.pais ? PAISES.find(p => p.codigo === m.sucursales.pais) : null
+                  
+                  return (
+                    <tr key={m.id} className="hover:bg-slate-50 transition">
+                      <td className="px-5 py-3.5 text-ink-500 whitespace-nowrap">{formatFecha(m.timestamp)}</td>
+                      <td className="px-5 py-3.5 font-500 text-ink-900">{m.organizaciones?.nombre || '—'}</td>
+                      <td className="px-5 py-3.5 text-ink-600">{m.sucursales?.nombre || '—'}</td>
+                      <td className="px-5 py-3.5 text-ink-600">
+                        {paisObj ? <span title={paisObj.nombre}>{paisObj.bandera}</span> : '—'}
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-600 capitalize ${getTipoBadge(m.tipo)}`}>
+                          {m.tipo}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-600 ${getOrigenBadge(m.origen)}`}>
+                          {formatOrigen(m.origen)}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5 font-600 text-ink-900 text-right">
+                        {m.tipo === 'abono' ? '+' : '-'}{Math.abs(Number(m.cantidad))}
+                      </td>
+                      <td className="px-5 py-3.5 font-600 text-ink-900 text-right">{m.saldo}</td>
+                      <td className="px-5 py-3.5 text-ink-500 truncate max-w-[200px]" title={m.descripcion}>{m.descripcion || '—'}</td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

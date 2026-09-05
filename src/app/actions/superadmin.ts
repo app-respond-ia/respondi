@@ -2499,12 +2499,25 @@ export async function recargarCreditosIA(organizacionId: string, cantidad: numbe
 }
 
 // ============================================================
-// CRÉDITOS IA (superadmin)
 // ============================================================
+export async function getSucursalesPorOrganizaciones(tenantIds: string[]) {
+  await requireSuperAdmin()
+  if (tenantIds.length === 0) return { success: true, sucursales: [] }
+
+  const { data, error } = await supabaseAdmin
+    .from('sucursales')
+    .select('id, nombre, tenant_id')
+    .in('tenant_id', tenantIds)
+    .order('nombre')
+
+  if (error) return { success: false, error: error.message }
+  return { success: true, sucursales: data }
+}
 
 export async function getMovimientosCreditos(filtros?: {
-  tenant_id?: string
-  branch_id?: string
+  tenant_ids?: string[]
+  branch_ids?: string[]
+  pais?: string
   tipo?: 'abono' | 'debito'
   origen?: 'consumo_ia' | 'recarga_manual' | 'recarga_plan'
   fecha_desde?: string
@@ -2517,12 +2530,12 @@ export async function getMovimientosCreditos(filtros?: {
     .select(`
       *,
       organizaciones:tenant_id (nombre),
-      sucursales:branch_id (nombre)
+      sucursales:branch_id (nombre, pais)
     `)
     .order('timestamp', { ascending: false })
 
-  if (filtros?.tenant_id) query = query.eq('tenant_id', filtros.tenant_id)
-  if (filtros?.branch_id) query = query.eq('branch_id', filtros.branch_id)
+  if (filtros?.tenant_ids && filtros.tenant_ids.length > 0) query = query.in('tenant_id', filtros.tenant_ids)
+  if (filtros?.branch_ids && filtros.branch_ids.length > 0) query = query.in('branch_id', filtros.branch_ids)
   if (filtros?.tipo) query = query.eq('tipo', filtros.tipo)
   if (filtros?.origen) query = query.eq('origen', filtros.origen)
   if (filtros?.fecha_desde) query = query.gte('timestamp', filtros.fecha_desde)
@@ -2530,9 +2543,15 @@ export async function getMovimientosCreditos(filtros?: {
 
   const { data, error } = await query
   if (error) return { success: false, error: error.message }
-  return { success: true, movimientos: data }
-}
 
+  // Filtro de país se aplica en JS porque es sobre la relación sucursales, difícil de filtrar en el query embebido
+  let resultado = data
+  if (filtros?.pais) {
+    resultado = data?.filter((m: any) => m.sucursales?.pais === filtros.pais)
+  }
+
+  return { success: true, movimientos: resultado }
+}
 export async function getResumenCreditos() {
   const { supabase } = await requireSuperAdmin()
 

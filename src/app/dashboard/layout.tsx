@@ -56,14 +56,30 @@ export default async function DashboardLayout({
     .eq('user_id', user.id)
     .order('branch_id', { ascending: true })
 
-  const branches = ((ubData || [])
+  let branches = ((ubData || [])
     .map((ub: any) => {
       const s = Array.isArray(ub.sucursales) ? ub.sucursales[0] : ub.sucursales
       return s ? { id: s.id, nombre: s.nombre } : null
     })
     .filter(Boolean) as { id: string, nombre: string }[])
 
-  const activeBranchId = await resolveBranchId(supabase, user.id) || ''
+  let activeBranchId = await resolveBranchId(supabase, user.id) || ''
+
+  // Si estamos impersonando, ignoramos las sucursales del usuario real (super_admin no tiene ninguna)
+  // y traemos las sucursales de la organización impersonada
+  if (isImpersonating) {
+    const { data: sucursalesOrg } = await supabase
+      .from('sucursales')
+      .select('id, nombre')
+      .eq('tenant_id', userData.tenant_id)
+      .eq('activa', true)
+      .order('created_at', { ascending: true })
+
+    branches = sucursalesOrg || []
+    if (!activeBranchId && branches.length > 0) {
+      activeBranchId = branches[0].id
+    }
+  }
 
   let creditos = null
   if (userData?.tenant_id) {

@@ -217,18 +217,7 @@ export default function Sidebar({ user, onCloseMobile, permisos, esAdmin, collap
             </Link>
           )
         })()}
-        {(() => {
-          const nivel = getNivel('facturacion')
-          const cls = navItemWithPermClass('/dashboard/facturacion', 'facturacion')
-          return nivel === 'ninguno' ? null : (
-            <Link href="/dashboard/facturacion" onClick={onCloseMobile} className={cls} title={collapsed ? 'Facturación y créditos' : undefined}>
-              <span className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
-                <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
-              </span>
-              {!collapsed && <span className="truncate">Facturación y créditos</span>}
-            </Link>
-          )
-        })()}
+
         {(() => {
           const nivel = getNivel('reglas')
           const cls = navItemWithPermClass('/dashboard/reglas', 'reglas')
@@ -343,6 +332,18 @@ export default function Sidebar({ user, onCloseMobile, permisos, esAdmin, collap
                 <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"/></svg>
               </span>
               {!collapsed && <span className="truncate">Sucursales</span>}
+            </Link>
+          )
+        })()}
+        {(() => {
+          const nivel = getNivel('facturacion')
+          const cls = navItemWithPermClass('/dashboard/facturacion', 'facturacion')
+          return nivel === 'ninguno' ? null : (
+            <Link href="/dashboard/facturacion" onClick={onCloseMobile} className={cls} title={collapsed ? 'Facturación y créditos' : undefined}>
+              <span className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
+                <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+              </span>
+              {!collapsed && <span className="truncate">Facturación y créditos</span>}
             </Link>
           )
         })()}

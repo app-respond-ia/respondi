@@ -5,6 +5,7 @@ import { supabaseAdmin } from '@/utils/supabase/admin'
 import { registrarAuditoria } from '@/lib/auditoria'
 import { crearNotificacion, notificarATodosLosSuperadmins } from '@/lib/notificaciones'
 import { registrarError } from '@/lib/errores'
+import { enviarEmailInvitacion } from '@/lib/email'
 
 async function requireVendedor() {
   const supabase = await createClient()
@@ -153,81 +154,49 @@ export async function crearCuentaTrial(data: {
     const { supabase, vendedor } = await requireVendedor()
     // Usar supabaseAdmin importado estáticamente para crear usuarios
 
-    console.log('[DEBUG INVITACION] redirectTo usado:', `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/auth/callback`)
-    const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(data.email_admin, {
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/auth/callback`
-    })
-
-    if (inviteError || !inviteData?.user) {
-      return { success: false, error: inviteError?.message || 'Error al invitar al administrador' }
-    }
-
-    const { data: orgId, error: rpcError } = await supabaseAdmin.rpc('crear_cuenta_completa', {
-      p_user_id: inviteData.user.id,
-      p_email: data.email_admin,
-      p_nombre: data.nombre_admin || null,
-      p_org_nombre: data.nombre_organizacion
-    })
-
-    if (rpcError) {
-      await registrarError({
-        origen: 'app',
-        descripcion: 'Fallo al crear cuenta trial vía crear_cuenta_completa',
-        stacktrace: rpcError.message
+    const { data: invitacionCreada, error: invitacionError } = await supabaseAdmin
+      .from('invitaciones_pendientes')
+      .insert({
+        email: data.email_admin,
+        tipo: 'admin_trial',
+        datos: {
+          nombre: data.nombre_admin || null,
+          nombre_organizacion: data.nombre_organizacion,
+          vendedor_id: vendedor.id
+        },
+        creado_por: vendedor.user_id
       })
-      await supabaseAdmin.auth.admin.deleteUser(inviteData.user.id)
-      return { success: false, error: rpcError.message }
-    }
-
-    const { data: org, error: updateVendedorError } = await supabaseAdmin
-      .from('organizaciones')
-      .update({ id_vendedor: vendedor.id })
-      .eq('id', orgId)
-      .select('*')
+      .select()
       .single()
 
-    if (updateVendedorError || !org) {
-      await registrarError({
-        origen: 'app',
-        descripcion: 'Cuenta trial creada vía RPC pero fallo al asignar id_vendedor',
-        stacktrace: updateVendedorError?.message,
-        tenant_id: orgId
-      })
-      return { success: false, error: 'La cuenta se creó pero no se pudo vincular al vendedor. Contacta a soporte.' }
+    if (invitacionError) {
+      return { success: false, error: 'Error al crear la invitación. Inténtalo de nuevo.' }
     }
 
-    const { error: vendedorClientesError } = await supabaseAdmin.from('vendedor_clientes').insert([{
-      vendedor_id: vendedor.id,
-      organizacion_id: org.id,
-      estado_seguimiento: 'trial'
-    }])
+    const { error: emailError } = await enviarEmailInvitacion({
+      email: data.email_admin,
+      actionLink: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/registro-trial`,
+      rol: 'admin'
+    })
 
-    if (vendedorClientesError) {
-      console.error('Error al vincular cliente con vendedor:', vendedorClientesError)
-      return { 
-        success: false, 
-        error: `El cliente fue creado correctamente, pero hubo un error al vincularlo a tu cuenta de vendedor. Error interno: ${vendedorClientesError.message}` 
-      }
+    if (emailError) {
+      await registrarError({
+        origen: 'app',
+        descripcion: 'Invitación de cliente trial creada pero fallo al enviar el email',
+        stacktrace: JSON.stringify(emailError)
+      })
     }
 
     await registrarAuditoria({
-      tenant_id: org.id,
+      tenant_id: null,
       user_id: vendedor.user_id,
-      accion: `el vendedor "${vendedor.nombre}" creó esta cuenta trial`,
-      tabla_afectada: 'organizaciones',
-      registro_id: org.id,
-      valor_nuevo: org
+      accion: `el vendedor "${vendedor.nombre}" invitó a crear la cuenta trial "${data.nombre_organizacion}"`,
+      tabla_afectada: 'invitaciones_pendientes',
+      registro_id: invitacionCreada.id,
+      valor_nuevo: { email: data.email_admin, nombre_organizacion: data.nombre_organizacion }
     })
 
-    await notificarATodosLosSuperadmins(supabaseAdmin, {
-      tipo: 'nueva_organizacion',
-      titulo: 'Nueva organización creada',
-      cuerpo: `El vendedor "${vendedor.nombre}" ha registrado al cliente "${data.nombre_organizacion}".`,
-      url: '/superadmin/organizaciones',
-      entidadId: org.id
-    })
-
-    return { success: true, organizacion: org }
+    return { success: true, pendiente: true }
   } catch (err: any) {
     return { success: false, error: err.message }
   }

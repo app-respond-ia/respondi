@@ -4,6 +4,8 @@ import { createClient } from '@/utils/supabase/server'
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { canManageRole } from './roles'
 import { registrarAuditoria } from '@/lib/auditoria'
+import { enviarEmailInvitacion } from '@/lib/email'
+import { registrarError } from '@/lib/errores'
 
 import { getAuthContext } from '@/lib/auth-context'
 
@@ -89,56 +91,50 @@ export async function invitarUsuario(data: { email: string, nombre: string | nul
     return { success: false, error: 'Este email ya tiene una cuenta en Respondi. Usa otro email.' }
   }
 
-  const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(data.email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/aceptar-invitacion`
+  const { data: invitacionCreada, error: invitacionError } = await supabaseAdmin
+    .from('invitaciones_pendientes')
+    .insert({
+      email: data.email,
+      tipo: 'usuario_organizacion',
+      datos: {
+        nombre: data.nombre,
+        tenant_id: auth.tenant_id,
+        branch_ids: data.branch_ids,
+        rol_personalizado_id: data.rol_personalizado_id
+      },
+      creado_por: auth.user_id
+    })
+    .select()
+    .single()
+
+  if (invitacionError) {
+    return { success: false, error: 'Error al crear la invitación. Inténtalo de nuevo.' }
+  }
+
+  const { error: emailError } = await enviarEmailInvitacion({
+    email: data.email,
+    actionLink: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/login`,
+    rol: 'agente'
   })
 
-  if (inviteError || !inviteData.user) {
-    return { success: false, error: inviteError?.message || 'Error al invitar usuario' }
+  if (emailError) {
+    await registrarError({
+      origen: 'app',
+      descripcion: 'Invitación de usuario creada pero fallo al enviar el email',
+      stacktrace: JSON.stringify(emailError)
+    })
   }
-
-  const { error: insertError } = await supabaseAdmin
-    .from('users')
-    .insert([{
-      id: inviteData.user.id,
-      tenant_id: auth.tenant_id,
-      branch_id: data.branch_ids[0],
-      email: data.email,
-      nombre: data.nombre || null,
-      rol: 'tenant_user',
-      rol_personalizado_id: data.rol_personalizado_id,
-      activo: true,
-      invitacion_aceptada: false
-    }])
-
-  if (insertError) {
-    await supabaseAdmin.auth.admin.deleteUser(inviteData.user.id)
-    return { success: false, error: insertError.message }
-  }
-
-  await supabaseAdmin.from('user_branches').insert(
-    data.branch_ids.map(bid => ({
-      user_id: inviteData.user.id,
-      branch_id: bid
-    }))
-  )
-
-  const { data: newUser } = await supabaseAdmin
-    .from('users')
-    .select('*')
-    .eq('id', inviteData.user.id)
-    .single()
 
   await registrarAuditoria({
     tenant_id: auth.tenant_id,
     user_id: auth.user_id,
     accion: `invitó al usuario "${data.email}"`,
-    tabla_afectada: 'users',
-    registro_id: inviteData.user.id,
-    valor_nuevo: newUser
+    tabla_afectada: 'invitaciones_pendientes',
+    registro_id: invitacionCreada.id,
+    valor_nuevo: { email: data.email, nombre: data.nombre }
   })
 
-  return { success: true, data: newUser }
+  return { success: true, pendiente: true }
 }
 
 export async function actualizarUsuario(id: string, data: Partial<{ nombre: string, branch_ids: string[], activo: boolean, rol_personalizado_id: string }>) {

@@ -40,6 +40,57 @@ export async function resolverAltaUsuario(userId: string, email: string, nombreF
     })
   }
 
+  if (invitacion.tipo === 'admin_trial') {
+    const datos = invitacion.datos as any
+
+    const { data: orgId, error: rpcError } = await supabaseAdmin.rpc('crear_cuenta_completa', {
+      p_user_id: userId,
+      p_email: email,
+      p_nombre: datos.nombre || nombreFallback,
+      p_org_nombre: datos.nombre_organizacion
+    })
+
+    if (rpcError) {
+      console.error('Error en crear_cuenta_completa vía invitación admin_trial:', rpcError)
+      return { manejado: false }
+    }
+
+    if (datos.vendedor_id) {
+      await supabaseAdmin
+        .from('organizaciones')
+        .update({ id_vendedor: datos.vendedor_id })
+        .eq('id', orgId)
+
+      await supabaseAdmin.from('vendedor_clientes').insert({
+        vendedor_id: datos.vendedor_id,
+        organizacion_id: orgId,
+        estado_seguimiento: 'trial'
+      })
+    }
+  }
+
+  if (invitacion.tipo === 'usuario_organizacion') {
+    const datos = invitacion.datos as any
+
+    await supabaseAdmin.from('users').insert({
+      id: userId,
+      tenant_id: datos.tenant_id,
+      branch_id: datos.branch_ids?.[0] || null,
+      email: email,
+      nombre: datos.nombre || nombreFallback,
+      rol: 'tenant_user',
+      rol_personalizado_id: datos.rol_personalizado_id,
+      activo: true,
+      invitacion_aceptada: true
+    })
+
+    if (datos.branch_ids && datos.branch_ids.length > 0) {
+      await supabaseAdmin.from('user_branches').insert(
+        datos.branch_ids.map((bid: string) => ({ user_id: userId, branch_id: bid }))
+      )
+    }
+  }
+
   await supabaseAdmin
     .from('invitaciones_pendientes')
     .update({ aceptada: true })

@@ -32,7 +32,7 @@ export async function getSucursales() {
 
 import { getMisPermisos } from './permisos'
 
-export async function crearSucursal(nombre: string, direccion?: string, copiarDesdeId?: string) {
+export async function crearSucursal(nombre: string, direccion?: string, copiarDesdeId?: string, pais?: string) {
   if (!nombre || nombre.trim().length === 0) {
     return { success: false, error: 'El nombre es obligatorio' }
   }
@@ -63,6 +63,7 @@ export async function crearSucursal(nombre: string, direccion?: string, copiarDe
       tenant_id: auth.tenant_id,
       nombre: nombre.trim(),
       direccion: direccion?.trim() || null,
+      pais: pais || null,
       activa: true
     })
     .select()
@@ -333,6 +334,7 @@ export async function getDatosSucursalParaCopiar(branchIdOrigen: string) {
 export async function crearSucursalConDatos(data: {
   nombre: string
   direccion?: string
+  pais?: string
   timezone: string
   servicios?: string
   politicas?: { titulo: string, descripcion: string }[]
@@ -371,6 +373,7 @@ export async function crearSucursalConDatos(data: {
       tenant_id: userData!.tenant_id,
       nombre: data.nombre,
       direccion: data.direccion || null,
+      pais: data.pais || null,
       timezone: data.timezone,
       activa: true,
       onboarding_completado: true

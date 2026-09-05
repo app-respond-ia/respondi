@@ -7,6 +7,7 @@ import { getSucursales, crearSucursal, desactivarSucursal, reactivarSucursal } f
 import { getMisPermisos } from '@/app/actions/permisos'
 import { useToast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
+import { PAISES } from '@/lib/paises'
 
 export default function SucursalesPage() {
   const [loading, setLoading] = useState(true)
@@ -21,8 +22,8 @@ export default function SucursalesPage() {
   // Modal Crear
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [modalLoading, setModalLoading] = useState(false)
-  const [modalData, setModalData] = useState<{ nombre: string, direccion: string, copiarDesdeId: string }>({
-    nombre: '', direccion: '', copiarDesdeId: ''
+  const [modalData, setModalData] = useState<{ nombre: string, direccion: string, pais: string, copiarDesdeId: string }>({
+    nombre: '', direccion: '', pais: '', copiarDesdeId: ''
   })
 
   const cargar = async () => {
@@ -56,7 +57,7 @@ export default function SucursalesPage() {
   }, [])
 
   const handleOpenModal = () => {
-    setModalData({ nombre: '', direccion: '', copiarDesdeId: '' })
+    setModalData({ nombre: '', direccion: '', pais: '', copiarDesdeId: '' })
     setIsModalOpen(true)
   }
 
@@ -64,7 +65,7 @@ export default function SucursalesPage() {
     e.preventDefault()
     setModalLoading(true)
 
-    const res = await crearSucursal(modalData.nombre, modalData.direccion, modalData.copiarDesdeId || undefined)
+    const res = await crearSucursal(modalData.nombre, modalData.direccion, modalData.copiarDesdeId || undefined, modalData.pais)
 
     if (res.success && res.data) {
       setIsModalOpen(false)
@@ -250,6 +251,17 @@ export default function SucursalesPage() {
                     <input type="text" placeholder="Calle principal 123"
                       value={modalData.direccion} onChange={e => setModalData({...modalData, direccion: e.target.value})}
                       className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm" />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-500 text-ink-700 mb-1.5">País</label>
+                    <select
+                      value={modalData.pais} onChange={e => setModalData({...modalData, pais: e.target.value})}
+                      className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm"
+                    >
+                      <option value="">Selecciona un país</option>
+                      {PAISES.map(p => <option key={p.codigo} value={p.codigo}>{p.bandera} {p.nombre}</option>)}
+                    </select>
                   </div>
 
                   <div>

@@ -11,6 +11,7 @@ import { getIconSvg } from '@/components/novedades/NovedadesManager'
 import { useToast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { DIAS_SEMANA } from '@/lib/dias-semana'
+import { PAISES } from '@/lib/paises'
 
 const AVAILABLE_ICONS = [
   'campana', 'reloj', 'caja', 'estrella', 'calendario', 'informacion',
@@ -61,6 +62,7 @@ export default function PerfilSucursalPage() {
   const [formData, setFormData] = useState({
     nombreSucursal: '',
     direccion: '',
+    pais: '',
     timezone: '',
     servicios: '',
     politicas: [] as {titulo: string, descripcion: string}[],
@@ -154,6 +156,7 @@ export default function PerfilSucursalPage() {
         setFormData({
           nombreSucursal: resPerfil.data.sucursal?.nombre || '',
           direccion: resPerfil.data.sucursal?.direccion || '',
+          pais: resPerfil.data.sucursal?.pais || '',
           timezone: resPerfil.data.sucursal?.timezone || 'America/Caracas',
           servicios: resPerfil.data.perfil?.servicios || '',
           politicas: resPerfil.data.perfil?.politicas || [],
@@ -345,6 +348,22 @@ export default function PerfilSucursalPage() {
                 className="w-full h-11 px-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition outline-none"
                 placeholder="Ej: Av. Principal, Local 4, Centro Comercial..."
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">País</label>
+              <select 
+                name="pais"
+                value={formData.pais}
+                onChange={handleChange}
+                disabled={nivelPermiso !== 'escritura'}
+                className="w-full h-11 px-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition outline-none bg-white"
+              >
+                <option value="">Selecciona un país</option>
+                {PAISES.map(p => (
+                  <option key={p.codigo} value={p.codigo}>{p.bandera} {p.nombre}</option>
+                ))}
+              </select>
             </div>
 
             <div>

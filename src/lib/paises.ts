@@ -1,0 +1,17 @@
+export const PAISES = [
+  { codigo: 'ES', nombre: 'España', bandera: '🇪🇸', prefijo: '+34' },
+  { codigo: 'MX', nombre: 'México', bandera: '🇲🇽', prefijo: '+52' },
+  { codigo: 'CO', nombre: 'Colombia', bandera: '🇨🇴', prefijo: '+57' },
+  { codigo: 'AR', nombre: 'Argentina', bandera: '🇦🇷', prefijo: '+54' },
+  { codigo: 'CL', nombre: 'Chile', bandera: '🇨🇱', prefijo: '+56' },
+  { codigo: 'PE', nombre: 'Perú', bandera: '🇵🇪', prefijo: '+51' },
+  { codigo: 'VE', nombre: 'Venezuela', bandera: '🇻🇪', prefijo: '+58' },
+  { codigo: 'EC', nombre: 'Ecuador', bandera: '🇪🇨', prefijo: '+593' },
+  { codigo: 'UY', nombre: 'Uruguay', bandera: '🇺🇾', prefijo: '+598' },
+  { codigo: 'PY', nombre: 'Paraguay', bandera: '🇵🇾', prefijo: '+595' },
+  { codigo: 'BO', nombre: 'Bolivia', bandera: '🇧🇴', prefijo: '+591' },
+  { codigo: 'DO', nombre: 'República Dominicana', bandera: '🇩🇴', prefijo: '+1809' },
+  { codigo: 'GT', nombre: 'Guatemala', bandera: '🇬🇹', prefijo: '+502' },
+  { codigo: 'CR', nombre: 'Costa Rica', bandera: '🇨🇷', prefijo: '+506' },
+  { codigo: 'PA', nombre: 'Panamá', bandera: '🇵🇦', prefijo: '+507' },
+]

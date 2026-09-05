@@ -7,6 +7,7 @@ import { getSucursales, getDatosSucursalParaCopiar, crearSucursalConDatos } from
 import { useToast } from '@/components/ui/Toast'
 import { EditorHorarios } from '@/components/sucursales/EditorHorarios'
 import { DIAS_SEMANA } from '@/lib/dias-semana'
+import { PAISES } from '@/lib/paises'
 
 // CAMBIO 1: Husos horarios completos LATAM + España, ordenados de GMT-6 a GMT+1
 const TIMEZONES = [
@@ -55,6 +56,7 @@ export default function NuevaSucursalPage() {
   // Config inicial
   const [nombre, setNombre] = useState('')
   const [direccion, setDireccion] = useState('')
+  const [pais, setPais] = useState('')
   const [timezone, setTimezone] = useState('America/Caracas')
   const [copiaGlobal, setCopiaGlobal] = useState<string>('')
   const [copiaAvanzada, setCopiaAvanzada] = useState(false)
@@ -242,6 +244,7 @@ export default function NuevaSucursalPage() {
     const res = await crearSucursalConDatos({
       nombre,
       direccion,
+      pais,
       timezone,
       servicios,
       politicas,
@@ -307,6 +310,15 @@ export default function NuevaSucursalPage() {
             <input type="text" value={direccion} onChange={e => setDireccion(e.target.value)}
               placeholder="Calle, número, ciudad"
               className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition" />
+          </div>
+
+          <div>
+            <label className="block text-sm font-500 text-ink-700 mb-1.5">País</label>
+            <select value={pais} onChange={e => setPais(e.target.value)}
+              className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition">
+              <option value="">Selecciona un país</option>
+              {PAISES.map(p => <option key={p.codigo} value={p.codigo}>{p.bandera} {p.nombre}</option>)}
+            </select>
           </div>
 
           {/* CAMBIO 1: Lista completa de husos horarios */}

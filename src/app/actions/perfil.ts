@@ -18,7 +18,7 @@ export async function getPerfilSucursal() {
   // 1. Obtener datos de la sucursal
   const { data: sucursal } = await supabase
     .from('sucursales')
-    .select('id, nombre, direccion, timezone')
+    .select('id, nombre, direccion, pais, timezone')
     .eq('id', branchId)
     .eq('tenant_id', userData.tenant_id)
     .single()
@@ -42,6 +42,7 @@ export async function getPerfilSucursal() {
 export async function savePerfilSucursal(data: { 
   nombreSucursal: string, 
   direccion: string, 
+  pais: string,
   timezone: string, 
   servicios: string, 
   politicas: {titulo: string, descripcion: string}[], 
@@ -81,6 +82,7 @@ export async function savePerfilSucursal(data: {
     .update({
       nombre: data.nombreSucursal,
       direccion: data.direccion,
+      pais: data.pais,
       timezone: data.timezone
     })
     .eq('id', branchId)

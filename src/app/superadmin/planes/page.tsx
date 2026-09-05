@@ -22,7 +22,7 @@ export default function PlanesPage() {
   const defaultFormData = {
     nombre: '', precio_usd: 0, creditos_mensuales: 1000, canales_max: 1, sucursales_max: 1, 
     usuarios_max: 1, precio_credito_adicional: 0.005, precio_sucursal_extra: 15, 
-    dias_retencion_mensajes: 30, modelo_ia: 'gpt-4o-mini', activo: false, acumula_creditos: false
+    dias_retencion_mensajes: 30, modelo_ia: 'gpt-4o-mini', activo: false, acumula_creditos: false, stripe_price_id: ''
   }
   
   const [formData, setFormData] = useState({ ...defaultFormData })
@@ -52,7 +52,8 @@ export default function PlanesPage() {
         dias_retencion_mensajes: plan.dias_retencion_mensajes || 30,
         modelo_ia: plan.modelo_ia || 'gpt-4o-mini',
         activo: plan.activo ?? true,
-        acumula_creditos: plan.acumula_creditos ?? false
+        acumula_creditos: plan.acumula_creditos ?? false,
+        stripe_price_id: plan.stripe_price_id || ''
       })
       setModalData(plan)
     } else {
@@ -248,6 +249,11 @@ export default function PlanesPage() {
                         <span className="text-sm font-500 text-ink-700">Acumular créditos no usados al renovar (por defecto, se resetean cada mes)</span>
                       </label>
                     </div>
+                  </div>
+                  <div className="mt-4">
+                    <label className="block text-xs font-500 text-ink-600 mb-1.5">ID de precio de Stripe</label>
+                    <input type="text" value={formData.stripe_price_id} onChange={e => setFormData({...formData, stripe_price_id: e.target.value})} className="w-full h-10 px-3 rounded-lg border border-slate-300 text-sm font-mono focus:border-brand-500 focus:ring-2 focus:ring-brand-100" placeholder="price_..." />
+                    <p className="text-[11px] text-ink-500 mt-1.5 leading-relaxed">Se configura manualmente en el Dashboard de Stripe (Products → Precios). Déjalo vacío hasta tener la cuenta de Stripe activa.</p>
                   </div>
                 </div>
 

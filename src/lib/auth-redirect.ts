@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import type { User } from '@supabase/supabase-js'
+import { registrarError } from '@/lib/errores'
 
 export async function resolverAltaUsuario(userId: string, email: string, nombreFallback: string): Promise<{ manejado: boolean }> {
   const { data: invitacion } = await supabaseAdmin
@@ -18,7 +19,7 @@ export async function resolverAltaUsuario(userId: string, email: string, nombreF
   if (invitacion.tipo === 'vendedor') {
     const datos = invitacion.datos as any
 
-    await supabaseAdmin.from('users').insert({
+    const { error: userInsertError } = await supabaseAdmin.from('users').insert({
       id: userId,
       email: email,
       nombre: datos.nombre || nombreFallback,
@@ -27,7 +28,16 @@ export async function resolverAltaUsuario(userId: string, email: string, nombreF
       invitacion_aceptada: true
     })
 
-    await supabaseAdmin.from('vendedores').insert({
+    if (userInsertError) {
+      await registrarError({
+        origen: 'app',
+        descripcion: 'resolverAltaUsuario (vendedor): fallo al crear fila en users',
+        stacktrace: JSON.stringify(userInsertError)
+      })
+      return { manejado: false }
+    }
+
+    const { error: vendedorInsertError } = await supabaseAdmin.from('vendedores').insert({
       user_id: userId,
       nombre: datos.nombre || nombreFallback,
       email: email,
@@ -38,6 +48,15 @@ export async function resolverAltaUsuario(userId: string, email: string, nombreF
       direccion: datos.direccion || {},
       activo: true
     })
+
+    if (vendedorInsertError) {
+      await registrarError({
+        origen: 'app',
+        descripcion: 'resolverAltaUsuario (vendedor): fallo al crear fila en vendedores (users ya se creó, queda huérfano)',
+        stacktrace: JSON.stringify(vendedorInsertError)
+      })
+      return { manejado: false }
+    }
   }
 
   if (invitacion.tipo === 'admin_trial') {
@@ -51,28 +70,50 @@ export async function resolverAltaUsuario(userId: string, email: string, nombreF
     })
 
     if (rpcError) {
-      console.error('Error en crear_cuenta_completa vía invitación admin_trial:', rpcError)
+      await registrarError({
+        origen: 'app',
+        descripcion: 'resolverAltaUsuario (admin_trial): fallo en rpc crear_cuenta_completa',
+        stacktrace: JSON.stringify(rpcError)
+      })
       return { manejado: false }
     }
 
     if (datos.vendedor_id) {
-      await supabaseAdmin
+      const { error: updateError } = await supabaseAdmin
         .from('organizaciones')
         .update({ id_vendedor: datos.vendedor_id })
         .eq('id', orgId)
 
-      await supabaseAdmin.from('vendedor_clientes').insert({
+      if (updateError) {
+        await registrarError({
+          origen: 'app',
+          descripcion: 'resolverAltaUsuario (admin_trial): fallo al vincular organización con vendedor',
+          stacktrace: JSON.stringify(updateError)
+        })
+        return { manejado: false }
+      }
+
+      const { error: vendClientError } = await supabaseAdmin.from('vendedor_clientes').insert({
         vendedor_id: datos.vendedor_id,
         organizacion_id: orgId,
         estado_seguimiento: 'trial'
       })
+
+      if (vendClientError) {
+        await registrarError({
+          origen: 'app',
+          descripcion: 'resolverAltaUsuario (admin_trial): fallo al crear fila en vendedor_clientes',
+          stacktrace: JSON.stringify(vendClientError)
+        })
+        return { manejado: false }
+      }
     }
   }
 
   if (invitacion.tipo === 'usuario_organizacion') {
     const datos = invitacion.datos as any
 
-    await supabaseAdmin.from('users').insert({
+    const { error: userInsertError } = await supabaseAdmin.from('users').insert({
       id: userId,
       tenant_id: datos.tenant_id,
       branch_id: datos.branch_ids?.[0] || null,
@@ -84,10 +125,28 @@ export async function resolverAltaUsuario(userId: string, email: string, nombreF
       invitacion_aceptada: true
     })
 
+    if (userInsertError) {
+      await registrarError({
+        origen: 'app',
+        descripcion: 'resolverAltaUsuario (usuario_organizacion): fallo al crear fila en users',
+        stacktrace: JSON.stringify(userInsertError)
+      })
+      return { manejado: false }
+    }
+
     if (datos.branch_ids && datos.branch_ids.length > 0) {
-      await supabaseAdmin.from('user_branches').insert(
+      const { error: branchesError } = await supabaseAdmin.from('user_branches').insert(
         datos.branch_ids.map((bid: string) => ({ user_id: userId, branch_id: bid }))
       )
+
+      if (branchesError) {
+        await registrarError({
+          origen: 'app',
+          descripcion: 'resolverAltaUsuario (usuario_organizacion): fallo al crear filas en user_branches',
+          stacktrace: JSON.stringify(branchesError)
+        })
+        return { manejado: false }
+      }
     }
   }
 

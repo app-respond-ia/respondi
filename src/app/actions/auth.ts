@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
+import { resolverAltaUsuario } from '@/lib/auth-redirect'
 
 // --- Fix Bug C: Registro Trial (con validación de email duplicado y rollback) ---
 export async function registroTrial(data: {
@@ -45,18 +46,20 @@ export async function registroTrial(data: {
   // Esperar a que Auth propague el usuario antes de llamar al RPC
   await new Promise(resolve => setTimeout(resolve, 1000))
 
-  // Llamar al RPC para crear organización, sucursal y usuario
-  const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('create_trial_account', {
-    p_user_id: userId,
-    p_email: data.email,
-    p_nombre: data.nombre,
-    p_org_nombre: data.nombreNegocio
-  })
+  const { manejado } = await resolverAltaUsuario(userId, data.email, data.nombre)
 
-  if (rpcError) {
-    // Rollback: eliminar usuario de Auth si el RPC falla
-    await supabaseAdmin.auth.admin.deleteUser(userId)
-    return { success: false, error: 'Error al configurar la cuenta. Inténtalo de nuevo.' }
+  if (!manejado) {
+    const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('create_trial_account', {
+      p_user_id: userId,
+      p_email: data.email,
+      p_nombre: data.nombre,
+      p_org_nombre: data.nombreNegocio
+    })
+
+    if (rpcError) {
+      await supabaseAdmin.auth.admin.deleteUser(userId)
+      return { success: false, error: 'Error al configurar la cuenta. Inténtalo de nuevo.' }
+    }
   }
 
 

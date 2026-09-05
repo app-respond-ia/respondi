@@ -517,6 +517,9 @@ export async function crearVendedor(data: {
   dni_nif?: string
   direccion?: any
 }) {
+  const resendKey = process.env.RESEND_API_KEY
+  console.log(`[DEBUG VERCEL ENV] RESEND_API_KEY definida: ${!!resendKey}, longitud: ${resendKey ? resendKey.length : 0}`)
+
   const { supabase, userId } = await requireSuperAdmin()
 
   // Verificar si el email ya existe en la tabla users
@@ -561,11 +564,17 @@ export async function crearVendedor(data: {
     return { success: false, error: errMsg || 'Error al generar la invitación del vendedor.' }
   }
 
+  console.log('--- DEBUG RESEND START ---')
+  console.log(`Intentando enviar email a: ${data.email} con action_link: ${inviteData.properties.action_link}`)
+
   const { error: emailError } = await enviarEmailInvitacion({
     email: data.email,
     actionLink: inviteData.properties.action_link,
     rol: 'vendedor'
   })
+
+  console.log(`Resultado de Resend -> emailError:`, emailError ? JSON.stringify(emailError) : 'null (ÉXITO)')
+  console.log('--- DEBUG RESEND END ---')
 
   if (emailError) {
     await registrarError({

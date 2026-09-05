@@ -199,7 +199,7 @@ export async function POST(req: Request) {
       await supabaseAdmin.from('conversations').update({ ia_intentos_fallidos: 0 }).eq('id', conversationId)
     }
 
-    await supabaseAdmin.rpc('descontar_credito_ia', { p_tenant_id: conv.tenant_id })
+    await supabaseAdmin.rpc('descontar_credito_ia', { p_tenant_id: conv.tenant_id, p_branch_id: conv.branch_id })
     await liberarCandado()
     return NextResponse.json({ status: 'Exito (Proceso IA finalizado)' })
 

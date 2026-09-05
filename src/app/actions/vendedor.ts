@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { registrarAuditoria } from '@/lib/auditoria'
 import { crearNotificacion, notificarATodosLosSuperadmins } from '@/lib/notificaciones'
+import { registrarError } from '@/lib/errores'
 
 async function requireVendedor() {
   const supabase = await createClient()
@@ -152,9 +153,6 @@ export async function crearCuentaTrial(data: {
     const { supabase, vendedor } = await requireVendedor()
     // Usar supabaseAdmin importado estáticamente para crear usuarios
 
-    const { data: planTrial } = await supabase.from('plans').select('id').eq('nombre', 'Trial').single()
-    if (!planTrial) return { success: false, error: 'Plan Trial no encontrado' }
-
     console.log('[DEBUG INVITACION] redirectTo usado:', `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/auth/callback`)
     const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(data.email_admin, {
       redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/auth/callback`
@@ -164,45 +162,38 @@ export async function crearCuentaTrial(data: {
       return { success: false, error: inviteError?.message || 'Error al invitar al administrador' }
     }
 
-    const fechaVencimiento = new Date()
-    fechaVencimiento.setDate(fechaVencimiento.getDate() + 14)
+    const { data: orgId, error: rpcError } = await supabaseAdmin.rpc('crear_cuenta_completa', {
+      p_user_id: inviteData.user.id,
+      p_email: data.email_admin,
+      p_nombre: data.nombre_admin || null,
+      p_org_nombre: data.nombre_organizacion
+    })
 
-    const { data: org, error: orgError } = await supabaseAdmin
-      .from('organizaciones')
-      .insert([{
-        nombre: data.nombre_organizacion,
-        plan_id: planTrial.id,
-        estado: 'trial',
-        fecha_vencimiento: fechaVencimiento.toISOString(),
-        id_vendedor: vendedor.id
-      }])
-      .select()
-      .single()
-
-    if (orgError) {
+    if (rpcError) {
+      await registrarError({
+        origen: 'app',
+        descripcion: 'Fallo al crear cuenta trial vía crear_cuenta_completa',
+        stacktrace: rpcError.message
+      })
       await supabaseAdmin.auth.admin.deleteUser(inviteData.user.id)
-      return { success: false, error: orgError.message }
+      return { success: false, error: rpcError.message }
     }
 
-    const { data: sucursal } = await supabaseAdmin
-      .from('sucursales')
-      .insert([{ tenant_id: org.id, nombre: data.nombre_organizacion, onboarding_completado: false }])
-      .select()
+    const { data: org, error: updateVendedorError } = await supabaseAdmin
+      .from('organizaciones')
+      .update({ id_vendedor: vendedor.id })
+      .eq('id', orgId)
+      .select('*')
       .single()
 
-    await supabaseAdmin.from('users').insert([{
-      id: inviteData.user.id,
-      tenant_id: org.id,
-      branch_id: sucursal?.id,
-      email: data.email_admin,
-      nombre: data.nombre_admin || null,
-      rol: 'admin',
-      activo: true,
-      invitacion_aceptada: false
-    }])
-
-    if (sucursal) {
-      await supabaseAdmin.from('user_branches').insert([{ user_id: inviteData.user.id, branch_id: sucursal.id }])
+    if (updateVendedorError || !org) {
+      await registrarError({
+        origen: 'app',
+        descripcion: 'Cuenta trial creada vía RPC pero fallo al asignar id_vendedor',
+        stacktrace: updateVendedorError?.message,
+        tenant_id: orgId
+      })
+      return { success: false, error: 'La cuenta se creó pero no se pudo vincular al vendedor. Contacta a soporte.' }
     }
 
     const { error: vendedorClientesError } = await supabaseAdmin.from('vendedor_clientes').insert([{

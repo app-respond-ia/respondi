@@ -2497,3 +2497,55 @@ export async function recargarCreditosIA(organizacionId: string, cantidad: numbe
     return { success: false, error: err.message }
   }
 }
+
+// ============================================================
+// CRÉDITOS IA (superadmin)
+// ============================================================
+
+export async function getMovimientosCreditos(filtros?: {
+  tenant_id?: string
+  branch_id?: string
+  tipo?: 'abono' | 'debito'
+  origen?: 'consumo_ia' | 'recarga_manual' | 'recarga_plan'
+  fecha_desde?: string
+  fecha_hasta?: string
+}) {
+  const { supabase } = await requireSuperAdmin()
+
+  let query = supabase
+    .from('message_quotas')
+    .select(`
+      *,
+      organizaciones:tenant_id (nombre),
+      sucursales:branch_id (nombre)
+    `)
+    .order('timestamp', { ascending: false })
+
+  if (filtros?.tenant_id) query = query.eq('tenant_id', filtros.tenant_id)
+  if (filtros?.branch_id) query = query.eq('branch_id', filtros.branch_id)
+  if (filtros?.tipo) query = query.eq('tipo', filtros.tipo)
+  if (filtros?.origen) query = query.eq('origen', filtros.origen)
+  if (filtros?.fecha_desde) query = query.gte('timestamp', filtros.fecha_desde)
+  if (filtros?.fecha_hasta) query = query.lte('timestamp', filtros.fecha_hasta)
+
+  const { data, error } = await query
+  if (error) return { success: false, error: error.message }
+  return { success: true, movimientos: data }
+}
+
+export async function getResumenCreditos() {
+  const { supabase } = await requireSuperAdmin()
+
+  const { data, error } = await supabase.rpc('get_resumen_creditos').single()
+  if (error) return { success: false, error: error.message }
+
+  return {
+    success: true,
+    resumen: {
+      totalConsumido: Number((data as any).total_consumido) || 0,
+      totalRecargaPlan: Number((data as any).total_recarga_plan) || 0,
+      totalRecargaManual: Number((data as any).total_recarga_manual) || 0,
+      saldoTotalPlataforma: Number((data as any).saldo_total_plataforma) || 0
+    }
+  }
+}

@@ -320,3 +320,30 @@ export async function getMetricas(periodo: 'hoy' | 'semana' | 'mes' | 'total' = 
     }
   }
 }
+
+export async function getMovimientosCreditosCliente(filtros?: {
+  tipo?: 'abono' | 'debito'
+  origen?: 'consumo_ia' | 'recarga_manual' | 'recarga_plan'
+  fecha_desde?: string
+  fecha_hasta?: string
+}) {
+  const supabase = await createClient()
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+
+  let query = supabase
+    .from('message_quotas')
+    .select('id, tipo, origen, cantidad, saldo, descripcion, timestamp')
+    .eq('tenant_id', auth.tenant_id)
+    .order('timestamp', { ascending: false })
+    .limit(100)
+
+  if (filtros?.tipo) query = query.eq('tipo', filtros.tipo)
+  if (filtros?.origen) query = query.eq('origen', filtros.origen)
+  if (filtros?.fecha_desde) query = query.gte('timestamp', filtros.fecha_desde)
+  if (filtros?.fecha_hasta) query = query.lte('timestamp', filtros.fecha_hasta)
+
+  const { data, error } = await query
+  if (error) return { success: false, error: error.message }
+  return { success: true, movimientos: data }
+}

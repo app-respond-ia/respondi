@@ -31,6 +31,7 @@ const GRUPOS = [
     secciones: [
       { id: 'skills', label: 'Skills de IA' },
       { id: 'precios', label: 'Lista de precios' },
+      { id: 'facturacion', label: 'Facturación y créditos' },
       { id: 'reglas', label: 'Escalado de casos' },
       { id: 'etiquetas', label: 'Etiquetas' },
       { id: 'canales', label: 'Canales' },

@@ -257,7 +257,32 @@ export async function getOrganizaciones(filtro?: string) {
   const { data, error } = await query
 
   if (error) return { success: false, error: error.message }
-  return { success: true, organizaciones: data }
+
+  // Traer stats sin romper el listado si falla
+  let statsMap = new Map()
+  try {
+    const { data: statsData, error: statsError } = await supabaseAdmin.rpc('get_organizaciones_con_stats')
+    if (statsError) {
+      console.error('Error al obtener stats de organizaciones:', statsError)
+    } else if (statsData) {
+      statsData.forEach((s: any) => statsMap.set(s.tenant_id, s))
+    }
+  } catch (err) {
+    console.error('Excepción al obtener stats de organizaciones:', err)
+  }
+
+  const organizacionesConStats = data?.map(org => {
+    const stats = statsMap.get(org.id)
+    return {
+      ...org,
+      sucursales_activas: stats?.sucursales_activas,
+      sucursales_total: stats?.sucursales_total,
+      usuarios_activos: stats?.usuarios_activos,
+      usuarios_total: stats?.usuarios_total
+    }
+  })
+
+  return { success: true, organizaciones: organizacionesConStats }
 }
 
 export async function entrarComoOrganizacion(organizacionId: string) {

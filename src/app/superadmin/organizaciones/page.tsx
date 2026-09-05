@@ -252,6 +252,9 @@ export default function OrganizacionesPage() {
                   </div>
                   <p className="text-sm text-ink-500 mt-0.5 truncate">
                     Plan {o.plans?.nombre || 'Ninguno'} {o.plan_pendiente_id && planes.find(p => p.id === o.plan_pendiente_id) ? `(→ ${planes.find(p => p.id === o.plan_pendiente_id).nombre})` : ''} · vence el {o.fecha_vencimiento ? new Date(o.fecha_vencimiento).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'N/A'} · vendedor: {((o.vendedor_clientes || []).map((vc: any) => vc.vendedores?.nombre).filter(Boolean).join(', ')) || 'Sin vendedor'}
+                    <span className="ml-2 pl-2 border-l border-slate-200">
+                      🏠 {o.sucursales_activas ?? 0} · 👤 {o.usuarios_activos ?? 0}
+                    </span>
                   </p>
                 </div>
                 

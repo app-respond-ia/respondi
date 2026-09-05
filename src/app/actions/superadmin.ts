@@ -7,6 +7,8 @@ import { revalidatePath } from 'next/cache'
 import { registrarAuditoria } from '@/lib/auditoria'
 import { crearNotificacion, notificarATodosLosSuperadmins, notificarAAdminsDeOrganizacion } from '@/lib/notificaciones'
 import { setImpersonatedTenantId, clearImpersonatedTenantId } from '@/lib/impersonate'
+import { enviarEmailInvitacion } from '@/lib/email'
+import { registrarError } from '@/lib/errores'
 
 // Helper de auth para asegurar que la action solo la ejecuta un super admin
 export async function requireSuperAdmin() {
@@ -542,71 +544,55 @@ export async function crearVendedor(data: {
     return { success: false, error: 'Ya existe un vendedor con este email.' }
   }
 
-  // Invitar al vendedor por email
-  const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(data.email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/auth/callback`
-  })
-
-  if (inviteError || !inviteData?.user) {
-    const errMsg = inviteError?.message || ''
-    if (errMsg.includes('already been registered') || errMsg.includes('already exists')) {
-      return { success: false, error: 'Este email ya tiene una cuenta en Respondi. Usa un email diferente.' }
-    }
-    return { success: false, error: errMsg || 'Error al enviar la invitación al vendedor.' }
-  }
-
-  // Crear registro en users con rol vendedor
-  const { error: userErr } = await supabaseAdmin.from('users').insert([{
-    id: inviteData.user.id,
-    email: data.email,
-    nombre: data.nombre,
-    rol: 'vendedor',
-    activo: true,
-    invitacion_aceptada: false
-  }])
-
-  if (userErr) {
-    // Rollback: eliminar el usuario de Auth si falla el insert en users
-    await supabaseAdmin.auth.admin.deleteUser(inviteData.user.id)
-    return { success: false, error: 'Error al crear el usuario. Inténtalo de nuevo.' }
-  }
-
-  // Crear registro en vendedores
-  const { data: result, error } = await supabase
-    .from('vendedores')
-    .insert([{
-      user_id: inviteData.user.id,
-      nombre: data.nombre,
+  // Guardar invitación pendiente (se activará cuando el vendedor se registre con este mismo email)
+  const { data: invitacionCreada, error: invitacionError } = await supabaseAdmin
+    .from('invitaciones_pendientes')
+    .insert({
       email: data.email,
-      comision_conversion_pct: data.comision_conversion_pct,
-      comision_mrr_pct: data.comision_mrr_pct,
-      telefono: data.telefono || null,
-      dni_nif: data.dni_nif || null,
-      direccion: data.direccion || {},
-      activo: true
-    }])
+      tipo: 'vendedor',
+      datos: {
+        nombre: data.nombre,
+        comision_conversion_pct: data.comision_conversion_pct,
+        comision_mrr_pct: data.comision_mrr_pct,
+        telefono: data.telefono || null,
+        dni_nif: data.dni_nif || null,
+        direccion: data.direccion || {}
+      },
+      creado_por: userId
+    })
     .select()
     .single()
 
-  if (error) {
-    // Rollback completo
-    await supabaseAdmin.auth.admin.deleteUser(inviteData.user.id)
-    await supabaseAdmin.from('users').delete().eq('id', inviteData.user.id)
-    return { success: false, error: error.message }
+  if (invitacionError) {
+    return { success: false, error: 'Error al crear la invitación. Inténtalo de nuevo.' }
+  }
+
+  const { error: emailError } = await enviarEmailInvitacion({
+    email: data.email,
+    actionLink: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/login`,
+    rol: 'vendedor'
+  })
+
+  if (emailError) {
+    await registrarError({
+      origen: 'app',
+      descripcion: 'Invitación de vendedor creada pero fallo al enviar el email',
+      stacktrace: JSON.stringify(emailError)
+    })
   }
 
   await supabase.from('audit_log').insert({
     tenant_id: null,
     user_id: userId,
     accion: 'crear_vendedor',
-    tabla_afectada: 'vendedores',
-    registro_id: result.id,
+    tabla_afectada: 'invitaciones_pendientes',
+    registro_id: invitacionCreada.id,
     valor_anterior: null,
     valor_nuevo: { nombre: data.nombre, email: data.email }
   })
 
   revalidatePath('/superadmin/vendedores')
-  return { success: true, vendedor: result }
+  return { success: true, vendedor: { id: invitacionCreada.id, nombre: data.nombre, email: data.email, pendiente: true } }
 }
 
 // E) actualizarVendedor

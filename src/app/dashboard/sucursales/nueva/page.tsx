@@ -176,7 +176,9 @@ export default function NuevaSucursalPage() {
         if (d.servicios) setServicios(d.servicios)
       }
       if (!modulo || modulo === 'politicas') {
-        if (d.politicas && Array.isArray(d.politicas) && d.politicas.length > 0) setPoliticas(d.politicas)
+        if (d.politicas && Array.isArray(d.politicas) && d.politicas.length > 0) {
+          setPoliticas(d.politicas.map((p: any) => typeof p === 'string' ? { titulo: 'Política', descripcion: p } : p))
+        }
       }
       if (!modulo || modulo === 'configuracion_ia') {
         if (d.modo_horario_ia !== undefined) setIaActivaFueraHorario(d.modo_horario_ia === 'siempre_activa')
@@ -276,8 +278,8 @@ export default function NuevaSucursalPage() {
       router.refresh()
     } else {
       showToast(res.error || 'Error al crear la sucursal', 'error')
+      setSaving(false)
     }
-    setSaving(false)
   }
 
   if (loading) return <Loading />
@@ -700,7 +702,7 @@ export default function NuevaSucursalPage() {
           ) : (
             <button onClick={handleGuardar} disabled={saving}
               className="px-6 h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-600 transition shadow-lg shadow-emerald-600/30 disabled:opacity-50">
-              {saving ? 'Creando...' : 'Crear sucursal ✓'}
+              {saving ? 'Creando...' : 'Activar sucursal ✓'}
             </button>
           )}
         </div>

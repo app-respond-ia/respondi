@@ -79,6 +79,22 @@ export async function crearSucursal(nombre: string, direccion?: string, copiarDe
     }
   }
 
+  // DEFENSA: Comprobar idempotencia por nombre en los últimos 10 segundos
+  const hace10Segundos = new Date(Date.now() - 10000).toISOString()
+  const { data: sucursalReciente } = await supabase
+    .from('sucursales')
+    .select('*')
+    .eq('tenant_id', auth.tenant_id)
+    .eq('nombre', nombre.trim())
+    .gte('created_at', hace10Segundos)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single()
+
+  if (sucursalReciente) {
+    return { success: true, data: sucursalReciente }
+  }
+
   const { data: nuevaSucursal, error } = await supabase
     .from('sucursales')
     .insert({
@@ -352,7 +368,7 @@ export async function getDatosSucursalParaCopiar(branchIdOrigen: string) {
     .from('price_list')
     .select('nombre, tipo, precio, precio_tipo, descripcion')
     .eq('branch_id', branchIdOrigen)
-    .eq('activo', true)
+    .eq('disponible', true)
 
   // Tipos de novedad
   const { data: tiposNovedad } = await supabase
@@ -422,6 +438,22 @@ export async function crearSucursalConDatos(data: {
 
   if (!tienePermiso) {
     return { success: false, error: 'No tienes permisos para crear sucursales' }
+  }
+
+  // DEFENSA: Comprobar idempotencia por nombre en los últimos 10 segundos
+  const hace10Segundos = new Date(Date.now() - 10000).toISOString()
+  const { data: sucursalReciente } = await supabase
+    .from('sucursales')
+    .select('*')
+    .eq('tenant_id', userData!.tenant_id)
+    .eq('nombre', data.nombre.trim())
+    .gte('created_at', hace10Segundos)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single()
+
+  if (sucursalReciente) {
+    return { success: true, sucursal: sucursalReciente }
   }
 
   // Crear sucursal

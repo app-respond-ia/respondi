@@ -981,7 +981,7 @@ export default function OnboardingPage() {
 
               <button disabled={saving} onClick={handleNext}
                 className={`px-6 h-11 rounded-xl text-white font-semibold shadow-lg transition ${step === 5 ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/30' : 'bg-brand-600 hover:bg-brand-700 shadow-brand-600/30'} disabled:opacity-50`}>
-                {saving ? 'Guardando...' : step === 5 ? 'Activar mi agente ✓' : 'Continuar →'}
+                {saving ? 'Guardando...' : step === 5 ? 'Activar sucursal ✓' : 'Continuar →'}
               </button>
             </div>
             </>

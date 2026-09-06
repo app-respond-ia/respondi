@@ -49,7 +49,7 @@ export async function POST(req: Request) {
       id, tenant_id, branch_id, contact_id, ia_pausada, ia_intentos_fallidos,
       contacts:contact_id (trato, modo, respuesta_auto, nota),
       sucursales:branch_id (
-        modo_pausa, timezone, trato_contactos_respuesta_auto,
+        modo_pausa, timezone, trato_contactos_respuesta_auto, trato_contactos_modo,
         business_profiles (msg_fuera_horario, msg_cuota_agotada, msg_pausa_automatica, abrir_caso_fuera_horario, modo_horario_ia, tono, servicios),
         business_hours (dia_semana, apertura, cierre, cerrado, tipo)
       )
@@ -98,17 +98,20 @@ export async function POST(req: Request) {
     const hours = branch?.business_hours || []
 
     if (contact && contact.trato !== 'normal') {
-      if (contact.modo === 'derivar') {
+      const modoEfectivo = contact.modo || branch?.trato_contactos_modo || 'ignorar'
+      
+      if (modoEfectivo === 'derivar') {
         await crearCasoDesdeSistema(conversationId, conv.tenant_id, conv.branch_id, conv.contact_id, 'Contacto configurado para derivar a humano sin pasar por IA.')
-      } else if (contact.modo === 'respuesta_automatica') {
+      } else if (modoEfectivo === 'respuesta_automatica') {
         const msg = contact.respuesta_auto || branch?.trato_contactos_respuesta_auto || 'En este momento no podemos atenderte.'
         await supabaseAdmin.from('messages').insert({
           tenant_id: conv.tenant_id, conversation_id: conversationId, remitente: 'ia', contenido: msg
         })
       }
+      
       await bloquearConversacion('derivacion_contacto')
       await logRechazo('blacklist')
-      return NextResponse.json({ status: `Ignorado (Trato contacto: ${contact.trato}, Modo: ${contact.modo})` })
+      return NextResponse.json({ status: `Ignorado (Trato contacto: ${contact.trato}, Modo: ${modoEfectivo})` })
     }
 
     if (branch && branch.modo_pausa === 'apagada') {

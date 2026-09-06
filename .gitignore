@@ -40,3 +40,19 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 scratchpad_*.ts
+
+# Scripts y archivos de diagnóstico temporales
+/scratch/
+diagnostico*.js
+check_*.js
+extract_*.js
+audit_*.js
+get-*.js
+query_*.js
+test-*.js
+schema-*.js
+verify_*.js
+dump-*.js
+*_output.txt
+*_output.json
+dummy_test.txt

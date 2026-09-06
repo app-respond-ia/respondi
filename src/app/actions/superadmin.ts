@@ -718,7 +718,11 @@ export async function getClientesDeVendedor(vendedorId: string) {
 
 // E5) getComisionesDeVendedor
 export async function getComisionesDeVendedor(vendedorId: string) {
-  const { supabase } = await requireSuperAdmin()
+  const auth = await requireSuperAdmin()
+  if (!superadminHasPermission(auth, 'comisiones', 'lectura')) {
+    return { success: false, error: 'No tienes permiso para esta acción' }
+  }
+  const { supabase } = auth
   const { data, error } = await supabase
     .from('comisiones')
     .select('*, organizaciones(nombre)')
@@ -833,7 +837,11 @@ export async function getComisiones(filtros?: {
   estado?: string
   tipo?: string
 }) {
-  const { supabase } = await requireSuperAdmin()
+  const auth = await requireSuperAdmin()
+  if (!superadminHasPermission(auth, 'comisiones', 'lectura')) {
+    return { success: false, error: 'No tienes permiso para esta acción' }
+  }
+  const { supabase } = auth
 
   let query = supabase
     .from('comisiones')
@@ -855,7 +863,11 @@ export async function getComisiones(filtros?: {
 
 // K) aprobarComision
 export async function aprobarComision(id: string) {
-  const { supabase, userId } = await requireSuperAdmin()
+  const auth = await requireSuperAdmin()
+  if (!superadminHasPermission(auth, 'comisiones', 'escritura')) {
+    return { success: false, error: 'No tienes permiso para esta acción' }
+  }
+  const { supabase, userId } = auth
 
   const { data: anterior } = await supabase.from('comisiones').select('*').eq('id', id).single()
 
@@ -900,7 +912,11 @@ export async function aprobarComision(id: string) {
 
 // L) marcarComisionPagada
 export async function marcarComisionPagada(id: string, notas_pago?: string) {
-  const { supabase, userId } = await requireSuperAdmin()
+  const auth = await requireSuperAdmin()
+  if (!superadminHasPermission(auth, 'comisiones', 'escritura')) {
+    return { success: false, error: 'No tienes permiso para esta acción' }
+  }
+  const { supabase, userId } = auth
 
   const { data: anterior } = await supabase.from('comisiones').select('*').eq('id', id).single()
 
@@ -953,7 +969,11 @@ export async function crearComisionManual(data: {
   mes_referencia?: string
   notas_pago?: string
 }) {
-  const { supabase, userId } = await requireSuperAdmin()
+  const auth = await requireSuperAdmin()
+  if (!superadminHasPermission(auth, 'comisiones', 'escritura')) {
+    return { success: false, error: 'No tienes permiso para esta acción' }
+  }
+  const { supabase, userId } = auth
 
   const { data: result, error } = await supabase
     .from('comisiones')

@@ -1,3 +1,5 @@
+> ⚠️ Documento histórico - refleja el estado del proyecto en la fecha de su última edición, no el estado actual. Para el estado actual, consultar la memoria del proyecto.
+
 # Cambios y decisiones respecto al Anteproyecto v2.0 — Respondi
 
 Este documento recoge las decisiones tomadas durante la maquetación del frontend

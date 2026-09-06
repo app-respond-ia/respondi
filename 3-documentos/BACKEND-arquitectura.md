@@ -1,3 +1,5 @@
+> ⚠️ Documento histórico - refleja el estado del proyecto en la fecha de su última edición, no el estado actual. Para el estado actual, consultar la memoria del proyecto.
+
 # Arquitectura Backend - Respondi
 
 Este documento detalla la arquitectura de seguridad, funciones de servidor, edge functions y bases de datos requeridas para el funcionamiento completo de Respondi.

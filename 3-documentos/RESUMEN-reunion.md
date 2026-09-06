@@ -1,3 +1,5 @@
+> ⚠️ Documento histórico - refleja el estado del proyecto en la fecha de su última edición, no el estado actual. Para el estado actual, consultar la memoria del proyecto.
+
 # RESPONDI · Prototipo del frontend
 ## Documento para la reunión de equipo
 

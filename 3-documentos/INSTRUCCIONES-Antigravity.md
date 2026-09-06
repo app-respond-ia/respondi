@@ -1,3 +1,5 @@
+> ⚠️ Documento histórico - refleja el estado del proyecto en la fecha de su última edición, no el estado actual. Para el estado actual, consultar la memoria del proyecto.
+
 # Respondi · Instrucciones para construir la app con Google Antigravity
 
 > Documento de arranque. Pégalo en Antigravity como contexto inicial del

@@ -1,6 +1,7 @@
 import OpenAI from 'openai'
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { crearCasoDesdeSistema } from '@/lib/casos/crearCasoDesdeSistema'
+import { registrarAuditoria } from '@/lib/auditoria'
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || 'sk-test-placeholder'
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY })
@@ -690,7 +691,7 @@ export async function generarRespuesta(conv: any) {
 
   // 12. Simular N8N webhook
   if (finalContent) {
-    const { error: errorAudit } = await supabaseAdmin.from('audit_log').insert({
+    await registrarAuditoria({
       tenant_id: tenantId,
       user_id: null,
       accion: 'SIMULACION_N8N_WEBHOOK',
@@ -702,7 +703,6 @@ export async function generarRespuesta(conv: any) {
         content: finalContent
       }
     })
-    if (errorAudit) console.error('Error insertando audit_log n8n:', errorAudit)
   }
 
   return { success: true }

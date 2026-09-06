@@ -298,7 +298,7 @@ export async function entrarComoOrganizacion(organizacionId: string) {
   
   await setImpersonatedTenantId(organizacionId)
   
-  await supabase.from('audit_log').insert({
+  await registrarAuditoria({
     tenant_id: organizacionId,
     user_id: null,
     actuado_como_id: userId,
@@ -315,7 +315,7 @@ export async function salirDeImpersonacion() {
   
   await clearImpersonatedTenantId()
   
-  await supabase.from('audit_log').insert({
+  await registrarAuditoria({
     tenant_id: null,
     user_id: null,
     actuado_como_id: userId,
@@ -352,7 +352,7 @@ export async function cambiarPlanOrganizacion(organizacionId: string, nuevoPlanI
   const { error } = await supabase.from('organizaciones').update(updates).eq('id', organizacionId)
   if (error) return { success: false, error: error.message }
 
-  await supabase.from('audit_log').insert({
+  await registrarAuditoria({
     tenant_id: organizacionId,
     user_id: userId,
     accion: 'cambiar_plan',
@@ -432,7 +432,7 @@ export async function registrarPagoYRenovar(organizacionId: string, importe: num
   })
   if (billingErr) console.error('Error insertando en billing:', billingErr)
 
-  await supabase.from('audit_log').insert({
+  await registrarAuditoria({
     tenant_id: organizacionId,
     user_id: userId,
     accion: 'registrar_pago_renovar',
@@ -581,7 +581,7 @@ export async function crearVendedor(data: {
     })
   }
 
-  await supabase.from('audit_log').insert({
+  await registrarAuditoria({
     tenant_id: null,
     user_id: userId,
     accion: 'crear_vendedor',
@@ -619,7 +619,7 @@ export async function actualizarVendedor(id: string, data: {
   if (error) return { success: false, error: error.message }
 
   // Log (usamos el id del vendedor como referencia en comisiones_log de forma genérica)
-  await supabase.from('audit_log').insert({
+  await registrarAuditoria({
     tenant_id: null,
     user_id: userId,
     accion: 'actualizar_vendedor',
@@ -1467,7 +1467,7 @@ export async function actualizarPerfilSuperadmin(nombre: string, apodo: string, 
 
     if (errUsers) throw new Error('Error al actualizar usuario: ' + errUsers.message)
 
-    await supabaseAdmin.from('audit_log').insert({
+    await registrarAuditoria({
       tenant_id: null,
       user_id: userId,
       accion: 'actualizar_perfil',
@@ -1495,7 +1495,7 @@ export async function cambiarContrasenaSuperadmin(password: string) {
     const { error } = await supabase.auth.updateUser({ password })
     if (error) return { success: false, error: error.message }
 
-    await supabaseAdmin.from('audit_log').insert({
+    await registrarAuditoria({
       tenant_id: null,
       user_id: userId,
       accion: 'cambiar_contrasena',
@@ -2370,7 +2370,7 @@ export async function recargarCreditosIA(organizacionId: string, cantidad: numbe
 
     if (rpcError) return { success: false, error: rpcError.message }
 
-    await supabaseAdmin.from('audit_log').insert({
+    await registrarAuditoria({
       tenant_id: organizacionId,
       user_id: userId,
       accion: 'recarga_manual_creditos_ia',

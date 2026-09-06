@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/server'
 import { requireSuperAdmin, canManageSuperadminRole } from './superadmin'
 import { superadminHasPermission } from '@/lib/permisosSuperadmin'
 import { revalidatePath } from 'next/cache'
+import { registrarAuditoria } from '@/lib/auditoria'
 
 // 1. Obtener todos los usuarios globales
 export async function getTodosLosUsuarios(
@@ -120,7 +121,7 @@ export async function cambiarEstadoUsuario(targetUserId: string, activo: boolean
     if (error) throw error
 
     // Registrar en audit log
-    await supabaseAdmin.from('audit_log').insert({
+    await registrarAuditoria({
       tenant_id: null,
       user_id: auth.userId,
       accion: activo ? 'activar_usuario' : 'desactivar_usuario',
@@ -151,7 +152,7 @@ export async function enviarResetPassword(email: string) {
 
     if (error) throw error
 
-    await supabaseAdmin.from('audit_log').insert({
+    await registrarAuditoria({
       tenant_id: null,
       user_id: auth.userId,
       accion: 'enviar_reset_password',
@@ -209,7 +210,7 @@ export async function cambiarRolUsuario(targetUserId: string, nuevoRol: 'admin' 
       }
     }
 
-    await supabaseAdmin.from('audit_log').insert({
+    await registrarAuditoria({
       tenant_id: null,
       user_id: auth.userId,
       accion: 'cambiar_rol_global',
@@ -266,7 +267,7 @@ export async function degradarSuperadmin(targetUserId: string) {
 
     if (updErr) throw updErr
 
-    await supabaseAdmin.from('audit_log').insert({
+    await registrarAuditoria({
       tenant_id: null,
       user_id: auth.userId,
       accion: 'degradar_superadmin',

@@ -231,7 +231,7 @@ export async function actualizarPerfilVendedor(nombre: string, apodo: string, co
 
     if (errVendedores) throw new Error('Error al actualizar vendedor: ' + errVendedores.message)
 
-    await supabaseAdmin.from('audit_log').insert({
+    await registrarAuditoria({
       tenant_id: null,
       user_id: userId,
       accion: 'actualizar_perfil_vendedor',
@@ -262,7 +262,7 @@ export async function cambiarContrasenaVendedor(password: string) {
     const { error } = await supabase.auth.updateUser({ password })
     if (error) return { success: false, error: error.message }
 
-    await supabaseAdmin.from('audit_log').insert({
+    await registrarAuditoria({
       tenant_id: null,
       user_id: userId,
       accion: 'cambiar_contrasena',

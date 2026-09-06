@@ -749,7 +749,11 @@ export async function eliminarPlan(id: string) {
 
 // H) getErrores
 export async function getErrores(filtro?: 'sin_resolver' | 'resuelto') {
-  const { supabase } = await requireSuperAdmin()
+  const auth = await requireSuperAdmin()
+  if (!superadminHasPermission(auth, 'soporte_vendedores', 'lectura')) {
+    return { success: false, error: 'No tienes permiso para esta acción' }
+  }
+  const { supabase } = auth
 
   let query = supabase
     .from('error_logs')
@@ -767,7 +771,11 @@ export async function getErrores(filtro?: 'sin_resolver' | 'resuelto') {
 
 // I) resolverError
 export async function resolverError(id: string) {
-  const { supabase } = await requireSuperAdmin()
+  const auth = await requireSuperAdmin()
+  if (!superadminHasPermission(auth, 'soporte_vendedores', 'escritura')) {
+    return { success: false, error: 'No tienes permiso para esta acción' }
+  }
+  const { supabase } = auth
   const { error } = await supabase.from('error_logs').update({ resuelto: true }).eq('id', id)
   if (error) return { success: false, error: error.message }
   revalidatePath('/superadmin/errores')
@@ -1153,7 +1161,11 @@ export async function actualizarEstadoOrganizacion(id: string, estado: string) {
 
 export async function getTicketsSoporte() {
   try {
-    const { supabase, userId } = await requireSuperAdmin()
+    const auth = await requireSuperAdmin()
+    if (!superadminHasPermission(auth, 'soporte_vendedores', 'lectura')) {
+      return { success: false, error: 'No tienes permiso para esta acción' }
+    }
+    const { supabase, userId } = auth
     const { data: tickets, error } = await supabase
       .from('support_tickets')
       .select(`
@@ -1187,7 +1199,11 @@ export async function getTicketsSoporte() {
 
 export async function getTicketDetalleSuperadmin(ticketId: string) {
   try {
-    const { supabase, userId } = await requireSuperAdmin()
+    const auth = await requireSuperAdmin()
+    if (!superadminHasPermission(auth, 'soporte_vendedores', 'lectura')) {
+      return { success: false, error: 'No tienes permiso para esta acción' }
+    }
+    const { supabase, userId } = auth
     const { data: ticket, error } = await supabase
       .from('support_tickets')
       .select(`
@@ -1222,7 +1238,11 @@ export async function getTicketDetalleSuperadmin(ticketId: string) {
 
 export async function asignarCategoriaPrioridad(ticketId: string, categoriaId: string | null, prioridad: string) {
   try {
-    const { supabase, userId } = await requireSuperAdmin()
+    const auth = await requireSuperAdmin()
+    if (!superadminHasPermission(auth, 'soporte_vendedores', 'escritura')) {
+      return { success: false, error: 'No tienes permiso para esta acción' }
+    }
+    const { supabase, userId } = auth
     const { error } = await supabaseAdmin
       .from('support_tickets')
       .update({ categoria_id: categoriaId, prioridad })
@@ -1248,7 +1268,11 @@ export async function asignarCategoriaPrioridad(ticketId: string, categoriaId: s
 
 export async function responderTicket(ticketId: string, mensaje: string) {
   try {
-    const { supabase, userId } = await requireSuperAdmin()
+    const auth = await requireSuperAdmin()
+    if (!superadminHasPermission(auth, 'soporte_vendedores', 'escritura')) {
+      return { success: false, error: 'No tienes permiso para esta acción' }
+    }
+    const { supabase, userId } = auth
     if (!mensaje || mensaje.trim() === '') return { success: false, error: 'Mensaje vacío' }
 
     const { data: ticket, error: ticketError } = await supabaseAdmin
@@ -1290,7 +1314,11 @@ export async function responderTicket(ticketId: string, mensaje: string) {
 
 export async function cambiarEstatusTicket(ticketId: string, estatus: 'abierto' | 'cerrado') {
   try {
-    const { supabase, userId } = await requireSuperAdmin()
+    const auth = await requireSuperAdmin()
+    if (!superadminHasPermission(auth, 'soporte_vendedores', 'escritura')) {
+      return { success: false, error: 'No tienes permiso para esta acción' }
+    }
+    const { supabase, userId } = auth
     const { error } = await supabaseAdmin
       .from('support_tickets')
       .update({ 
@@ -1324,7 +1352,11 @@ export async function cambiarEstatusTicket(ticketId: string, estatus: 'abierto' 
 
 export async function getCategoriasTickets() {
   try {
-    const { supabase } = await requireSuperAdmin()
+    const auth = await requireSuperAdmin()
+    if (!superadminHasPermission(auth, 'soporte_vendedores', 'lectura')) {
+      return { success: false, error: 'No tienes permiso para esta acción' }
+    }
+    const { supabase } = auth
     const { data, error } = await supabase
       .from('ticket_categorias')
       .select('*')
@@ -1339,7 +1371,11 @@ export async function getCategoriasTickets() {
 
 export async function crearCategoriaTicket(nombre: string, color: string) {
   try {
-    const { supabase } = await requireSuperAdmin()
+    const auth = await requireSuperAdmin()
+    if (!superadminHasPermission(auth, 'soporte_vendedores', 'escritura')) {
+      return { success: false, error: 'No tienes permiso para esta acción' }
+    }
+    const { supabase } = auth
     const { error } = await supabase
       .from('ticket_categorias')
       .insert({ nombre: nombre.trim(), color })
@@ -1355,7 +1391,11 @@ export async function crearCategoriaTicket(nombre: string, color: string) {
 
 export async function actualizarCategoriaTicket(id: string, nombre: string, color: string) {
   try {
-    const { supabase } = await requireSuperAdmin()
+    const auth = await requireSuperAdmin()
+    if (!superadminHasPermission(auth, 'soporte_vendedores', 'escritura')) {
+      return { success: false, error: 'No tienes permiso para esta acción' }
+    }
+    const { supabase } = auth
     const { error } = await supabase
       .from('ticket_categorias')
       .update({ nombre: nombre.trim(), color })
@@ -1372,7 +1412,11 @@ export async function actualizarCategoriaTicket(id: string, nombre: string, colo
 
 export async function borrarCategoriaTicket(id: string) {
   try {
-    const { supabase } = await requireSuperAdmin()
+    const auth = await requireSuperAdmin()
+    if (!superadminHasPermission(auth, 'soporte_vendedores', 'escritura')) {
+      return { success: false, error: 'No tienes permiso para esta acción' }
+    }
+    const { supabase } = auth
     
     // Check if category is used
     const { count, error: countError } = await supabase
@@ -1421,7 +1465,11 @@ export async function getSuperadmins() {
 
 export async function asignarTicket(ticketId: string, asignadoA: string | null) {
   try {
-    const { supabase, userId } = await requireSuperAdmin()
+    const auth = await requireSuperAdmin()
+    if (!superadminHasPermission(auth, 'soporte_vendedores', 'escritura')) {
+      return { success: false, error: 'No tienes permiso para esta acción' }
+    }
+    const { supabase, userId } = auth
     const { error } = await supabaseAdmin
       .from('support_tickets')
       .update({ asignado_a: asignadoA })

@@ -143,11 +143,13 @@ export async function crearSucursal(nombre: string, direccion?: string, copiarDe
     }
   }
 
-  const { data: propietarios } = await supabase
+  const { data: propietarios, error: errorPropietarios } = await supabase
     .from('users')
     .select('id, roles_personalizados!inner(es_propietario)')
     .eq('tenant_id', auth.tenant_id)
     .eq('roles_personalizados.es_propietario', true)
+
+  console.log('DEBUG propietarios:', JSON.stringify(propietarios), 'error:', JSON.stringify(errorPropietarios))
 
   if (propietarios && propietarios.length > 0) {
     await supabase.from('user_branches').insert(

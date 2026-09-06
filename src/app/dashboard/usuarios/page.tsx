@@ -10,7 +10,7 @@ import {
   desactivarUsuario,
   reactivarUsuario
 } from '@/app/actions/usuarios'
-import { getMisPermisos, getPermisosUsuario } from '@/app/actions/permisos'
+import { getMisPermisos } from '@/app/actions/permisos'
 import { getRolesPersonalizados } from '@/app/actions/roles'
 import { useToast } from '@/components/ui/Toast'
 

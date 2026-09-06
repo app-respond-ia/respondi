@@ -8,42 +8,7 @@ import { canManageRole } from './roles'
 import type { SeccionPermiso, NivelPermiso, PermisoSeccion } from '@/lib/permisos-types'
 import { SECCIONES_CON_ALCANCE } from '@/lib/permisos-types'
 
-// Obtener los permisos de un usuario en una sucursal específica
-export async function getPermisosUsuario(userId: string, branchId: string) {
-  const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: 'No autorizado' }
-
-  const { data: adminData } = await supabaseAdmin
-    .from('users')
-    .select('rol, tenant_id, roles_personalizados(es_propietario)')
-    .eq('id', user.id)
-    .single()
-
-  if (!adminData) return { success: false, error: 'No autorizado' }
-
-  const roleData = Array.isArray(adminData.roles_personalizados) 
-    ? adminData.roles_personalizados[0] 
-    : adminData.roles_personalizados
-
-  const esAdmin = adminData.rol === 'super_admin' || (roleData?.es_propietario || false)
-  const esPropios = userId === user.id
-
-  if (!esAdmin && !esPropios) {
-    return { success: false, error: 'No tienes permisos para ver esto' }
-  }
-
-  const { data: permisos, error } = await supabase
-    .from('user_permissions')
-    .select('seccion, nivel, alcance')
-    .eq('user_id', userId)
-    .eq('branch_id', branchId)
-
-  if (error) return { success: false, error: error.message }
-
-  return { success: true, data: permisos || [] }
-}
 
 export async function getMisPermisos() {
   const supabase = await createClient()

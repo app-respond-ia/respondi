@@ -6,6 +6,7 @@ import { requireSuperAdmin, canManageSuperadminRole } from './superadmin'
 import { superadminHasPermission } from '@/lib/permisosSuperadmin'
 import { revalidatePath } from 'next/cache'
 import { registrarAuditoria } from '@/lib/auditoria'
+import { registrarError } from '@/lib/errores'
 
 // 1. Obtener todos los usuarios globales
 export async function getTodosLosUsuarios(
@@ -174,7 +175,10 @@ export async function cambiarRolUsuario(targetUserId: string, nuevoRol: 'admin' 
       return { success: false, error: 'No tienes permiso de escritura en usuarios globales' }
     }
 
-    const { data: targetUser } = await supabaseAdmin.from('users').select('rol, nombre, email').eq('id', targetUserId).single()
+    const { data: targetUser, error: errTarget } = await supabaseAdmin.from('users').select('rol, nombre, email').eq('id', targetUserId).single()
+    if (errTarget && errTarget.code !== 'PGRST116') {
+      await registrarError({ origen: 'app', descripcion: 'Fallo al leer usuario en cambiarRolUsuario', stacktrace: errTarget.message, tenant_id: null })
+    }
     if (!targetUser) return { success: false, error: 'Usuario no encontrado' }
 
     if (targetUser.rol === 'super_admin') {
@@ -193,13 +197,20 @@ export async function cambiarRolUsuario(targetUserId: string, nuevoRol: 'admin' 
     }
 
     const { error: updErr } = await supabaseAdmin.from('users').update(updates).eq('id', targetUserId)
-    if (updErr) throw updErr
+    if (updErr) {
+      await registrarError({ origen: 'app', descripcion: 'Fallo al actualizar rol de usuario en cambiarRolUsuario', stacktrace: updErr.message, tenant_id: null })
+      throw updErr
+    }
 
     // Si se pasa a vendedor, creamos la fila en vendedores
     if (nuevoRol === 'vendedor') {
-      const { data: existe } = await supabaseAdmin.from('vendedores').select('id').eq('user_id', targetUserId).single()
+      const { data: existe, error: errExiste } = await supabaseAdmin.from('vendedores').select('id').eq('user_id', targetUserId).single()
+      if (errExiste && errExiste.code !== 'PGRST116') {
+        await registrarError({ origen: 'app', descripcion: 'Fallo al verificar vendedor existente en cambiarRolUsuario', stacktrace: errExiste.message, tenant_id: null })
+      }
+      
       if (!existe) {
-        await supabaseAdmin.from('vendedores').insert({
+        const { error: errIns } = await supabaseAdmin.from('vendedores').insert({
           user_id: targetUserId,
           nombre: targetUser.nombre || targetUser.email,
           email: targetUser.email,
@@ -207,6 +218,10 @@ export async function cambiarRolUsuario(targetUserId: string, nuevoRol: 'admin' 
           tipo_comision: 'recurrente',
           activo: true
         })
+        if (errIns) {
+          await registrarError({ origen: 'app', descripcion: 'Fallo al crear vendedor en cambiarRolUsuario', stacktrace: errIns.message, tenant_id: null })
+          throw errIns
+        }
       }
     }
 

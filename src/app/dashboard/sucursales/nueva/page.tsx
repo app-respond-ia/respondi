@@ -317,6 +317,20 @@ export default function NuevaSucursalPage() {
 
   const handleGuardar = async () => {
     setSaving(true)
+    
+    console.log('DEBUG HORARIOS ESTADO ACTUAL:', JSON.stringify(horarios, null, 2))
+    const horariosPayload = horarios.flatMap(h => {
+      if (h.cerrado) return [{ dia_semana: h.dia_semana, apertura: null, cierre: null, cerrado: true, orden: 0 }] as { dia_semana: number, apertura: string | null, cierre: string | null, cerrado: boolean, orden: number }[]
+      return h.franjas.map((f, i) => ({
+        dia_semana: h.dia_semana,
+        apertura: f.apertura.length === 5 ? `${f.apertura}:00` : f.apertura,
+        cierre: f.cierre.length === 5 ? `${f.cierre}:00` : f.cierre,
+        cerrado: false,
+        orden: i
+      })) as { dia_semana: number, apertura: string | null, cierre: string | null, cerrado: boolean, orden: number }[]
+    })
+    console.log('DEBUG HORARIOS PAYLOAD FINAL:', JSON.stringify(horariosPayload, null, 2))
+
     const res = await crearSucursalConDatos({
       nombre,
       direccion,
@@ -329,16 +343,7 @@ export default function NuevaSucursalPage() {
       msg_fuera_horario: msgFueraHorario,
       caso_fuera_horario: casoFueraHorario,
       modo_horario_ia: iaActivaFueraHorario ? 'siempre_activa' : 'mismo_negocio',
-      horarios: horarios.flatMap(h => {
-        if (h.cerrado) return [{ dia_semana: h.dia_semana, apertura: null, cierre: null, cerrado: true, orden: 0 }] as { dia_semana: number, apertura: string | null, cierre: string | null, cerrado: boolean, orden: number }[]
-        return h.franjas.map((f, i) => ({
-          dia_semana: h.dia_semana,
-          apertura: f.apertura.length === 5 ? `${f.apertura}:00` : f.apertura,
-          cierre: f.cierre.length === 5 ? `${f.cierre}:00` : f.cierre,
-          cerrado: false,
-          orden: i
-        })) as { dia_semana: number, apertura: string | null, cierre: string | null, cerrado: boolean, orden: number }[]
-      }),
+      horarios: horariosPayload,
       // Enviamos solo nombre y activo para no incluir el campo 'fija' interno
       skills: skills.map(s => ({ skill_global_id: s.skill_global_id, nombre: s.nombre, activo: s.activo })),
       precios,
@@ -571,7 +576,7 @@ export default function NuevaSucursalPage() {
                     localItems = servicios ? [servicios] : []
                   } else if (m.id === 'politicas') {
                     localCount = politicas.length > 0 ? `${politicas.length} políticas` : 'Sin políticas'
-                    localItems = politicas.map(p => p.titulo)
+                    localItems = politicas.map(p => p.descripcion || p.titulo)
                   } else if (m.id === 'configuracion_ia') {
                     localCount = 'Configurado'
                     localItems = [

@@ -32,7 +32,7 @@ export async function getTodosLosUsuarios(
       .select(`
         id, email, nombre, rol, activo, fecha_creacion,
         tenant_id,
-        organizaciones (nombre, plan_id),
+        organizaciones!tenant_id (nombre, plan_id),
         superadmin_rol_id,
         superadmin_roles (nombre, nivel),
         rol_personalizado_id,

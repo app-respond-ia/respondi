@@ -2,7 +2,7 @@ import { supabaseAdmin } from '@/utils/supabase/admin'
 
 interface RegistrarAuditoriaParams {
   tenant_id: string | null
-  user_id: string
+  user_id: string | null
   accion: string
   tabla_afectada: string
   registro_id?: string

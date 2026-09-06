@@ -707,14 +707,22 @@ export async function getComisionesDeVendedor(vendedorId: string) {
 
 // F) getPlanes
 export async function getPlanes() {
-  const { supabase } = await requireSuperAdmin()
+  const auth = await requireSuperAdmin()
+  if (!superadminHasPermission(auth, 'planes', 'lectura')) {
+    return { success: false, error: 'No tienes permiso para esta acción' }
+  }
+  const { supabase } = auth
   const { data, error } = await supabase.from('plans').select('*').order('precio_usd', { ascending: true })
   if (error) return { success: false, error: error.message }
   return { success: true, planes: data }
 }
 
 export async function crearPlan(data: any) {
-  const { supabase } = await requireSuperAdmin()
+  const auth = await requireSuperAdmin()
+  if (!superadminHasPermission(auth, 'planes', 'escritura')) {
+    return { success: false, error: 'No tienes permiso para esta acción' }
+  }
+  const { supabase } = auth
   const { data: result, error } = await supabase.from('plans').insert(data).select().single()
   if (error) return { success: false, error: error.message }
   revalidatePath('/superadmin/planes')
@@ -723,7 +731,11 @@ export async function crearPlan(data: any) {
 
 // G) actualizarPlan
 export async function actualizarPlan(id: string, data: any) {
-  const { supabase } = await requireSuperAdmin()
+  const auth = await requireSuperAdmin()
+  if (!superadminHasPermission(auth, 'planes', 'escritura')) {
+    return { success: false, error: 'No tienes permiso para esta acción' }
+  }
+  const { supabase } = auth
   const { data: result, error } = await supabase.from('plans').update(data).eq('id', id).select().single()
   if (error) return { success: false, error: error.message }
   revalidatePath('/superadmin/planes')
@@ -731,7 +743,11 @@ export async function actualizarPlan(id: string, data: any) {
 }
 
 export async function eliminarPlan(id: string) {
-  const { supabase } = await requireSuperAdmin()
+  const auth = await requireSuperAdmin()
+  if (!superadminHasPermission(auth, 'planes', 'escritura')) {
+    return { success: false, error: 'No tienes permiso para esta acción' }
+  }
+  const { supabase } = auth
   // Check if any organization uses this plan
   const { count, error: countError } = await supabase
     .from('organizaciones')

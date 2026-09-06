@@ -382,16 +382,20 @@ export default function GlobalUsersTable({ defaultFiltro }: { defaultFiltro: str
                             <div className="hidden group-hover/dropdown:block absolute right-0 mt-0 w-48 bg-white border border-slate-100 shadow-xl rounded-xl py-1 z-50">
                               {u.rol !== 'super_admin' ? (
                                 <>
-                                  {u.rol !== 'vendedor' && (
+                                  {/* u.rol !== 'vendedor' && (
                                     <button onClick={() => handleChangeRole(u, 'vendedor')} className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 transition">
                                       Convertir a Vendedor
                                     </button>
-                                  )}
-                                  {u.rol !== 'tenant_user' && (
+                                  ) */}
+                                  {/* u.rol !== 'tenant_user' && (
                                     <button onClick={() => handleChangeRole(u, 'tenant_user')} className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 transition">
                                       Convertir a Cliente
                                     </button>
-                                  )}
+                                  ) */}
+                                  {/* Nota: La conversión entre cliente y vendedor se ha deshabilitado por decisión de producto. */}
+                                  <div className="w-full text-left px-4 py-2 text-xs text-slate-400 italic bg-slate-50 border-b border-slate-100">
+                                    Cambio de rol deshabilitado. Si necesitas cambiarlo, elimina y recrea la cuenta.
+                                  </div>
                                 </>
                               ) : (
                                 <>

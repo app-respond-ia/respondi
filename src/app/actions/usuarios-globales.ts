@@ -170,6 +170,8 @@ export async function enviarResetPassword(email: string) {
 // 4. Cambiar rol entre tenant_user y vendedor
 export async function cambiarRolUsuario(targetUserId: string, nuevoRol: 'tenant_user' | 'vendedor') {
   try {
+    return { success: false, error: 'Cambiar el tipo de cuenta entre cliente y vendedor ya no está permitido desde este panel. Elimina la cuenta y pide que se registre de nuevo con el rol correcto.' }
+    /*
     const auth = await requireSuperAdmin()
     if (!superadminHasPermission(auth, 'usuarios_globales', 'escritura')) {
       return { success: false, error: 'No tienes permiso de escritura en usuarios globales' }
@@ -217,6 +219,7 @@ export async function cambiarRolUsuario(targetUserId: string, nuevoRol: 'tenant_
 
     revalidatePath('/superadmin/usuarios')
     return { success: true }
+    */
   } catch (err: any) {
     return { success: false, error: err.message }
   }

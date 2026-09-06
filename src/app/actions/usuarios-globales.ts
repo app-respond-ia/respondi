@@ -167,8 +167,8 @@ export async function enviarResetPassword(email: string) {
   }
 }
 
-// 4. Cambiar rol entre tenant_user/admin y vendedor
-export async function cambiarRolUsuario(targetUserId: string, nuevoRol: 'admin' | 'vendedor') {
+// 4. Cambiar rol entre tenant_user y vendedor
+export async function cambiarRolUsuario(targetUserId: string, nuevoRol: 'tenant_user' | 'vendedor') {
   try {
     const auth = await requireSuperAdmin()
     if (!superadminHasPermission(auth, 'usuarios_globales', 'escritura')) {
@@ -272,9 +272,9 @@ export async function degradarSuperadmin(targetUserId: string) {
         return { success: false, error: 'No puedes degradar a un Propietario' }
     }
 
-    // Degradar a admin sin tenant (o usuario base)
+    // Degradar a tenant_user sin tenant
     const { error: updErr } = await supabaseAdmin.from('users').update({
-      rol: 'admin',
+      rol: 'tenant_user',
       superadmin_rol_id: null,
       tenant_id: null,
       branch_id: null

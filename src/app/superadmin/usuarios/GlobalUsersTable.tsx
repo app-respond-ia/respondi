@@ -139,7 +139,7 @@ export default function GlobalUsersTable({ defaultFiltro }: { defaultFiltro: str
     })
   }
 
-  const handleChangeRole = (user: any, targetRole: 'admin' | 'vendedor') => {
+  const handleChangeRole = (user: any, targetRole: 'tenant_user' | 'vendedor') => {
     if (!canWrite) return
     let desc = `El usuario pasará a ser ${targetRole}. `
     if (targetRole === 'vendedor') {
@@ -387,8 +387,8 @@ export default function GlobalUsersTable({ defaultFiltro }: { defaultFiltro: str
                                       Convertir a Vendedor
                                     </button>
                                   )}
-                                  {u.rol !== 'admin' && (
-                                    <button onClick={() => handleChangeRole(u, 'admin')} className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 transition">
+                                  {u.rol !== 'tenant_user' && (
+                                    <button onClick={() => handleChangeRole(u, 'tenant_user')} className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 transition">
                                       Convertir a Cliente
                                     </button>
                                   )}

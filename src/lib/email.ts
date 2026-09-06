@@ -12,6 +12,7 @@ export async function enviarEmailInvitacion(params: {
     super_admin: 'Super Administrador',
     vendedor: 'Vendedor/Partner',
     admin: 'Administrador de la Tienda',
+    tenant_user: 'Administrador',
     agente: 'Agente de Atención',
     operario: 'Operario',
   }

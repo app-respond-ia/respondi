@@ -27,6 +27,55 @@ const TIMEZONES = [
   { id: 'Europe/Madrid', label: 'Europa/Madrid (GMT+1)' },
 ]
 
+function PreviewModuleItem({ label, countLabel, items }: { label: string, countLabel: string, items: React.ReactNode[] }) {
+  const [expanded, setExpanded] = useState(false)
+  const [showAll, setShowAll] = useState(false)
+
+  if (items.length === 0) {
+    return (
+      <div className="flex items-center justify-between text-sm py-1.5">
+        <span className="font-500 text-brand-800">{label}</span>
+        <span className="text-brand-600 font-400">{countLabel}</span>
+      </div>
+    )
+  }
+
+  const visibleItems = showAll ? items : items.slice(0, 5)
+  const hiddenCount = items.length - 5
+
+  return (
+    <div className="text-sm border-t border-brand-200/50 py-2 first:border-0 first:pt-0">
+      <div 
+        className="flex items-center justify-between cursor-pointer group select-none"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <span className="font-500 text-brand-800 group-hover:text-brand-900 transition flex items-center gap-1.5">
+          {label}
+          <svg className={`w-3.5 h-3.5 text-brand-500 transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/></svg>
+        </span>
+        <span className="text-brand-600 font-500 bg-white/60 px-2 py-0.5 rounded-md text-xs border border-brand-200/50 shadow-sm">{countLabel}</span>
+      </div>
+      
+      {expanded && (
+        <div className="mt-2.5 pl-3 border-l-2 border-brand-200 space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+          {visibleItems.map((item, idx) => (
+            <div key={idx} className="text-xs text-brand-700/90">{item}</div>
+          ))}
+          {hiddenCount > 0 && !showAll && (
+            <button 
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setShowAll(true); }}
+              className="text-xs font-600 text-brand-600 hover:text-brand-800 hover:underline pt-1"
+            >
+              Ver más ({hiddenCount})
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // CAMBIO 3: Módulos de copia completos (incluye roles, configuracion_ia, servicios, politicas)
 const MODULOS = [
   { id: 'horarios', label: 'Horarios de atención' },
@@ -273,9 +322,23 @@ export default function NuevaSucursalPage() {
       tipos_novedad: tiposNovedad
     })
     if (res.success) {
-      // CAMBIO 5: router.push + router.refresh() para actualizar el selector de sucursal en el header
-      router.push('/dashboard/sucursales')
+      // Timeout de seguridad por si la navegación se atasca
+      setTimeout(() => {
+        setSaving(prev => {
+          if (prev) {
+            showToast('La sucursal puede haberse creado correctamente. Si no ves los cambios, recarga la página.', 'info')
+            router.push('/dashboard/sucursales')
+            return false
+          }
+          return prev
+        })
+      }, 8000)
+
+      // CAMBIO 5: router.refresh() primero, y router.push con un margen para evitar race conditions
       router.refresh()
+      setTimeout(() => {
+        router.push('/dashboard/sucursales')
+      }, 200)
     } else {
       showToast(res.error || 'Error al crear la sucursal', 'error')
       setSaving(false)
@@ -366,19 +429,41 @@ export default function NuevaSucursalPage() {
                 {previewData && copiaGlobal && !loadingCopia && (
                   <div className="mt-4 p-4 rounded-xl border border-brand-200 bg-brand-50 space-y-2">
                     <p className="text-xs font-700 text-brand-700 uppercase tracking-wide mb-2">Vista previa — datos que se copiarán</p>
-                    {[
-                      { label: 'Horarios', value: previewData.horarios?.filter((h: any) => !h.cerrado).length > 0 ? `${previewData.horarios.filter((h: any) => !h.cerrado).length} días configurados` : 'Sin horarios' },
-                      { label: 'Skills de IA', value: previewData.skills?.length > 0 ? `${previewData.skills.length} skills` : 'Sin skills' },
-                      { label: 'Precios', value: previewData.precios?.length > 0 ? `${previewData.precios.length} productos` : 'Sin precios' },
-                      { label: 'Etiquetas', value: previewData.etiquetas?.length > 0 ? `${previewData.etiquetas.length} etiquetas` : 'Sin etiquetas' },
-                      { label: 'Reglas', value: previewData.reglas?.length > 0 ? `${previewData.reglas.length} reglas` : 'Sin reglas' },
-                      { label: 'Tipos de Novedades', value: previewData.tipos_novedad?.length > 0 ? `${previewData.tipos_novedad.length} tipos` : 'Sin tipos custom' },
-                    ].map(item => (
-                      <div key={item.label} className="flex items-center justify-between text-sm">
-                        <span className="font-500 text-brand-800">{item.label}</span>
-                        <span className="text-brand-600 font-400">{item.value}</span>
-                      </div>
-                    ))}
+                    <div className="flex flex-col">
+                      <PreviewModuleItem 
+                        label="Horarios" 
+                        countLabel={previewData.horarios?.filter((h: any) => !h.cerrado).length > 0 ? `${previewData.horarios.filter((h: any) => !h.cerrado).length} franjas` : 'Sin horarios'} 
+                        items={previewData.horarios?.filter((h: any) => !h.cerrado).map((h: any) => {
+                          const dia = DIAS_SEMANA.find(d => d.id === h.dia_semana)?.label || `Día ${h.dia_semana}`;
+                          return `${dia}: ${h.apertura?.substring(0,5) || ''} - ${h.cierre?.substring(0,5) || ''}`;
+                        }) || []}
+                      />
+                      <PreviewModuleItem 
+                        label="Skills de IA" 
+                        countLabel={previewData.skills?.length > 0 ? `${previewData.skills.length} skills` : 'Sin skills'} 
+                        items={previewData.skills?.map((s: any) => s.nombre) || []}
+                      />
+                      <PreviewModuleItem 
+                        label="Precios" 
+                        countLabel={previewData.precios?.length > 0 ? `${previewData.precios.length} productos` : 'Sin precios'} 
+                        items={previewData.precios?.map((p: any) => `${p.nombre} ${p.precio ? `($${p.precio})` : ''}`) || []}
+                      />
+                      <PreviewModuleItem 
+                        label="Etiquetas" 
+                        countLabel={previewData.etiquetas?.length > 0 ? `${previewData.etiquetas.length} etiquetas` : 'Sin etiquetas'} 
+                        items={previewData.etiquetas?.map((e: any) => e.nombre) || []}
+                      />
+                      <PreviewModuleItem 
+                        label="Reglas" 
+                        countLabel={previewData.reglas?.length > 0 ? `${previewData.reglas.length} reglas` : 'Sin reglas'} 
+                        items={previewData.reglas?.map((r: any) => r.nombre) || []}
+                      />
+                      <PreviewModuleItem 
+                        label="Tipos de Novedades" 
+                        countLabel={previewData.tipos_novedad?.length > 0 ? `${previewData.tipos_novedad.length} tipos` : 'Sin tipos custom'} 
+                        items={previewData.tipos_novedad?.map((t: any) => t.nombre) || []}
+                      />
+                    </div>
                   </div>
                 )}
               </div>

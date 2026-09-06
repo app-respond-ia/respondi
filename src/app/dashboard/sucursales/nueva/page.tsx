@@ -133,7 +133,7 @@ export default function NuevaSucursalPage() {
   const [horarios, setHorarios] = useState(
     DIAS_SEMANA.map(d => ({
       dia_semana: d.id,
-      cerrado: d.id === 0 || d.id === 6,
+      cerrado: true,
       franjas: [{ apertura: '09:00', cierre: '18:00', orden: 0 }]
     }))
   )
@@ -172,7 +172,7 @@ export default function NuevaSucursalPage() {
   }, [])
 
   const resetModuloData = (modulo: string) => {
-    if (modulo === 'horarios') setHorarios(DIAS_SEMANA.map(d => ({ dia_semana: d.id, cerrado: d.id === 0 || d.id === 6, franjas: [{ apertura: '09:00', cierre: '18:00', orden: 0 }] })))
+    if (modulo === 'horarios') setHorarios(DIAS_SEMANA.map(d => ({ dia_semana: d.id, cerrado: true, franjas: [{ apertura: '09:00', cierre: '18:00', orden: 0 }] })))
     if (modulo === 'skills') setSkills(prev => prev.map(s => ({ ...s, activo: s.fija })))
     if (modulo === 'precios') setPrecios([])
     if (modulo === 'etiquetas') setEtiquetas([])

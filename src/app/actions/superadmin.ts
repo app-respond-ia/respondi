@@ -484,7 +484,11 @@ export async function getOrganizacionesBasico() {
 
 // C) getVendedores (superadmin)
 export async function getVendedores() {
-  const { supabase } = await requireSuperAdmin()
+  const auth = await requireSuperAdmin()
+  if (!superadminHasPermission(auth, 'vendedores', 'lectura')) {
+    return { success: false, error: 'No tienes permiso para esta acción' }
+  }
+  const { supabase } = auth
   const { data, error } = await supabase
     .from('vendedores')
     .select(`
@@ -517,7 +521,11 @@ export async function crearVendedor(data: {
   dni_nif?: string
   direccion?: any
 }) {
-  const { supabase, userId } = await requireSuperAdmin()
+  const auth = await requireSuperAdmin()
+  if (!superadminHasPermission(auth, 'vendedores', 'escritura')) {
+    return { success: false, error: 'No tienes permiso para esta acción' }
+  }
+  const { supabase, userId } = auth
 
   // Verificar si el email ya existe en la tabla users
   const { data: userExistente } = await supabase
@@ -605,7 +613,11 @@ export async function actualizarVendedor(id: string, data: {
   dni_nif?: string
   direccion?: any
 }) {
-  const { supabase, userId } = await requireSuperAdmin()
+  const auth = await requireSuperAdmin()
+  if (!superadminHasPermission(auth, 'vendedores', 'escritura')) {
+    return { success: false, error: 'No tienes permiso para esta acción' }
+  }
+  const { supabase, userId } = auth
 
   const { data: anterior } = await supabase.from('vendedores').select('*').eq('id', id).single()
 
@@ -635,7 +647,11 @@ export async function actualizarVendedor(id: string, data: {
 
 // E2) añadirNotaVendedor
 export async function añadirNotaVendedor(vendedor_id: string, nota: string) {
-  const { supabase, userId } = await requireSuperAdmin()
+  const auth = await requireSuperAdmin()
+  if (!superadminHasPermission(auth, 'vendedores', 'escritura')) {
+    return { success: false, error: 'No tienes permiso para esta acción' }
+  }
+  const { supabase, userId } = auth
 
   if (!nota.trim()) return { success: false, error: 'La nota no puede estar vacía' }
 
@@ -657,7 +673,11 @@ export async function añadirNotaVendedor(vendedor_id: string, nota: string) {
 
 // E3) getVendedorDetalle
 export async function getVendedorDetalle(vendedorId: string) {
-  const { supabase } = await requireSuperAdmin()
+  const auth = await requireSuperAdmin()
+  if (!superadminHasPermission(auth, 'vendedores', 'lectura')) {
+    return { success: false, error: 'No tienes permiso para esta acción' }
+  }
+  const { supabase } = auth
   const { data, error } = await supabase
     .from('vendedores')
     .select(`
@@ -673,7 +693,11 @@ export async function getVendedorDetalle(vendedorId: string) {
 
 // E4) getClientesDeVendedor
 export async function getClientesDeVendedor(vendedorId: string) {
-  const { supabase } = await requireSuperAdmin()
+  const auth = await requireSuperAdmin()
+  if (!superadminHasPermission(auth, 'vendedores', 'lectura')) {
+    return { success: false, error: 'No tienes permiso para esta acción' }
+  }
+  const { supabase } = auth
   const { data, error } = await supabase
     .from('vendedor_clientes')
     .select(`

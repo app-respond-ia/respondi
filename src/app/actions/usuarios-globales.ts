@@ -214,8 +214,6 @@ export async function cambiarRolUsuario(targetUserId: string, nuevoRol: 'tenant_
           user_id: targetUserId,
           nombre: targetUser.nombre || targetUser.email,
           email: targetUser.email,
-          porcentaje_comision: 0,
-          tipo_comision: 'recurrente',
           activo: true
         })
         if (errIns) {

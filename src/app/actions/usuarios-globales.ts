@@ -175,7 +175,8 @@ export async function cambiarRolUsuario(targetUserId: string, nuevoRol: 'tenant_
       return { success: false, error: 'No tienes permiso de escritura en usuarios globales' }
     }
 
-    const { data: targetUser, error: errTarget } = await supabaseAdmin.from('users').select('rol, nombre, email').eq('id', targetUserId).single()
+    // 1. Obtener estado ANTERIOR para validación y auditoría (añadimos tenant_id)
+    const { data: targetUser, error: errTarget } = await supabaseAdmin.from('users').select('rol, nombre, email, tenant_id').eq('id', targetUserId).single()
     if (errTarget && errTarget.code !== 'PGRST116') {
       await registrarError({ origen: 'app', descripcion: 'Fallo al leer usuario en cambiarRolUsuario', stacktrace: errTarget.message, tenant_id: null })
     }
@@ -189,48 +190,29 @@ export async function cambiarRolUsuario(targetUserId: string, nuevoRol: 'tenant_
       return { success: false, error: `El usuario ya tiene el rol ${nuevoRol}` }
     }
 
-    // Actualizar rol y quitar tenant si pasa a vendedor
-    const updates: any = { rol: nuevoRol }
-    if (nuevoRol === 'vendedor') {
-      updates.tenant_id = null
-      updates.branch_id = null
+    // 2. Ejecutar RPC atómico
+    const { error: rpcError } = await supabaseAdmin.rpc('cambiar_rol_usuario_global', {
+      p_user_id: targetUserId,
+      p_nuevo_rol: nuevoRol
+    })
+
+    if (rpcError) {
+      await registrarError({ origen: 'app', descripcion: 'Fallo al cambiar rol atómicamente', stacktrace: rpcError.message, tenant_id: null })
+      throw rpcError
     }
 
-    const { error: updErr } = await supabaseAdmin.from('users').update(updates).eq('id', targetUserId)
-    if (updErr) {
-      await registrarError({ origen: 'app', descripcion: 'Fallo al actualizar rol de usuario en cambiarRolUsuario', stacktrace: updErr.message, tenant_id: null })
-      throw updErr
-    }
+    // 3. Obtener estado NUEVO para auditoría
+    const { data: newUser } = await supabaseAdmin.from('users').select('rol, tenant_id').eq('id', targetUserId).single()
 
-    // Si se pasa a vendedor, creamos la fila en vendedores
-    if (nuevoRol === 'vendedor') {
-      const { data: existe, error: errExiste } = await supabaseAdmin.from('vendedores').select('id').eq('user_id', targetUserId).single()
-      if (errExiste && errExiste.code !== 'PGRST116') {
-        await registrarError({ origen: 'app', descripcion: 'Fallo al verificar vendedor existente en cambiarRolUsuario', stacktrace: errExiste.message, tenant_id: null })
-      }
-      
-      if (!existe) {
-        const { error: errIns } = await supabaseAdmin.from('vendedores').insert({
-          user_id: targetUserId,
-          nombre: targetUser.nombre || targetUser.email,
-          email: targetUser.email,
-          activo: true
-        })
-        if (errIns) {
-          await registrarError({ origen: 'app', descripcion: 'Fallo al crear vendedor en cambiarRolUsuario', stacktrace: errIns.message, tenant_id: null })
-          throw errIns
-        }
-      }
-    }
-
+    // 4. Registrar auditoría con el tenant_id en valor_anterior y valor_nuevo
     await registrarAuditoria({
       tenant_id: null,
       user_id: auth.userId,
       accion: 'cambiar_rol_global',
       tabla_afectada: 'users',
       registro_id: targetUserId,
-      valor_anterior: { rol: targetUser.rol },
-      valor_nuevo: { rol: nuevoRol }
+      valor_anterior: { rol: targetUser.rol, tenant_id: targetUser.tenant_id },
+      valor_nuevo: { rol: newUser?.rol, tenant_id: newUser?.tenant_id }
     })
 
     revalidatePath('/superadmin/usuarios')

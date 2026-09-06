@@ -325,64 +325,28 @@ export async function getDatosSucursalParaCopiar(branchIdOrigen: string) {
 
   const userData = { tenant_id: auth.tenant_id }
 
-  // Verificar que la sucursal origen pertenece al mismo tenant
-  const { data: sucursal } = await supabase
-    .from('sucursales')
-    .select('id, nombre, direccion, timezone')
-    .eq('id', branchIdOrigen)
-    .eq('tenant_id', userData.tenant_id)
-    .single()
+  // Lanzar todas las lecturas en paralelo
+  const [
+    { data: sucursal },
+    { data: etiquetas },
+    { data: reglas },
+    { data: horarios },
+    { data: skills },
+    { data: precios },
+    { data: tiposNovedad },
+    { data: businessProfile }
+  ] = await Promise.all([
+    supabase.from('sucursales').select('id, nombre, direccion, timezone').eq('id', branchIdOrigen).eq('tenant_id', userData.tenant_id).single(),
+    supabase.from('message_categories').select('nombre, descripcion_intencion, color, activa, es_plantilla, orden, es_fallback, es_protegida').eq('branch_id', branchIdOrigen).eq('tenant_id', userData.tenant_id),
+    supabase.from('case_rules').select('nombre, descripcion_intencion, tipo_caso, activa, es_plantilla, es_protegida').eq('branch_id', branchIdOrigen).eq('tenant_id', userData.tenant_id),
+    supabase.from('business_hours').select('dia_semana, apertura, cierre, cerrado, orden').eq('branch_id', branchIdOrigen).order('dia_semana', { ascending: true }).order('orden', { ascending: true }),
+    supabase.from('skills').select('nombre, activo, skill_global_id').eq('branch_id', branchIdOrigen),
+    supabase.from('price_list').select('nombre, tipo, precio, precio_tipo, descripcion').eq('branch_id', branchIdOrigen).eq('disponible', true),
+    supabase.from('tipos_novedad').select('nombre, icono, color').eq('branch_id', branchIdOrigen).eq('tenant_id', userData.tenant_id),
+    supabase.from('business_profiles').select('servicios, politicas, msg_fuera_horario, idioma_base, tono, caso_fuera_horario, modo_horario_ia').eq('branch_id', branchIdOrigen).maybeSingle()
+  ])
 
   if (!sucursal) return { success: false, error: 'Sucursal no encontrada' }
-
-  // Etiquetas
-  const { data: etiquetas } = await supabase
-    .from('message_categories')
-    .select('nombre, descripcion_intencion, color, activa, es_plantilla, orden, es_fallback, es_protegida')
-    .eq('branch_id', branchIdOrigen)
-    .eq('tenant_id', userData.tenant_id)
-
-  // Reglas
-  const { data: reglas } = await supabase
-    .from('case_rules')
-    .select('nombre, descripcion_intencion, tipo_caso, activa, es_plantilla, es_protegida')
-    .eq('branch_id', branchIdOrigen)
-    .eq('tenant_id', userData.tenant_id)
-
-  // Horarios
-  const { data: horarios } = await supabase
-    .from('business_hours')
-    .select('dia_semana, apertura, cierre, cerrado, orden')
-    .eq('branch_id', branchIdOrigen)
-    .order('dia_semana', { ascending: true })
-    .order('orden', { ascending: true })
-
-  // Skills
-  const { data: skills } = await supabase
-    .from('skills')
-    .select('nombre, activo, skill_global_id')
-    .eq('branch_id', branchIdOrigen)
-
-  // Precios
-  const { data: precios } = await supabase
-    .from('price_list')
-    .select('nombre, tipo, precio, precio_tipo, descripcion')
-    .eq('branch_id', branchIdOrigen)
-    .eq('disponible', true)
-
-  // Tipos de novedad
-  const { data: tiposNovedad } = await supabase
-    .from('tipos_novedad')
-    .select('nombre, icono, color')
-    .eq('branch_id', branchIdOrigen)
-    .eq('tenant_id', userData.tenant_id)
-
-  // Business profile (servicios, políticas, configuración IA)
-  const { data: businessProfile } = await supabase
-    .from('business_profiles')
-    .select('servicios, politicas, msg_fuera_horario, idioma_base, tono, caso_fuera_horario, modo_horario_ia')
-    .eq('branch_id', branchIdOrigen)
-    .maybeSingle()
 
   return {
     success: true,
@@ -473,67 +437,74 @@ export async function crearSucursalConDatos(data: {
 
   if (branchErr || !newBranch) return { success: false, error: branchErr?.message || 'Error al crear sucursal' }
 
+  // Recopilar promesas de inserción para ejecutarlas en paralelo
+  const insertPromises: PromiseLike<any>[] = []
+
   // Business profile
   if (data.servicios || data.politicas || data.msg_fuera_horario) {
-    const { error } = await supabase.from('business_profiles').insert({
-      branch_id: newBranch.id,
-      servicios: data.servicios || null,
-      politicas: data.politicas || null,
-      idioma_base: data.idioma_base || 'es',
-      tono: data.tono || 'cercano',
-      msg_fuera_horario: data.msg_fuera_horario || null,
-      caso_fuera_horario: data.caso_fuera_horario ?? false,
-      modo_horario_ia: data.modo_horario_ia || 'mismo_negocio'
-    })
-    if (error) {
-      await registrarError({ origen: 'app', descripcion: 'Fallo al crear business_profiles durante alta de sucursal', stacktrace: error.message, tenant_id: userData!.tenant_id })
-    }
+    insertPromises.push(
+      supabase.from('business_profiles').insert({
+        branch_id: newBranch.id,
+        servicios: data.servicios || null,
+        politicas: data.politicas || null,
+        idioma_base: data.idioma_base || 'es',
+        tono: data.tono || 'cercano',
+        msg_fuera_horario: data.msg_fuera_horario || null,
+        caso_fuera_horario: data.caso_fuera_horario ?? false,
+        modo_horario_ia: data.modo_horario_ia || 'mismo_negocio'
+      }).then(({ error }) => {
+        if (error) return registrarError({ origen: 'app', descripcion: 'Fallo al crear business_profiles durante alta de sucursal', stacktrace: error.message, tenant_id: userData!.tenant_id })
+      })
+    )
   }
 
   // Horarios
   if (data.horarios && data.horarios!.length > 0) {
-    const { error } = await supabase.from('business_hours').insert(
-      data.horarios!.map(h => ({ ...h, branch_id: newBranch.id }))
+    insertPromises.push(
+      supabase.from('business_hours').insert(
+        data.horarios!.map(h => ({ ...h, branch_id: newBranch.id }))
+      ).then(({ error }) => {
+        if (error) return registrarError({ origen: 'app', descripcion: 'Fallo al crear business_hours durante alta de sucursal', stacktrace: error.message, tenant_id: userData!.tenant_id })
+      })
     )
-    if (error) {
-      await registrarError({ origen: 'app', descripcion: 'Fallo al crear business_hours durante alta de sucursal', stacktrace: error.message, tenant_id: userData!.tenant_id })
-    }
   }
 
   // Skills
   if (data.skills && data.skills!.length > 0) {
-    const { error } = await supabase.from('skills').insert(
-      data.skills!.map((s, idx) => ({
-        branch_id: newBranch.id,
-        tenant_id: userData!.tenant_id,
-        skill_global_id: s.skill_global_id,
-        nombre: s.nombre,
-        activo: s.activo,
-        orden: idx
-      }))
+    insertPromises.push(
+      supabase.from('skills').insert(
+        data.skills!.map((s, idx) => ({
+          branch_id: newBranch.id,
+          tenant_id: userData!.tenant_id,
+          skill_global_id: s.skill_global_id,
+          nombre: s.nombre,
+          activo: s.activo,
+          orden: idx
+        }))
+      ).then(({ error }) => {
+        if (error) return registrarError({ origen: 'app', descripcion: 'Fallo al crear skills durante alta de sucursal', stacktrace: error.message, tenant_id: userData!.tenant_id })
+      })
     )
-    if (error) {
-      await registrarError({ origen: 'app', descripcion: 'Fallo al crear skills durante alta de sucursal', stacktrace: error.message, tenant_id: userData!.tenant_id })
-    }
   }
 
   // Precios
   if (data.precios && data.precios!.length > 0) {
-    const { error } = await supabase.from('price_list').insert(
-      data.precios!.map(p => ({
-        branch_id: newBranch.id,
-        tenant_id: userData!.tenant_id,
-        nombre: p.nombre,
-        tipo: p.tipo || 'producto',
-        precio: p.precio,
-        precio_tipo: p.precio_tipo || 'exacto',
-        descripcion: p.descripcion || null,
-        activo: true
-      }))
+    insertPromises.push(
+      supabase.from('price_list').insert(
+        data.precios!.map(p => ({
+          branch_id: newBranch.id,
+          tenant_id: userData!.tenant_id,
+          nombre: p.nombre,
+          tipo: p.tipo || 'producto',
+          precio: p.precio,
+          precio_tipo: p.precio_tipo || 'exacto',
+          descripcion: p.descripcion || null,
+          activo: true
+        }))
+      ).then(({ error }) => {
+        if (error) return registrarError({ origen: 'app', descripcion: 'Fallo al crear price_list durante alta de sucursal', stacktrace: error.message, tenant_id: userData!.tenant_id })
+      })
     )
-    if (error) {
-      await registrarError({ origen: 'app', descripcion: 'Fallo al crear price_list durante alta de sucursal', stacktrace: error.message, tenant_id: userData!.tenant_id })
-    }
   }
 
   // Etiquetas

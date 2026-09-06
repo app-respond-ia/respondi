@@ -76,14 +76,13 @@ function PreviewModuleItem({ label, countLabel, items }: { label: string, countL
   )
 }
 
-// CAMBIO 3: Módulos de copia completos (incluye roles, configuracion_ia, servicios, politicas)
+// CAMBIO 3: Módulos de copia completos (incluye configuracion_ia, servicios, politicas)
 const MODULOS = [
   { id: 'horarios', label: 'Horarios de atención' },
   { id: 'skills', label: 'Skills de IA' },
   { id: 'precios', label: 'Lista de precios' },
   { id: 'etiquetas', label: 'Etiquetas' },
   { id: 'reglas', label: 'Escalado de casos' },
-  { id: 'roles', label: 'Roles' },
   { id: 'configuracion_ia', label: 'Configuración del agente IA' },
   { id: 'servicios', label: 'Servicios' },
   { id: 'politicas', label: 'Políticas' },
@@ -111,7 +110,7 @@ export default function NuevaSucursalPage() {
   const [copiaAvanzada, setCopiaAvanzada] = useState(false)
   const [copiaModulos, setCopiaModulos] = useState<Record<string, string>>({
     horarios: '', skills: '', precios: '', etiquetas: '', reglas: '',
-    roles: '', configuracion_ia: '', servicios: '', politicas: '', tipos_novedad: ''
+    configuracion_ia: '', servicios: '', politicas: '', tipos_novedad: ''
   })
   const [loadingCopia, setLoadingCopia] = useState(false)
   // CAMBIO 2: Estado para la vista previa de datos a copiar
@@ -171,6 +170,24 @@ export default function NuevaSucursalPage() {
       setLoading(false)
     })
   }, [])
+
+  const resetModuloData = (modulo: string) => {
+    if (modulo === 'horarios') setHorarios(DIAS_SEMANA.map(d => ({ dia_semana: d.id, cerrado: d.id === 0 || d.id === 6, franjas: [{ apertura: '09:00', cierre: '18:00', orden: 0 }] })))
+    if (modulo === 'skills') setSkills(prev => prev.map(s => ({ ...s, activo: s.fija })))
+    if (modulo === 'precios') setPrecios([])
+    if (modulo === 'etiquetas') setEtiquetas([])
+    if (modulo === 'reglas') setReglas([])
+    if (modulo === 'tipos_novedad') setTiposNovedad([])
+    if (modulo === 'servicios') setServicios('')
+    if (modulo === 'politicas') setPoliticas([])
+    if (modulo === 'configuracion_ia') {
+      setIaActivaFueraHorario(false)
+      setCasoFueraHorario(false)
+      setMsgFueraHorario('')
+      setIdiomaBase('es')
+      setTono('cercano')
+    }
+  }
 
   const cargarDatosCopia = async (branchId: string, modulo?: string) => {
     if (!branchId) return
@@ -243,12 +260,20 @@ export default function NuevaSucursalPage() {
   const handleCopiaGlobalChange = (branchId: string) => {
     setCopiaGlobal(branchId)
     setPreviewData(null)
-    if (branchId) cargarDatosCopia(branchId)
+    if (branchId) {
+      cargarDatosCopia(branchId)
+    } else {
+      MODULOS.forEach(m => resetModuloData(m.id))
+    }
   }
 
   const handleCopiaModuloChange = (modulo: string, branchId: string) => {
     setCopiaModulos(prev => ({ ...prev, [modulo]: branchId }))
-    if (branchId) cargarDatosCopia(branchId, modulo)
+    if (branchId) {
+      cargarDatosCopia(branchId, modulo)
+    } else {
+      resetModuloData(modulo)
+    }
   }
 
 
@@ -322,6 +347,7 @@ export default function NuevaSucursalPage() {
       tipos_novedad: tiposNovedad
     })
     if (res.success) {
+      showToast('Sucursal creada correctamente', 'success')
       // Timeout de seguridad por si la navegación se atasca
       setTimeout(() => {
         setSaving(prev => {
@@ -463,6 +489,25 @@ export default function NuevaSucursalPage() {
                         countLabel={previewData.tipos_novedad?.length > 0 ? `${previewData.tipos_novedad.length} tipos` : 'Sin tipos custom'} 
                         items={previewData.tipos_novedad?.map((t: any) => t.nombre) || []}
                       />
+                      <PreviewModuleItem 
+                        label="Configuración del agente IA" 
+                        countLabel={'Configurado'} 
+                        items={[
+                          `Idioma base: ${previewData.idioma_base || 'es'}`,
+                          `Tono: ${previewData.tono || 'cercano'}`,
+                          `Modo fuera de horario: ${previewData.modo_horario_ia || 'mismo_negocio'}`
+                        ]}
+                      />
+                      <PreviewModuleItem 
+                        label="Servicios e instalaciones" 
+                        countLabel={previewData.servicios ? 'Configurado' : 'Sin servicios'} 
+                        items={previewData.servicios ? [previewData.servicios] : []}
+                      />
+                      <PreviewModuleItem 
+                        label="Políticas y normas" 
+                        countLabel={previewData.politicas?.length > 0 ? `${previewData.politicas.length} políticas` : 'Sin políticas'} 
+                        items={previewData.politicas?.map((p: any) => typeof p === 'string' ? p : p.titulo) || []}
+                      />
                     </div>
                   </div>
                 )}
@@ -473,7 +518,15 @@ export default function NuevaSucursalPage() {
             <label className="flex items-center gap-3 cursor-pointer">
               <div className="relative shrink-0">
                 <input type="checkbox" checked={copiaAvanzada}
-                  onChange={e => { setCopiaAvanzada(e.target.checked); setCopiaGlobal(''); setPreviewData(null) }}
+                  onChange={e => { 
+                    setCopiaAvanzada(e.target.checked)
+                    setCopiaGlobal('')
+                    setCopiaModulos(MODULOS.reduce((acc, m) => ({ ...acc, [m.id]: '' }), {}))
+                    setPreviewData(null)
+                    if (e.target.checked) {
+                      MODULOS.forEach(m => resetModuloData(m.id))
+                    }
+                  }}
                   className="peer sr-only" />
                 <div className={`w-11 h-6 rounded-full transition-colors ${copiaAvanzada ? 'bg-brand-600' : 'bg-slate-300'}`}></div>
                 <div className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${copiaAvanzada ? 'translate-x-5' : 'translate-x-0'}`}></div>
@@ -484,20 +537,70 @@ export default function NuevaSucursalPage() {
             {/* CAMBIO 3: Copia avanzada por módulo — ahora con todos los módulos */}
             {copiaAvanzada && (
               <div className="space-y-3">
-                {MODULOS.map(m => (
-                  <div key={m.id} className="flex items-center gap-3">
-                    <span className="text-sm font-500 text-ink-700 w-52 shrink-0">{m.label}</span>
-                    <select value={copiaModulos[m.id]} onChange={e => handleCopiaModuloChange(m.id, e.target.value)}
-                      disabled={loadingCopia}
-                      className="flex-1 h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition disabled:opacity-50">
-                      <option value="">Desde cero</option>
-                      {sucursales.map(s => (
-                        <option key={s.id} value={s.id}>{s.nombre}</option>
-                      ))}
-                    </select>
-                  </div>
-                ))}
-                {loadingCopia && <p className="text-xs text-ink-400">Cargando datos...</p>}
+                {MODULOS.map(m => {
+                  const tieneOrigen = copiaModulos[m.id] && copiaModulos[m.id] !== ''
+                  
+                  let localCount = ''
+                  let localItems: React.ReactNode[] = []
+                  
+                  if (m.id === 'horarios') {
+                    const activos = horarios.filter(h => !h.cerrado)
+                    localCount = activos.length > 0 ? `${activos.length} franjas` : 'Sin horarios'
+                    localItems = activos.map(h => {
+                      const dia = DIAS_SEMANA.find(d => d.id === h.dia_semana)?.label || `Día ${h.dia_semana}`
+                      return `${dia}: ${h.franjas.map(f => `${f.apertura} - ${f.cierre}`).join(', ')}`
+                    })
+                  } else if (m.id === 'skills') {
+                    const activas = skills.filter(s => s.activo)
+                    localCount = activas.length > 0 ? `${activas.length} skills` : 'Sin skills'
+                    localItems = activas.map(s => s.nombre)
+                  } else if (m.id === 'precios') {
+                    localCount = precios.length > 0 ? `${precios.length} productos` : 'Sin precios'
+                    localItems = precios.map(p => `${p.nombre} ${p.precio ? `($${p.precio})` : ''}`)
+                  } else if (m.id === 'etiquetas') {
+                    localCount = etiquetas.length > 0 ? `${etiquetas.length} etiquetas` : 'Sin etiquetas'
+                    localItems = etiquetas.map(e => e.nombre)
+                  } else if (m.id === 'reglas') {
+                    localCount = reglas.length > 0 ? `${reglas.length} reglas` : 'Sin reglas'
+                    localItems = reglas.map(r => r.nombre)
+                  } else if (m.id === 'tipos_novedad') {
+                    localCount = tiposNovedad.length > 0 ? `${tiposNovedad.length} tipos` : 'Sin tipos custom'
+                    localItems = tiposNovedad.map(t => t.nombre)
+                  } else if (m.id === 'servicios') {
+                    localCount = servicios ? 'Configurado' : 'Sin servicios'
+                    localItems = servicios ? [servicios] : []
+                  } else if (m.id === 'politicas') {
+                    localCount = politicas.length > 0 ? `${politicas.length} políticas` : 'Sin políticas'
+                    localItems = politicas.map(p => p.titulo)
+                  } else if (m.id === 'configuracion_ia') {
+                    localCount = 'Configurado'
+                    localItems = [
+                      `Idioma base: ${idiomaBase}`,
+                      `Tono: ${tono}`,
+                      `Modo fuera horario: ${iaActivaFueraHorario ? 'siempre_activa' : 'mismo_negocio'}`
+                    ]
+                  }
+
+                  return (
+                    <div key={m.id} className="flex flex-col gap-2 p-3 bg-white rounded-xl border border-slate-200 shadow-sm">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <span className="text-sm font-500 text-ink-700">{m.label}</span>
+                        <select value={copiaModulos[m.id] || ''} onChange={e => handleCopiaModuloChange(m.id, e.target.value)}
+                          className="text-sm border-slate-300 rounded-lg focus:ring-brand-500 focus:border-brand-500 max-w-[200px] w-full bg-slate-50">
+                          <option value="">Desde cero</option>
+                          {sucursales.map((s: any) => (
+                            <option key={s.id} value={s.id}>{s.nombre}</option>
+                          ))}
+                        </select>
+                      </div>
+                      {tieneOrigen && (
+                        <div className="mt-2 pt-2 border-t border-slate-100 max-h-[240px] overflow-y-auto pr-1 custom-scrollbar">
+                           <PreviewModuleItem label={m.label} countLabel={localCount} items={localItems} />
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>

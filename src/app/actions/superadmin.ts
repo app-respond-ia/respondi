@@ -248,7 +248,11 @@ export async function getEvolucionNegocio(from?: string, to?: string) {
 
 // B) getOrganizaciones
 export async function getOrganizaciones(filtro?: string) {
-  const { userId } = await requireSuperAdmin()
+  const auth = await requireSuperAdmin()
+  if (!superadminHasPermission(auth, 'organizaciones', 'lectura')) {
+    return { success: false, error: 'No tienes permiso para esta acción' }
+  }
+  const { userId } = auth
   void userId // verificación de auth; la query usa supabaseAdmin para evitar RLS en el join con vendedores
 
   let query = supabaseAdmin
@@ -336,7 +340,11 @@ export async function salirDeImpersonacion() {
 
 // B2) cambiarPlanOrganizacion
 export async function cambiarPlanOrganizacion(organizacionId: string, nuevoPlanId: string) {
-  const { supabase, userId } = await requireSuperAdmin()
+  const auth = await requireSuperAdmin()
+  if (!superadminHasPermission(auth, 'organizaciones', 'escritura')) {
+    return { success: false, error: 'No tienes permiso para esta acción' }
+  }
+  const { supabase, userId } = auth
 
   const { data: org } = await supabase.from('organizaciones').select('plan_id, plans!plan_id(precio_usd)').eq('id', organizacionId).single()
   const { data: nuevoPlan } = await supabase.from('plans').select('nombre, precio_usd').eq('id', nuevoPlanId).single()
@@ -385,7 +393,11 @@ export async function cambiarPlanOrganizacion(organizacionId: string, nuevoPlanI
 
 // B3) registrarPagoYRenovar
 export async function registrarPagoYRenovar(organizacionId: string, importe: number, moneda: string, notas?: string) {
-  const { supabase, userId } = await requireSuperAdmin()
+  const auth = await requireSuperAdmin()
+  if (!superadminHasPermission(auth, 'organizaciones', 'escritura')) {
+    return { success: false, error: 'No tienes permiso para esta acción' }
+  }
+  const { supabase, userId } = auth
 
   const { data: org } = await supabase.from('organizaciones').select('fecha_vencimiento, plan_pendiente_id, plan_id, estado').eq('id', organizacionId).single()
   if (!org) return { success: false, error: 'Organización no encontrada' }
@@ -479,7 +491,11 @@ export async function registrarPagoYRenovar(organizacionId: string, importe: num
 
 
 export async function getOrganizacionesBasico() {
-  const { supabase } = await requireSuperAdmin()
+  const auth = await requireSuperAdmin()
+  if (!superadminHasPermission(auth, 'organizaciones', 'lectura')) {
+    return { success: false, error: 'No tienes permiso para esta acción' }
+  }
+  const { supabase } = auth
   const { data, error } = await supabase
     .from('organizaciones')
     .select('id, nombre, estado')
@@ -1159,7 +1175,11 @@ export async function getVendedorComisiones() {
 
 export async function actualizarEstadoOrganizacion(id: string, estado: string) {
   try {
-    const { userId } = await requireSuperAdmin()
+    const auth = await requireSuperAdmin()
+    if (!superadminHasPermission(auth, 'organizaciones', 'escritura')) {
+      return { success: false, error: 'No tienes permiso para esta acción' }
+    }
+    const { userId } = auth
     // Usamos supabaseAdmin para bypassear RLS y poder leer/escribir organizaciones sin restricciones
 
     const { data: anterior } = await supabaseAdmin
@@ -2520,7 +2540,11 @@ export async function getConsumoIA(from?: string, to?: string) {
 
 export async function recargarCreditosIA(organizacionId: string, cantidad: number, motivo: string) {
   try {
-    const { userId } = await requireSuperAdmin()
+    const auth = await requireSuperAdmin()
+    if (!superadminHasPermission(auth, 'organizaciones', 'escritura')) {
+      return { success: false, error: 'No tienes permiso para esta acción' }
+    }
+    const { userId } = auth
 
     const { error: rpcError } = await supabaseAdmin.rpc('abonar_credito_ia', {
       p_tenant_id: organizacionId,
@@ -2558,7 +2582,10 @@ export async function recargarCreditosIA(organizacionId: string, cantidad: numbe
 // ============================================================
 // ============================================================
 export async function getSucursalesPorOrganizaciones(tenantIds: string[]) {
-  await requireSuperAdmin()
+  const auth = await requireSuperAdmin()
+  if (!superadminHasPermission(auth, 'organizaciones', 'lectura')) {
+    return { success: false, error: 'No tienes permiso para esta acción' }
+  }
   if (tenantIds.length === 0) return { success: true, sucursales: [] }
 
   const { data, error } = await supabaseAdmin
@@ -2580,7 +2607,11 @@ export async function getMovimientosCreditos(filtros?: {
   fecha_desde?: string
   fecha_hasta?: string
 }) {
-  const { supabase } = await requireSuperAdmin()
+  const auth = await requireSuperAdmin()
+  if (!superadminHasPermission(auth, 'organizaciones', 'lectura')) {
+    return { success: false, error: 'No tienes permiso para esta acción' }
+  }
+  const { supabase } = auth
 
   let query = supabase
     .from('message_quotas')
@@ -2610,7 +2641,11 @@ export async function getMovimientosCreditos(filtros?: {
   return { success: true, movimientos: resultado }
 }
 export async function getResumenCreditos() {
-  const { supabase } = await requireSuperAdmin()
+  const auth = await requireSuperAdmin()
+  if (!superadminHasPermission(auth, 'organizaciones', 'lectura')) {
+    return { success: false, error: 'No tienes permiso para esta acción' }
+  }
+  const { supabase } = auth
 
   const { data, error } = await supabase.rpc('get_resumen_creditos').single()
   if (error) return { success: false, error: error.message }

@@ -143,15 +143,16 @@ export async function crearSucursal(nombre: string, direccion?: string, copiarDe
     }
   }
 
-  const { data: admins } = await supabase
+  const { data: propietarios } = await supabase
     .from('users')
-    .select('id')
+    .select('id, roles_personalizados!inner(es_propietario)')
     .eq('tenant_id', auth.tenant_id)
-    .eq('rol', 'admin')
-  if (admins && admins.length > 0) {
+    .eq('roles_personalizados.es_propietario', true)
+
+  if (propietarios && propietarios.length > 0) {
     await supabase.from('user_branches').insert(
-      admins.map((a: any) => ({
-        user_id: a.id,
+      propietarios.map((p: any) => ({
+        user_id: p.id,
         branch_id: nuevaSucursal.id
       }))
     )

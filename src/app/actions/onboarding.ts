@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { supabaseAdmin } from '@/utils/supabase/admin'
+import { registrarError } from '@/lib/errores'
 
 // Helper privado para resolver y validar tenantId y branchId asegurando la propiedad (prevención de IDOR)
 async function resolveAndValidateIds(user: any, inputTenantId?: string, inputBranchId?: string) {
@@ -242,23 +243,34 @@ export async function saveStep1(data: {
       .eq('id', user.id)
       .single()
 
+    if (userErr && userErr.code !== 'PGRST116') {
+      await registrarError({ origen: 'app', descripcion: 'Fallo al leer usuario en Paso 1 de onboarding', stacktrace: userErr.message, tenant_id: null })
+    }
+
     if (userErr || !userData?.tenant_id) {
-      console.error('Error buscando tenant en saveStep1:', userErr, JSON.stringify(userErr))
       throw new Error('No tenant')
     }
     const tenantId = userData.tenant_id
 
-    await supabaseAdmin
+    const { error: updOrgErr } = await supabaseAdmin
       .from('organizaciones')
       .update({ nombre: data.nombreNegocio, direccion_fiscal: data.direccionFiscal })
       .eq('id', tenantId)
 
-    const { data: branches } = await supabaseAdmin
+    if (updOrgErr) {
+      await registrarError({ origen: 'app', descripcion: 'Fallo al actualizar organización en Paso 1 de onboarding', stacktrace: updOrgErr.message, tenant_id: tenantId })
+    }
+
+    const { data: branches, error: errSelBr } = await supabaseAdmin
       .from('sucursales')
       .select('id')
       .eq('tenant_id', tenantId)
       .order('created_at', { ascending: true })
       .limit(1)
+
+    if (errSelBr) {
+      await registrarError({ origen: 'app', descripcion: 'Fallo al leer sucursales en Paso 1 de onboarding', stacktrace: errSelBr.message, tenant_id: tenantId })
+    }
 
     let branch = branches && branches.length > 0 ? branches[0] : null
 
@@ -278,12 +290,12 @@ export async function saveStep1(data: {
         .select('id')
         .single()
       if (branchErr) {
-        console.error('Error insertando sucursal en saveStep1:', branchErr, JSON.stringify(branchErr))
+        await registrarError({ origen: 'app', descripcion: 'Fallo al insertar sucursal en Paso 1 de onboarding', stacktrace: branchErr.message, tenant_id: tenantId })
         throw branchErr
       }
       branch = newBranch
     } else {
-      await supabaseAdmin
+      const { error: errUpdBr } = await supabaseAdmin
         .from('sucursales')
         .update({
           nombre: data.nombreSucursal,
@@ -292,19 +304,30 @@ export async function saveStep1(data: {
           moneda: data.moneda
         })
         .eq('id', branch.id)
+        
+      if (errUpdBr) {
+        await registrarError({ origen: 'app', descripcion: 'Fallo al actualizar sucursal en Paso 1 de onboarding', stacktrace: errUpdBr.message, tenant_id: tenantId })
+      }
     }
 
-    await supabaseAdmin
+    const { error: errUpdUsr } = await supabaseAdmin
       .from('users')
       .update({ branch_id: branch.id })
       .eq('id', user.id)
 
+    if (errUpdUsr) {
+      await registrarError({ origen: 'app', descripcion: 'Fallo al actualizar branch_id del usuario en Paso 1 de onboarding', stacktrace: errUpdUsr.message, tenant_id: tenantId })
+    }
 
-    const { data: profiles } = await supabaseAdmin
+    const { data: profiles, error: errSelProf } = await supabaseAdmin
       .from('business_profiles')
       .select('id')
       .eq('branch_id', branch.id)
       .limit(1)
+
+    if (errSelProf) {
+      await registrarError({ origen: 'app', descripcion: 'Fallo al leer business_profiles en Paso 1 de onboarding', stacktrace: errSelProf.message, tenant_id: tenantId })
+    }
 
     const profile = profiles && profiles.length > 0 ? profiles[0] : null
 
@@ -315,7 +338,7 @@ export async function saveStep1(data: {
         politicas: data.politicas
       })
       if (insErr) {
-        console.error('Error insertando profile en saveStep1:', insErr, JSON.stringify(insErr))
+        await registrarError({ origen: 'app', descripcion: 'Fallo al insertar business_profiles en Paso 1 de onboarding', stacktrace: insErr.message, tenant_id: tenantId })
         throw insErr
       }
     } else {
@@ -324,15 +347,19 @@ export async function saveStep1(data: {
         politicas: data.politicas
       }).eq('id', profile.id)
       if (updErr) {
-        console.error('Error actualizando profile en saveStep1:', updErr, JSON.stringify(updErr))
+        await registrarError({ origen: 'app', descripcion: 'Fallo al actualizar business_profiles en Paso 1 de onboarding', stacktrace: updErr.message, tenant_id: tenantId })
         throw updErr
       }
     }
 
-    await supabaseAdmin.from('sucursales').update({ onboarding_paso: 2 }).eq('id', branch.id)
+    const { error: errUpdStep } = await supabaseAdmin.from('sucursales').update({ onboarding_paso: 2 }).eq('id', branch.id)
+    if (errUpdStep) {
+      await registrarError({ origen: 'app', descripcion: 'Fallo al actualizar onboarding_paso en Paso 1 de onboarding', stacktrace: errUpdStep.message, tenant_id: tenantId })
+    }
+    
     return { success: true, branchId: branch.id }
   } catch (error: any) {
-    console.error('Error en paso Datos Generales (saveStep1):', error, JSON.stringify(error, Object.getOwnPropertyNames(error || {})))
+    await registrarError({ origen: 'app', descripcion: 'Excepción general en Paso 1 de onboarding', stacktrace: error.message, tenant_id: null })
     throw error
   }
 }
@@ -447,7 +474,7 @@ export async function saveStep3(data: {
 
     const { error: delError } = await supabaseAdmin.from('skills').delete().eq('branch_id', branchId)
     if (delError) {
-      console.error('Error borrando skills en paso 3:', delError, JSON.stringify(delError))
+      await registrarError({ origen: 'app', descripcion: 'Fallo al borrar skills en Paso 3 de onboarding', stacktrace: delError.message, tenant_id: tenantId })
       throw delError
     }
 
@@ -462,19 +489,23 @@ export async function saveStep3(data: {
     }))
 
     if (rows.length > 0) {
-      const { error } = await supabaseAdmin.from('skills').insert(rows)
-      if (error) {
-        console.error('Error insertando skills en paso 3:', error, JSON.stringify(error))
-        throw error
+      const { error: insError } = await supabaseAdmin.from('skills').insert(rows)
+      if (insError) {
+        await registrarError({ origen: 'app', descripcion: 'Fallo al insertar skills en Paso 3 de onboarding', stacktrace: insError.message, tenant_id: tenantId })
+        throw insError
       }
     }
 
     // --- Siembra Protegida ---
-    const { data: existingTags } = await supabaseAdmin.from('message_categories')
+    const { data: existingTags, error: errSelTags } = await supabaseAdmin.from('message_categories')
       .select('id').eq('branch_id', branchId).eq('es_fallback', true)
     
+    if (errSelTags) {
+      await registrarError({ origen: 'app', descripcion: 'Fallo al leer message_categories en Paso 3 de onboarding', stacktrace: errSelTags.message, tenant_id: tenantId })
+    }
+
     if (!existingTags || existingTags.length === 0) {
-      await supabaseAdmin.from('message_categories').insert({
+      const { error: errInsTag } = await supabaseAdmin.from('message_categories').insert({
         tenant_id: tenantId,
         branch_id: branchId,
         nombre: "Otros",
@@ -486,11 +517,18 @@ export async function saveStep3(data: {
         es_protegida: true,
         orden: 0
       })
+      if (errInsTag) {
+        await registrarError({ origen: 'app', descripcion: 'Fallo al insertar message_categories en Paso 3 de onboarding', stacktrace: errInsTag.message, tenant_id: tenantId })
+      }
     }
 
-    const { data: existingRules } = await supabaseAdmin.from('case_rules')
+    const { data: existingRules, error: errSelRules } = await supabaseAdmin.from('case_rules')
       .select('tipo_caso').eq('branch_id', branchId).in('tipo_caso', ['documento_no_procesable', 'derivacion_solicitada'])
     
+    if (errSelRules) {
+      await registrarError({ origen: 'app', descripcion: 'Fallo al leer case_rules en Paso 3 de onboarding', stacktrace: errSelRules.message, tenant_id: tenantId })
+    }
+
     const existingRuleTypes = existingRules?.map(r => r.tipo_caso) || []
     const rulesToInsert = []
     
@@ -515,20 +553,23 @@ export async function saveStep3(data: {
     }
     
     if (rulesToInsert.length > 0) {
-      await supabaseAdmin.from('case_rules').insert(rulesToInsert)
+      const { error: errInsRules } = await supabaseAdmin.from('case_rules').insert(rulesToInsert)
+      if (errInsRules) {
+        await registrarError({ origen: 'app', descripcion: 'Fallo al insertar case_rules en Paso 3 de onboarding', stacktrace: errInsRules.message, tenant_id: tenantId })
+      }
     }
     // --- Fin Siembra Protegida ---
 
 
     const { error: updError } = await supabaseAdmin.from('sucursales').update({ onboarding_paso: 4 }).eq('id', branchId)
     if (updError) {
-      console.error('Error actualizando sucursal en paso 3:', updError, JSON.stringify(updError))
+      await registrarError({ origen: 'app', descripcion: 'Fallo al actualizar onboarding_paso en Paso 3 de onboarding', stacktrace: updError.message, tenant_id: tenantId })
       throw updError
     }
 
     return { success: true }
   } catch (error: any) {
-    console.error('Error en paso Skills de IA (saveStep3):', error, JSON.stringify(error, Object.getOwnPropertyNames(error || {})))
+    await registrarError({ origen: 'app', descripcion: 'Excepción general en Paso 3 de onboarding', stacktrace: error.message, tenant_id: null })
     throw error
   }
 }

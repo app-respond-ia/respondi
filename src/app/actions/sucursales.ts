@@ -96,71 +96,119 @@ export async function crearSucursal(nombre: string, direccion?: string, copiarDe
   // Si hay copiarDesdeId, procedemos a copiar (best-effort)
   if (copiarDesdeId) {
     // 1. business_profiles
-    const { data: bp } = await supabase
+    const { data: bp, error: errSelBp } = await supabase
       .from('business_profiles')
       .select('descripcion, politicas, servicios, idioma_base, tono, disclaimer_texto, msg_fuera_horario, msg_cuota_agotada, msg_pausa_automatica')
       .eq('branch_id', copiarDesdeId)
       .single()
+      
+    if (errSelBp && errSelBp.code !== 'PGRST116') {
+      await registrarError({ origen: 'app', descripcion: 'Fallo al leer business_profiles para copiar sucursal', stacktrace: errSelBp.message, tenant_id: auth.tenant_id })
+    }
+    
     if (bp) {
-      await supabase.from('business_profiles').insert({
+      const { error: errInsBp } = await supabase.from('business_profiles').insert({
         branch_id: nuevaSucursal.id,
         ...bp
       })
+      if (errInsBp) {
+        await registrarError({ origen: 'app', descripcion: 'Fallo al copiar business_profiles en nueva sucursal', stacktrace: errInsBp.message, tenant_id: auth.tenant_id })
+      }
     }
 
     // 2. business_hours
-    const { data: bh } = await supabase
+    const { data: bh, error: errSelBh } = await supabase
       .from('business_hours')
       .select('dia_semana, apertura, cierre, cerrado')
       .eq('branch_id', copiarDesdeId)
       .limit(7)
+      
+    if (errSelBh) {
+      await registrarError({ origen: 'app', descripcion: 'Fallo al leer business_hours para copiar sucursal', stacktrace: errSelBh.message, tenant_id: auth.tenant_id })
+    }
+      
     if (bh && bh.length > 0) {
       const inserts = bh.map((h: any) => ({ branch_id: nuevaSucursal.id, ...h }))
-      await supabase.from('business_hours').insert(inserts)
+      const { error: errInsBh } = await supabase.from('business_hours').insert(inserts)
+      if (errInsBh) {
+        await registrarError({ origen: 'app', descripcion: 'Fallo al copiar business_hours en nueva sucursal', stacktrace: errInsBh.message, tenant_id: auth.tenant_id })
+      }
     }
 
     // 3. case_rules
-    const { data: cr } = await supabase
+    const { data: cr, error: errSelCr } = await supabase
       .from('case_rules')
       .select('nombre, descripcion_intencion, tipo_caso, activa, es_plantilla')
       .eq('branch_id', copiarDesdeId)
       .eq('tenant_id', auth.tenant_id)
+      
+    if (errSelCr) {
+      await registrarError({ origen: 'app', descripcion: 'Fallo al leer case_rules para copiar sucursal', stacktrace: errSelCr.message, tenant_id: auth.tenant_id })
+    }
+      
     if (cr && cr.length > 0) {
       const inserts = cr.map((r: any) => ({ tenant_id: auth.tenant_id, branch_id: nuevaSucursal.id, ...r }))
-      await supabase.from('case_rules').insert(inserts)
+      const { error: errInsCr } = await supabase.from('case_rules').insert(inserts)
+      if (errInsCr) {
+        await registrarError({ origen: 'app', descripcion: 'Fallo al copiar case_rules en nueva sucursal', stacktrace: errInsCr.message, tenant_id: auth.tenant_id })
+      }
     }
 
     // 4. price_list
-    const { data: pl } = await supabase
+    const { data: pl, error: errSelPl } = await supabase
       .from('price_list')
       .select('nombre, precio, precio_tipo, moneda, descripcion, disponible')
       .eq('branch_id', copiarDesdeId)
       .eq('tenant_id', auth.tenant_id)
+      
+    if (errSelPl) {
+      await registrarError({ origen: 'app', descripcion: 'Fallo al leer price_list para copiar sucursal', stacktrace: errSelPl.message, tenant_id: auth.tenant_id })
+    }
+      
     if (pl && pl.length > 0) {
       const inserts = pl.map((p: any) => ({ tenant_id: auth.tenant_id, branch_id: nuevaSucursal.id, ...p }))
-      await supabase.from('price_list').insert(inserts)
+      const { error: errInsPl } = await supabase.from('price_list').insert(inserts)
+      if (errInsPl) {
+        await registrarError({ origen: 'app', descripcion: 'Fallo al copiar price_list en nueva sucursal', stacktrace: errInsPl.message, tenant_id: auth.tenant_id })
+      }
     }
 
     // 5. message_categories
-    const { data: mc } = await supabase
+    const { data: mc, error: errSelMc } = await supabase
       .from('message_categories')
       .select('nombre, descripcion_intencion, color, activa, es_plantilla, orden')
       .eq('branch_id', copiarDesdeId)
       .eq('tenant_id', auth.tenant_id)
+      
+    if (errSelMc) {
+      await registrarError({ origen: 'app', descripcion: 'Fallo al leer message_categories para copiar sucursal', stacktrace: errSelMc.message, tenant_id: auth.tenant_id })
+    }
+      
     if (mc && mc.length > 0) {
       const inserts = mc.map((c: any) => ({ tenant_id: auth.tenant_id, branch_id: nuevaSucursal.id, ...c }))
-      await supabase.from('message_categories').insert(inserts)
+      const { error: errInsMc } = await supabase.from('message_categories').insert(inserts)
+      if (errInsMc) {
+        await registrarError({ origen: 'app', descripcion: 'Fallo al copiar message_categories en nueva sucursal', stacktrace: errInsMc.message, tenant_id: auth.tenant_id })
+      }
     }
 
     // 6. skills
-    const { data: sk } = await supabase
+    const { data: sk, error: errSelSk } = await supabase
       .from('skills')
       .select('nombre, descripcion, activo, orden, skill_global_id')
       .eq('branch_id', copiarDesdeId)
       .eq('tenant_id', auth.tenant_id)
+      
+    if (errSelSk) {
+      await registrarError({ origen: 'app', descripcion: 'Fallo al leer skills para copiar sucursal', stacktrace: errSelSk.message, tenant_id: auth.tenant_id })
+    }
+      
     if (sk && sk.length > 0) {
       const inserts = sk.map((s: any) => ({ tenant_id: auth.tenant_id, branch_id: nuevaSucursal.id, ...s }))
-      await supabase.from('skills').insert(inserts)
+      const { error: errInsSk } = await supabase.from('skills').insert(inserts)
+      if (errInsSk) {
+        await registrarError({ origen: 'app', descripcion: 'Fallo al copiar skills en nueva sucursal', stacktrace: errInsSk.message, tenant_id: auth.tenant_id })
+      }
     }
   }
 

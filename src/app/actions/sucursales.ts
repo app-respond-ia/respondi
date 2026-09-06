@@ -6,6 +6,27 @@ import { registrarAuditoria } from '@/lib/auditoria'
 import { getAuthContext } from '@/lib/auth-context'
 import { registrarError } from '@/lib/errores'
 
+async function vincularPropietariosASucursal(supabase: any, tenantId: string, sucursalId: string) {
+  const { data: propietarios, error } = await supabase
+    .from('users')
+    .select('id, roles_personalizados!inner(es_propietario)')
+    .eq('tenant_id', tenantId)
+    .eq('roles_personalizados.es_propietario', true)
+
+  if (error) {
+    console.error('Error buscando propietarios para vincular a sucursal:', JSON.stringify(error))
+    return
+  }
+
+  if (propietarios && propietarios.length > 0) {
+    await supabase.from('user_branches').insert(
+      propietarios.map((p: any) => ({
+        user_id: p.id,
+        branch_id: sucursalId
+      }))
+    )
+  }
+}
 
 export async function getSucursales() {
   const supabase = await createClient()
@@ -143,22 +164,7 @@ export async function crearSucursal(nombre: string, direccion?: string, copiarDe
     }
   }
 
-  const { data: propietarios, error: errorPropietarios } = await supabase
-    .from('users')
-    .select('id, roles_personalizados!inner(es_propietario)')
-    .eq('tenant_id', auth.tenant_id)
-    .eq('roles_personalizados.es_propietario', true)
-
-  console.log('DEBUG propietarios:', JSON.stringify(propietarios), 'error:', JSON.stringify(errorPropietarios))
-
-  if (propietarios && propietarios.length > 0) {
-    await supabase.from('user_branches').insert(
-      propietarios.map((p: any) => ({
-        user_id: p.id,
-        branch_id: nuevaSucursal.id
-      }))
-    )
-  }
+  await vincularPropietariosASucursal(supabase, auth.tenant_id, nuevaSucursal.id)
 
   await registrarAuditoria({
     tenant_id: auth.tenant_id,
@@ -552,6 +558,8 @@ export async function crearSucursalConDatos(data: {
     registro_id: newBranch.id,
     valor_nuevo: newBranch
   })
+
+  await vincularPropietariosASucursal(supabase, userData!.tenant_id, newBranch.id)
 
   return { success: true, sucursal: newBranch }
 }

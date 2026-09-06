@@ -48,7 +48,11 @@ export async function requireSuperAdmin() {
 // A) getDashboardData
 export async function getDashboardData(from?: string, to?: string) {
   try {
-    const { supabase } = await requireSuperAdmin()
+    const auth = await requireSuperAdmin()
+    if (!superadminHasPermission(auth, 'vision_general', 'lectura')) {
+      return { success: false, error: 'No tienes permiso para esta acción' }
+    }
+    const { supabase } = auth
 
     const now = new Date()
     const in3Days = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000)
@@ -147,7 +151,11 @@ export async function getDashboardData(from?: string, to?: string) {
 
 export async function getEvolucionNegocio(from?: string, to?: string) {
   try {
-    const { supabase } = await requireSuperAdmin()
+    const auth = await requireSuperAdmin()
+    if (!superadminHasPermission(auth, 'vision_general', 'lectura')) {
+      return { success: false, error: 'No tienes permiso para esta acción' }
+    }
+    const { supabase } = auth
     
     const now = new Date()
     const startDate = from ? new Date(from) : new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
@@ -1510,6 +1518,9 @@ export async function borrarCategoriaTicket(id: string) {
 export async function getSuperadmins() {
   try {
     const auth = await requireSuperAdmin()
+    if (!superadminHasPermission(auth, 'vision_general', 'lectura')) {
+      return { success: false, error: 'No tienes permiso para esta acción' }
+    }
     const { data, error } = await supabaseAdmin
       .from('users')
       .select('id, nombre, email, activo, superadmin_rol_id, superadmin_roles(nombre, nivel, es_propietario)')
@@ -2113,7 +2124,11 @@ export async function asignarRolSuperadmin(targetUserId: string, rolId: string |
 
 export async function getRendimientoVendedores(from?: string, to?: string) {
   try {
-    const { supabase } = await requireSuperAdmin()
+    const auth = await requireSuperAdmin()
+    if (!superadminHasPermission(auth, 'vision_general', 'lectura')) {
+      return { success: false, error: 'No tienes permiso para esta acción' }
+    }
+    const { supabase } = auth
     
     const { data: vendedores, error } = await supabase.from('vendedores').select(`
       id,
@@ -2196,7 +2211,11 @@ export async function getRendimientoVendedores(from?: string, to?: string) {
 
 export async function getCalidadSoporte(from?: string, to?: string, superadminId?: string) {
   try {
-    const { supabase } = await requireSuperAdmin()
+    const auth = await requireSuperAdmin()
+    if (!superadminHasPermission(auth, 'vision_general', 'lectura')) {
+      return { success: false, error: 'No tienes permiso para esta acción' }
+    }
+    const { supabase } = auth
     
     // Fetch all support tickets (vendedores) and client tickets (clientes)
     let querySupport = supabase.from('support_tickets').select('fecha_apertura, fecha_cierre, calificacion, fecha_calificacion, asignado_a')
@@ -2344,7 +2363,11 @@ export async function getCalidadSoporte(from?: string, to?: string, superadminId
 
 export async function getConsumoIA(from?: string, to?: string) {
   try {
-    const { supabase } = await requireSuperAdmin()
+    const auth = await requireSuperAdmin()
+    if (!superadminHasPermission(auth, 'vision_general', 'lectura')) {
+      return { success: false, error: 'No tienes permiso para esta acción' }
+    }
+    const { supabase } = auth
     
     // Fetch ai_logs
     const { data: logs, error } = await supabase

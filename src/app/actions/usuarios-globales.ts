@@ -41,7 +41,7 @@ export async function getTodosLosUsuarios(
       .order('fecha_creacion', { ascending: false })
 
     if (filtro === 'Clientes') {
-      query = query.in('rol', ['admin', 'usuario']) // tenant_user in Respondi v1, but schema says admin, usuario
+      query = query.in('rol', ['admin', 'usuario', 'tenant_user'])
     } else if (filtro === 'Vendedores') {
       query = query.eq('rol', 'vendedor')
     } else if (filtro === 'Superadmins') {

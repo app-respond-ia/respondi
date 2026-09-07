@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { updatePasswordAndAcceptInvite, loginWithGoogle } from '@/app/actions/auth'
 import Link from 'next/link'
+import { traducirError } from '@/lib/errores'
 
 export default function AcceptForm({ userEmail }: { userEmail: string }) {
   const [showPassword, setShowPassword] = useState(false)
@@ -23,7 +24,7 @@ export default function AcceptForm({ userEmail }: { userEmail: string }) {
     const result = await updatePasswordAndAcceptInvite(formData)
     
     if (result?.error) {
-      setError(result.error)
+      setError(traducirError(result.error))
       setIsLoading(false)
     } else if (result?.success) {
       window.location.href = result.redirectUrl || '/'
@@ -35,7 +36,7 @@ export default function AcceptForm({ userEmail }: { userEmail: string }) {
     setError(null)
     const result = await loginWithGoogle()
     if (result?.error) {
-      setError(result.error)
+      setError(traducirError(result.error))
       setIsLoading(false)
     }
   }

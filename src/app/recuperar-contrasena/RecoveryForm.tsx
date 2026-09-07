@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { resetPasswordForEmail } from '@/app/actions/auth'
+import { traducirError } from '@/lib/errores'
 
 export default function RecoveryForm() {
   const [email, setEmail] = useState('')
@@ -16,7 +17,7 @@ export default function RecoveryForm() {
     setIsLoading(false)
     
     if (result?.error) {
-      setError(result.error)
+      setError(traducirError(result.error))
     } else {
       setIsSent(true)
     }

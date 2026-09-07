@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { loginUser } from '@/app/actions/auth'
 import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
+import { traducirError } from '@/lib/errores'
 
 export default function LoginForm() {
   const [showPassword, setShowPassword] = useState(false)
@@ -17,7 +18,7 @@ export default function LoginForm() {
     const password = formData.get('password') as string
     const result = await loginUser({ email, password })
     if (!result.success) {
-      setError(result.error || 'Error al iniciar sesión')
+      setError(traducirError(result.error))
       setIsLoading(false)
     } else {
       window.location.href = '/'
@@ -35,7 +36,7 @@ export default function LoginForm() {
       }
     })
     if (error) {
-      setError(error.message)
+      setError(traducirError(error))
       setIsLoading(false)
     } else if (data?.url) {
       window.location.href = data.url

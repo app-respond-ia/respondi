@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { signupTrial, loginWithGoogle } from '@/app/actions/auth'
 import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
+import { traducirError } from '@/lib/errores'
 
 export default function SignupForm() {
   const [showPassword, setShowPassword] = useState(false)
@@ -23,7 +24,7 @@ export default function SignupForm() {
     setError(null)
     const result = await signupTrial(formData)
     if (result?.error) {
-      setError(result.error)
+      setError(traducirError(result.error))
       setIsLoading(false)
     } else {
       if (result?.session) {
@@ -43,7 +44,7 @@ export default function SignupForm() {
     setError(null)
     const result = await loginWithGoogle()
     if (result?.error) {
-      setError(result.error)
+      setError(traducirError(result.error))
       setIsLoading(false)
     } else if (result?.url) {
       window.location.href = result.url

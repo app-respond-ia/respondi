@@ -54,6 +54,9 @@ export default function LoginForm() {
           </svg>
           Continuar con Google
         </button>
+        <p className="text-center text-[11px] text-ink-500 mt-3 leading-relaxed">
+          Al continuar, aceptas la <Link href="/privacidad" target="_blank" className="font-500 hover:text-ink-700 underline">Política de Privacidad</Link> y los <Link href="/terminos" target="_blank" className="font-500 hover:text-ink-700 underline">Términos de Servicio</Link>.
+        </p>
       </form>
 
       <div className="flex items-center gap-4 my-6">

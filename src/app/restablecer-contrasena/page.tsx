@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { actualizarContrasena } from '@/app/actions/auth-recovery'
-import { traducirError } from '@/lib/errores'
+import { traducirError } from '@/lib/traducirError'
 
 export default function RestablecerContrasenaPage() {
   const router = useRouter()

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { updatePasswordAndAcceptInvite, loginWithGoogle } from '@/app/actions/auth'
 import Link from 'next/link'
-import { traducirError } from '@/lib/errores'
+import { traducirError } from '@/lib/traducirError'
 
 export default function AcceptForm({ userEmail }: { userEmail: string }) {
   const [showPassword, setShowPassword] = useState(false)

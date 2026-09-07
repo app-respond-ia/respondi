@@ -1,7 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
-import { traducirError } from '@/lib/errores'
+import { traducirError } from '@/lib/traducirError'
 
 export type ToastType = 'success' | 'error' | 'info'
 

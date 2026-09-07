@@ -4,7 +4,7 @@ import Loading from '@/components/Loading'
 import { useState, useEffect } from 'react'
 import { getAuditLog } from '@/app/actions/audit-log'
 import { getMisPermisos } from '@/app/actions/permisos'
-import { traducirError } from '@/lib/errores'
+import { traducirError } from '@/lib/traducirError'
 
 export default function AuditLogPage() {
   const [entradas, setEntradas] = useState<any[]>([])

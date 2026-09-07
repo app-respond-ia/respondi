@@ -3,7 +3,7 @@ import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
 import { getVendedorDashboard } from '@/app/actions/vendedor'
-import { traducirError } from '@/lib/errores'
+import { traducirError } from '@/lib/traducirError'
 
 export default function VendedorDashboard() {
   const [data, setData] = useState<any>(null)

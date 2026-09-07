@@ -3,7 +3,7 @@ import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
 import { getMetricas } from '@/app/actions/metricas'
-import { traducirError } from '@/lib/errores'
+import { traducirError } from '@/lib/traducirError'
 
 type Periodo = 'hoy' | 'semana' | 'mes' | 'total'
 

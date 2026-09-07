@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { signupTrial, loginWithGoogle } from '@/app/actions/auth'
 import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
-import { traducirError } from '@/lib/errores'
+import { traducirError } from '@/lib/traducirError'
 
 export default function SignupForm() {
   const [showPassword, setShowPassword] = useState(false)

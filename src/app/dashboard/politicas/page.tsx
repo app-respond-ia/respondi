@@ -9,7 +9,7 @@ import {
   registerPolicyDocument, 
   saveManualPolicy 
 } from '@/app/actions/politicas'
-import { traducirError } from '@/lib/errores'
+import { traducirError } from '@/lib/traducirError'
 import { createClient } from '@/utils/supabase/client'
 import { FileText, Trash2, UploadCloud, FileType, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
 

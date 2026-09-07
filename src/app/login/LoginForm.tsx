@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { loginUser } from '@/app/actions/auth'
 import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
-import { traducirError } from '@/lib/errores'
+import { traducirError } from '@/lib/traducirError'
 
 export default function LoginForm() {
   const [showPassword, setShowPassword] = useState(false)

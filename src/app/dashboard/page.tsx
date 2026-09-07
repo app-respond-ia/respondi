@@ -3,7 +3,7 @@ import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
 import { getDashboardData } from '@/app/actions/dashboard'
-import { traducirError } from '@/lib/errores'
+import { traducirError } from '@/lib/traducirError'
 
 export default function DashboardPage() {
   const [period, setPeriod] = useState<'hoy' | 'semana' | 'mes'>('semana')

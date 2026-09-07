@@ -44,29 +44,37 @@ export default function SuperadminLayout({
   const closeSidebar = () => setSidebarOpen(false)
 
   const links = [
+    { type: 'header', label: 'General' },
     { href: '/superadmin', seccion: 'vision_general', label: 'Visión general', exact: true, icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
     )},
+    { type: 'header', label: 'Negocio' },
     { href: '/superadmin/organizaciones', seccion: 'organizaciones', label: 'Organizaciones', exact: false, icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-    )},
-    { href: '/superadmin/creditos', seccion: 'organizaciones', label: 'Mov. Créditos IA', exact: false, icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" /></svg>
     )},
     { href: '/superadmin/planes', seccion: 'planes', label: 'Planes', exact: false, icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.99 1.99 0 013 12V7a4 4 0 014-4z"/></svg>
     )},
+    { href: '/superadmin/creditos', seccion: 'organizaciones', label: 'Mov. Créditos IA', exact: false, icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" /></svg>
+    )},
+    { type: 'header', label: 'Programa de vendedores' },
     { href: '/superadmin/vendedores', seccion: 'vendedores', label: 'Vendedores', exact: false, icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-6a4 4 0 11-8 0 4 4 0 018 0zm6 3a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-    )},
-    { href: '/superadmin/skills', seccion: 'skills', label: 'Skills de IA', exact: false, icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
     )},
     { href: '/superadmin/comisiones', seccion: 'comisiones', label: 'Comisiones', exact: false, icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
     )},
+    { type: 'header', label: 'Producto' },
+    { href: '/superadmin/skills', seccion: 'skills', label: 'Skills de IA', exact: false, icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+    )},
+    { type: 'header', label: 'Sistema' },
     { href: '/superadmin/errores', seccion: 'errores', label: 'Errores del sistema', exact: false, icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+    )},
+    { href: '/superadmin/roles', seccion: 'gestion_superadmins', label: 'Roles y permisos', exact: false, icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
     )},
     {
       label: 'Soporte',
@@ -78,9 +86,6 @@ export default function SuperadminLayout({
         { href: '/superadmin/tickets-clientes', seccion: 'soporte_clientes', label: 'Clientes', exact: false, badge: ticketsClientesAbiertos }
       ]
     },
-    { href: '/superadmin/roles', seccion: 'gestion_superadmins', label: 'Roles y permisos', exact: false, icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-    )},
     {
       label: 'Cuentas de usuario',
       icon: (
@@ -102,14 +107,22 @@ export default function SuperadminLayout({
   }
 
   // Filter links
-  const visibleLinks = links.map(link => {
+  const rawVisibleLinks = links.map(link => {
+    if (link.type === 'header') return link
     if (link.subLinks) {
       const visibleSubs = link.subLinks.filter(sub => hasPermission(sub.seccion))
       if (visibleSubs.length === 0) return null
       return { ...link, subLinks: visibleSubs }
     }
     return hasPermission(link.seccion) ? link : null
-  }).filter(Boolean)
+  }).filter(Boolean) as any[]
+
+  // Remove headers that have no items below them
+  const visibleLinks = rawVisibleLinks.filter((link, index, arr) => {
+    if (link.type !== 'header') return true
+    // A header is valid only if the immediate next item exists and is NOT another header
+    return index + 1 < arr.length && arr[index + 1].type !== 'header'
+  })
 
 
   return (
@@ -136,7 +149,22 @@ export default function SuperadminLayout({
         </div>
 
         <nav className="flex-1 px-3 py-5 space-y-1 overflow-y-auto scrollbar-hide">
-          {visibleLinks.map((link: any) => {
+          {visibleLinks.map((link: any, index: number) => {
+            if (link.type === 'header') {
+              if (collapsed) {
+                return (
+                  <div key={`header-${index}`} className={`flex justify-center ${index === 0 ? 'pb-2' : 'pt-5 pb-2'}`}>
+                    <div className="h-px w-8 bg-white/10"></div>
+                  </div>
+                )
+              }
+              return (
+                <p key={`header-${index}`} className={`px-3 ${index === 0 ? 'pb-2' : 'pt-5 pb-2'} text-[10px] uppercase tracking-widest text-ink-500/70 font-600`}>
+                  {link.label}
+                </p>
+              )
+            }
+
             if (link.subLinks) {
               const isGroupActive = link.subLinks.some((sub: any) => sub.exact ? pathname === sub.href : (pathname === sub.href || pathname.startsWith(sub.href + '/')))
               const isExpanded = expandedGroup === link.label || (isGroupActive && expandedGroup === null)

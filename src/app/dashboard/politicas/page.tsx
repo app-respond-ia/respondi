@@ -9,6 +9,7 @@ import {
   registerPolicyDocument, 
   saveManualPolicy 
 } from '@/app/actions/politicas'
+import { traducirError } from '@/lib/errores'
 import { createClient } from '@/utils/supabase/client'
 import { FileText, Trash2, UploadCloud, FileType, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
 
@@ -101,7 +102,8 @@ export default function PoliticasPage() {
 
       await loadPolicies()
     } catch (err: any) {
-      setErrorMsg(err.message || 'Error desconocido al subir archivo')
+      console.error(err)
+      setErrorMsg(traducirError(err.message || 'Error desconocido al subir archivo'))
     } finally {
       setUploading(false)
     }
@@ -124,7 +126,8 @@ export default function PoliticasPage() {
       setManualText('')
       await loadPolicies()
     } catch (err: any) {
-      setErrorMsg(err.message || 'Error guardando texto manual')
+      console.error(err)
+      setErrorMsg(traducirError(err.message || 'Error guardando texto manual'))
     } finally {
       setUploading(false)
     }

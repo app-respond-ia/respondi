@@ -3,6 +3,7 @@ import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
 import { getVendedorDashboard } from '@/app/actions/vendedor'
+import { traducirError } from '@/lib/errores'
 
 export default function VendedorDashboard() {
   const [data, setData] = useState<any>(null)
@@ -16,8 +17,8 @@ export default function VendedorDashboard() {
         setData(res.data)
       } else {
         setError(res.error === 'Vendedor no encontrado'
-          ? 'Tu cuenta de vendedor no está configurada correctamente. Contacta con el administrador.'
-          : res.error || 'Error al cargar el dashboard'
+          ? 'No tienes perfil de vendedor asociado a esta cuenta.'
+          : traducirError(res.error || 'Error al cargar el dashboard')
         )
       }
       setLoading(false)

@@ -3,6 +3,7 @@ import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
 import { getDashboardData } from '@/app/actions/dashboard'
+import { traducirError } from '@/lib/errores'
 
 export default function DashboardPage() {
   const [period, setPeriod] = useState<'hoy' | 'semana' | 'mes'>('semana')
@@ -19,7 +20,7 @@ export default function DashboardPage() {
       if (res.success && res.data) {
         setData(res.data)
       } else {
-        setError(res.error || 'Error al cargar datos')
+        setError(traducirError(res.error || 'Error al cargar datos'))
       }
       setLoading(false)
     }

@@ -3,6 +3,7 @@ import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
 import { getMetricas } from '@/app/actions/metricas'
+import { traducirError } from '@/lib/errores'
 
 type Periodo = 'hoy' | 'semana' | 'mes' | 'total'
 
@@ -86,7 +87,7 @@ export default function MetricasPage() {
     if (res.success) {
       setData(res.data)
     } else {
-      setError(res.error || 'Error al cargar métricas')
+      setError(traducirError(res.error || 'Error al cargar métricas'))
     }
     setLoading(false)
   }

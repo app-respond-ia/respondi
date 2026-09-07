@@ -1,6 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
+import { traducirError } from '@/lib/errores'
 
 export type ToastType = 'success' | 'error' | 'info'
 
@@ -30,7 +31,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const showToast = useCallback((message: string, type: ToastType = 'success') => {
     setIsClosing(false)
-    setToast({ message, type, id: Date.now() })
+    const finalMessage = type === 'error' ? traducirError(message) : message
+    setToast({ message: finalMessage, type, id: Date.now() })
   }, [])
 
   useEffect(() => {

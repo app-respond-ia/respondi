@@ -4,6 +4,7 @@ import Loading from '@/components/Loading'
 import { useState, useEffect } from 'react'
 import { getAuditLog } from '@/app/actions/audit-log'
 import { getMisPermisos } from '@/app/actions/permisos'
+import { traducirError } from '@/lib/errores'
 
 export default function AuditLogPage() {
   const [entradas, setEntradas] = useState<any[]>([])
@@ -45,7 +46,7 @@ export default function AuditLogPage() {
       setEntradas(res.data.entradas || [])
       setUsuariosDisp(res.data.usuarios_disponibles || [])
     } else {
-      setErrorMsg(res.error || 'Error al cargar el registro de auditoría')
+      setErrorMsg(traducirError(res.error || 'Error al cargar el registro de auditoría'))
     }
     setLoading(false)
   }

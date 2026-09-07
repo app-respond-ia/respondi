@@ -9,7 +9,7 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Rutas públicas que no requieren autenticación
-  const publicRoutes = ['/login', '/registro-trial', '/recuperar-contrasena', '/aceptar-invitacion', '/auth/callback']
+  const publicRoutes = ['/login', '/registro-trial', '/recuperar-contrasena', '/aceptar-invitacion', '/auth/callback', '/privacidad', '/terminos']
   const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route)) || pathname === '/'
 
   // Rutas protegidas por rol

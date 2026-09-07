@@ -99,7 +99,7 @@ export default function SignupForm() {
         <label className="flex items-start gap-3 cursor-pointer select-none pt-1">
           <input name="terms" type="checkbox" className="mt-0.5 w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-400 shrink-0" required />
           <span className="text-sm text-ink-700 leading-relaxed">
-            Acepto los <Link href="#" className="font-500 text-brand-600 hover:text-brand-700">Términos del servicio</Link> y la <Link href="#" className="font-500 text-brand-600 hover:text-brand-700">Política de privacidad</Link>.
+            He leído y acepto la <Link href="/privacidad" target="_blank" className="font-500 text-brand-600 hover:text-brand-700">Política de Privacidad</Link> y los <Link href="/terminos" target="_blank" className="font-500 text-brand-600 hover:text-brand-700">Términos de Servicio</Link>.
           </span>
         </label>
 

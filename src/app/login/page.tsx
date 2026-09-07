@@ -37,7 +37,13 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <p className="relative text-center text-brand-300/70 text-sm mt-10">© 2026 Respondi · Atsura</p>
+        <div className="relative text-center text-brand-300/70 text-sm mt-10 space-y-2">
+          <p>© 2026 Respondi · Atsura</p>
+          <div className="flex justify-center gap-4">
+            <a href="/privacidad" target="_blank" className="hover:text-white transition">Privacidad</a>
+            <a href="/terminos" target="_blank" className="hover:text-white transition">Términos</a>
+          </div>
+        </div>
       </div>
 
       {/* ============ FORMULARIO ============ */}

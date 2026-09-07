@@ -186,13 +186,16 @@ export default function PrivacidadPage() {
           <li>Acceso interno limitado por rol, incluso para nuestro propio personal.</li>
         </ul>
 
-        <h2 className="text-2xl font-700 font-display text-ink-900 mt-10 mb-4">10. Menores de edad</h2>
+        <h2 className="text-2xl font-700 font-display text-ink-900 mt-10 mb-4">10. Cookies</h2>
+        <p className="mb-6">Usamos únicamente cookies técnicas esenciales, necesarias para que la plataforma funcione — por ejemplo, para mantener tu sesión iniciada. No usamos cookies de análisis, publicidad ni seguimiento. Por eso, no necesitamos pedirte un consentimiento adicional para su uso. Si en el futuro incorporamos herramientas de analítica o publicidad, actualizaremos esta sección y solicitaremos tu consentimiento cuando corresponda.</p>
+
+        <h2 className="text-2xl font-700 font-display text-ink-900 mt-10 mb-4">11. Menores de edad</h2>
         <p className="mb-6">Respondi no está dirigido a menores de edad. No recogemos conscientemente datos de menores al crear cuentas de negocio. Si detectas que un menor ha facilitado datos personales a través de la plataforma, contáctanos para eliminarlos.</p>
 
-        <h2 className="text-2xl font-700 font-display text-ink-900 mt-10 mb-4">11. Cambios en esta política</h2>
+        <h2 className="text-2xl font-700 font-display text-ink-900 mt-10 mb-4">12. Cambios en esta política</h2>
         <p className="mb-6">Podemos actualizar esta política cuando cambien nuestras prácticas o la normativa aplicable. Cuando lo hagamos, indicaremos en esta misma página qué ha cambiado, no solo la fecha de la actualización. Si el cambio es significativo, avisaremos a los negocios clientes con antelación razonable.</p>
 
-        <h2 className="text-2xl font-700 font-display text-ink-900 mt-10 mb-4">12. Contacto</h2>
+        <h2 className="text-2xl font-700 font-display text-ink-900 mt-10 mb-4">13. Contacto</h2>
         <p className="mb-6"><strong>privacidad@respondi.app</strong></p>
       </main>
     </div>

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { updatePasswordAndAcceptInvite, loginWithGoogle } from '@/app/actions/auth'
+import Link from 'next/link'
 
 export default function AcceptForm({ userEmail }: { userEmail: string }) {
   const [showPassword, setShowPassword] = useState(false)
@@ -94,6 +95,13 @@ export default function AcceptForm({ userEmail }: { userEmail: string }) {
               className="w-full h-12 pl-11 pr-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition" />
           </div>
         </div>
+
+        <label className="flex items-start gap-3 cursor-pointer select-none pt-1">
+          <input name="terms" type="checkbox" className="mt-0.5 w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-400 shrink-0" required />
+          <span className="text-sm text-ink-700 leading-relaxed">
+            He leído y acepto la <Link href="/privacidad" target="_blank" className="font-500 text-brand-600 hover:text-brand-700">Política de Privacidad</Link> y los <Link href="/terminos" target="_blank" className="font-500 text-brand-600 hover:text-brand-700">Términos de Servicio</Link>.
+          </span>
+        </label>
 
         {error && <p className="text-red-500 text-sm">{error}</p>}
 

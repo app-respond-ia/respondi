@@ -22,6 +22,7 @@ type SidebarProps = {
 export default function Sidebar({ user, onCloseMobile, permisos, esAdmin, collapsed, onToggleCollapse }: SidebarProps) {
   const pathname = usePathname()
   const [configColapsada, setConfigColapsada] = useState(false)
+  const [accesoColapsada, setAccesoColapsada] = useState(false)
   const [organizacionColapsada, setOrganizacionColapsada] = useState(false)
 
   const isActive = (path: string) => {
@@ -254,6 +255,27 @@ export default function Sidebar({ user, onCloseMobile, permisos, esAdmin, collap
             </Link>
           )
         })()}
+        </>
+        )}
+        {collapsed ? (
+          <div className="flex flex-col items-center gap-1 pt-5 pb-1">
+            <div className="h-px w-8 bg-white/10"></div>
+            <button onClick={() => setAccesoColapsada(v => !v)} title="Acceso y seguridad" className={`w-full flex flex-col items-center gap-0.5 py-1.5 rounded-lg transition ${accesoColapsada ? 'bg-brand-500/15' : 'hover:bg-white/5'}`}>
+              <span className={`w-8 h-8 rounded-lg flex items-center justify-center transition ${accesoColapsada ? 'bg-brand-500/20 text-brand-400' : 'bg-white/5 text-ink-500'}`}>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                </svg>
+              </span>
+              <svg className={`w-3 h-3 text-ink-500 transition-transform duration-200 ${accesoColapsada ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/>
+              </svg>
+            </button>
+          </div>
+        ) : (
+          <p className="px-3 pt-5 pb-2 text-[10px] uppercase tracking-widest text-ink-500/70 font-600">Acceso y seguridad</p>
+        )}
+        {(!collapsed || accesoColapsada) && (
+        <>
         {(() => {
           const nivel = getNivel('usuarios')
           const cls = navItemWithPermClass('/dashboard/usuarios', 'usuarios')

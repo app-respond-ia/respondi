@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { 
   getPolicies, 
   deletePolicy, 
@@ -158,6 +159,12 @@ export default function PoliticasPage() {
   return (
     <div className="p-6 max-w-5xl mx-auto">
       <div className="mb-8">
+        <Link
+          href="/dashboard/perfil-sucursal"
+          className="inline-block mb-2 text-sm font-600 text-brand-700 hover:text-brand-800 hover:underline"
+        >
+          ← Volver a Perfil de sucursal
+        </Link>
         <h1 className="text-2xl font-semibold text-slate-900">Políticas y Conocimiento</h1>
         <p className="text-slate-500 mt-1">Sube documentos o escribe políticas para que la IA se base en ellas al responder.</p>
       </div>

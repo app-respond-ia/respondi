@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
+import { traducirError } from '@/lib/traducirError'
 
 // Para el superadmin — gestión de skills globales
 export async function getSkillsGlobales() {
@@ -142,7 +143,7 @@ export async function toggleSkillCliente(branchId: string, tenantId: string, ski
   // Verificar que el cliente puede togglear esta skill
   const { data: skillGlobal } = await supabase
     .from('skills_globales')
-    .select('id, cliente_puede_toggle')
+    .select('id, nombre, cliente_puede_toggle')
     .eq('id', skillGlobalId)
     .single()
 
@@ -154,10 +155,10 @@ export async function toggleSkillCliente(branchId: string, tenantId: string, ski
   const { error } = await supabase
     .from('skills')
     .upsert(
-      { branch_id: branchId, skill_global_id: skillGlobalId, activo },
+      { tenant_id: tenantId, branch_id: branchId, skill_global_id: skillGlobalId, nombre: skillGlobal.nombre, activo },
       { onConflict: 'branch_id,skill_global_id' }
     )
 
-  if (error) return { success: false, error: error.message }
+  if (error) return { success: false, error: traducirError(error) }
   return { success: true }
 }

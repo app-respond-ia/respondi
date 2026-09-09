@@ -6,9 +6,7 @@ import {
   getUsuarios,
   invitarUsuario,
   actualizarUsuario,
-  reenviarInvitacion,
-  desactivarUsuario,
-  reactivarUsuario
+  reenviarInvitacion
 } from '@/app/actions/usuarios'
 import { getMisPermisos } from '@/app/actions/permisos'
 import { getRolesPersonalizados } from '@/app/actions/roles'
@@ -169,12 +167,7 @@ export default function UsuariosPage() {
   const handleToggleActivo = async () => {
     if (!selectedUser) return
     setEditLoading(true)
-    let res
-    if (selectedUser.activo) {
-      res = await desactivarUsuario(selectedUser.id)
-    } else {
-      res = await reactivarUsuario(selectedUser.id)
-    }
+    const res = await actualizarUsuario(selectedUser.id, { activo: !selectedUser.activo })
 
     if (res.success) {
       setIsEditModalOpen(false)

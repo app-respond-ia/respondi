@@ -3,15 +3,24 @@
 import { createClient } from '@/utils/supabase/server'
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { getAuthContext } from '@/lib/auth-context'
+import { getMisPermisos } from './permisos'
 import { v4 as uuidv4 } from 'uuid'
 import { registrarAuditoria } from '@/lib/auditoria'
 
 const MAX_DOCUMENTS = 20
 const BUCKET_NAME = 'policy_documents'
 
+// Gestión de políticas cuelga del mismo permiso de escritura que el perfil de sucursal
+async function checkPermisoEscritura() {
+  const misPermisos = await getMisPermisos()
+  if (!misPermisos.success) return false
+  return (misPermisos as any).esAdmin ||
+    (misPermisos.data || []).some((p: any) => p.seccion === 'perfil' && p.nivel === 'escritura')
+}
+
 // 1. Validar si la sucursal ha llegado al límite de 20 documentos
-async function checkLimit(supabase: any, branchId: string) {
-  const { count, error } = await supabase
+async function checkLimit(branchId: string) {
+  const { count, error } = await supabaseAdmin
     .from('policy_sources')
     .select('*', { count: 'exact', head: true })
     .eq('branch_id', branchId)
@@ -36,7 +45,9 @@ export async function getPolicyUploadUrl(filename: string, extension: string, fi
     const { tenant_id: tenantId, branch_id: branchId } = auth
     if (!branchId || !tenantId) throw new Error('Contexto inválido')
 
-    await checkLimit(supabase, branchId)
+    if (!(await checkPermisoEscritura())) throw new Error('No tienes permisos para gestionar políticas')
+
+    await checkLimit(branchId)
 
     const fileId = uuidv4()
     const safePath = `${tenantId}/${branchId}/${fileId}.${extension.toLowerCase()}`
@@ -72,14 +83,16 @@ export async function registerPolicyDocument(nombre: string, rutaArchivo: string
     const { tenant_id: tenantId, branch_id: branchId, user_id: userId } = auth
     if (!branchId || !tenantId) throw new Error('Contexto inválido')
 
+    if (!(await checkPermisoEscritura())) throw new Error('No tienes permisos para gestionar políticas')
+
     // COMPROBACIÓN ESTRICTA DE SEGURIDAD
     if (!rutaArchivo.startsWith(`${tenantId}/${branchId}/`)) {
       throw new Error('Ruta de archivo no autorizada para esta sucursal.')
     }
 
-    await checkLimit(supabase, branchId)
+    await checkLimit(branchId)
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('policy_sources')
       .insert({
         tenant_id: tenantId,
@@ -119,9 +132,11 @@ export async function saveManualPolicy(nombre: string, textoManual: string) {
     const { tenant_id: tenantId, branch_id: branchId, user_id: userId } = auth
     if (!branchId || !tenantId) throw new Error('Contexto inválido')
 
-    await checkLimit(supabase, branchId)
+    if (!(await checkPermisoEscritura())) throw new Error('No tienes permisos para gestionar políticas')
 
-    const { data, error } = await supabase
+    await checkLimit(branchId)
+
+    const { data, error } = await supabaseAdmin
       .from('policy_sources')
       .insert({
         tenant_id: tenantId,
@@ -161,8 +176,10 @@ export async function deletePolicy(id: string, rutaArchivo?: string | null) {
     const { tenant_id: tenantId, branch_id: branchId, user_id: userId } = auth
     if (!branchId || !tenantId) throw new Error('Contexto inválido')
 
+    if (!(await checkPermisoEscritura())) throw new Error('No tienes permisos para gestionar políticas')
+
     // Verificar propiedad
-    const { data: source, error: fetchError } = await supabase
+    const { data: source, error: fetchError } = await supabaseAdmin
       .from('policy_sources')
       .select('id, nombre, ruta_archivo')
       .eq('id', id)
@@ -179,12 +196,12 @@ export async function deletePolicy(id: string, rutaArchivo?: string | null) {
         .storage
         .from(BUCKET_NAME)
         .remove([fileToDelete])
-      
+
       if (storageError) console.error('Error borrando archivo de storage:', storageError)
     }
 
     // Borrar de DB (borra fragments en cascada)
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await supabaseAdmin
       .from('policy_sources')
       .delete()
       .eq('id', id)

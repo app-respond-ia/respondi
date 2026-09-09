@@ -1,5 +1,6 @@
 'use client'
 import Loading from '@/components/Loading'
+import Link from 'next/link'
 
 import { useState, useEffect, useMemo } from 'react'
 import { getPerfilSucursal, savePerfilSucursal } from '@/app/actions/perfil'
@@ -385,7 +386,18 @@ export default function PerfilSucursalPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Políticas (Devoluciones, Envíos, etc)</label>
+              <div className="flex items-center justify-between gap-3 mb-1.5">
+                <label className="block text-sm font-semibold text-slate-700">Políticas (Devoluciones, Envíos, etc)</label>
+                <Link
+                  href="/dashboard/politicas"
+                  className="shrink-0 text-xs font-600 text-brand-700 hover:text-brand-800 hover:underline"
+                >
+                  Gestionar políticas para la IA →
+                </Link>
+              </div>
+              <p className="text-xs text-slate-500 mb-3">
+                Esto es solo un resumen visible aquí. Los documentos y textos que usa la IA para responder se gestionan aparte.
+              </p>
 
               {formData.politicas.length > 0 && (
                 <div className="flex flex-col gap-2 mb-3">

@@ -1,0 +1,114 @@
+# Arquitectura — Respondi
+
+Decisiones de diseño estructurales y el motivo detrás de cada una.
+Si vas a proponer un cambio que contradiga algo de aquí, primero
+entiende por qué se decidió así — pregunta antes de deshacerlo.
+
+## Modelo de contactos ("Escenario A")
+Un contacto es compartido a nivel de organización (mismo cliente
+identificado igual en todas las sucursales), pero las conversaciones
+activas se aíslan por sucursal — un mismo contacto puede tener una
+conversación activa distinta por cada sucursal a la que escriba.
+
+## Canales de mensajería
+- Modelo: **cada cliente trae su propia cuenta**, sin excepción. En
+  Whaticket, cada cliente paga y gestiona su propia suscripción (Respondi
+  solo se conecta por API). Para el canal oficial de Meta, cada cliente
+  monta su propia conexión directa a la Meta Cloud API y mete sus propias
+  credenciales/tokens en su panel de Respondi — sin BSP, sin que Atsura sea
+  Tech Provider ni haga Embedded Signup centralizado.
+- n8n es un simple conector de mensajes (relay). Toda la lógica de
+  negocio (decisión IA-vs-humano, resolución de canal, creación de
+  contacto/caso, transcripción de audio) vive en Next.js/Supabase.
+- n8n sigue llamando directo a las APIs de Meta/Whaticket para el
+  envío de mensajes (por ahora) — revisar endurecimiento de seguridad
+  más adelante.
+- Canal de **email** (pendiente de construir, antes de Shopify): mismo
+  motor de IA y mismas herramientas que WhatsApp, pero lógica de
+  conversación distinta — sin ventana de 24h, hilos con asunto en vez
+  de mensajes en tiempo real, proveedor de correo entrante en vez de
+  n8n como puente. `channels.tipo` ya está preparado como enum para
+  añadir este valor.
+- Pendiente: cuando Meta oficial esté conectado de verdad, la UI de
+  Chats debe avisar cuando la ventana de 24h esté cerrada y ofrecer
+  elegir plantilla aprobada, en vez de dejar que el envío falle sin
+  explicación.
+
+## Multimedia entrante
+- Imágenes: se pasan directo a la IA la primera vez; después se
+  guarda una descripción de texto (`contenido`) para reutilizar en el
+  historial sin volver a mandar la imagen.
+- Audio: se transcribe solo bajo demanda (cuando la IA lo necesita),
+  no automáticamente al llegar; la transcripción se cachea igual, una
+  sola vez, y vive en Next.js, no en n8n.
+- Documentos (PDF, Word): la IA no los procesa por ahora — el agente
+  confirma la recepción y el caso se marca para revisión humana.
+
+## Jerarquía de pausa/horario de la IA
+Orden de prioridad para si la IA responde a un mensaje:
+1. Conversación en pausa manual (`conversations.ia_pausada`)
+2. Trato/modo del contacto
+3. Apagado manual de la sucursal (`sucursales.modo_pausa`: solo
+   controla 'apagada' vs 'ninguna')
+4. Horario comercial (el comportamiento fuera de horario lo decide
+   `business_profiles.ia_activa_fuera_horario`, NO `modo_pausa`)
+5. Responde normal
+
+El horario real del negocio (consultable por la IA bajo demanda) está
+separado del horario en que responde la IA (3 modos:
+`mismo_negocio`/`personalizado`/`siempre_activa`, en `route.ts` Fase 1).
+
+## Herramientas de la IA
+La IA (fase 2 del motor) tiene herramientas propias, no solo texto:
+- Puede etiquetar la conversación usando las categorías configuradas
+  por esa sucursal en `message_categories`
+- Puede escalar a un humano usando las reglas de esa sucursal en
+  `case_rules`
+- **Regla de oro**: nunca etiquetas ni reglas inventadas, solo las que
+  existan de verdad para esa sucursal
+
+Búsqueda de catálogo (`price_list`): NO usa RAG/embeddings — usa una
+herramienta con filtros estructurados (categoría, subcategoría,
+precio) + etiquetas por producto, porque los vectores dan resultados
+aproximados en vez de precisos para datos estructurados.
+
+Políticas del negocio: SÍ usan RAG real (texto troceado en fragmentos
++ embeddings + pgvector). Admite dos formas de alimentarlo a la vez:
+texto manual y documentos subidos (PDFs) — ambos como fragmentos en
+la misma tabla, sin distinción para la IA.
+
+Resumen de conversación (`conversations.resumen`): no se genera tras
+cada respuesta de la IA — es una tarea periódica aparte, cuando una
+conversación lleva 24h sin actividad.
+
+## Sistema de créditos
+1 mensaje respondido por la IA = 1 crédito. Movimientos en
+`message_quotas` (`tipo`: abono/debito: dirección; `origen`:
+consumo_ia/recarga_manual/recarga_plan: matiz consultable). Pasarela
+de pago: Stripe (diseñado desde el principio, en curso). Además del
+plan mensual, el usuario puede comprar créditos sueltos (paquetes
+puntuales fuera del ciclo mensual).
+
+Cuando Stripe esté conectado: el cambio de plan de una organización
+con `stripe_subscription_id` no nulo solo se podrá hacer desde el
+portal de Stripe, no manualmente desde el panel — para evitar
+desincronización entre la base de datos y la suscripción real.
+
+## Permisos y roles
+`roles_personalizados` (nivel 1-5, `es_propietario`) es el sistema
+real. La columna legacy `rol` en `users` puede desincronizarse de
+`es_propietario` — origen repetido de bugs de permisos (revisar antes
+de tocar cualquier lógica de permisos). Bug abierto: un admin/dueño
+de organización no podía hacer ciertas acciones en su propio panel —
+ver `docs/estado/pendientes.md`.
+
+## Manejo de errores del sistema
+`registrarError()` (`src/lib/errores.ts`) es la función central —
+mismo patrón que `registrarAuditoria()`, usa `supabaseAdmin`, nunca
+lanza excepción. Cubre tanto orígenes externos (n8n, api_meta, llm,
+db, cron) como internos (`origen: 'app'`, Server Actions).
+
+## Papeleo de canal WhatsApp oficial (no código, contexto de negocio)
+- BSP: Gupshup (no 360dialog) — sin cuota fija, pago por mensaje.
+- Modelo de cuenta individual por cliente (ver arriba, "Canales de
+  mensajería") — Atsura NO centraliza ni gestiona cuentas de clientes.

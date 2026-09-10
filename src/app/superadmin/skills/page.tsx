@@ -20,6 +20,7 @@ export default function SuperadminSkillsPage() {
     descripcion: '',
     cliente_puede_toggle: true,
     activa_por_defecto: true,
+    visible_cliente: true,
   })
 
   const { hasPermission } = useSuperadminPermisos()
@@ -37,7 +38,7 @@ export default function SuperadminSkillsPage() {
   const openCrear = () => {
     setModalMode('crear')
     setSelectedId(null)
-    setFormData({ nombre: '', descripcion: '', cliente_puede_toggle: true, activa_por_defecto: true })
+    setFormData({ nombre: '', descripcion: '', cliente_puede_toggle: true, activa_por_defecto: true, visible_cliente: true })
     setIsModalOpen(true)
   }
 
@@ -49,6 +50,7 @@ export default function SuperadminSkillsPage() {
       descripcion: s.descripcion || '',
       cliente_puede_toggle: s.cliente_puede_toggle,
       activa_por_defecto: s.activa_por_defecto,
+      visible_cliente: s.visible_cliente,
     })
     setIsModalOpen(true)
   }
@@ -116,6 +118,9 @@ export default function SuperadminSkillsPage() {
                 <p className="font-600 text-ink-900">{s.nombre}</p>
                 <p className="text-xs text-ink-500 mt-0.5">{s.descripcion}</p>
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
+                  {!s.visible_cliente && (
+                    <span className="text-[10px] font-600 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">Oculta para clientes</span>
+                  )}
                   {!s.cliente_puede_toggle && (
                     <span className="text-[10px] font-600 px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">El cliente no puede cambiarla</span>
                   )}
@@ -177,6 +182,15 @@ export default function SuperadminSkillsPage() {
                   </div>
                   <input type="checkbox" checked={formData.activa_por_defecto}
                     onChange={e => setFormData({...formData, activa_por_defecto: e.target.checked})}
+                    className="w-5 h-5 rounded text-brand-600 focus:ring-brand-400 ml-3 shrink-0" />
+                </label>
+                <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer">
+                  <div>
+                    <p className="text-sm font-500 text-ink-900">Visible para clientes</p>
+                    <p className="text-xs text-ink-500 mt-0.5">Si está desactivado, no aparece en el panel de cliente ni en el onboarding, aunque siga existiendo en el catálogo</p>
+                  </div>
+                  <input type="checkbox" checked={formData.visible_cliente}
+                    onChange={e => setFormData({...formData, visible_cliente: e.target.checked})}
                     className="w-5 h-5 rounded text-brand-600 focus:ring-brand-400 ml-3 shrink-0" />
                 </label>
               </div>

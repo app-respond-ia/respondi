@@ -76,6 +76,7 @@ export async function generarRespuesta(conv: any) {
   const activeSkills = new Set(branchSkills?.map((s: any) => s.skills_globales.slug) || [])
   const canEscalate = activeSkills.has('escalar_humano') && rules && rules.length > 0
   const canTag = activeSkills.has('etiquetar_conversacion') && categories && categories.length > 0
+  const canUseNovedades = activeSkills.has('novedades_dia')
 
   // 3.6. Contexto CRM (Historial y Novedades)
   const { data: pastConvs } = await supabaseAdmin
@@ -88,13 +89,15 @@ export async function generarRespuesta(conv: any) {
     .order('fecha_cierre', { ascending: false })
     .limit(5)
 
-  const { data: dailyUpdates } = await supabaseAdmin
-    .from('daily_updates')
-    .select('*, tipos_novedad:tipo_id(nombre)')
-    .eq('branch_id', branchId)
-    .eq('activo', true)
-    .lte('fecha_vigencia_inicio', new Date().toISOString())
-    .or(`fecha_vigencia_fin.is.null,fecha_vigencia_fin.gte.${new Date().toISOString()}`)
+  const { data: dailyUpdates } = canUseNovedades
+    ? await supabaseAdmin
+        .from('daily_updates')
+        .select('*, tipos_novedad:tipo_id(nombre)')
+        .eq('branch_id', branchId)
+        .eq('activo', true)
+        .lte('fecha_vigencia_inicio', new Date().toISOString())
+        .or(`fecha_vigencia_fin.is.null,fecha_vigencia_fin.gte.${new Date().toISOString()}`)
+    : { data: null }
 
   // 4. Preparar Prompt del Sistema
   let systemPrompt = `Eres el asistente virtual del negocio.\n`

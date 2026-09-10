@@ -19,6 +19,7 @@ export async function getSkillsGlobalesBase() {
   const { data, error } = await supabase
     .from('skills_globales')
     .select('id, slug, nombre, descripcion, activa_por_defecto, cliente_puede_toggle, orden')
+    .eq('visible_cliente', true)
     .order('orden', { ascending: true })
   if (error) return { success: false, error: error.message }
   return { success: true, data }
@@ -29,6 +30,7 @@ export async function crearSkillGlobal(data: {
   descripcion?: string
   cliente_puede_toggle: boolean
   activa_por_defecto: boolean
+  visible_cliente: boolean
   orden: number
 }) {
   const supabase = await createClient()
@@ -53,6 +55,7 @@ export async function actualizarSkillGlobal(id: string, data: Partial<{
   descripcion: string
   cliente_puede_toggle: boolean
   activa_por_defecto: boolean
+  visible_cliente: boolean
   orden: number
 }>) {
   const supabase = await createClient()
@@ -106,10 +109,11 @@ export async function eliminarSkillGlobal(id: string) {
 export async function getSkillsParaCliente(branchId: string) {
   const supabase = await createClient()
 
-  // Leer skills globales
+  // Leer skills globales (solo las visibles para clientes)
   const { data: globales, error } = await supabase
     .from('skills_globales')
     .select('*')
+    .eq('visible_cliente', true)
     .order('orden', { ascending: true })
 
   if (error) return { success: false, error: error.message }
@@ -126,7 +130,7 @@ export async function getSkillsParaCliente(branchId: string) {
     return {
       ...g,
       // For compatibility with the frontend that expects 'idName' which doesn't exist on skills_globales
-      idName: g.slug, 
+      idName: g.slug,
       fija: !g.cliente_puede_toggle,
       activo: clienteSkill ? clienteSkill.activo : g.activa_por_defecto
     }

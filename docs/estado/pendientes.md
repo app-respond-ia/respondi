@@ -8,10 +8,9 @@ solo la lista viva).
 - [ ] UI de horarios: no distingue horario del negocio vs. horario de
       respuesta de la IA
 - [ ] Falta botón de políticas en el perfil de sucursal
-- [ ] Bug de permisos: un admin/dueño de organización no podía hacer
-      ciertas acciones en su propio panel (detectado en pruebas de la
-      última reunión) — sospecha: misma familia que el problema de
-      `rol` legacy desincronizado con `es_propietario`
+- [x] Bug de permisos: un admin/dueño de organización no podía hacer
+      ciertas acciones en su propio panel — resuelto, ver
+      `docs/estado/incidentes-resueltos.md`
 - [ ] Verificaciones aplazadas: contraseña con cuenta email
       (vendedor/superadmin), fix de invitación con hash, prueba de
       notificación de comisiones
@@ -48,6 +47,28 @@ solo la lista viva).
       entendibles) — pausado a propósito hasta cerrar la auditoría de
       esquema y la estrategia de errores/seguridad, para diseñar el
       mapeo una sola vez
+- [ ] Interceptor de `Toast.tsx` traduce a ciegas TODO error, incluidos
+      mensajes ya legibles y correctos de la propia app — bug
+      relacionado con el de arriba pero distinto y más urgente, afecta
+      a toda la app, merece su propio tramo. Causa: `showToast(msg,
+      'error')` pasa `msg` por `traducirError()` sin distinguir si ya
+      es un mensaje humano de la app o un error técnico crudo de
+      Postgres/Auth; si no coincide con ninguno de los patrones que
+      `traducirError` reconoce (`23505`/`23502`/`42501`/etc.), cae
+      siempre al genérico "Ha ocurrido un error inesperado. Si
+      persiste, contacta con soporte." — destruyendo el mensaje real.
+      Repro real: `actualizarRegla` (`src/app/actions/reglas.ts`)
+      bloquea correctamente editar una regla `es_protegida` con el
+      mensaje "Esta regla es del sistema y no se puede editar ni
+      desactivar.", pero en `/dashboard/reglas` el usuario solo veía el
+      genérico. El commit `75db8e0` ya evitó el problema a mano en 4
+      pantallas con "manejo de error local" (mostrando el error fuera
+      del Toast) — indicio de que ya se detectó antes sin arreglar la
+      causa de raíz. Posibles enfoques: que las Server Actions marquen
+      de algún modo si un error ya es "para mostrar tal cual" vs "crudo
+      a traducir", o que `traducirError` solo actúe sobre objetos de
+      error reales (con `.code`/`.message` de Postgres) y no sobre
+      strings ya construidos por la app.
 - [ ] Stripe (Pieza B) — falta crear la cuenta de Stripe; resto del
       código ya preparado (ver `docs/estado/creditos-facturacion.md`)
 - [ ] Migrar `create_trial_account`/flujo de Google OAuth al RPC

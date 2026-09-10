@@ -104,9 +104,9 @@ function ReglaRow({ item, onToggle, onEdit, onDelete, dragHandleProps, disableDr
       {/* Controles de la derecha */}
       <div className="flex flex-col items-end gap-3 shrink-0 ml-1">
         {/* Toggle */}
-        <button 
-          onClick={() => onToggle(item)} 
-          disabled={soloLectura}
+        <button
+          onClick={() => onToggle(item)}
+          disabled={soloLectura || item.es_protegida}
           className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 ${item.activa ? 'bg-emerald-500' : 'bg-slate-200'} disabled:opacity-50 disabled:cursor-not-allowed`}
           role="switch" 
           aria-checked={item.activa}
@@ -116,7 +116,11 @@ function ReglaRow({ item, onToggle, onEdit, onDelete, dragHandleProps, disableDr
         
         {/* Botones editar / eliminar */}
         {item.es_protegida ? (
-          <span className="text-[10px] uppercase font-bold tracking-wider bg-slate-100 text-slate-500 px-2 py-1 rounded border border-slate-200">Del sistema</span>
+          <span title="Regla del sistema — no se puede editar ni eliminar" className="shrink-0 inline-flex items-center justify-center w-5 h-5 rounded-full bg-brand-100/50 text-brand-600">
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+            </svg>
+          </span>
         ) : (
           <div className="flex items-center gap-1">
             <button onClick={() => onEdit(item)} disabled={soloLectura} className="p-1.5 rounded-lg text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition disabled:opacity-50 disabled:cursor-not-allowed" aria-label="Editar">

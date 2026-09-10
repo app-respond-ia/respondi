@@ -25,87 +25,114 @@ export async function getMetricas(periodo: 'hoy' | 'semana' | 'mes' | 'total' = 
   }
 
   // ── CONVERSACIONES ──────────────────────────────────────────
-  const { data: convs } = await supabase
+  // OJO: esta pantalla estaba escrita contra un esquema que no existe
+  // (`status`, `created_at`, `updated_at`, `channel_id`, `channels(tipo)`...).
+  // Todas las consultas fallaban y, como el error se descartaba, la pantalla
+  // enseñaba ceros como si fueran datos reales. Los nombres correctos son
+  // `estado`, `fecha_inicio`, `fecha_cierre` y `canal`.
+  const { data: convs, error: errConvs } = await supabase
     .from('conversations')
-    .select('id, status, channel_id, created_at, updated_at, channels(tipo)')
+    .select('id, estado, canal, fecha_inicio, fecha_cierre')
     .eq('branch_id', branchId)
-    .gte('created_at', desde)
+    .gte('fecha_inicio', desde)
+
+  if (errConvs) return { success: false, error: errConvs.message }
 
   const totalConvs = convs?.length || 0
-  const convsActivas = convs?.filter(c => c.status === 'activa').length || 0
-  const convsCerradas = convs?.filter(c => c.status === 'cerrada').length || 0
+  const convsActivas = convs?.filter(c => c.estado === 'activa').length || 0
+  const convsCerradas = convs?.filter(c => c.estado === 'cerrada').length || 0
   const tasaCierre = totalConvs > 0 ? Math.round((convsCerradas / totalConvs) * 100) : 0
 
   const porCanal: Record<string, number> = {}
   convs?.forEach(c => {
-    const tipo = (c.channels as any)?.tipo || 'desconocido'
+    const tipo = c.canal || 'desconocido'
     porCanal[tipo] = (porCanal[tipo] || 0) + 1
   })
 
-  // Duración media (ms entre created_at y updated_at para cerradas)
-  const cerradas = convs?.filter(c => c.status === 'cerrada') || []
+  // Duración media de las conversaciones ya cerradas, en minutos
+  const cerradas = convs?.filter(c => c.estado === 'cerrada' && c.fecha_cierre) || []
   const duracionMedia = cerradas.length > 0
     ? Math.round(cerradas.reduce((acc, c) => {
-        const dur = new Date(c.updated_at).getTime() - new Date(c.created_at).getTime()
-        return acc + (isNaN(dur) ? 0 : dur)
-      }, 0) / cerradas.length / 60000) // en minutos
+        const dur = new Date(c.fecha_cierre).getTime() - new Date(c.fecha_inicio).getTime()
+        return acc + (isNaN(dur) || dur < 0 ? 0 : dur)
+      }, 0) / cerradas.length / 60000)
     : 0
 
   // Hora pico
   const porHora: Record<number, number> = {}
   for (let i = 0; i < 24; i++) porHora[i] = 0
   convs?.forEach(c => {
-    const h = new Date(c.created_at).getHours()
+    const h = new Date(c.fecha_inicio).getHours()
     porHora[h] = (porHora[h] || 0) + 1
   })
   const horaPico = Object.entries(porHora).sort((a, b) => b[1] - a[1])[0]?.[0] || '0'
 
   // ── MENSAJES ─────────────────────────────────────────────────
-  const { data: msgs } = await supabase
-    .from('messages')
-    .select('id, role, created_at, conversation_id')
+  // `messages` no tiene `branch_id`: se filtra por las conversaciones de esta
+  // sucursal. Y las columnas son `remitente` ('cliente'|'ia'|'agente') y
+  // `timestamp`, no `role` ni `created_at`.
+  const { data: idsConvSucursal } = await supabase
+    .from('conversations')
+    .select('id')
     .eq('branch_id', branchId)
-    .gte('created_at', desde)
+
+  const idsConv = (idsConvSucursal || []).map(c => c.id)
+
+  const { data: msgs } = idsConv.length
+    ? await supabase
+        .from('messages')
+        .select('id, remitente, timestamp, conversation_id')
+        .in('conversation_id', idsConv)
+        .gte('timestamp', desde)
+    : { data: [] as any[] }
 
   const totalMsgs = msgs?.length || 0
-  const msgsIA = msgs?.filter(m => m.role === 'assistant').length || 0
-  const msgsCliente = msgs?.filter(m => m.role === 'user').length || 0
+  const msgsIA = msgs?.filter(m => m.remitente === 'ia').length || 0
+  const msgsCliente = msgs?.filter(m => m.remitente === 'cliente').length || 0
   const ratioIA = totalMsgs > 0 ? Math.round((msgsIA / totalMsgs) * 100) : 0
   const promedioMsgsPorConv = totalConvs > 0 ? Math.round(totalMsgs / totalConvs) : 0
 
   // ── CASOS ────────────────────────────────────────────────────
+  // `cases` usa `estatus` (pendiente|atendiendo|resuelto|cerrado),
+  // `fecha_apertura`, `fecha_cierre` y `agente_id`. No existe `source`.
   const { data: casosData } = await supabase
     .from('cases')
-    .select('id, status, created_at, updated_at, assigned_to, source, conversation_id, conversation_tags(nombre)')
+    .select('id, estatus, descripcion, fecha_apertura, fecha_cierre, agente_id, conversation_id')
     .eq('branch_id', branchId)
-    .gte('created_at', desde)
+    .gte('fecha_apertura', desde)
 
+  const CERRADOS = ['resuelto', 'cerrado']
   const totalCasos = casosData?.length || 0
-  const casosAbiertos = casosData?.filter(c => c.status === 'abierto').length || 0
-  const casosCerrados = casosData?.filter(c => c.status === 'cerrado').length || 0
+  const casosAbiertos = casosData?.filter(c => !CERRADOS.includes(c.estatus)).length || 0
+  const casosCerrados = casosData?.filter(c => CERRADOS.includes(c.estatus)).length || 0
   const tasaResolucion = totalCasos > 0 ? Math.round((casosCerrados / totalCasos) * 100) : 0
 
-  // Tiempo medio resolución casos cerrados (minutos)
-  const casosCerradosData = casosData?.filter(c => c.status === 'cerrado') || []
+  // Tiempo medio de resolución de los casos cerrados, en minutos
+  const casosCerradosData = casosData?.filter(c => CERRADOS.includes(c.estatus) && c.fecha_cierre) || []
   const tiempoMedioResolucion = casosCerradosData.length > 0
     ? Math.round(casosCerradosData.reduce((acc, c) => {
-        const dur = new Date(c.updated_at).getTime() - new Date(c.created_at).getTime()
-        return acc + (isNaN(dur) ? 0 : dur)
+        const dur = new Date(c.fecha_cierre).getTime() - new Date(c.fecha_apertura).getTime()
+        return acc + (isNaN(dur) || dur < 0 ? 0 : dur)
       }, 0) / casosCerradosData.length / 60000)
     : 0
 
-  // Casos escalados por IA vs manual
-  const casosEscaladosIA = casosData?.filter(c => c.source === 'ia').length || 0
+  // No hay ninguna columna que diga de dónde salió el caso. Hoy solo los crea
+  // el sistema (al escalar, fuera de horario, sin cuota...) y siempre con una
+  // descripción; los que abre la entrada de mensajes nacen sin ella. Se usa
+  // eso como distinción hasta que exista un campo de origen de verdad.
+  const casosEscaladosIA = casosData?.filter(c => !!c.descripcion).length || 0
   const casosEscaladosManuales = totalCasos - casosEscaladosIA
 
   // Tasa de escalado (% convs que generaron un caso)
   const tasaEscalado = totalConvs > 0 ? Math.round((totalCasos / totalConvs) * 100) : 0
 
   // ── CONTACTOS ────────────────────────────────────────────────
+  // `contacts` es por organización, no por sucursal: no tiene `branch_id`.
+  // Y el canal es una columna suya (`canal`), no una relación con `channels`.
   const { data: contactosData } = await supabase
     .from('contacts')
-    .select('id, created_at, channel_id, channels(tipo)')
-    .eq('branch_id', branchId)
+    .select('id, created_at, canal')
+    .eq('tenant_id', auth.tenant_id)
 
   const totalContactos = contactosData?.length || 0
   const nuevosContactos = contactosData?.filter(c => c.created_at >= desde).length || 0
@@ -113,7 +140,7 @@ export async function getMetricas(periodo: 'hoy' | 'semana' | 'mes' | 'total' = 
   // Contactos por canal
   const contactosPorCanal: Record<string, number> = {}
   contactosData?.forEach(c => {
-    const tipo = (c.channels as any)?.tipo || 'desconocido'
+    const tipo = c.canal || 'desconocido'
     contactosPorCanal[tipo] = (contactosPorCanal[tipo] || 0) + 1
   })
 
@@ -185,8 +212,8 @@ export async function getMetricas(periodo: 'hoy' | 'semana' | 'mes' | 'total' = 
         .from('cases')
         .select('*', { count: 'exact', head: true })
         .eq('branch_id', branchId)
-        .eq('assigned_to', u.id)
-        .gte('created_at', desde)
+        .eq('agente_id', u.id)
+        .gte('fecha_apertura', desde)
       actividadPorUsuario.push({
         nombre: u.nombre || u.email,
         email: u.email,
@@ -200,7 +227,7 @@ export async function getMetricas(periodo: 'hoy' | 'semana' | 'mes' | 'total' = 
   // Convs resueltas sin intervención humana = cerradas sin casos asociados
   const convsConCaso = new Set(casosData?.map(c => c.conversation_id) || [])
   const convsSinEscalado = convsCerradas - [...convsConCaso].filter(id =>
-    convs?.some(c => c.id === id && c.status === 'cerrada')
+    convs?.some(c => c.id === id && c.estado === 'cerrada')
   ).length
   const tasaResolucionIA = convsCerradas > 0
     ? Math.round((convsSinEscalado / convsCerradas) * 100)
@@ -218,9 +245,9 @@ export async function getMetricas(periodo: 'hoy' | 'semana' | 'mes' | 'total' = 
   const hace30 = new Date(now); hace30.setDate(hace30.getDate() - 29)
   const { data: convsGrafico } = await supabase
     .from('conversations')
-    .select('created_at')
+    .select('fecha_inicio')
     .eq('branch_id', branchId)
-    .gte('created_at', hace30.toISOString())
+    .gte('fecha_inicio', hace30.toISOString())
 
   const porDia: Record<string, number> = {}
   for (let i = 0; i < 30; i++) {
@@ -228,17 +255,19 @@ export async function getMetricas(periodo: 'hoy' | 'semana' | 'mes' | 'total' = 
     porDia[d.toISOString().split('T')[0]] = 0
   }
   convsGrafico?.forEach(c => {
-    const key = c.created_at.split('T')[0]
+    const key = c.fecha_inicio.split('T')[0]
     if (porDia[key] !== undefined) porDia[key]++
   })
   const graficoConvs = Object.entries(porDia).map(([fecha, total]) => ({ fecha, total }))
 
   // Mensajes por día (últimos 30 días)
-  const { data: msgsGrafico } = await supabase
-    .from('messages')
-    .select('created_at, role')
-    .eq('branch_id', branchId)
-    .gte('created_at', hace30.toISOString())
+  const { data: msgsGrafico } = idsConv.length
+    ? await supabase
+        .from('messages')
+        .select('timestamp, remitente')
+        .in('conversation_id', idsConv)
+        .gte('timestamp', hace30.toISOString())
+    : { data: [] as any[] }
 
   const msgsPorDia: Record<string, { ia: number, cliente: number }> = {}
   for (let i = 0; i < 30; i++) {
@@ -246,9 +275,9 @@ export async function getMetricas(periodo: 'hoy' | 'semana' | 'mes' | 'total' = 
     msgsPorDia[d.toISOString().split('T')[0]] = { ia: 0, cliente: 0 }
   }
   msgsGrafico?.forEach(m => {
-    const key = m.created_at.split('T')[0]
+    const key = String(m.timestamp).split('T')[0]
     if (msgsPorDia[key]) {
-      if (m.role === 'assistant') msgsPorDia[key].ia++
+      if (m.remitente === 'ia') msgsPorDia[key].ia++
       else msgsPorDia[key].cliente++
     }
   })

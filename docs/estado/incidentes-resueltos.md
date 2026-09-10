@@ -568,3 +568,38 @@ Dos consecuencias:
    llegaría a usar nunca.
 
 No se toca sin decidirlo con Jorge: cambia lo que ve el agente en su bandeja.
+
+## La pantalla de Métricas nunca funcionó (resuelto)
+`src/app/actions/metricas.ts` estaba escrito contra un esquema que no existe.
+Las seis consultas del archivo pedían columnas inventadas:
+
+- `conversations.status` / `created_at` / `updated_at` / `channel_id` y un
+  embed `channels(tipo)` sin relación → los nombres reales son `estado`,
+  `fecha_inicio`, `fecha_cierre` y `canal`.
+- `messages.role` / `created_at` / `branch_id` → son `remitente`, `timestamp`,
+  y `messages` **no tiene** `branch_id`: hay que ir por las conversaciones.
+- `cases.status` / `created_at` / `updated_at` / `assigned_to` / `source` →
+  son `estatus`, `fecha_apertura`, `fecha_cierre`, `agente_id`, y `source` no
+  existe.
+- `contacts.branch_id` / `channel_id` → `contacts` es por organización, no por
+  sucursal, y el canal es una columna suya.
+
+Todas fallaban, y como el error se descartaba (`const { data } = await ...`
+sin mirar `error`), la pantalla enseñaba **ceros en todo** como si fueran
+datos reales. Es la misma forma de fallar que el `activo` de `price_list`:
+columna equivocada, error silencioso, dato falso en pantalla.
+
+Reescrito contra el esquema real y verificado con una sesión de cliente: la
+acción devuelve ahora conteos de verdad. La primera consulta comprueba el
+error y corta, para que no pueda volver a pintar ceros en silencio.
+
+Se amplió el barrido automático de columnas inexistentes a los `.select()`
+(antes solo miraba `.insert()`/`.update()`). Tras el arreglo: cero hallazgos
+en todo `src/`. El guion está en el scratchpad de la sesión y conviene
+repetirlo cuando se toque el esquema.
+
+Nota: la métrica "casos escalados por IA vs manuales" no tiene ninguna
+columna que la sustente —no existe un campo de origen del caso—, así que de
+momento se distingue por si el caso tiene descripción (los crea el sistema)
+o no (los abre la entrada de mensajes). Si esa métrica importa, hace falta
+una columna `origen` de verdad.

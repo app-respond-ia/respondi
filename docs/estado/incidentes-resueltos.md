@@ -174,3 +174,40 @@ producción en local, se generó una cookie de sesión real del cliente
 aparece el stacktrace completo en la consola del servidor. Lección: ante
 un 500 de Server Action sin rastro en `error_logs`, reproducir con
 `npm run build && npm start` en local antes de seguir instrumentando.
+
+## Funciones internas abiertas al público en la API REST (resuelto)
+El linter de Supabase avisaba de que `crear_cuenta_completa` era
+ejecutable por los roles `anon` y `authenticated` a través de
+`/rest/v1/rpc/`. Confirmado con una llamada real y anónima: la función se
+ejecutaba entera y solo fallaba al final por la FK `users.id → auth.users`.
+Es decir, cualquiera con una cuenta gratuita (que sí tiene un uuid válido)
+podía fabricarse organizaciones con sus créditos de trial en bucle, sin
+pasar por el registro. Lo mismo con las tres `check_*` que dispara pg_cron.
+
+Dos cosas que casi salen mal y conviene recordar:
+
+1. **El primer intento no hizo nada.** La migración `20260910180000` hacía
+   `REVOKE ... FROM anon, authenticated` y se aplicó sin errores, pero el
+   agujero seguía abierto: esos roles nunca tuvieron un permiso directo, lo
+   heredaban de `PUBLIC` (Postgres concede EXECUTE a PUBLIC en toda función
+   nueva por defecto; el ACL se ve como `=X/postgres`, donde el `=` a la
+   izquierda es PUBLIC). Solo se detectó porque se volvió a llamar al
+   endpoint después de aplicar, en vez de dar por bueno el "migración
+   aplicada". Corregido en `20260910190000` revocando desde `PUBLIC`.
+
+2. **`service_role` también heredaba de PUBLIC.** Un `REVOKE ... FROM
+   PUBLIC` a secas habría dejado el alta de cuentas inservible, porque el
+   servidor de la app llama a la función con esa clave. Hay que devolverle
+   el permiso explícitamente en la misma migración.
+
+No se tocaron `auth_rol`, `auth_is_admin`, `auth_tenant_id`,
+`auth_has_permission` ni `is_super_admin`, que el linter marca igual: 56
+políticas de RLS las invocan y una política se evalúa con el rol de quien
+consulta, así que `authenticated` necesita conservar el EXECUTE o se cae el
+acceso a media aplicación. Tampoco `get_resumen_creditos`, que sí se llama
+con el cliente de sesión desde `superadmin.ts`.
+
+Verificación final en producción: anónimo → 401/42501; usuario identificado
+con sesión real → 403/42501; `service_role` → entra y llega a la lógica de
+la función; pg_cron (rol `postgres`, dueño de las funciones) → conserva
+acceso.

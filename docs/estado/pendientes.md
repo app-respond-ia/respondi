@@ -11,15 +11,12 @@ solo la lista viva).
 - [x] Bug de permisos: un admin/dueño de organización no podía hacer
       ciertas acciones en su propio panel — resuelto, ver
       `docs/estado/incidentes-resueltos.md`
-- [ ] `crear_cuenta_completa` es ejecutable por los roles `anon` y
-      `authenticated` vía `/rest/v1/rpc/`. La FK `users.id → auth.users`
-      impide inventarse usuarios, pero cualquiera con una cuenta puede
-      llamarla y crear organizaciones (con sus créditos de trial) en
-      bucle, o para el id de otra persona. Revocar el EXECUTE: las 3
-      llamadas de la app usan `supabaseAdmin` (service role), que se
-      salta los GRANT, así que revocar no rompe nada. OJO: no tocar
-      `get_resumen_creditos`, esa sí se llama con el cliente de sesión
-      (`superadmin.ts`).
+- [x] `crear_cuenta_completa` ejecutable por cualquiera vía
+      `/rest/v1/rpc/` — cerrado (10-09-2026, migración
+      `20260910190000`). Verificado en producción: anónimo y usuario
+      identificado reciben 42501 "permission denied"; el servidor de la
+      app (service_role) y pg_cron conservan el acceso. Las tres
+      `check_*` de cron quedan igual de cerradas.
 - [ ] Verificaciones aplazadas: contraseña con cuenta email
       (vendedor/superadmin), fix de invitación con hash, prueba de
       notificación de comisiones

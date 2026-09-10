@@ -189,6 +189,12 @@ export async function generarRespuesta(conv: any) {
   }
   systemPrompt += `- No inventes información. Si no lo sabes, indícalo${canEscalate ? ' o usa escalar_humano' : ''}.\n`
   systemPrompt += `- Eres un asistente, responde de manera concisa y natural.\n`
+  // Cuando el negocio estaba cerrado se le manda al cliente un aviso
+  // automático y la conversación queda en espera. Al abrir, esa respuesta
+  // pendiente se contesta, pero el aviso sigue en el historial y el modelo lo
+  // repetía: el cliente leía "estamos cerrados" justo cuando ya habían
+  // abierto.
+  systemPrompt += `- Si en el historial hay un aviso automático de que el negocio estaba cerrado o sin disponibilidad, NO lo repitas: el cliente ya lo recibió. Contesta directamente a lo que preguntó.\n`
   if (canEscalate) {
     systemPrompt += `- Si el usuario envía un archivo no soportado (ej. PDF o Word), invoca escalar_humano.\n`
     // Sin esto, el modelo contesta "te paso con una persona del equipo" y se

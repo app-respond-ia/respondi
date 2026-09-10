@@ -524,3 +524,47 @@ era el correcto mientras nadie tocara nada. Pero eran dos campos muertos.
 Ahora: con "Idioma multi" activa se responde en el idioma del cliente y, si
 no queda claro en cuál escribe, en el idioma base. Con la skill apagada se
 responde siempre en el idioma base. Verificado con las dos configuraciones.
+
+## Ronda del ciclo de vida de una conversación (10-09-2026)
+No "¿responde o no responde?", sino qué pasa DESPUÉS de bloquear una
+conversación y si el cliente acaba siendo atendido. 13 escenarios contra los
+endpoints reales.
+
+Funciona bien (verificado):
+- **Fuera de horario**: avisa, bloquea, y cuando llega el horario de apertura
+  `/api/cron/revisar-bloqueos` la desbloquea y dispara la respuesta a la
+  pregunta que había quedado pendiente.
+- **Sucursal apagada** y **sin créditos**: mismo ciclo; al encenderla o al
+  recargar créditos se desbloquea sola.
+- **Contacto marcado para no atender**: se bloquea y el revisor NO la
+  desbloquea, que es lo correcto.
+- **Escalado**: crea el caso, pausa la IA, la IA no responde por encima del
+  agente mientras está pausada, y al devolverla desde el chat vuelve a
+  responder.
+- El candado `ia_procesando_desde` evita que el revisor de bloqueos y el cron
+  principal procesen la misma conversación a la vez.
+
+Corregido por el camino: al reabrir, la IA **repetía el aviso de "estamos
+cerrados"** que seguía en el historial, justo cuando el negocio ya había
+abierto. Ahora se le indica que no repita los avisos automáticos.
+
+## Cada mensaje entrante abre un caso — decisión pendiente
+`resolve_incoming_message_context` (la función que llama n8n al llegar cada
+mensaje) inserta **siempre** una fila en `cases` con `estatus = 'pendiente'`
+y sin descripción, además de crear el contacto y la conversación.
+
+Verificado llamándola directamente: un simple "hola" de un cliente nuevo deja
+un caso abierto.
+
+Dos consecuencias:
+1. La bandeja "Mis casos" del agente —que según `core-plataforma.md` es su
+   cola de trabajo, con SLA— se llena de un caso vacío por conversación,
+   indistinguible de un escalado real.
+2. Más grave: `/api/ai/summarize` solo cierra la conversación **si no hay
+   casos pendientes**. Como siempre hay uno, **ninguna conversación se cierra
+   sola**. Y como el motor lee la memoria de conversaciones anteriores de las
+   que están `cerradas`, **la IA nunca tendrá memoria de conversaciones
+   pasadas en producción**. Esa función existe y está probada, pero no se
+   llegaría a usar nunca.
+
+No se toca sin decidirlo con Jorge: cambia lo que ve el agente en su bandeja.

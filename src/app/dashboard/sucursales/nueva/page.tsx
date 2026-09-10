@@ -8,7 +8,8 @@ import { useToast } from '@/components/ui/Toast'
 import { EditorHorarios } from '@/components/sucursales/EditorHorarios'
 import { DIAS_SEMANA } from '@/lib/dias-semana'
 import { horariosPorDefecto, registrosAHorarios, validarHorarios } from '@/lib/horarios'
-import { SelectorHorarioIA, type ModoHorarioIA } from '@/components/sucursales/SelectorHorarioIA'
+import { type ModoHorarioIA } from '@/components/sucursales/SelectorHorarioIA'
+import { ConfiguracionMensajeIA } from '@/components/sucursales/ConfiguracionMensajeIA'
 import { PAISES } from '@/lib/paises'
 
 // CAMBIO 1: Husos horarios completos LATAM + España, ordenados de GMT-6 a GMT+1
@@ -131,6 +132,7 @@ export default function NuevaSucursalPage() {
   const [modoHorarioIa, setModoHorarioIa] = useState<ModoHorarioIA>('mismo_negocio')
   const [horariosIA, setHorariosIA] = useState(horariosPorDefecto())
   const [casoFueraHorario, setCasoFueraHorario] = useState(false)
+  const [sinMensaje, setSinMensaje] = useState(false)
 
   // Onboarding — horarios (mismos defaults que el resto de la app)
   const [horarios, setHorarios] = useState(horariosPorDefecto())
@@ -332,7 +334,7 @@ export default function NuevaSucursalPage() {
       politicas,
       idioma_base: idiomaBase,
       tono,
-      msg_fuera_horario: msgFueraHorario,
+      msg_fuera_horario: sinMensaje ? '' : msgFueraHorario,
       abrir_caso_fuera_horario: casoFueraHorario,
       modo_horario_ia: modoHorarioIa,
       horarios,
@@ -613,7 +615,7 @@ export default function NuevaSucursalPage() {
   }
 
   // ── ONBOARDING EN CASCADA (CAMBIO 4) ─────────────────────────
-  const totalSteps = 4
+  const totalSteps = 5
   const pct = Math.round(((onbStep - 1) / totalSteps) * 100)
 
   return (
@@ -687,14 +689,6 @@ export default function NuevaSucursalPage() {
                   </button>
                 </div>
 
-                {/* Mensaje fuera de horario */}
-                <div>
-                  <label className="block text-sm font-500 text-ink-700 mb-1.5">Mensaje fuera de horario</label>
-                  <textarea rows={2} value={msgFueraHorario} onChange={e => setMsgFueraHorario(e.target.value)}
-                    placeholder="Mensaje cuando el cliente escribe fuera de horario..."
-                    className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white resize-none text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition" />
-                </div>
-
                 {/* Idioma y Tono */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -717,34 +711,6 @@ export default function NuevaSucursalPage() {
                   </div>
                 </div>
 
-                <SelectorHorarioIA
-                  modo={modoHorarioIa}
-                  onChangeModo={modo => {
-                    setModoHorarioIa(modo)
-                    if (modo === 'siempre_activa') setCasoFueraHorario(false)
-                  }}
-                  horariosIA={horariosIA}
-                  onChangeHorariosIA={setHorariosIA}
-                />
-
-                {modoHorarioIa !== 'siempre_activa' && (
-                  <div className="space-y-3">
-                    <label className="block text-sm font-600 text-slate-700">Comportamiento fuera de horario</label>
-                    <label className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50 transition cursor-pointer hover:bg-slate-100">
-                      <div>
-                        <p className="text-sm font-500 text-ink-900">Abrir caso automáticamente fuera de horario</p>
-                        <p className="text-xs text-ink-500 mt-0.5">Se crea un caso para que un agente lo atienda cuando vuelva a haber horario.</p>
-                      </div>
-                      <div className="relative ml-4 shrink-0">
-                        <input type="checkbox" checked={casoFueraHorario}
-                          onChange={e => setCasoFueraHorario(e.target.checked)}
-                          className="peer sr-only" />
-                        <div className={`w-11 h-6 rounded-full transition-colors ${casoFueraHorario ? 'bg-brand-600' : 'bg-slate-300'}`}></div>
-                        <div className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${casoFueraHorario ? 'translate-x-5' : 'translate-x-0'}`}></div>
-                      </div>
-                    </label>
-                  </div>
-                )}
               </div>
             </div>
           )}
@@ -814,10 +780,35 @@ export default function NuevaSucursalPage() {
           )}
 
           {/* PASO 4: PRECIOS */}
+          {/* PASO 4: MENSAJE DE BIENVENIDA (mismo bloque que el onboarding principal) */}
           {onbStep === 4 && (
             <div>
               <div className="flex items-center gap-3 mb-1">
                 <span className="w-9 h-9 rounded-xl bg-brand-100 text-brand-700 font-display font-700 flex items-center justify-center text-sm">4</span>
+                <span className="text-xs font-600 uppercase tracking-wider text-brand-600">Mensaje de bienvenida</span>
+              </div>
+              <h2 className="font-display font-700 text-xl text-ink-900 mb-1">El primer mensaje al cliente</h2>
+              <p className="text-ink-500 text-sm mb-6">La IA enviará este texto al inicio de cada conversación nueva en esta sucursal.</p>
+
+              <ConfiguracionMensajeIA
+                mensaje={msgFueraHorario}
+                onChangeMensaje={setMsgFueraHorario}
+                sinMensaje={sinMensaje}
+                onChangeSinMensaje={setSinMensaje}
+                modo={modoHorarioIa}
+                onChangeModo={setModoHorarioIa}
+                horariosIA={horariosIA}
+                onChangeHorariosIA={setHorariosIA}
+                abrirCaso={casoFueraHorario}
+                onChangeAbrirCaso={setCasoFueraHorario}
+              />
+            </div>
+          )}
+
+          {onbStep === 5 && (
+            <div>
+              <div className="flex items-center gap-3 mb-1">
+                <span className="w-9 h-9 rounded-xl bg-brand-100 text-brand-700 font-display font-700 flex items-center justify-center text-sm">5</span>
                 <span className="text-xs font-600 uppercase tracking-wider text-brand-600">Lista de precios</span>
               </div>
               <h2 className="font-display font-700 text-xl text-ink-900 mb-1">Precios de esta sucursal</h2>
@@ -870,7 +861,7 @@ export default function NuevaSucursalPage() {
           </button>
 
           <div className="flex items-center gap-2">
-            {[1,2,3,4].map(dot => (
+            {[1,2,3,4,5].map(dot => (
               <span key={dot} className={`rounded-full transition-all duration-300 ${dot === onbStep ? 'w-6 h-2 bg-brand-600' : dot < onbStep ? 'w-2 h-2 bg-brand-300' : 'w-2 h-2 bg-slate-200'}`} />
             ))}
           </div>

@@ -14,7 +14,8 @@ import {
 } from '@/app/actions/onboarding'
 import { getSkillsGlobalesBase } from '@/app/actions/skills-globales'
 import { EditorHorarios } from '@/components/sucursales/EditorHorarios'
-import { SelectorHorarioIA, type ModoHorarioIA } from '@/components/sucursales/SelectorHorarioIA'
+import { type ModoHorarioIA } from '@/components/sucursales/SelectorHorarioIA'
+import { ConfiguracionMensajeIA } from '@/components/sucursales/ConfiguracionMensajeIA'
 import { horariosPorDefecto, validarHorarios } from '@/lib/horarios'
 import { ErrorModal } from '@/components/ui/ErrorModal'
 import { useMemo, useRef } from 'react'
@@ -724,46 +725,18 @@ export default function OnboardingPage() {
                   <h1 className="font-display font-bold text-2xl text-ink-900 mb-1.5">El primer mensaje al cliente</h1>
                   <p className="text-ink-500 mb-6">La IA enviará este texto al inicio de cada conversación nueva.</p>
 
-                  <label className="flex items-center gap-2.5 mb-4 cursor-pointer">
-                    <input type="checkbox" checked={s4Skip} onChange={e => {
-                      setS4Skip(e.target.checked);
-                      if (e.target.checked) setS4Msg('');
-                    }} className="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-400" />
-                    <span className="font-semibold text-ink-900 text-sm">No quiero enviar mensaje de bienvenida</span>
-                  </label>
-
-                  <textarea rows={5} value={s4Msg} onChange={e => setS4Msg(e.target.value)} disabled={s4Skip}
-                    placeholder="Ej. ¡Hola! Soy el asistente virtual de Pastelería Dulce Hogar. Estoy aquí para ayudarte con información sobre nuestros productos y precios. ¿En qué puedo ayudarte hoy?"
-                    className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white resize-none placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition disabled:opacity-50 disabled:bg-slate-50"></textarea>
-
-                  <div className="flex items-start gap-3 mt-4 rounded-xl bg-brand-50 border border-brand-100 p-3.5">
-                    <svg className="w-5 h-5 text-brand-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    <p className="text-sm text-ink-700">Es buena idea aclarar que se trata de un asistente virtual. Así el cliente sabe que habla con una IA.</p>
-                  </div>
-
-                  <div className="mt-6">
-                    <SelectorHorarioIA
-                      modo={s4ModoHorarioIa}
-                      onChangeModo={modo => {
-                        setS4ModoHorarioIa(modo)
-                        if (modo === 'siempre_activa') setS4AbrirCaso(false)
-                      }}
-                      horariosIA={horariosIA}
-                      onChangeHorariosIA={setHorariosIA}
-                    />
-                  </div>
-
-                  {s4ModoHorarioIa !== 'siempre_activa' && (
-                    <div className="mt-4">
-                      <label className="flex items-start gap-2.5 cursor-pointer group">
-                        <input type="checkbox" checked={s4AbrirCaso} onChange={e => setS4AbrirCaso(e.target.checked)}
-                          className="w-4 h-4 mt-0.5 rounded border-slate-300 text-brand-600 focus:ring-brand-400" />
-                        <span className="text-sm font-500 text-ink-900 group-hover:text-brand-700 transition">
-                          Abrir un caso automáticamente cuando llega un mensaje fuera de horario
-                        </span>
-                      </label>
-                    </div>
-                  )}
+                  <ConfiguracionMensajeIA
+                    mensaje={s4Msg}
+                    onChangeMensaje={setS4Msg}
+                    sinMensaje={s4Skip}
+                    onChangeSinMensaje={setS4Skip}
+                    modo={s4ModoHorarioIa}
+                    onChangeModo={setS4ModoHorarioIa}
+                    horariosIA={horariosIA}
+                    onChangeHorariosIA={setHorariosIA}
+                    abrirCaso={s4AbrirCaso}
+                    onChangeAbrirCaso={setS4AbrirCaso}
+                  />
                 </div>
               )}
 

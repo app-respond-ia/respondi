@@ -6,6 +6,8 @@ import { registrarAuditoria } from '@/lib/auditoria'
 import { getAuthContext } from '@/lib/auth-context'
 import { revalidatePath } from 'next/cache'
 import { supabaseAdmin } from '@/utils/supabase/admin'
+import { registrosAHorarios } from '@/lib/horarios'
+import { getMisPermisos } from './permisos'
 
 export async function getPerfilSucursal() {
   const supabase = await createClient()
@@ -39,7 +41,52 @@ export async function getPerfilSucursal() {
   }
 }
 
-export async function savePerfilSucursal(data: { 
+// Carga en UNA sola llamada todo lo que necesita /dashboard/perfil-sucursal.
+// Antes la pantalla lanzaba 5 Server Actions y cada una resolvía por su
+// cuenta la sesión y la sucursal activa (getAuthContext ≈ 3 consultas),
+// así que se hacían ~15 idas y vueltas para pintar una pantalla. Aquí la
+// sesión se resuelve una vez y el resto de consultas van en paralelo.
+export async function getDatosPerfilSucursal() {
+  const supabase = await createClient()
+
+  const [auth, permisos] = await Promise.all([
+    getAuthContext(supabase),
+    getMisPermisos()
+  ])
+
+  if (auth.error) return { success: false, error: auth.error }
+
+  const branchId = auth.branch_id
+  const tenantId = auth.tenant_id
+
+  const [
+    { data: sucursal },
+    { data: businessProfile },
+    { data: filasNegocio },
+    { data: filasIA },
+    { data: tiposNovedad }
+  ] = await Promise.all([
+    supabase.from('sucursales').select('id, nombre, direccion, pais, timezone').eq('id', branchId).eq('tenant_id', tenantId).single(),
+    supabase.from('business_profiles').select('id, servicios, politicas, idioma_base, tono, msg_fuera_horario, abrir_caso_fuera_horario, modo_horario_ia').eq('branch_id', branchId).single(),
+    supabase.from('business_hours').select('*').eq('branch_id', branchId).eq('tipo', 'negocio').order('dia_semana', { ascending: true }).order('orden', { ascending: true }),
+    supabase.from('business_hours').select('*').eq('branch_id', branchId).eq('tipo', 'ia').order('dia_semana', { ascending: true }).order('orden', { ascending: true }),
+    supabase.from('tipos_novedad').select('*').eq('branch_id', branchId).order('created_at', { ascending: true })
+  ])
+
+  return {
+    success: true,
+    data: {
+      sucursal: sucursal || null,
+      perfil: businessProfile || null,
+      horarios: registrosAHorarios(filasNegocio),
+      horariosIA: registrosAHorarios(filasIA),
+      tiposNovedad: tiposNovedad || [],
+      permisos
+    }
+  }
+}
+
+export async function savePerfilSucursal(data: {
   nombreSucursal: string, 
   direccion: string, 
   pais: string,

@@ -4,16 +4,14 @@ import { ErrorCarga } from '@/components/ui/ErrorCarga'
 import Link from 'next/link'
 
 import { useState, useEffect, useMemo } from 'react'
-import { getPerfilSucursal, savePerfilSucursal } from '@/app/actions/perfil'
-import { getHorarios, saveHorarios } from '@/app/actions/horarios'
-import { getMisPermisos } from '@/app/actions/permisos'
-import { getTiposNovedad, crearTipoNovedad, actualizarTipoNovedad, eliminarTipoNovedad, TipoNovedadData } from '@/app/actions/tipos-novedad'
+import { getDatosPerfilSucursal, savePerfilSucursal } from '@/app/actions/perfil'
+import { saveHorarios } from '@/app/actions/horarios'
+import { crearTipoNovedad, actualizarTipoNovedad, eliminarTipoNovedad, TipoNovedadData } from '@/app/actions/tipos-novedad'
 import { EditorHorarios } from '@/components/sucursales/EditorHorarios'
 import { SelectorHorarioIA } from '@/components/sucursales/SelectorHorarioIA'
 import { getIconSvg } from '@/components/novedades/NovedadesManager'
 import { useToast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
-import { DIAS_SEMANA } from '@/lib/dias-semana'
 import { PAISES } from '@/lib/paises'
 
 const AVAILABLE_ICONS = [
@@ -140,59 +138,43 @@ export default function PerfilSucursalPage() {
     const cargar = async () => {
       setLoading(true)
       try {
-        const [resPerfil, resHorarios, resHorariosIA, permisosRes] = await Promise.all([
-          getPerfilSucursal(),
-          getHorarios('negocio'),
-          getHorarios('ia'),
-          getMisPermisos()
-        ])
-      
-      if (!permisosRes.success) setErrorCarga(true)
-      if (permisosRes.success) {
-        if ((permisosRes as any).esAdmin) {
-          setNivelPermiso('escritura')
-        } else {
-          const p = (permisosRes.data || []).find((p: any) => p.seccion === 'perfil')
-          setNivelPermiso(p?.nivel || 'ninguno')
+        const res = await getDatosPerfilSucursal()
+
+        if (!res.success || !res.data) {
+          setErrorCarga(true)
+          return
         }
-      }
-      
-      if (resPerfil.success && resPerfil.data) {
+
+        const { sucursal, perfil, horarios: hNegocio, horariosIA: hIA, tiposNovedad: tipos, permisos } = res.data
+
+        const permisosRes = permisos as any
+        if (!permisosRes?.success) setErrorCarga(true)
+        if (permisosRes?.success) {
+          if (permisosRes.esAdmin) {
+            setNivelPermiso('escritura')
+          } else {
+            const p = (permisosRes.data || []).find((p: any) => p.seccion === 'perfil')
+            setNivelPermiso(p?.nivel || 'ninguno')
+          }
+        }
+
         setFormData({
-          nombreSucursal: resPerfil.data.sucursal?.nombre || '',
-          direccion: resPerfil.data.sucursal?.direccion || '',
-          pais: resPerfil.data.sucursal?.pais || '',
-          timezone: resPerfil.data.sucursal?.timezone || 'America/Caracas',
-          servicios: resPerfil.data.perfil?.servicios || '',
-          politicas: resPerfil.data.perfil?.politicas || [],
-          idioma_base: resPerfil.data.perfil?.idioma_base || 'es',
-          tono: resPerfil.data.perfil?.tono || 'cercano',
-          msg_fuera_horario: resPerfil.data.perfil?.msg_fuera_horario || '',
-          abrir_caso_fuera_horario: resPerfil.data.perfil?.abrir_caso_fuera_horario ?? false,
-          modo_horario_ia: resPerfil.data.perfil?.modo_horario_ia || 'mismo_negocio'
+          nombreSucursal: sucursal?.nombre || '',
+          direccion: sucursal?.direccion || '',
+          pais: sucursal?.pais || '',
+          timezone: sucursal?.timezone || 'America/Caracas',
+          servicios: perfil?.servicios || '',
+          politicas: perfil?.politicas || [],
+          idioma_base: perfil?.idioma_base || 'es',
+          tono: perfil?.tono || 'cercano',
+          msg_fuera_horario: perfil?.msg_fuera_horario || '',
+          abrir_caso_fuera_horario: perfil?.abrir_caso_fuera_horario ?? false,
+          modo_horario_ia: perfil?.modo_horario_ia || 'mismo_negocio'
         })
-      }
-      
-      if (resHorarios.success && resHorarios.data) {
-        const ordenados = DIAS_SEMANA.map(d => {
-          const bd = resHorarios.data.find((h: any) => h.dia_semana === d.id)
-          return bd ? { ...bd } : { dia_semana: d.id, apertura: '09:00', cierre: '18:00', cerrado: true }
-        })
-        setHorarios(ordenados)
-      }
 
-      if (resHorariosIA.success && resHorariosIA.data) {
-        const ordenadosIA = DIAS_SEMANA.map(d => {
-          const bd = resHorariosIA.data.find((h: any) => h.dia_semana === d.id)
-          return bd ? { ...bd } : { dia_semana: d.id, apertura: '09:00', cierre: '18:00', cerrado: true }
-        })
-        setHorariosIA(ordenadosIA)
-      }
-
-      const resTipos = await getTiposNovedad()
-      if (resTipos.success && resTipos.data) {
-        setTiposNovedad(resTipos.data)
-      }
+        setHorarios(hNegocio)
+        setHorariosIA(hIA)
+        setTiposNovedad(tipos)
       } catch (error) {
         console.error("Error al cargar datos del perfil:", error)
         setErrorCarga(true)

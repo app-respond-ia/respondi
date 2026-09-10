@@ -19,9 +19,15 @@ interface EditorHorariosProps {
   horarios: HorarioDia[]
   onChange: (horarios: HorarioDia[]) => void
   nivelPermiso: 'lectura' | 'escritura'
+  variant?: 'negocio' | 'ia'
 }
 
-export function EditorHorarios({ horarios, onChange, nivelPermiso }: EditorHorariosProps) {
+const VARIANT_CHIP = {
+  negocio: { label: 'Negocio', className: 'bg-slate-100 text-slate-600' },
+  ia: { label: 'IA', className: 'bg-brand-100 text-brand-700' }
+}
+
+export function EditorHorarios({ horarios, onChange, nivelPermiso, variant }: EditorHorariosProps) {
   const [copyPopoverOpen, setCopyPopoverOpen] = useState<number | null>(null)
   const [copyTargets, setCopyTargets] = useState<number[]>([])
 
@@ -73,6 +79,13 @@ export function EditorHorarios({ horarios, onChange, nivelPermiso }: EditorHorar
 
   return (
     <div className="divide-y divide-slate-100">
+      {variant && (
+        <div className="px-4 sm:px-5 py-2.5 bg-slate-50/50">
+          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-700 uppercase tracking-wide ${VARIANT_CHIP[variant].className}`}>
+            {VARIANT_CHIP[variant].label}
+          </span>
+        </div>
+      )}
       {horarios.map(h => {
         const diaObj = DIAS_SEMANA.find(d => d.id === h.dia_semana)
         return (

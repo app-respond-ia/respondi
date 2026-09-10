@@ -481,10 +481,11 @@ export default function PerfilSucursalPage() {
             <p className="text-sm text-ink-500 mt-1">Configura las horas físicas en las que el negocio está abierto. La IA usará esto por defecto para saber si estás fuera de horario, a menos que configures un horario distinto para ella más abajo.</p>
           </div>
           
-          <EditorHorarios 
+          <EditorHorarios
             horarios={horarios}
             onChange={setHorarios}
             nivelPermiso={nivelPermiso}
+            variant="negocio"
           />
         </section>
 
@@ -682,12 +683,21 @@ export default function PerfilSucursalPage() {
               
               {formData.modo_horario_ia === 'personalizado' && (
                 <div className="mt-4 border border-slate-200 rounded-xl overflow-hidden">
-                  <EditorHorarios 
+                  <EditorHorarios
                     horarios={horariosIA}
                     onChange={setHorariosIA}
                     nivelPermiso={nivelPermiso}
+                    variant="ia"
                   />
                 </div>
+              )}
+
+              {formData.modo_horario_ia === 'mismo_negocio' && (
+                <p className="text-xs text-ink-500 mt-1">La IA seguirá el horario del negocio configurado arriba.</p>
+              )}
+
+              {formData.modo_horario_ia === 'siempre_activa' && (
+                <p className="text-xs text-ink-500 mt-1">La IA responde en cualquier momento del día, todos los días, sin restricción de horario.</p>
               )}
             </div>
 

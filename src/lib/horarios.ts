@@ -1,29 +1,55 @@
 import { DIAS_SEMANA } from '@/lib/dias-semana'
 
+// Una franja "cruza la medianoche" cuando su hora de cierre es anterior a la
+// de apertura (22:00 → 02:00): termina ya en el día siguiente.
+function minutosDe(hora: string) {
+  const [h, m] = hora.split(':').map(Number)
+  return h * 60 + m
+}
+
+// ¿Los `minutos` actuales caen dentro de esta franja?
+// `esDelDiaAnterior` sirve para la cola de una franja nocturna: a la 01:00 del
+// jueves seguimos dentro de la franja "miércoles 22:00 → 02:00".
+function dentroDeFranja(franja: any, minutos: number, esDelDiaAnterior: boolean) {
+  if (!franja.apertura || !franja.cierre) return false
+  const apertura = minutosDe(franja.apertura)
+  const cierre = minutosDe(franja.cierre)
+  const cruzaMedianoche = cierre < apertura
+
+  if (esDelDiaAnterior) {
+    // Del día anterior solo cuentan las franjas que se prolongan pasada la
+    // medianoche, y solo hasta su hora de cierre.
+    return cruzaMedianoche && minutos <= cierre
+  }
+
+  // Si cruza medianoche, hoy está abierta desde la apertura hasta las 24:00.
+  return cruzaMedianoche ? minutos >= apertura : (minutos >= apertura && minutos <= cierre)
+}
+
 // Comprobador de huso horario basado en Intl (nativo)
 export function isFueraDeHorario(timezone: string, horarios: any[]) {
   // Si no hay horario configurado, asumimos abierto 24/7
-  if (!horarios || horarios.length === 0) return false 
+  if (!horarios || horarios.length === 0) return false
 
   try {
     const dateStr = new Date().toLocaleString('en-US', { timeZone: timezone, hour12: false })
-    const dateInTz = new Date(dateStr) 
+    const dateInTz = new Date(dateStr)
     const dayOfWeek = dateInTz.getDay() // 0 = Domingo, 6 = Sábado
     const currentMinutes = dateInTz.getHours() * 60 + dateInTz.getMinutes()
+
+    // Primero el día anterior: un negocio nocturno que abrió ayer a las 22:00
+    // y cierra a las 02:00 sigue abierto ahora mismo, aunque hoy figure como
+    // cerrado o no haya empezado su franja.
+    const diaAnterior = (dayOfWeek + 6) % 7
+    for (const franja of horarios.filter(h => h.dia_semana === diaAnterior && !h.cerrado)) {
+      if (dentroDeFranja(franja, currentMinutes, true)) return false
+    }
 
     const franjasHoy = horarios.filter(h => h.dia_semana === dayOfWeek && !h.cerrado)
     if (franjasHoy.length === 0) return true // Cerrado todo el día
 
     for (const franja of franjasHoy) {
-      if (!franja.apertura || !franja.cierre) continue
-      const [apH, apM] = franja.apertura.split(':').map(Number)
-      const [ciH, ciM] = franja.cierre.split(':').map(Number)
-      const openMin = apH * 60 + apM
-      const closeMin = ciH * 60 + ciM
-      
-      if (currentMinutes >= openMin && currentMinutes <= closeMin) {
-        return false // Está abierto
-      }
+      if (dentroDeFranja(franja, currentMinutes, false)) return false // Está abierto
     }
     return true // Fuera de todas las franjas
   } catch (error) {
@@ -90,14 +116,31 @@ export function validarHorarios(horarios: HorarioDia[]): string | null {
     }
 
     const ordenadas = [...dia.franjas].sort((a, b) => a.apertura.localeCompare(b.apertura))
+    let yaHayFranjaNocturna = false
+
     for (let i = 0; i < ordenadas.length; i++) {
       const f = ordenadas[i]
       if (!f.apertura || !f.cierre) {
         return `Falta una hora de apertura o cierre en ${nombreDia}.`
       }
-      if (f.apertura >= f.cierre) {
-        return `En ${nombreDia}, la hora de apertura debe ser anterior a la de cierre.`
+      if (f.apertura === f.cierre) {
+        return `En ${nombreDia}, la apertura y el cierre no pueden ser la misma hora.`
       }
+
+      // Cierre anterior a la apertura = el negocio cierra ya de madrugada
+      // (22:00 → 02:00). Se permite, con dos condiciones para que el horario
+      // siga siendo interpretable: solo una por día y siempre la última.
+      const cruzaMedianoche = f.cierre < f.apertura
+      if (cruzaMedianoche) {
+        if (yaHayFranjaNocturna) {
+          return `En ${nombreDia} solo puede haber una franja que termine después de medianoche.`
+        }
+        if (i !== ordenadas.length - 1) {
+          return `En ${nombreDia}, la franja que termina después de medianoche tiene que ser la última del día.`
+        }
+        yaHayFranjaNocturna = true
+      }
+
       if (i > 0 && f.apertura < ordenadas[i - 1].cierre) {
         return `En ${nombreDia} hay franjas que se solapan.`
       }

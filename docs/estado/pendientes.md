@@ -41,9 +41,10 @@ solo la lista viva).
       función de horarios con el reloj congelado. Todos correctos. Por el
       camino salieron dos fallos graves del motor de IA, ver
       `incidentes-resueltos.md`
-- [ ] **Horarios que cruzan medianoche** (bar de 22:00 a 02:00, farmacia
-      de guardia): hoy no se pueden configurar. Ver la limitación en
-      `incidentes-resueltos.md`. Decidir si se soporta
+- [x] **Horarios que cruzan medianoche** — soportados (10-09-2026). Un bar
+      de 22:00 a 02:00 ya se puede configurar; el editor marca la franja
+      como "del día siguiente" y el cálculo mira también la cola del día
+      anterior. 31 escenarios verificados
 - [ ] `PRICING` en `generarRespuesta.ts` está fijo (0,20 y 1,20 por millón
       de tokens) mientras el modelo ya es configurable por plan: el coste
       estimado de `ai_logs` será incorrecto para cualquier modelo que no

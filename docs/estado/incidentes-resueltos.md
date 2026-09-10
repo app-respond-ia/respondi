@@ -391,3 +391,24 @@ para un tipo de cliente que entra dentro del público de Respondi. Arreglarlo
 supone permitir el cruce de día en la validación y, en `isFueraDeHorario`,
 mirar también las franjas del día anterior que se prolongan más allá de
 medianoche. Pendiente de decidir.
+
+## Horarios que cruzan la medianoche — resuelto
+La limitación descrita más arriba queda resuelta (10-09-2026). Un bar de
+22:00 a 02:00, una farmacia de guardia o un soporte por turnos ya pueden
+configurar su horario real.
+
+- `validarHorarios` acepta que el cierre sea anterior a la apertura, con dos
+  condiciones para que el día siga siendo interpretable: solo una franja
+  nocturna por día y siempre la última. Se sigue rechazando apertura igual
+  a cierre y las franjas solapadas.
+- `isFueraDeHorario` mira ahora también las franjas del **día anterior** que
+  se prolongan pasada la medianoche. Es la parte que no salta a la vista: a
+  la 01:00 del sábado el negocio está abierto por la franja del viernes,
+  aunque el sábado no tenga ninguna franja propia.
+- `EditorHorarios` marca la franja con la etiqueta "del día siguiente", para
+  que ver "22:00 a 02:00" no parezca una errata.
+
+Verificado con 31 escenarios (reloj congelado): apertura y cierre justos,
+cola del día anterior, día sin franja propia que hereda la cola del
+anterior, lunes de madrugada cerrado porque el domingo no abre, husos
+horarios distintos, y los 7 casos de validación.

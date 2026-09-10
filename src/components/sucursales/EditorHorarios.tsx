@@ -120,6 +120,13 @@ export function EditorHorarios({ horarios, onChange, nivelPermiso, variant }: Ed
                       disabled={nivelPermiso !== 'escritura'}
                       className="w-32 h-10 px-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition outline-none disabled:bg-slate-100 disabled:text-slate-400 text-sm font-medium"
                     />
+                    {/* Aviso de cierre de madrugada: sin esto, ver "22:00 a
+                        02:00" hace dudar de si es un error de tecleo. */}
+                    {franja.apertura && franja.cierre && franja.cierre.substring(0, 5) < franja.apertura.substring(0, 5) && (
+                      <span className="text-[11px] font-600 px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 whitespace-nowrap">
+                        del día siguiente
+                      </span>
+                    )}
                     {nivelPermiso === 'escritura' && h.franjas.length > 1 && (
                       <button
                         type="button"

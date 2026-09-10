@@ -10,6 +10,17 @@ import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { useSuperadminPermisos } from '@/components/layout/SuperadminPermisosContext'
 
 
+// vendedor_clientes.organizacion_id tiene una restricción UNIQUE, así que
+// PostgREST trata la relación como "uno a uno" y devuelve un OBJETO, no un
+// array. Hacerle .map() reventaba la pantalla entera en cuanto alguna
+// organización tenía vendedor asignado.
+function nombresDeVendedores(org: any): string {
+  const vc = org?.vendedor_clientes
+  if (!vc) return ''
+  const lista = Array.isArray(vc) ? vc : [vc]
+  return lista.map((x: any) => x?.vendedores?.nombre).filter(Boolean).join(', ')
+}
+
 export default function OrganizacionesPage() {
   const [organizaciones, setOrganizaciones] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -60,12 +71,9 @@ export default function OrganizacionesPage() {
   }
 
   const organizacionesFiltradas = organizaciones.filter(o => {
-    const nombresVendedores = (o.vendedor_clientes || [])
-      .map((vc: any) => vc.vendedores?.nombre)
-      .filter(Boolean)
-      .join(', ')
+    const nombresVendedores = nombresDeVendedores(o)
 
-    return o.nombre.toLowerCase().includes(search.toLowerCase()) || 
+    return o.nombre.toLowerCase().includes(search.toLowerCase()) ||
       nombresVendedores.toLowerCase().includes(search.toLowerCase())
   })
 
@@ -252,7 +260,7 @@ export default function OrganizacionesPage() {
                     </span>
                   </div>
                   <p className="text-sm text-ink-500 mt-0.5 truncate">
-                    Plan {o.plans?.nombre || 'Ninguno'} {o.plan_pendiente_id && planes.find(p => p.id === o.plan_pendiente_id) ? `(→ ${planes.find(p => p.id === o.plan_pendiente_id).nombre})` : ''} · vence el {o.fecha_vencimiento ? new Date(o.fecha_vencimiento).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'N/A'} · vendedor: {((o.vendedor_clientes || []).map((vc: any) => vc.vendedores?.nombre).filter(Boolean).join(', ')) || 'Sin vendedor'}
+                    Plan {o.plans?.nombre || 'Ninguno'} {o.plan_pendiente_id && planes.find(p => p.id === o.plan_pendiente_id) ? `(→ ${planes.find(p => p.id === o.plan_pendiente_id).nombre})` : ''} · vence el {o.fecha_vencimiento ? new Date(o.fecha_vencimiento).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'N/A'} · vendedor: {nombresDeVendedores(o) || 'Sin vendedor'}
                     <span className="ml-2 pl-2 border-l border-slate-200">
                       🏠 {o.sucursales_activas ?? 0} · 👤 {o.usuarios_activos ?? 0}
                     </span>
@@ -324,7 +332,7 @@ export default function OrganizacionesPage() {
                 {/* Datos */}
                 <dl className="space-y-2.5 text-sm">
                   <div className="flex justify-between gap-2"><dt className="text-ink-500">Alta</dt><dd className="text-ink-900 font-500 text-right">{new Date(modalOrganizacion.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}</dd></div>
-                  <div className="flex justify-between gap-2"><dt className="text-ink-500">Vendedor</dt><dd className="text-ink-900 font-500 text-right">{((modalOrganizacion.vendedor_clientes || []).map((vc: any) => vc.vendedores?.nombre).filter(Boolean).join(', ')) || 'Sin vendedor'}</dd></div>
+                  <div className="flex justify-between gap-2"><dt className="text-ink-500">Vendedor</dt><dd className="text-ink-900 font-500 text-right">{nombresDeVendedores(modalOrganizacion) || 'Sin vendedor'}</dd></div>
                 </dl>
 
                 {/* Acciones de gestión */}

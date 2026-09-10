@@ -32,8 +32,12 @@ async function requireVendedor() {
 
 export async function getVendedorClientes() {
   try {
-    const { supabase, vendedor } = await requireVendedor()
-    const { data, error } = await supabase
+    const { vendedor } = await requireVendedor()
+    // supabaseAdmin: la RLS de `organizaciones` solo deja ver la propia
+    // organización del usuario, y un vendedor no pertenece a ninguna, así que
+    // con el cliente de sesión el embed dejaba la lista de clientes vacía.
+    // requireVendedor() ya autenticó, y filtramos por su propio vendedor_id.
+    const { data, error } = await supabaseAdmin
       .from('vendedor_clientes')
       .select(`*, organizaciones (nombre, estado, plan_id, plans(nombre))`)
       .eq('vendedor_id', vendedor.id)
@@ -99,8 +103,10 @@ export async function actualizarClienteSeguimiento(id: string, data: {
 
 export async function getVendedorComisiones() {
   try {
-    const { supabase, vendedor } = await requireVendedor()
-    const { data, error } = await supabase
+    const { vendedor } = await requireVendedor()
+    // Mismo motivo que en getVendedorClientes: el embed de organizaciones
+    // queda fuera del alcance de la RLS de un vendedor.
+    const { data, error } = await supabaseAdmin
       .from('comisiones')
       .select(`*, organizaciones (nombre)`)
       .eq('vendedor_id', vendedor.id)
@@ -114,13 +120,14 @@ export async function getVendedorComisiones() {
 
 export async function getVendedorDashboard() {
   try {
-    const { supabase, vendedor, avatarUrl, apodo, color } = await requireVendedor()
+    const { vendedor, avatarUrl, apodo, color } = await requireVendedor()
 
+    // Mismo motivo que en getVendedorClientes.
     const [{ data: clientes }, { data: comisiones }] = await Promise.all([
-      supabase.from('vendedor_clientes')
+      supabaseAdmin.from('vendedor_clientes')
         .select(`*, organizaciones (nombre, estado, plan_id, plans(nombre, precio_usd))`)
         .eq('vendedor_id', vendedor.id),
-      supabase.from('comisiones')
+      supabaseAdmin.from('comisiones')
         .select('tipo, importe, moneda, estado, mes_referencia')
         .eq('vendedor_id', vendedor.id)
     ])

@@ -37,6 +37,24 @@ solo la lista viva).
 - (Catálogo conversacional, recuperación de carritos, devoluciones y
   fidelización van después, una vez validado lo anterior)
 
+## Invitaciones pendientes — invisibles en toda la app
+Una invitación vive en `invitaciones_pendientes` hasta que la persona se
+registra; solo entonces aparece la fila en `vendedores`/`organizaciones`.
+Como ninguna pantalla consulta esa tabla, quien invita no tiene **ninguna**
+señal de que la invitación existe: no puede verla, ni reenviarla, ni
+cancelarla, ni detectar que escribió mal el email. Detectado probando el
+alta real de vendedor y cliente (10-09-2026), donde un email mal escrito
+(`n8n@propulsesytem.com`) pasó desapercibido hasta revisar la base.
+- [ ] `/superadmin/vendedores`: mostrar invitaciones de vendedor pendientes
+      (fecha, reenviar, cancelar)
+- [ ] `/vendedor/clientes` ("Mis clientes"): mostrar las invitaciones de
+      cliente pendientes de ese vendedor
+- [ ] Panel de superadmin: alguna forma de ver cuándo un vendedor invita a
+      un cliente (por decidir: aviso, contador o listado)
+- [ ] `crearCuentaTrial` no valida el formato del email — hay una invitación
+      real con el email `mmm`. Validar antes de crear, y de paso limpiar las
+      invitaciones basura de las pruebas
+
 ## Sueltos — sin bloquear nada, hacer cuando encaje
 - [ ] Unificar `onboarding/page.tsx` para que reutilice el componente
       compartido `EditorHorarios` (`src/components/sucursales/

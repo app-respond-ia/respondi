@@ -2,7 +2,12 @@ import { supabaseAdmin } from '@/utils/supabase/admin'
 import type { User } from '@supabase/supabase-js'
 import { registrarError } from '@/lib/errores'
 
-export async function resolverAltaUsuario(userId: string, email: string, nombreFallback: string): Promise<{ manejado: boolean }> {
+// Devuelve `manejado: true` si la invitación se procesó entera.
+// `fallo: true` significa que SÍ había invitación pero algo se rompió a mitad;
+// hay que distinguirlo de "no había invitación", porque si no quien llama
+// sigue adelante y le crea a la persona una organización nueva desde cero,
+// desvinculándola del vendedor que la trajo sin que nadie se entere.
+export async function resolverAltaUsuario(userId: string, email: string, nombreFallback: string): Promise<{ manejado: boolean, fallo?: boolean }> {
   const { data: invitacion } = await supabaseAdmin
     .from('invitaciones_pendientes')
     .select('*')
@@ -34,7 +39,7 @@ export async function resolverAltaUsuario(userId: string, email: string, nombreF
         descripcion: 'resolverAltaUsuario (vendedor): fallo al crear fila en users',
         stacktrace: JSON.stringify(userInsertError)
       })
-      return { manejado: false }
+      return { manejado: false, fallo: true }
     }
 
     const { error: vendedorInsertError } = await supabaseAdmin.from('vendedores').insert({
@@ -55,7 +60,7 @@ export async function resolverAltaUsuario(userId: string, email: string, nombreF
         descripcion: 'resolverAltaUsuario (vendedor): fallo al crear fila en vendedores (users ya se creó, queda huérfano)',
         stacktrace: JSON.stringify(vendedorInsertError)
       })
-      return { manejado: false }
+      return { manejado: false, fallo: true }
     }
   }
 
@@ -75,7 +80,7 @@ export async function resolverAltaUsuario(userId: string, email: string, nombreF
         descripcion: 'resolverAltaUsuario (admin_trial): fallo en rpc crear_cuenta_completa',
         stacktrace: JSON.stringify(rpcError)
       })
-      return { manejado: false }
+      return { manejado: false, fallo: true }
     }
 
     if (datos.vendedor_id) {
@@ -90,7 +95,7 @@ export async function resolverAltaUsuario(userId: string, email: string, nombreF
           descripcion: 'resolverAltaUsuario (admin_trial): fallo al vincular organización con vendedor',
           stacktrace: JSON.stringify(updateError)
         })
-        return { manejado: false }
+        return { manejado: false, fallo: true }
       }
 
       const { error: vendClientError } = await supabaseAdmin.from('vendedor_clientes').insert({
@@ -105,7 +110,7 @@ export async function resolverAltaUsuario(userId: string, email: string, nombreF
           descripcion: 'resolverAltaUsuario (admin_trial): fallo al crear fila en vendedor_clientes',
           stacktrace: JSON.stringify(vendClientError)
         })
-        return { manejado: false }
+        return { manejado: false, fallo: true }
       }
     }
   }
@@ -131,7 +136,7 @@ export async function resolverAltaUsuario(userId: string, email: string, nombreF
         descripcion: 'resolverAltaUsuario (usuario_organizacion): fallo al crear fila en users',
         stacktrace: JSON.stringify(userInsertError)
       })
-      return { manejado: false }
+      return { manejado: false, fallo: true }
     }
 
     if (datos.branch_ids && datos.branch_ids.length > 0) {
@@ -145,7 +150,7 @@ export async function resolverAltaUsuario(userId: string, email: string, nombreF
           descripcion: 'resolverAltaUsuario (usuario_organizacion): fallo al crear filas en user_branches',
           stacktrace: JSON.stringify(branchesError)
         })
-        return { manejado: false }
+        return { manejado: false, fallo: true }
       }
     }
   }
@@ -178,7 +183,14 @@ export async function determinarRedireccionPostAuth(user: User, type: string | n
   if (!userData) {
     const nombre = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuario'
 
-    const { manejado } = await resolverAltaUsuario(user.id, user.email!, nombre)
+    const { manejado, fallo } = await resolverAltaUsuario(user.id, user.email!, nombre)
+
+    // Había invitación pero se rompió a mitad: NO seguimos creando una cuenta
+    // suelta, porque perdería la vinculación con su vendedor y quedaría un
+    // alta a medias muy difícil de detectar después.
+    if (fallo) {
+      return `${origin}/login?error=account_setup_failed`
+    }
 
     if (!manejado) {
       const { error: rpcError } = await supabaseAdmin.rpc('crear_cuenta_completa', {

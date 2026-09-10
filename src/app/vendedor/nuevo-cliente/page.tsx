@@ -20,7 +20,13 @@ export default function NuevoClientePage() {
     const res = await crearCuentaTrial(formData)
 
     if (res.success) {
-      showToast(`Cuenta trial creada para ${formData.nombre_organizacion}. Se ha enviado un email de acceso a ${formData.email_admin}.`, 'success')
+      // No damos el email por enviado si el proveedor de correo lo rechazó:
+      // el vendedor se quedaría esperando a un cliente que no recibió nada.
+      if (res.avisoEmail) {
+        showToast(`Invitación guardada para ${formData.nombre_organizacion}, pero el email no se pudo enviar. Reenvíalo desde "Mis clientes".`, 'error')
+      } else {
+        showToast(`Invitación enviada a ${formData.email_admin}. Aparecerá en "Mis clientes" en cuanto se registre.`, 'success')
+      }
       setFormData({ nombre_organizacion: '', email_admin: '', nombre_admin: '' })
     } else {
       showToast(res.error || 'Error al crear la cuenta', 'error')

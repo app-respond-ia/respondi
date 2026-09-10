@@ -2,13 +2,15 @@
 import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
-import { getVendedores } from '@/app/actions/superadmin'
+import { getVendedores, getInvitacionesSuperadmin, reenviarInvitacionSuperadmin, cancelarInvitacionSuperadmin } from '@/app/actions/superadmin'
+import PanelInvitaciones from '@/components/invitaciones/PanelInvitaciones'
 import Link from 'next/link'
 import VendedorModal from '@/components/vendedores/VendedorModal'
 import { useSuperadminPermisos } from '@/components/layout/SuperadminPermisosContext'
 
 export default function VendedoresPage() {
   const [vendedores, setVendedores] = useState<any[]>([])
+  const [invitaciones, setInvitaciones] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   // Búsqueda, Filtro y Ordenamiento
@@ -29,8 +31,11 @@ export default function VendedoresPage() {
 
   const cargar = async () => {
     setLoading(true)
-    const res = await getVendedores()
+    const [res, resInv] = await Promise.all([getVendedores(), getInvitacionesSuperadmin()])
     if (res.success && res.vendedores) setVendedores(res.vendedores)
+    // Un vendedor invitado no existe en `vendedores` hasta que se registra:
+    // sin este bloque, quien invitaba no volvía a ver ni rastro.
+    if (resInv.success && resInv.vendedores) setInvitaciones(resInv.vendedores)
     setLoading(false)
   }
 
@@ -111,6 +116,21 @@ export default function VendedoresPage() {
           <p className="font-display font-700 text-2xl text-ink-900">{totalClientes}</p>
         </div>
       </div>
+
+      {/* Invitaciones de vendedor: existen antes de que la persona se registre */}
+      {invitaciones.length > 0 && (
+        <div className="mb-6">
+          <PanelInvitaciones
+            titulo="Invitaciones de vendedor"
+            descripcion="Todavía no se han registrado. Aparecerán en la lista de abajo en cuanto creen su cuenta."
+            invitaciones={invitaciones}
+            canWrite={canWrite}
+            onReenviar={reenviarInvitacionSuperadmin}
+            onCancelar={cancelarInvitacionSuperadmin}
+            onCambio={cargar}
+          />
+        </div>
+      )}
 
       {/* Controles de Búsqueda y Filtro */}
       <div className="flex flex-wrap items-center gap-3 mb-5">

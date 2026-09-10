@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { crearVendedor, actualizarVendedor, añadirNotaVendedor } from '@/app/actions/superadmin'
 import { useToast } from '@/components/ui/Toast'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
+import { emailValido } from '@/lib/invitaciones'
 
 interface VendedorModalProps {
   isOpen: boolean
@@ -37,6 +39,7 @@ export default function VendedorModal({ isOpen, onClose, mode, vendedor, onSucce
   const [nuevaNota, setNuevaNota] = useState('')
   const [savingNota, setSavingNota] = useState(false)
   const [notasLocales, setNotasLocales] = useState<any[]>([])
+  const [confirmarDesactivar, setConfirmarDesactivar] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
@@ -67,22 +70,41 @@ export default function VendedorModal({ isOpen, onClose, mode, vendedor, onSucce
       showToast('Nombre y email son obligatorios', 'error')
       return
     }
-    if (mode === 'editar' && formData.activo === false) {
-      if (!confirm(`¿Seguro que quieres desactivar al vendedor "${formData.nombre}"? Perderá acceso al panel.`)) {
-        return
-      }
+    // El email es lo único que enlaza la invitación con el alta posterior:
+    // si está mal escrito, ni sale el correo ni se puede aceptar nunca.
+    if (mode === 'crear' && !emailValido(formData.email)) {
+      showToast('Introduce una dirección de email válida', 'error')
+      return
     }
-    
+    if (mode === 'editar' && formData.activo === false) {
+      setConfirmarDesactivar(true)
+      return
+    }
+    await guardar()
+  }
+
+  const guardar = async () => {
     setSaving(true)
-    let res
+    let res: any
     if (mode === 'crear') {
       res = await crearVendedor(formData)
     } else {
       res = await actualizarVendedor(vendedor.id, formData)
     }
-    
+
     if (res.success) {
-      showToast(mode === 'crear' ? 'Vendedor creado y email de acceso enviado ✓' : 'Vendedor actualizado ✓', 'success')
+      if (mode === 'crear') {
+        // No damos por enviado el email si Resend lo rechazó: quedaría un
+        // vendedor esperando un correo que nunca salió.
+        if (res.avisoEmail) {
+          showToast('Vendedor creado, pero el email no se pudo enviar. Reenvíalo desde la lista de invitaciones.', 'error')
+        } else {
+          showToast('Vendedor creado y email de acceso enviado ✓', 'success')
+        }
+      } else {
+        showToast('Vendedor actualizado ✓', 'success')
+      }
+      setConfirmarDesactivar(false)
       onSuccess()
       onClose()
     } else {
@@ -277,6 +299,18 @@ export default function VendedorModal({ isOpen, onClose, mode, vendedor, onSucce
           </div>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={confirmarDesactivar}
+        title="Desactivar vendedor"
+        message={`"${formData.nombre}" perderá el acceso a su panel. Sus clientes y comisiones se conservan.`}
+        confirmText="Desactivar"
+        cancelText="Volver"
+        type="danger"
+        isLoading={saving}
+        onConfirm={guardar}
+        onClose={() => !saving && setConfirmarDesactivar(false)}
+      />
     </div>
   )
 }

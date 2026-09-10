@@ -6,6 +6,9 @@ import Link from 'next/link'
 type VendedorStats = {
   id: string
   nombre: string
+  invitacionesEnviadas: number
+  invitacionesAceptadas: number
+  tasaCierre: number
   clientesCaptadosEnRango: number
   clientesHistoricos: number
   comisionesGeneradasEnRango: number
@@ -70,6 +73,12 @@ export default function RendimientoVendedores({ initialData }: { initialData: Ve
               <th className="p-4 whitespace-nowrap cursor-pointer hover:bg-slate-100 transition group select-none" onClick={() => handleSort('nombre')}>
                 Vendedor {getSortIcon('nombre')}
               </th>
+              <th className="p-4 whitespace-nowrap cursor-pointer hover:bg-slate-100 transition group select-none text-right" onClick={() => handleSort('invitacionesEnviadas')}>
+                Invitaciones {getSortIcon('invitacionesEnviadas')}
+              </th>
+              <th className="p-4 whitespace-nowrap cursor-pointer hover:bg-slate-100 transition group select-none text-right" onClick={() => handleSort('tasaCierre')}>
+                Tasa de cierre {getSortIcon('tasaCierre')}
+              </th>
               <th className="p-4 whitespace-nowrap cursor-pointer hover:bg-slate-100 transition group select-none text-right" onClick={() => handleSort('clientesCaptadosEnRango')}>
                 Clientes (Rango) {getSortIcon('clientesCaptadosEnRango')}
               </th>
@@ -92,6 +101,22 @@ export default function RendimientoVendedores({ initialData }: { initialData: Ve
               <tr key={v.id} className="hover:bg-slate-50/50 transition">
                 <td className="p-4 font-600 text-brand-600 hover:underline">
                   <Link href={`/superadmin/vendedores/${v.id}`}>{v.nombre}</Link>
+                </td>
+                <td className="p-4 text-right text-ink-500">
+                  {v.invitacionesEnviadas > 0
+                    ? `${v.invitacionesAceptadas}/${v.invitacionesEnviadas}`
+                    : '—'}
+                </td>
+                <td className="p-4 text-right">
+                  {v.invitacionesEnviadas > 0 ? (
+                    <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded-full font-600 text-xs ${
+                      v.tasaCierre >= 50 ? 'bg-emerald-100 text-emerald-700'
+                      : v.tasaCierre > 0 ? 'bg-amber-100 text-amber-700'
+                      : 'bg-slate-100 text-ink-500'
+                    }`}>
+                      {v.tasaCierre}%
+                    </span>
+                  ) : <span className="text-ink-400">—</span>}
                 </td>
                 <td className="p-4 text-right">
                   <span className="inline-flex items-center justify-center bg-slate-100 text-ink-700 px-2 py-0.5 rounded-full font-600 text-xs">

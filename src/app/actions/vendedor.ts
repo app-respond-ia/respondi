@@ -6,7 +6,7 @@ import { registrarAuditoria } from '@/lib/auditoria'
 import { crearNotificacion, notificarATodosLosSuperadmins } from '@/lib/notificaciones'
 import { registrarError } from '@/lib/errores'
 import { enviarEmailInvitacion } from '@/lib/email'
-import { emailValido, normalizarEmail, estadoInvitacion, calcularEmbudo } from '@/lib/invitaciones'
+import { emailValido, normalizarEmail, estadoInvitacion, calcularEmbudo, posibleErrata } from '@/lib/invitaciones'
 
 async function requireVendedor() {
   const supabase = await createClient()
@@ -50,11 +50,46 @@ export async function getInvitacionesVendedor() {
 
     if (error) return { success: false, error: error.message }
 
-    const invitaciones = (data || []).map(inv => ({
-      ...inv,
-      nombre_organizacion: (inv.datos as any)?.nombre_organizacion || null,
-      estado: estadoInvitacion(inv)
-    }))
+    const filas = data || []
+
+    // ¿Alguno de esos emails ya tiene cuenta? Entonces la invitación se
+    // cumplió aunque nadie la marcara (por ejemplo si la persona se registró
+    // por su cuenta con Google, sin abrir el correo). Se corrige la fila para
+    // que deje de aparecer como pendiente.
+    const emails = [...new Set(filas.map(i => normalizarEmail(i.email)).filter(Boolean))]
+    const { data: cuentas } = emails.length
+      ? await supabaseAdmin.from('users').select('email').in('email', emails)
+      : { data: [] as any[] }
+
+    const cuentasPorEmail = new Set((cuentas || []).map((u: any) => normalizarEmail(u.email)))
+    const aReconciliar = filas
+      .filter(i => !i.aceptada && cuentasPorEmail.has(normalizarEmail(i.email)))
+      .map(i => i.id)
+
+    if (aReconciliar.length > 0) {
+      await supabaseAdmin
+        .from('invitaciones_pendientes')
+        .update({ aceptada: true })
+        .in('id', aReconciliar)
+    }
+
+    const reconciliadas = new Set(aReconciliar)
+    const emailsReales = [
+      ...(cuentas || []).map((u: any) => u.email),
+      ...filas.filter(i => i.aceptada).map(i => i.email)
+    ]
+
+    const invitaciones = filas.map(inv => {
+      const aceptada = inv.aceptada || reconciliadas.has(inv.id)
+      return {
+        ...inv,
+        aceptada,
+        nombre_organizacion: (inv.datos as any)?.nombre_organizacion || null,
+        estado: estadoInvitacion({ ...inv, aceptada }),
+        email_valido: emailValido(inv.email),
+        posible_errata_de: aceptada ? null : posibleErrata(inv.email, emailsReales)
+      }
+    })
 
     return { success: true, invitaciones }
   } catch (err: any) {
@@ -355,7 +390,13 @@ export async function crearCuentaTrial(data: {
       valor_nuevo: { email, nombre_organizacion: data.nombre_organizacion }
     })
 
-    return { success: true, pendiente: true }
+    // Si el correo no salió hay que decirlo: si no, el vendedor se queda
+    // esperando a un cliente que nunca recibió nada.
+    return {
+      success: true,
+      pendiente: true,
+      avisoEmail: emailError ? 'La invitación quedó guardada, pero el email no se pudo enviar.' : null
+    }
   } catch (err: any) {
     return { success: false, error: err.message }
   }

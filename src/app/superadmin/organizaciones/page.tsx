@@ -4,7 +4,8 @@ import Loading from '@/components/Loading'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { getOrganizaciones, actualizarEstadoOrganizacion, entrarComoOrganizacion, getPlanes, cambiarPlanOrganizacion, registrarPagoYRenovar, recargarCreditosIA } from '@/app/actions/superadmin'
+import { getOrganizaciones, actualizarEstadoOrganizacion, entrarComoOrganizacion, getPlanes, cambiarPlanOrganizacion, registrarPagoYRenovar, recargarCreditosIA, getInvitacionesSuperadmin, reenviarInvitacionSuperadmin, cancelarInvitacionSuperadmin } from '@/app/actions/superadmin'
+import PanelInvitaciones from '@/components/invitaciones/PanelInvitaciones'
 import { useToast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { useSuperadminPermisos } from '@/components/layout/SuperadminPermisosContext'
@@ -23,6 +24,7 @@ function nombresDeVendedores(org: any): string {
 
 export default function OrganizacionesPage() {
   const [organizaciones, setOrganizaciones] = useState<any[]>([])
+  const [invitaciones, setInvitaciones] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [filtro, setFiltro] = useState('Todos')
   const [search, setSearch] = useState('')
@@ -54,7 +56,16 @@ export default function OrganizacionesPage() {
   useEffect(() => {
     loadOrganizaciones()
     loadPlanes()
+    loadInvitaciones()
   }, [filtro])
+
+  // Las invitaciones de cliente (las que envían los vendedores desde su panel)
+  // no existen como organización hasta que la persona se registra, así que
+  // sin esto Respondi no tenía forma de ver a quién se había invitado.
+  async function loadInvitaciones() {
+    const res = await getInvitacionesSuperadmin()
+    if (res.success && res.clientes) setInvitaciones(res.clientes)
+  }
 
   async function loadPlanes() {
     const res = await getPlanes()
@@ -236,6 +247,22 @@ export default function OrganizacionesPage() {
           </div>
         </div>
       </div>
+
+      {/* Invitaciones de cliente pendientes de registro */}
+      {invitaciones.length > 0 && (
+        <div className="mb-6">
+          <PanelInvitaciones
+            titulo="Invitaciones de cliente"
+            descripcion="Enviadas por vendedores o por el equipo. Aparecerán como organización en cuanto se registren."
+            invitaciones={invitaciones}
+            canWrite={canWrite}
+            onReenviar={reenviarInvitacionSuperadmin}
+            onCancelar={cancelarInvitacionSuperadmin}
+            onCambio={loadInvitaciones}
+            mostrarVendedor
+          />
+        </div>
+      )}
 
       {/* Lista de organizaciones */}
       <div className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100">

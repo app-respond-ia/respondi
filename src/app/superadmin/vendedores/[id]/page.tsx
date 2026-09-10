@@ -9,8 +9,12 @@ import VendedorModal from '@/components/vendedores/VendedorModal'
 import { 
   getVendedorDetalle, 
   getClientesDeVendedor, 
-  getComisionesDeVendedor 
+  getComisionesDeVendedor,
+  getInvitacionesDeVendedor,
+  reenviarInvitacionSuperadmin,
+  cancelarInvitacionSuperadmin
 } from '@/app/actions/superadmin'
+import PanelInvitaciones from '@/components/invitaciones/PanelInvitaciones'
 import { useSuperadminPermisos } from '@/components/layout/SuperadminPermisosContext'
 
 export default function VendedorDetallePage() {
@@ -21,9 +25,10 @@ export default function VendedorDetallePage() {
   const [vendedor, setVendedor] = useState<any>(null)
   const [clientes, setClientes] = useState<any[]>([])
   const [comisiones, setComisiones] = useState<any[]>([])
+  const [invitaciones, setInvitaciones] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   
-  const [activeTab, setActiveTab] = useState<'clientes' | 'comisiones'>('clientes')
+  const [activeTab, setActiveTab] = useState<'clientes' | 'comisiones' | 'invitaciones'>('clientes')
   const [isModalOpen, setIsModalOpen] = useState(false)
 
   const { hasPermission } = useSuperadminPermisos()
@@ -31,10 +36,11 @@ export default function VendedorDetallePage() {
 
   const cargar = useCallback(async () => {
     setLoading(true)
-    const [resVend, resCli, resCom] = await Promise.all([
+    const [resVend, resCli, resCom, resInv] = await Promise.all([
       getVendedorDetalle(id as string),
       getClientesDeVendedor(id as string),
-      getComisionesDeVendedor(id as string)
+      getComisionesDeVendedor(id as string),
+      getInvitacionesDeVendedor(id as string)
     ])
 
     if (!resVend.success || !resVend.vendedor) {
@@ -46,6 +52,7 @@ export default function VendedorDetallePage() {
     setVendedor(resVend.vendedor)
     if (resCli.success && resCli.clientes) setClientes(resCli.clientes)
     if (resCom.success && resCom.comisiones) setComisiones(resCom.comisiones)
+    if (resInv.success && resInv.invitaciones) setInvitaciones(resInv.invitaciones)
 
     setLoading(false)
   }, [id, router, showToast])
@@ -206,6 +213,24 @@ export default function VendedorDetallePage() {
     )
   }
 
+  // --- Renderizado de Invitaciones ---
+  // Es el primer escalón del embudo: invitación enviada -> alta -> cliente
+  // activo. Sin esto solo se veían las que ya habían acabado en cliente.
+  const renderInvitaciones = () => (
+    <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+      <PanelInvitaciones
+        titulo="Invitaciones enviadas"
+        descripcion="Clientes a los que este vendedor ha invitado y todavía no se han registrado."
+        invitaciones={invitaciones}
+        canWrite={canWrite}
+        onReenviar={reenviarInvitacionSuperadmin}
+        onCancelar={cancelarInvitacionSuperadmin}
+        onCambio={cargar}
+        vacioTexto="Este vendedor no ha enviado ninguna invitación."
+      />
+    </div>
+  )
+
   if (loading) return <Loading />
   if (!vendedor) return null
 
@@ -245,9 +270,17 @@ export default function VendedorDetallePage() {
             >
               Historial de Comisiones ({comisiones.length})
             </button>
+            <button
+              onClick={() => setActiveTab('invitaciones')}
+              className={`pb-3 text-sm font-600 border-b-2 transition ${activeTab === 'invitaciones' ? 'border-brand-500 text-brand-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+            >
+              Invitaciones ({invitaciones.length})
+            </button>
           </div>
 
-          {activeTab === 'clientes' ? renderClientes() : renderComisiones()}
+          {activeTab === 'clientes' ? renderClientes()
+            : activeTab === 'comisiones' ? renderComisiones()
+            : renderInvitaciones()}
         </div>
 
         {/* Panel Lateral Sticky: Ficha del vendedor */}

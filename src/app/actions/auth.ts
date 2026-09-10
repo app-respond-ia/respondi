@@ -46,7 +46,14 @@ export async function registroTrial(data: {
   // Esperar a que Auth propague el usuario antes de llamar al RPC
   await new Promise(resolve => setTimeout(resolve, 1000))
 
-  const { manejado } = await resolverAltaUsuario(userId, data.email, data.nombre)
+  const { manejado, fallo } = await resolverAltaUsuario(userId, data.email, data.nombre)
+
+  // Tenía invitación pero el alta se rompió a mitad. No seguimos adelante
+  // creando una organización suelta: perdería la vinculación con el vendedor
+  // que lo trajo (y su comisión) sin que nadie llegue a enterarse.
+  if (fallo) {
+    return { success: false, error: 'No se pudo completar el alta desde tu invitación. Avísanos y lo revisamos.' }
+  }
 
   if (!manejado) {
     const { error: rpcError } = await supabaseAdmin.rpc('crear_cuenta_completa', {

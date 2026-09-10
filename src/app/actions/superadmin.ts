@@ -9,6 +9,7 @@ import { crearNotificacion, notificarATodosLosSuperadmins, notificarAAdminsDeOrg
 import { setImpersonatedTenantId, clearImpersonatedTenantId } from '@/lib/impersonate'
 import { enviarEmailInvitacion } from '@/lib/email'
 import { registrarError } from '@/lib/errores'
+import { estadoInvitacion, emailValido, normalizarEmail, posibleErrata } from '@/lib/invitaciones'
 
 // Helper de auth para asegurar que la action solo la ejecuta un super admin
 export async function requireSuperAdmin() {
@@ -535,6 +536,243 @@ export async function getVendedores() {
   return { success: true, vendedores: data }
 }
 
+// ── Invitaciones pendientes (superadmin) ─────────────────────────────────
+// Una invitación vive en `invitaciones_pendientes` hasta que la persona se
+// registra con ese mismo email; solo entonces nace la fila en `vendedores`
+// o en `organizaciones`. Hasta ahora ninguna pantalla de superadmin leía
+// esa tabla: invitabas a un vendedor y desaparecía del panel, y las
+// invitaciones que los vendedores mandaban a sus clientes eran invisibles
+// para Respondi. Por eso se colaron altas con el email "mmm" sin que nadie
+// se enterara.
+
+// Enriquece las filas crudas con el nombre de quien invitó, el vendedor al
+// que pertenecen (en las de cliente) y el estado calculado.
+async function enriquecerInvitaciones(filas: any[]) {
+  const userIds = [...new Set(filas.map(i => i.creado_por).filter(Boolean))]
+  const vendedorIds = [...new Set(filas.map(i => i.datos?.vendedor_id).filter(Boolean))]
+  const emails = [...new Set(filas.map(i => normalizarEmail(i.email)).filter(Boolean))]
+
+  const [resUsers, resVendedores, resCuentas] = await Promise.all([
+    userIds.length
+      ? supabaseAdmin.from('users').select('id, nombre, email').in('id', userIds)
+      : Promise.resolve({ data: [] as any[] }),
+    vendedorIds.length
+      ? supabaseAdmin.from('vendedores').select('id, nombre').in('id', vendedorIds)
+      : Promise.resolve({ data: [] as any[] }),
+    // Cuentas que ya existen con alguno de esos emails. Sirve para dos cosas:
+    // reconciliar invitaciones que se quedaron marcadas como pendientes pese a
+    // que la persona ya se dio de alta, y detectar erratas al teclear.
+    emails.length
+      ? supabaseAdmin.from('users').select('id, email').in('email', emails)
+      : Promise.resolve({ data: [] as any[] })
+  ])
+
+  const porUsuario = new Map((resUsers.data || []).map((u: any) => [u.id, u]))
+  const porVendedor = new Map((resVendedores.data || []).map((v: any) => [v.id, v]))
+  const cuentasPorEmail = new Set((resCuentas.data || []).map((u: any) => normalizarEmail(u.email)))
+
+  // Para el aviso de errata comparamos contra las cuentas que existen de
+  // verdad y contra las invitaciones que sí se aceptaron.
+  const emailsReales = [
+    ...(resCuentas.data || []).map((u: any) => u.email),
+    ...filas.filter(i => i.aceptada).map(i => i.email)
+  ]
+
+  // Auto-curación: si la persona ya tiene cuenta con ese email, la invitación
+  // se cumplió, aunque el flujo de alta no llegara a marcarla (por ejemplo si
+  // se registró por su cuenta con Google sin abrir el correo). Se corrige la
+  // fila para que no vuelva a aparecer como pendiente nunca más.
+  const aReconciliar = filas
+    .filter(i => !i.aceptada && cuentasPorEmail.has(normalizarEmail(i.email)))
+    .map(i => i.id)
+
+  if (aReconciliar.length > 0) {
+    await supabaseAdmin
+      .from('invitaciones_pendientes')
+      .update({ aceptada: true })
+      .in('id', aReconciliar)
+  }
+
+  const reconciliadas = new Set(aReconciliar)
+
+  return filas.map(inv => {
+    const d = inv.datos || {}
+    const autor = porUsuario.get(inv.creado_por)
+    const aceptada = inv.aceptada || reconciliadas.has(inv.id)
+    return {
+      id: inv.id,
+      email: inv.email,
+      tipo: inv.tipo as 'vendedor' | 'admin_trial' | 'usuario_organizacion',
+      aceptada,
+      created_at: inv.created_at,
+      estado: estadoInvitacion({ ...inv, aceptada }),
+      nombre: d.nombre || null,
+      nombre_organizacion: d.nombre_organizacion || null,
+      vendedor_id: d.vendedor_id || null,
+      vendedor_nombre: d.vendedor_id ? (porVendedor.get(d.vendedor_id)?.nombre || null) : null,
+      invitado_por: autor?.nombre || autor?.email || null,
+      // Aviso visual: si el email no tiene forma válida, el correo nunca salió
+      // y esa invitación no se va a poder aceptar jamás.
+      email_valido: emailValido(inv.email),
+      // Y si se parece muchísimo a una cuenta que ya existe, casi seguro que
+      // fue una errata al teclear.
+      posible_errata_de: aceptada ? null : posibleErrata(inv.email, emailsReales)
+    }
+  })
+}
+
+// Invitaciones de vendedor (las que crea el propio superadmin) y de cliente
+// (las que crean los vendedores desde su panel). Cada bloque se devuelve
+// solo si el rol de superadmin tiene lectura en la sección correspondiente.
+export async function getInvitacionesSuperadmin() {
+  try {
+    const auth = await requireSuperAdmin()
+    const puedeVendedores = superadminHasPermission(auth, 'vendedores', 'lectura')
+    const puedeClientes = superadminHasPermission(auth, 'organizaciones', 'lectura')
+
+    if (!puedeVendedores && !puedeClientes) {
+      return { success: false, error: 'No tienes permiso para esta acción' }
+    }
+
+    const tipos: string[] = []
+    if (puedeVendedores) tipos.push('vendedor')
+    if (puedeClientes) tipos.push('admin_trial')
+
+    // supabaseAdmin: la RLS de invitaciones_pendientes exige rol super_admin
+    // en la sesión, y requireSuperAdmin() ya lo ha comprobado arriba.
+    const { data, error } = await supabaseAdmin
+      .from('invitaciones_pendientes')
+      .select('id, email, tipo, datos, aceptada, created_at, creado_por')
+      .in('tipo', tipos)
+      .order('created_at', { ascending: false })
+
+    if (error) return { success: false, error: error.message }
+
+    const invitaciones = await enriquecerInvitaciones(data || [])
+
+    return {
+      success: true,
+      invitaciones,
+      vendedores: invitaciones.filter(i => i.tipo === 'vendedor'),
+      clientes: invitaciones.filter(i => i.tipo === 'admin_trial')
+    }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
+
+// Invitaciones enviadas por un vendedor concreto (para su ficha de detalle).
+export async function getInvitacionesDeVendedor(vendedorId: string) {
+  try {
+    const auth = await requireSuperAdmin()
+    if (!superadminHasPermission(auth, 'vendedores', 'lectura')) {
+      return { success: false, error: 'No tienes permiso para esta acción' }
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('invitaciones_pendientes')
+      .select('id, email, tipo, datos, aceptada, created_at, creado_por')
+      .eq('tipo', 'admin_trial')
+      .eq('datos->>vendedor_id', vendedorId)
+      .order('created_at', { ascending: false })
+
+    if (error) return { success: false, error: error.message }
+    return { success: true, invitaciones: await enriquecerInvitaciones(data || []) }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
+
+// La sección de permisos que gobierna una invitación depende de a quién
+// invita: un vendedor se gestiona desde "vendedores", un cliente trial
+// desde "organizaciones".
+function seccionDeInvitacion(tipo: string) {
+  return tipo === 'vendedor' ? 'vendedores' : 'organizaciones'
+}
+
+export async function reenviarInvitacionSuperadmin(invitacionId: string) {
+  try {
+    const auth = await requireSuperAdmin()
+
+    const { data: inv } = await supabaseAdmin
+      .from('invitaciones_pendientes')
+      .select('id, email, tipo, aceptada')
+      .eq('id', invitacionId)
+      .single()
+
+    if (!inv) return { success: false, error: 'Invitación no encontrada.' }
+    if (!superadminHasPermission(auth, seccionDeInvitacion(inv.tipo), 'escritura')) {
+      return { success: false, error: 'No tienes permiso para esta acción' }
+    }
+    if (inv.aceptada) return { success: false, error: 'Esa invitación ya fue aceptada.' }
+    if (!emailValido(inv.email)) {
+      return { success: false, error: `"${inv.email}" no es una dirección de email válida. Cancela la invitación y vuelve a enviarla con el email correcto.` }
+    }
+
+    const esVendedor = inv.tipo === 'vendedor'
+    const { error: emailError } = await enviarEmailInvitacion({
+      email: inv.email,
+      actionLink: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}${esVendedor ? '/login' : '/registro-trial'}`,
+      rol: esVendedor ? 'vendedor' : 'tenant_user'
+    })
+
+    if (emailError) {
+      await registrarError({
+        origen: 'app',
+        descripcion: 'Fallo al reenviar invitación desde superadmin',
+        stacktrace: JSON.stringify(emailError)
+      })
+      return { success: false, error: 'No se pudo enviar el email. Revisa la configuración de correo.' }
+    }
+
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
+
+export async function cancelarInvitacionSuperadmin(invitacionId: string) {
+  try {
+    const auth = await requireSuperAdmin()
+
+    const { data: inv } = await supabaseAdmin
+      .from('invitaciones_pendientes')
+      .select('id, email, tipo, datos, aceptada')
+      .eq('id', invitacionId)
+      .single()
+
+    if (!inv) return { success: false, error: 'Invitación no encontrada.' }
+    if (!superadminHasPermission(auth, seccionDeInvitacion(inv.tipo), 'escritura')) {
+      return { success: false, error: 'No tienes permiso para esta acción' }
+    }
+    if (inv.aceptada) {
+      return { success: false, error: 'Esa invitación ya fue aceptada, no se puede cancelar.' }
+    }
+
+    const { error } = await supabaseAdmin
+      .from('invitaciones_pendientes')
+      .delete()
+      .eq('id', invitacionId)
+
+    if (error) return { success: false, error: error.message }
+
+    await registrarAuditoria({
+      tenant_id: null,
+      user_id: auth.userId,
+      accion: `canceló la invitación a "${inv.email}"`,
+      tabla_afectada: 'invitaciones_pendientes',
+      registro_id: invitacionId,
+      valor_anterior: inv
+    })
+
+    revalidatePath('/superadmin/vendedores')
+    revalidatePath('/superadmin/organizaciones')
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
+
 // D) crearVendedor
 export async function crearVendedor(data: {
   nombre: string
@@ -551,11 +789,19 @@ export async function crearVendedor(data: {
   }
   const { supabase, userId } = auth
 
+  // El email es lo único que une la invitación con el alta posterior: si está
+  // mal escrito, ni sale el correo ni se podrá aceptar nunca. Antes no se
+  // validaba y se crearon invitaciones con emails como "mmm".
+  const email = normalizarEmail(data.email)
+  if (!emailValido(email)) {
+    return { success: false, error: 'Introduce una dirección de email válida.' }
+  }
+
   // Verificar si el email ya existe en la tabla users
   const { data: userExistente } = await supabase
     .from('users')
     .select('id, rol')
-    .eq('email', data.email)
+    .eq('email', email)
     .single()
 
   if (userExistente) {
@@ -569,18 +815,32 @@ export async function crearVendedor(data: {
   const { data: vendedorExistente } = await supabase
     .from('vendedores')
     .select('id')
-    .eq('email', data.email)
+    .eq('email', email)
     .single()
 
   if (vendedorExistente) {
     return { success: false, error: 'Ya existe un vendedor con este email.' }
   }
 
+  // Evitar invitaciones duplicadas al mismo email: si ya hay una sin aceptar,
+  // lo correcto es reenviarla desde la lista, no crear otra fila.
+  const { data: invitacionAbierta } = await supabaseAdmin
+    .from('invitaciones_pendientes')
+    .select('id')
+    .eq('email', email)
+    .eq('tipo', 'vendedor')
+    .eq('aceptada', false)
+    .maybeSingle()
+
+  if (invitacionAbierta) {
+    return { success: false, error: 'Ya hay una invitación pendiente para este email. Puedes reenviarla desde la lista de invitaciones.' }
+  }
+
   // Guardar invitación pendiente (se activará cuando el vendedor se registre con este mismo email)
   const { data: invitacionCreada, error: invitacionError } = await supabaseAdmin
     .from('invitaciones_pendientes')
     .insert({
-      email: data.email,
+      email,
       tipo: 'vendedor',
       datos: {
         nombre: data.nombre,
@@ -600,7 +860,7 @@ export async function crearVendedor(data: {
   }
 
   const { error: emailError } = await enviarEmailInvitacion({
-    email: data.email,
+    email,
     actionLink: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/login`,
     rol: 'vendedor'
   })
@@ -620,11 +880,18 @@ export async function crearVendedor(data: {
     tabla_afectada: 'invitaciones_pendientes',
     registro_id: invitacionCreada.id,
     valor_anterior: null,
-    valor_nuevo: { nombre: data.nombre, email: data.email }
+    valor_nuevo: { nombre: data.nombre, email }
   })
 
   revalidatePath('/superadmin/vendedores')
-  return { success: true, vendedor: { id: invitacionCreada.id, nombre: data.nombre, email: data.email, pendiente: true } }
+  // `avisoEmail` deja que la pantalla avise de que la invitación quedó
+  // guardada pero el correo no salió, en vez de decir "enviada" y que nadie
+  // se entere hasta que el vendedor pregunte por qué no le llega nada.
+  return {
+    success: true,
+    avisoEmail: emailError ? 'La invitación quedó guardada, pero el email no se pudo enviar.' : null,
+    vendedor: { id: invitacionCreada.id, nombre: data.nombre, email, pendiente: true }
+  }
 }
 
 // E) actualizarVendedor
@@ -2156,8 +2423,24 @@ export async function getRendimientoVendedores(from?: string, to?: string) {
       vendedor_clientes ( id, fecha_vinculacion ),
       comisiones ( importe, estado, fecha_generacion, fecha_pago, moneda )
     `)
-    
+
     if (error) throw error
+
+    // Invitaciones que ha enviado cada vendedor: es el primer escalón del
+    // embudo (invitación → alta → cliente activo) y sin él no se puede
+    // calcular ninguna tasa de cierre.
+    const { data: invitaciones } = await supabaseAdmin
+      .from('invitaciones_pendientes')
+      .select('datos, aceptada, created_at')
+      .eq('tipo', 'admin_trial')
+
+    const invitacionesPorVendedor = new Map<string, { aceptada: boolean; created_at: string }[]>()
+    for (const inv of invitaciones || []) {
+      const vid = (inv.datos as any)?.vendedor_id
+      if (!vid) continue
+      if (!invitacionesPorVendedor.has(vid)) invitacionesPorVendedor.set(vid, [])
+      invitacionesPorVendedor.get(vid)!.push(inv as any)
+    }
 
     let fromDate = from ? new Date(from) : null
     let toDate = to ? new Date(to) : null
@@ -2181,6 +2464,18 @@ export async function getRendimientoVendedores(from?: string, to?: string) {
 
       const clientesHistoricos = clientes.length
       const clientesCaptadosEnRango = from || to ? clientes.filter((c: any) => isInRange(c.fecha_vinculacion)).length : clientesHistoricos
+
+      const invitacionesDelVendedor = invitacionesPorVendedor.get(v.id) || []
+      const invitacionesEnRango = from || to
+        ? invitacionesDelVendedor.filter(i => isInRange(i.created_at))
+        : invitacionesDelVendedor
+      const invitacionesEnviadas = invitacionesEnRango.length
+      const invitacionesAceptadas = invitacionesEnRango.filter(i => i.aceptada).length
+      // Tasa de cierre = de cada 100 invitaciones enviadas, cuántas acabaron
+      // en un alta real. Es el número que mide de verdad al vendedor.
+      const tasaCierre = invitacionesEnviadas > 0
+        ? Math.round((invitacionesAceptadas / invitacionesEnviadas) * 100)
+        : 0
 
       let comisionesGeneradasEnRango = 0
       let comisionesPagadasEnRango = 0
@@ -2208,13 +2503,18 @@ export async function getRendimientoVendedores(from?: string, to?: string) {
       return {
         id: v.id,
         nombre: v.nombre,
+        invitacionesEnviadas,
+        invitacionesAceptadas,
+        tasaCierre,
         clientesCaptadosEnRango,
         clientesHistoricos,
         comisionesGeneradasEnRango,
         comisionesPagadasEnRango,
         comisionesPendientes
       }
-    }).filter(v => v.clientesHistoricos > 0 || v.comisionesGeneradasEnRango > 0 || v.comisionesPendientes > 0 || v.comisionesPagadasEnRango > 0)
+      // Un vendedor que solo ha enviado invitaciones (aún sin cerrar ninguna)
+      // también tiene que aparecer: si no, su actividad es invisible.
+    }).filter(v => v.clientesHistoricos > 0 || v.invitacionesEnviadas > 0 || v.comisionesGeneradasEnRango > 0 || v.comisionesPendientes > 0 || v.comisionesPagadasEnRango > 0)
 
     // Ordenar por defecto por comisionesGeneradasEnRango DESC
     stats.sort((a, b) => b.comisionesGeneradasEnRango - a.comisionesGeneradasEnRango)

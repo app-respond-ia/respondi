@@ -36,6 +36,44 @@ export function normalizarEmail(email: string): string {
   return (email || '').trim().toLowerCase()
 }
 
+// Distancia de edición (Levenshtein): cuántos caracteres hay que cambiar
+// para pasar de un texto a otro.
+function distanciaEdicion(a: string, b: string): number {
+  const m = a.length, n = b.length
+  if (Math.abs(m - n) > 2) return 99  // corte rápido: no nos interesa
+  let fila = Array.from({ length: n + 1 }, (_, i) => i)
+  for (let i = 1; i <= m; i++) {
+    const nueva = [i]
+    for (let j = 1; j <= n; j++) {
+      nueva[j] = Math.min(
+        fila[j] + 1,
+        nueva[j - 1] + 1,
+        fila[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+      )
+    }
+    fila = nueva
+  }
+  return fila[n]
+}
+
+// Busca, entre los emails de cuentas que ya existen, uno que se parezca
+// tanto al de la invitación que casi seguro sea una errata al teclear.
+//
+// Nace de un caso real: se invitó a "n8n@propulsesytem.com" (falta una
+// "s") y la invitación se quedó pendiente para siempre, mientras la
+// cuenta buena se daba de alta con el email correcto. A simple vista las
+// dos líneas parecían la misma y costó entender por qué una seguía
+// pendiente.
+export function posibleErrata(email: string, emailsExistentes: string[]): string | null {
+  const e = normalizarEmail(email)
+  for (const otro of emailsExistentes) {
+    const o = normalizarEmail(otro)
+    if (o === e) continue
+    if (distanciaEdicion(e, o) <= 2) return otro
+  }
+  return null
+}
+
 // Embudo de captación de un vendedor.
 export type EmbudoVendedor = {
   enviadas: number

@@ -7,7 +7,8 @@ import { getSucursales, getDatosSucursalParaCopiar, crearSucursalConDatos } from
 import { useToast } from '@/components/ui/Toast'
 import { EditorHorarios } from '@/components/sucursales/EditorHorarios'
 import { DIAS_SEMANA } from '@/lib/dias-semana'
-import { registrosAHorarios } from '@/lib/horarios'
+import { horariosPorDefecto, registrosAHorarios, validarHorarios } from '@/lib/horarios'
+import { SelectorHorarioIA, type ModoHorarioIA } from '@/components/sucursales/SelectorHorarioIA'
 import { PAISES } from '@/lib/paises'
 
 // CAMBIO 1: Husos horarios completos LATAM + España, ordenados de GMT-6 a GMT+1
@@ -127,17 +128,12 @@ export default function NuevaSucursalPage() {
   const [msgFueraHorario, setMsgFueraHorario] = useState('')
   const [idiomaBase, setIdiomaBase] = useState('es')
   const [tono, setTono] = useState('cercano')
-  const [iaActivaFueraHorario, setIaActivaFueraHorario] = useState(false)
+  const [modoHorarioIa, setModoHorarioIa] = useState<ModoHorarioIA>('mismo_negocio')
+  const [horariosIA, setHorariosIA] = useState(horariosPorDefecto())
   const [casoFueraHorario, setCasoFueraHorario] = useState(false)
 
-  // Onboarding — horarios (CAMBIO 4: estructura igual a perfil-sucursal)
-  const [horarios, setHorarios] = useState(
-    DIAS_SEMANA.map(d => ({
-      dia_semana: d.id,
-      cerrado: true,
-      franjas: [{ apertura: '09:00', cierre: '18:00', orden: 0 }]
-    }))
-  )
+  // Onboarding — horarios (mismos defaults que el resto de la app)
+  const [horarios, setHorarios] = useState(horariosPorDefecto())
 
   // Onboarding — skills, precios, etiquetas, reglas
   const [skills, setSkills] = useState<any[]>([])
@@ -173,7 +169,7 @@ export default function NuevaSucursalPage() {
   }, [])
 
   const resetModuloData = (modulo: string) => {
-    if (modulo === 'horarios') setHorarios(DIAS_SEMANA.map(d => ({ dia_semana: d.id, cerrado: true, franjas: [{ apertura: '09:00', cierre: '18:00', orden: 0 }] })))
+    if (modulo === 'horarios') setHorarios(horariosPorDefecto())
     if (modulo === 'skills') setSkills(prev => prev.map(s => ({ ...s, activo: s.fija })))
     if (modulo === 'precios') setPrecios([])
     if (modulo === 'etiquetas') setEtiquetas([])
@@ -182,7 +178,8 @@ export default function NuevaSucursalPage() {
     if (modulo === 'servicios') setServicios('')
     if (modulo === 'politicas') setPoliticas([])
     if (modulo === 'configuracion_ia') {
-      setIaActivaFueraHorario(false)
+      setModoHorarioIa('mismo_negocio')
+      setHorariosIA(horariosPorDefecto())
       setCasoFueraHorario(false)
       setMsgFueraHorario('')
       setIdiomaBase('es')
@@ -234,7 +231,8 @@ export default function NuevaSucursalPage() {
         }
       }
       if (!modulo || modulo === 'configuracion_ia') {
-        if (d.modo_horario_ia !== undefined) setIaActivaFueraHorario(d.modo_horario_ia === 'siempre_activa')
+        if (d.modo_horario_ia !== undefined) setModoHorarioIa(d.modo_horario_ia as ModoHorarioIA)
+        if (d.horarios_ia && d.horarios_ia.length > 0) setHorariosIA(registrosAHorarios(d.horarios_ia))
         if (d.abrir_caso_fuera_horario !== undefined) setCasoFueraHorario(d.abrir_caso_fuera_horario)
         if (d.msg_fuera_horario) setMsgFueraHorario(d.msg_fuera_horario)
         if (d.idioma_base) setIdiomaBase(d.idioma_base)
@@ -303,6 +301,27 @@ export default function NuevaSucursalPage() {
   }
 
   const handleGuardar = async () => {
+    // Una sucursal con los 7 días cerrados quedaría siempre "fuera de
+    // horario" para la IA: no respondería nunca. Se avisa antes de crearla.
+    if (horarios.every(h => h.cerrado)) {
+      showToast('La sucursal no tiene ningún día abierto. Abre al menos un día en el paso de horarios, o la IA la tratará como cerrada siempre.', 'error')
+      return
+    }
+
+    const errorHorarios = validarHorarios(horarios)
+    if (errorHorarios) {
+      showToast(errorHorarios, 'error')
+      return
+    }
+
+    if (modoHorarioIa === 'personalizado') {
+      const errorHorariosIA = validarHorarios(horariosIA)
+      if (errorHorariosIA) {
+        showToast(`Horario de la IA: ${errorHorariosIA}`, 'error')
+        return
+      }
+    }
+
     setSaving(true)
     const res = await crearSucursalConDatos({
       nombre,
@@ -315,8 +334,9 @@ export default function NuevaSucursalPage() {
       tono,
       msg_fuera_horario: msgFueraHorario,
       abrir_caso_fuera_horario: casoFueraHorario,
-      modo_horario_ia: iaActivaFueraHorario ? 'siempre_activa' : 'mismo_negocio',
+      modo_horario_ia: modoHorarioIa,
       horarios,
+      horarios_ia: modoHorarioIa === 'personalizado' ? horariosIA : undefined,
       // Enviamos solo nombre y activo para no incluir el campo 'fija' interno
       skills: skills.map(s => ({ skill_global_id: s.skill_global_id, nombre: s.nombre, activo: s.activo })),
       precios,
@@ -555,7 +575,7 @@ export default function NuevaSucursalPage() {
                     localItems = [
                       `Idioma base: ${idiomaBase}`,
                       `Tono: ${tono}`,
-                      `Modo fuera horario: ${iaActivaFueraHorario ? 'siempre_activa' : 'mismo_negocio'}`
+                      `Modo fuera horario: ${modoHorarioIa}`
                     ]
                   }
 
@@ -697,45 +717,34 @@ export default function NuevaSucursalPage() {
                   </div>
                 </div>
 
-                {/* Comportamiento fuera de horario — con exclusión mutua igual que el onboarding principal */}
-                <div className="space-y-3">
-                  <label className="block text-sm font-600 text-slate-700">Comportamiento fuera de horario</label>
-                  <label className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition">
-                    <div>
-                      <p className="text-sm font-500 text-ink-900">La IA sigue respondiendo fuera de horario</p>
-                      <p className="text-xs text-ink-500 mt-0.5">Si está desactivado, solo se enviará el mensaje de fuera de horario.</p>
-                    </div>
-                    <div className="relative ml-4 shrink-0">
-                      <input type="checkbox" checked={iaActivaFueraHorario}
-                        onChange={e => {
-                          setIaActivaFueraHorario(e.target.checked)
-                          if (e.target.checked) setCasoFueraHorario(false)
-                        }}
-                        className="peer sr-only" />
-                      <div className={`w-11 h-6 rounded-full transition-colors ${iaActivaFueraHorario ? 'bg-brand-600' : 'bg-slate-300'}`}></div>
-                      <div className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${iaActivaFueraHorario ? 'translate-x-5' : 'translate-x-0'}`}></div>
-                    </div>
-                  </label>
-                  {iaActivaFueraHorario ? (
-                    <p className="text-xs text-ink-500 mt-1">La IA responde en cualquier momento del día, todos los días, sin restricción de horario.</p>
-                  ) : (
-                    <p className="text-xs text-ink-500 mt-1">La IA seguirá el horario del negocio configurado arriba.</p>
-                  )}
-                  <label className={`flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50 transition ${iaActivaFueraHorario ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100'}`}>
-                    <div>
-                      <p className="text-sm font-500 text-ink-900">Abrir caso automáticamente fuera de horario</p>
-                      <p className="text-xs text-ink-500 mt-0.5">Se crea un caso para que un agente lo atienda cuando vuelva a haber horario.</p>
-                    </div>
-                    <div className="relative ml-4 shrink-0">
-                      <input type="checkbox" checked={casoFueraHorario}
-                        onChange={e => setCasoFueraHorario(e.target.checked)}
-                        disabled={iaActivaFueraHorario}
-                        className="peer sr-only" />
-                      <div className={`w-11 h-6 rounded-full transition-colors ${casoFueraHorario ? 'bg-brand-600' : 'bg-slate-300'} peer-disabled:opacity-50`}></div>
-                      <div className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${casoFueraHorario ? 'translate-x-5' : 'translate-x-0'}`}></div>
-                    </div>
-                  </label>
-                </div>
+                <SelectorHorarioIA
+                  modo={modoHorarioIa}
+                  onChangeModo={modo => {
+                    setModoHorarioIa(modo)
+                    if (modo === 'siempre_activa') setCasoFueraHorario(false)
+                  }}
+                  horariosIA={horariosIA}
+                  onChangeHorariosIA={setHorariosIA}
+                />
+
+                {modoHorarioIa !== 'siempre_activa' && (
+                  <div className="space-y-3">
+                    <label className="block text-sm font-600 text-slate-700">Comportamiento fuera de horario</label>
+                    <label className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50 transition cursor-pointer hover:bg-slate-100">
+                      <div>
+                        <p className="text-sm font-500 text-ink-900">Abrir caso automáticamente fuera de horario</p>
+                        <p className="text-xs text-ink-500 mt-0.5">Se crea un caso para que un agente lo atienda cuando vuelva a haber horario.</p>
+                      </div>
+                      <div className="relative ml-4 shrink-0">
+                        <input type="checkbox" checked={casoFueraHorario}
+                          onChange={e => setCasoFueraHorario(e.target.checked)}
+                          className="peer sr-only" />
+                        <div className={`w-11 h-6 rounded-full transition-colors ${casoFueraHorario ? 'bg-brand-600' : 'bg-slate-300'}`}></div>
+                        <div className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${casoFueraHorario ? 'translate-x-5' : 'translate-x-0'}`}></div>
+                      </div>
+                    </label>
+                  </div>
+                )}
               </div>
             </div>
           )}

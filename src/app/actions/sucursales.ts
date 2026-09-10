@@ -335,16 +335,18 @@ export async function getDatosSucursalParaCopiar(branchIdOrigen: string) {
     { data: skills },
     { data: precios },
     { data: tiposNovedad },
-    { data: businessProfile }
+    { data: businessProfile },
+    { data: horariosIA }
   ] = await Promise.all([
     supabase.from('sucursales').select('id, nombre, direccion, timezone').eq('id', branchIdOrigen).eq('tenant_id', userData.tenant_id).single(),
     supabase.from('message_categories').select('nombre, descripcion_intencion, color, activa, es_plantilla, orden, es_fallback, es_protegida').eq('branch_id', branchIdOrigen).eq('tenant_id', userData.tenant_id),
     supabase.from('case_rules').select('nombre, descripcion_intencion, tipo_caso, activa, es_plantilla, es_protegida').eq('branch_id', branchIdOrigen).eq('tenant_id', userData.tenant_id),
-    supabase.from('business_hours').select('dia_semana, apertura, cierre, cerrado, orden').eq('branch_id', branchIdOrigen).order('dia_semana', { ascending: true }).order('orden', { ascending: true }),
+    supabase.from('business_hours').select('dia_semana, apertura, cierre, cerrado, orden').eq('branch_id', branchIdOrigen).eq('tipo', 'negocio').order('dia_semana', { ascending: true }).order('orden', { ascending: true }),
     supabase.from('skills').select('nombre, activo, skill_global_id').eq('branch_id', branchIdOrigen),
     supabase.from('price_list').select('nombre, tipo, precio, precio_tipo, descripcion').eq('branch_id', branchIdOrigen).eq('disponible', true),
     supabase.from('tipos_novedad').select('nombre, icono, color').eq('branch_id', branchIdOrigen).eq('tenant_id', userData.tenant_id),
-    supabase.from('business_profiles').select('servicios, politicas, msg_fuera_horario, idioma_base, tono, abrir_caso_fuera_horario, modo_horario_ia').eq('branch_id', branchIdOrigen).maybeSingle()
+    supabase.from('business_profiles').select('servicios, politicas, msg_fuera_horario, idioma_base, tono, abrir_caso_fuera_horario, modo_horario_ia').eq('branch_id', branchIdOrigen).maybeSingle(),
+    supabase.from('business_hours').select('dia_semana, apertura, cierre, cerrado, orden').eq('branch_id', branchIdOrigen).eq('tipo', 'ia').order('dia_semana', { ascending: true }).order('orden', { ascending: true })
   ])
 
   if (!sucursal) return { success: false, error: 'Sucursal no encontrada' }
@@ -354,6 +356,7 @@ export async function getDatosSucursalParaCopiar(branchIdOrigen: string) {
     data: {
       sucursal,
       horarios: horarios || [],
+      horarios_ia: horariosIA || [],
       skills: skills || [],
       precios: precios || [],
       etiquetas: etiquetas || [],
@@ -383,6 +386,7 @@ export async function crearSucursalConDatos(data: {
   abrir_caso_fuera_horario?: boolean
   modo_horario_ia?: string
   horarios?: HorarioDia[]
+  horarios_ia?: HorarioDia[]
   skills?: { idName?: string, skill_global_id: string, nombre: string, activo: boolean }[]
   precios?: { nombre: string, tipo: string, precio: number | null, precio_tipo: string, descripcion?: string }[]
   etiquetas?: { nombre: string, descripcion_intencion?: string | null, color: string, activa: boolean, es_plantilla: boolean, orden: number, es_fallback?: boolean, es_protegida?: boolean }[]
@@ -408,6 +412,11 @@ export async function crearSucursalConDatos(data: {
   if (data.horarios && data.horarios.length > 0) {
     const errorValidacion = validarHorarios(data.horarios)
     if (errorValidacion) return { success: false, error: errorValidacion }
+  }
+
+  if (data.horarios_ia && data.horarios_ia.length > 0) {
+    const errorValidacionIA = validarHorarios(data.horarios_ia)
+    if (errorValidacionIA) return { success: false, error: `Horario de la IA: ${errorValidacionIA}` }
   }
 
   // DEFENSA: Comprobar idempotencia por nombre en los últimos 10 segundos
@@ -471,6 +480,17 @@ export async function crearSucursalConDatos(data: {
         horariosARegistros(data.horarios!, newBranch.id, 'negocio')
       ).then(({ error }) => {
         if (error) return registrarError({ origen: 'app', descripcion: 'Fallo al crear business_hours durante alta de sucursal', stacktrace: error.message, tenant_id: userData!.tenant_id })
+      })
+    )
+  }
+
+  // Horario personalizado de la IA (solo si el modo lo usa)
+  if (data.modo_horario_ia === 'personalizado' && data.horarios_ia && data.horarios_ia.length > 0) {
+    insertPromises.push(
+      supabase.from('business_hours').insert(
+        horariosARegistros(data.horarios_ia!, newBranch.id, 'ia')
+      ).then(({ error }) => {
+        if (error) return registrarError({ origen: 'app', descripcion: 'Fallo al crear business_hours (IA) durante alta de sucursal', stacktrace: error.message, tenant_id: userData!.tenant_id })
       })
     )
   }

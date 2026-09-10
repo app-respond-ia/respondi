@@ -13,6 +13,9 @@ import {
   saveStep5
 } from '@/app/actions/onboarding'
 import { getSkillsGlobalesBase } from '@/app/actions/skills-globales'
+import { EditorHorarios } from '@/components/sucursales/EditorHorarios'
+import { SelectorHorarioIA, type ModoHorarioIA } from '@/components/sucursales/SelectorHorarioIA'
+import { horariosPorDefecto, validarHorarios } from '@/lib/horarios'
 import { ErrorModal } from '@/components/ui/ErrorModal'
 import { useMemo, useRef } from 'react'
 import { createClient } from '@/utils/supabase/client'
@@ -74,18 +77,9 @@ export default function OnboardingPage() {
   const [politicaTituloInput, setPoliticaTituloInput] = useState('')
   const [politicaDescInput, setPoliticaDescInput] = useState('')
 
-  // Step 2
-  const [s2, setS2] = useState([
-    { dia: 'Lunes', dia_semana: 1, activo: true, franjas: [{ apertura: '', cierre: '' }] },
-    { dia: 'Martes', dia_semana: 2, activo: true, franjas: [{ apertura: '', cierre: '' }] },
-    { dia: 'Miércoles', dia_semana: 3, activo: true, franjas: [{ apertura: '', cierre: '' }] },
-    { dia: 'Jueves', dia_semana: 4, activo: true, franjas: [{ apertura: '', cierre: '' }] },
-    { dia: 'Viernes', dia_semana: 5, activo: true, franjas: [{ apertura: '', cierre: '' }] },
-    { dia: 'Sábado', dia_semana: 6, activo: false, franjas: [{ apertura: '', cierre: '' }] },
-    { dia: 'Domingo', dia_semana: 0, activo: false, franjas: [{ apertura: '', cierre: '' }] }
-  ])
-  const [copyPopoverOpen, setCopyPopoverOpen] = useState<number | null>(null)
-  const [copyTargets, setCopyTargets] = useState<number[]>([])
+  // Step 2 — misma forma canónica y mismos defaults que el resto de la app
+  const [s2, setS2] = useState(horariosPorDefecto())
+  const [horariosIA, setHorariosIA] = useState(horariosPorDefecto())
   const [modalError, setModalError] = useState('')
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false)
 
@@ -100,7 +94,7 @@ export default function OnboardingPage() {
   // Step 4
   const [s4Msg, setS4Msg] = useState('')
   const [s4Skip, setS4Skip] = useState(false)
-  const [s4IaActiva, setS4IaActiva] = useState(false)
+  const [s4ModoHorarioIa, setS4ModoHorarioIa] = useState<ModoHorarioIA>('mismo_negocio')
   const [s4AbrirCaso, setS4AbrirCaso] = useState(false)
 
   // Step 5
@@ -163,28 +157,8 @@ export default function OnboardingPage() {
         setPoliticas(d.s1.politicas || [])
       }
 
-      if (d.s2 && Object.keys(d.s2).length > 0) {
-        const s2Array = [
-          { dia: 'Lunes', dia_semana: 1 },
-          { dia: 'Martes', dia_semana: 2 },
-          { dia: 'Miércoles', dia_semana: 3 },
-          { dia: 'Jueves', dia_semana: 4 },
-          { dia: 'Viernes', dia_semana: 5 },
-          { dia: 'Sábado', dia_semana: 6 },
-          { dia: 'Domingo', dia_semana: 0 }
-        ].map(def => {
-          const loaded = d.s2[def.dia_semana]
-          if (loaded) {
-            return {
-              ...def,
-              activo: loaded.activo,
-              franjas: loaded.franjas.length > 0 ? loaded.franjas : [{ apertura: '', cierre: '' }]
-            }
-          }
-          return { ...def, activo: false, franjas: [{ apertura: '', cierre: '' }] }
-        })
-        setS2(s2Array)
-      }
+      if (d.s2 && d.s2.length > 0) setS2(d.s2)
+      if (d.s2_ia && d.s2_ia.length > 0) setHorariosIA(d.s2_ia)
 
       if (globalRes.success && globalRes.data) {
         const globales = globalRes.data.map((g: any) => ({
@@ -214,7 +188,7 @@ export default function OnboardingPage() {
           setS4Msg(d.s4)
         }
       }
-      if (d.s4_ia_activa !== undefined) setS4IaActiva(d.s4_ia_activa)
+      if (d.s4_modo_horario_ia !== undefined) setS4ModoHorarioIa(d.s4_modo_horario_ia as ModoHorarioIA)
       if (d.s4_abrir_caso !== undefined) setS4AbrirCaso(d.s4_abrir_caso)
       if (d.s5 && d.s5.length > 0) setS5Prods(d.s5)
 
@@ -271,37 +245,17 @@ export default function OnboardingPage() {
       if (!s1.nombreSucursal.trim()) { showError('El nombre de la primera sucursal es obligatorio'); return }
     }
     if (step === 2) {
-      for (const d of s2) {
-        if (!d.activo) continue;
-        if (d.franjas.length === 0) {
-          showError(`El día ${d.dia} está activo pero no tiene franjas.`);
-          return;
-        }
-        const sortedFranjas = [...d.franjas].sort((a, b) => a.apertura.localeCompare(b.apertura));
-        for (let i = 0; i < sortedFranjas.length; i++) {
-          const f = sortedFranjas[i];
-          if (!f.apertura || !f.cierre) {
-            showError(`Revisa las horas del ${d.dia}: faltan datos.`);
-            return;
-          }
-          if (f.apertura >= f.cierre) {
-            showError(`Horario inválido el ${d.dia}: el cierre debe ser posterior a la apertura.`);
-            return;
-          }
-          if (i > 0) {
-            const prev = sortedFranjas[i - 1];
-            if (f.apertura < prev.cierre) {
-              showError(`Solapamiento el ${d.dia}: la franja que empieza a las ${f.apertura} choca con la anterior.`);
-              return;
-            }
-          }
-        }
-      }
+      const errorHorarios = validarHorarios(s2)
+      if (errorHorarios) { showError(errorHorarios); return }
     }
     if (step === 4) {
       if (!s4Skip && !s4Msg.trim()) {
         showError('Debes escribir un mensaje de bienvenida, o marcar la casilla de "No quiero enviar mensaje de bienvenida".');
         return;
+      }
+      if (s4ModoHorarioIa === 'personalizado') {
+        const errorHorariosIA = validarHorarios(horariosIA)
+        if (errorHorariosIA) { showError(`Horario de la IA: ${errorHorariosIA}`); return }
       }
     }
 
@@ -347,17 +301,7 @@ export default function OnboardingPage() {
           setStep(2)
         }
       } else if (step === 2) {
-        // Puente temporal: el estado local aún usa `activo`; el contrato
-        // compartido usa `cerrado`. Desaparece cuando este paso adopte
-        // EditorHorarios (Tramo C).
-        const res = await saveStep2({
-          branchId,
-          horarios: s2.map(h => ({
-            dia_semana: h.dia_semana,
-            cerrado: !h.activo,
-            franjas: h.franjas.map((f, idx) => ({ ...f, orden: idx }))
-          }))
-        })
+        const res = await saveStep2({ branchId, horarios: s2 })
         if (res.success) setStep(3)
       } else if (step === 3) {
         const payload = {
@@ -368,12 +312,13 @@ export default function OnboardingPage() {
         const res = await saveStep3(payload)
         if (res.success) setStep(4)
       } else if (step === 4) {
-        const res = await saveStep4({ 
-          tenantId, 
-          branchId, 
+        const res = await saveStep4({
+          tenantId,
+          branchId,
           msg: s4Skip ? '' : s4Msg,
-          iaActiva: s4IaActiva,
-          abrirCaso: s4AbrirCaso
+          abrirCaso: s4AbrirCaso,
+          modoHorarioIa: s4ModoHorarioIa,
+          horariosIA: s4ModoHorarioIa === 'personalizado' ? horariosIA : undefined
         })
         if (res.success) setStep(5)
       } else if (step === 5) {
@@ -389,22 +334,6 @@ export default function OnboardingPage() {
   }
 
   const handleBack = () => { if (step > 0) setStep(step - 1) }
-
-  const applyCopyHorario = (sourceIndex: number) => {
-    const sourceFranjas = s2[sourceIndex].franjas
-    if (sourceFranjas.length === 0) return
-    const n = [...s2]
-    copyTargets.forEach(targetIndex => {
-      n[targetIndex] = {
-        ...n[targetIndex],
-        activo: true,
-        franjas: sourceFranjas.map(f => ({ apertura: f.apertura, cierre: f.cierre }))
-      }
-    })
-    setS2(n)
-    setCopyPopoverOpen(null)
-    setCopyTargets([])
-  }
 
   if (loading) {
     return <Loading />
@@ -733,101 +662,13 @@ export default function OnboardingPage() {
                   </div>
                   <h1 className="font-display font-bold text-2xl text-ink-900 mb-1.5">¿Cuándo atiende tu negocio?</h1>
                   <p className="text-ink-500 mb-4">Añade hasta 4 franjas por día. Este es el horario en el que tu negocio atiende; más adelante podrás elegir cómo se comporta la IA fuera de él.</p>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-slate-100 text-slate-600 mb-2">Negocio</span>
-
-                  <div className="space-y-4">
-                    {s2.map((h, i) => (
-                      <div key={h.dia} className={`p-4 rounded-xl border transition ${h.activo ? 'border-brand-200 bg-white shadow-sm' : 'border-slate-200 bg-slate-50'}`}>
-                        <label className="flex items-center gap-2.5 mb-3 cursor-pointer">
-                          <input type="checkbox" checked={h.activo} onChange={e => {
-                            const n = [...s2]; 
-                            n[i].activo = e.target.checked; 
-                            if (e.target.checked && n[i].franjas.length === 0) {
-                              n[i].franjas = [{ apertura: '', cierre: '' }];
-                            }
-                            setS2(n);
-                          }} className="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-400" />
-                          <span className={`font-semibold ${h.activo ? 'text-ink-900' : 'text-ink-400'}`}>{h.dia}</span>
-                        </label>
-                        
-                        {h.activo && (
-                          <div className="space-y-2.5 pl-6 border-l-2 border-brand-100 ml-2">
-                            {h.franjas.map((f, j) => (
-                              <div key={j} className="flex items-center gap-2 sm:gap-3">
-                                <input type="time" value={f.apertura} onChange={e => {
-                                  const n = [...s2]; n[i].franjas[j].apertura = e.target.value; setS2(n);
-                                }} className="flex-1 h-11 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition" />
-                                <span className="text-ink-400 text-sm font-medium">-</span>
-                                <input type="time" value={f.cierre} onChange={e => {
-                                  const n = [...s2]; n[i].franjas[j].cierre = e.target.value; setS2(n);
-                                }} className="flex-1 h-11 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition" />
-                                <button type="button" onClick={() => {
-                                  const n = [...s2]; n[i].franjas.splice(j, 1); setS2(n);
-                                }} className="p-2.5 text-ink-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition" title="Eliminar franja">
-                                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                                </button>
-                              </div>
-                            ))}
-                            {h.franjas.length < 4 && (
-                              <button type="button" onClick={() => {
-                                const n = [...s2]; n[i].franjas.push({ apertura: '', cierre: '' }); setS2(n);
-                              }} className="text-xs font-semibold text-brand-600 hover:text-brand-800 transition pt-1 flex items-center gap-1">
-                                + Añadir franja
-                              </button>
-                            )}
-                            {h.franjas.length === 0 && (
-                              <p className="text-xs text-red-500 font-medium">Debe haber al menos una franja si el día está activo.</p>
-                            )}
-
-                            {h.franjas.some(f => f.apertura && f.cierre) && (
-                              <div className="relative pt-1">
-                                <button type="button" onClick={() => {
-                                  setCopyPopoverOpen(copyPopoverOpen === i ? null : i)
-                                  setCopyTargets([])
-                                }} className="text-xs font-semibold text-ink-500 hover:text-ink-700 transition flex items-center gap-1">
-                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-                                  Copiar a...
-                                </button>
-
-                                {copyPopoverOpen === i && (
-                                  <div className="absolute z-10 mt-2 w-56 bg-white rounded-xl shadow-lg border border-slate-200 p-3">
-                                    <p className="text-xs font-semibold text-ink-700 mb-2">Copiar horario de {h.dia} a:</p>
-                                    <div className="space-y-1.5 mb-3">
-                                      {s2.map((otherDay, otherIndex) => otherIndex !== i && (
-                                        <label key={otherDay.dia} className="flex items-center gap-2 text-sm text-ink-700 cursor-pointer">
-                                          <input type="checkbox"
-                                            checked={copyTargets.includes(otherIndex)}
-                                            onChange={e => {
-                                              if (e.target.checked) {
-                                                setCopyTargets(prev => [...prev, otherIndex])
-                                              } else {
-                                                setCopyTargets(prev => prev.filter(idx => idx !== otherIndex))
-                                              }
-                                            }}
-                                            className="w-3.5 h-3.5 rounded border-slate-300 text-brand-600 focus:ring-brand-400" />
-                                          {otherDay.dia}
-                                        </label>
-                                      ))}
-                                    </div>
-                                    <div className="flex gap-2">
-                                      <button type="button" onClick={() => { setCopyPopoverOpen(null); setCopyTargets([]) }}
-                                        className="flex-1 h-8 rounded-lg text-xs font-600 text-ink-600 hover:bg-slate-100 transition">
-                                        Cancelar
-                                      </button>
-                                      <button type="button" onClick={() => applyCopyHorario(i)}
-                                        disabled={copyTargets.length === 0}
-                                        className="flex-1 h-8 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-600 transition">
-                                        Aplicar
-                                      </button>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    <EditorHorarios
+                      horarios={s2}
+                      onChange={setS2}
+                      nivelPermiso="escritura"
+                      variant="negocio"
+                    />
                   </div>
                 </div>
               )}
@@ -900,25 +741,29 @@ export default function OnboardingPage() {
                     <p className="text-sm text-ink-700">Es buena idea aclarar que se trata de un asistente virtual. Así el cliente sabe que habla con una IA.</p>
                   </div>
 
-                  <div className="mt-6 space-y-3">
-                    <label className="flex items-start gap-2.5 cursor-pointer group">
-                      <input type="checkbox" checked={s4IaActiva} onChange={e => {
-                        setS4IaActiva(e.target.checked);
-                        if (e.target.checked) setS4AbrirCaso(false);
+                  <div className="mt-6">
+                    <SelectorHorarioIA
+                      modo={s4ModoHorarioIa}
+                      onChangeModo={modo => {
+                        setS4ModoHorarioIa(modo)
+                        if (modo === 'siempre_activa') setS4AbrirCaso(false)
                       }}
-                        className="w-4 h-4 mt-0.5 rounded border-slate-300 text-brand-600 focus:ring-brand-400" />
-                      <span className="text-sm font-500 text-ink-900 group-hover:text-brand-700 transition">
-                        Permitir que la IA siga respondiendo fuera del horario de atención
-                      </span>
-                    </label>
-                    <label className={`flex items-start gap-2.5 group ${s4IaActiva ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
-                      <input type="checkbox" checked={s4AbrirCaso} disabled={s4IaActiva} onChange={e => setS4AbrirCaso(e.target.checked)}
-                        className="w-4 h-4 mt-0.5 rounded border-slate-300 text-brand-600 focus:ring-brand-400 disabled:cursor-not-allowed" />
-                      <span className="text-sm font-500 text-ink-900 group-hover:text-brand-700 transition">
-                        Abrir un caso automáticamente cuando llega un mensaje fuera de horario
-                      </span>
-                    </label>
+                      horariosIA={horariosIA}
+                      onChangeHorariosIA={setHorariosIA}
+                    />
                   </div>
+
+                  {s4ModoHorarioIa !== 'siempre_activa' && (
+                    <div className="mt-4">
+                      <label className="flex items-start gap-2.5 cursor-pointer group">
+                        <input type="checkbox" checked={s4AbrirCaso} onChange={e => setS4AbrirCaso(e.target.checked)}
+                          className="w-4 h-4 mt-0.5 rounded border-slate-300 text-brand-600 focus:ring-brand-400" />
+                        <span className="text-sm font-500 text-ink-900 group-hover:text-brand-700 transition">
+                          Abrir un caso automáticamente cuando llega un mensaje fuera de horario
+                        </span>
+                      </label>
+                    </div>
+                  )}
                 </div>
               )}
 

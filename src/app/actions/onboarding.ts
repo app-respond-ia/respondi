@@ -3,7 +3,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { registrarError } from '@/lib/errores'
-import { validarHorarios, horariosARegistros, type HorarioDia } from '@/lib/horarios'
+import { validarHorarios, horariosARegistros, registrosAHorarios, type HorarioDia } from '@/lib/horarios'
 
 // Helper privado para resolver y validar tenantId y branchId asegurando la propiedad (prevención de IDOR)
 async function resolveAndValidateIds(user: any, inputTenantId?: string, inputBranchId?: string) {
@@ -130,13 +130,14 @@ export async function getOnboardingState() {
   }
 
   if (branchId) {
-    const [orgData, branchData, profileData, hoursData, skillsData, priceData] = await Promise.all([
+    const [orgData, branchData, profileData, hoursData, skillsData, priceData, hoursIAData] = await Promise.all([
       supabaseAdmin.from('organizaciones').select('nombre, direccion_fiscal').eq('id', userData.tenant_id).single(),
       supabaseAdmin.from('sucursales').select('nombre, direccion, timezone, moneda, onboarding_paso, onboarding_completado').eq('id', branchId).single(),
       supabaseAdmin.from('business_profiles').select('servicios, politicas, msg_fuera_horario, abrir_caso_fuera_horario, modo_horario_ia').eq('branch_id', branchId).limit(1).single(),
-      supabaseAdmin.from('business_hours').select('dia_semana, apertura, cierre, cerrado, orden').eq('branch_id', branchId).order('orden', { ascending: true }),
+      supabaseAdmin.from('business_hours').select('dia_semana, apertura, cierre, cerrado, orden').eq('branch_id', branchId).eq('tipo', 'negocio').order('orden', { ascending: true }),
       supabaseAdmin.from('skills').select('skill_global_id, nombre, activo').eq('branch_id', branchId),
-      supabaseAdmin.from('price_list').select('nombre, precio').eq('branch_id', branchId)
+      supabaseAdmin.from('price_list').select('nombre, precio').eq('branch_id', branchId),
+      supabaseAdmin.from('business_hours').select('dia_semana, apertura, cierre, cerrado, orden').eq('branch_id', branchId).eq('tipo', 'ia').order('orden', { ascending: true })
     ])
 
     dataState.paso = branchData?.data?.onboarding_paso ?? 1
@@ -154,16 +155,11 @@ export async function getOnboardingState() {
     }
 
     if (hoursData?.data && hoursData.data.length > 0) {
-      const daysMap: Record<number, { dia_semana: number, activo: boolean, franjas: any[] }> = {}
-      hoursData.data.forEach(row => {
-        if (!daysMap[row.dia_semana]) {
-          daysMap[row.dia_semana] = { dia_semana: row.dia_semana, activo: !row.cerrado, franjas: [] }
-        }
-        if (!row.cerrado) {
-          daysMap[row.dia_semana].franjas.push({ apertura: row.apertura.substring(0, 5), cierre: row.cierre.substring(0, 5) })
-        }
-      })
-      dataState.s2 = daysMap
+      dataState.s2 = registrosAHorarios(hoursData.data)
+    }
+
+    if (hoursIAData?.data && hoursIAData.data.length > 0) {
+      dataState.s2_ia = registrosAHorarios(hoursIAData.data)
     }
 
     if (skillsData?.data && skillsData.data.length > 0) {
@@ -174,7 +170,6 @@ export async function getOnboardingState() {
       dataState.s4 = profileData.data.msg_fuera_horario
     }
     if (profileData?.data) {
-      dataState.s4_ia_activa = profileData.data.modo_horario_ia === 'siempre_activa'
       dataState.s4_abrir_caso = profileData.data.abrir_caso_fuera_horario || false
       dataState.s4_modo_horario_ia = profileData.data.modo_horario_ia || 'mismo_negocio'
     }
@@ -532,7 +527,14 @@ export async function saveStep3(data: {
   }
 }
 
-export async function saveStep4(data: { tenantId: string, branchId: string, msg: string, iaActiva: boolean, abrirCaso: boolean, modoHorarioIa?: string }) {
+export async function saveStep4(data: {
+  tenantId: string
+  branchId: string
+  msg: string
+  abrirCaso: boolean
+  modoHorarioIa: 'mismo_negocio' | 'siempre_activa' | 'personalizado'
+  horariosIA?: HorarioDia[]
+}) {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -541,6 +543,28 @@ export async function saveStep4(data: { tenantId: string, branchId: string, msg:
     const res = await resolveAndValidateIds(user, data.tenantId, data.branchId)
     if (!res.valid) return { success: false, error: res.error }
     const { branchId } = res
+
+    // Horario personalizado de la IA: se guarda en business_hours con
+    // tipo='ia', separado del horario del negocio.
+    if (data.modoHorarioIa === 'personalizado') {
+      if (!data.horariosIA || data.horariosIA.length === 0) {
+        return { success: false, error: 'Debes configurar el horario personalizado de la IA.' }
+      }
+      const errorValidacion = validarHorarios(data.horariosIA)
+      if (errorValidacion) return { success: false, error: `Horario de la IA: ${errorValidacion}` }
+
+      const { error: delIAError } = await supabaseAdmin
+        .from('business_hours')
+        .delete()
+        .eq('branch_id', branchId)
+        .eq('tipo', 'ia')
+      if (delIAError) throw delIAError
+
+      const { error: insIAError } = await supabaseAdmin
+        .from('business_hours')
+        .insert(horariosARegistros(data.horariosIA, branchId!, 'ia'))
+      if (insIAError) throw insIAError
+    }
 
     const { data: profiles, error: selError } = await supabaseAdmin
       .from('business_profiles')
@@ -560,7 +584,7 @@ export async function saveStep4(data: { tenantId: string, branchId: string, msg:
         branch_id: branchId,
         msg_fuera_horario: data.msg,
         abrir_caso_fuera_horario: data.abrirCaso,
-        modo_horario_ia: data.iaActiva ? 'siempre_activa' : 'mismo_negocio'
+        modo_horario_ia: data.modoHorarioIa
       })
       if (insError) {
         console.error('Error insertando profile en paso 4:', insError, JSON.stringify(insError))
@@ -571,7 +595,7 @@ export async function saveStep4(data: { tenantId: string, branchId: string, msg:
         .update({ 
           msg_fuera_horario: data.msg,
           abrir_caso_fuera_horario: data.abrirCaso,
-          modo_horario_ia: data.iaActiva ? 'siempre_activa' : 'mismo_negocio'
+          modo_horario_ia: data.modoHorarioIa
         })
         .eq('id', profile.id)
       if (updErr) {

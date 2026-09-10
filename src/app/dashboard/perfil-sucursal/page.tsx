@@ -8,6 +8,7 @@ import { getHorarios, saveHorarios } from '@/app/actions/horarios'
 import { getMisPermisos } from '@/app/actions/permisos'
 import { getTiposNovedad, crearTipoNovedad, actualizarTipoNovedad, eliminarTipoNovedad, TipoNovedadData } from '@/app/actions/tipos-novedad'
 import { EditorHorarios } from '@/components/sucursales/EditorHorarios'
+import { SelectorHorarioIA } from '@/components/sucursales/SelectorHorarioIA'
 import { getIconSvg } from '@/components/novedades/NovedadesManager'
 import { useToast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
@@ -658,47 +659,14 @@ export default function PerfilSucursalPage() {
             </div>
 
             {/* Horario de la IA */}
-            <div className="space-y-3 pt-4 border-t border-slate-100">
-              <label className="block text-sm font-semibold text-slate-700">Horario de atención de la IA</label>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                {[
-                  { id: 'mismo_negocio', label: 'Mismo que el negocio' },
-                  { id: 'siempre_activa', label: 'Siempre activa (24/7)' },
-                  { id: 'personalizado', label: 'Horario personalizado' }
-                ].map(opt => (
-                  <label key={opt.id} className={`flex items-center gap-3 p-4 rounded-xl border transition cursor-pointer ${formData.modo_horario_ia === opt.id ? 'bg-brand-50 border-brand-300' : 'bg-white border-slate-200 hover:border-slate-300'}`}>
-                    <input 
-                      type="radio" 
-                      name="modo_horario_ia" 
-                      value={opt.id} 
-                      checked={formData.modo_horario_ia === opt.id}
-                      onChange={handleChange}
-                      disabled={nivelPermiso !== 'escritura'}
-                      className="text-brand-600 focus:ring-brand-500"
-                    />
-                    <span className="text-sm font-500 text-ink-900">{opt.label}</span>
-                  </label>
-                ))}
-              </div>
-              
-              {formData.modo_horario_ia === 'personalizado' && (
-                <div className="mt-4 border border-slate-200 rounded-xl overflow-hidden">
-                  <EditorHorarios
-                    horarios={horariosIA}
-                    onChange={setHorariosIA}
-                    nivelPermiso={nivelPermiso}
-                    variant="ia"
-                  />
-                </div>
-              )}
-
-              {formData.modo_horario_ia === 'mismo_negocio' && (
-                <p className="text-xs text-ink-500 mt-1">La IA seguirá el horario del negocio configurado arriba.</p>
-              )}
-
-              {formData.modo_horario_ia === 'siempre_activa' && (
-                <p className="text-xs text-ink-500 mt-1">La IA responde en cualquier momento del día, todos los días, sin restricción de horario.</p>
-              )}
+            <div className="pt-4 border-t border-slate-100">
+              <SelectorHorarioIA
+                modo={formData.modo_horario_ia}
+                onChangeModo={modo => setFormData({ ...formData, modo_horario_ia: modo })}
+                horariosIA={horariosIA}
+                onChangeHorariosIA={setHorariosIA}
+                nivelPermiso={nivelPermiso}
+              />
             </div>
 
             {/* Comportamiento fuera de horario */}

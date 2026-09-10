@@ -62,9 +62,12 @@ cuentas ya existentes; aviso de errata; y el fallo de envío de email ya no
 se traga en silencio.
 - [ ] Limpiar las invitaciones basura de las pruebas (`mmm`, `mmmm` y
       `n8n@propulsesytem.com`) desde el panel, con el botón Cancelar
-- [ ] Caducidad real de invitaciones: hoy `DIAS_CADUCIDAD_INVITACION` (14)
-      solo pinta el estado en pantalla; no bloquea el alta. Si se quiere
-      que caduquen de verdad hace falta migración
+- [x] Caducidad real de invitaciones — **se decide no hacerla**. Bloquear
+      un alta porque la invitación tiene más de 14 días solo genera
+      soporte: el enlace no lleva ningún secreto, la vinculación se hace
+      por email, así que una invitación vieja no es un riesgo. El estado
+      "caducada" en pantalla ya cumple su función: avisar a quien invitó
+      de que reenvíe
 
 ## Sueltos — sin bloquear nada, hacer cuando encaje
 - [x] Cron `disparador-ia-agrupador` — revisado (10-09-2026). No puede ser
@@ -106,19 +109,10 @@ se traga en silencio.
       respecto a la segunda. Mientras existan las dos, volverán a
       desincronizarse. Decidir con Jorge si el modal rápido pasa a ser un
       enlace al asistente y se elimina `crearSucursal`.
-- [ ] Unificar `onboarding/page.tsx` para que reutilice el componente
-      compartido `EditorHorarios` (`src/components/sucursales/
-      EditorHorarios.tsx`) en vez de su propia implementación
-      duplicada del editor de horarios (franjas, "copiar a...", etc.,
-      hoy repetida a mano dentro del Paso 2 del wizard). También
-      reemplazar su checkbox simplificado de 2 opciones para el
-      horario de la IA por el selector completo de 3 modos
-      (`mismo_negocio`/`siempre_activa`/`personalizado`) que ya usa
-      `perfil-sucursal`, si tiene sentido ofrecerlo desde el alta
-      inicial. Aplazado a propósito: onboarding es el flujo más
-      crítico de la app (alta de cuentas reales), y este cambio
-      merece su propio tramo con testing dedicado end-to-end, no
-      mezclado con ajustes de claridad visual menores.
+- [x] Unificar el editor de horarios del onboarding — ya estaba hecho en
+      el tramo C: `onboarding/page.tsx` usa `EditorHorarios` (paso 2) y
+      `ConfiguracionMensajeIA` con el selector de 3 modos (paso 4). La
+      nota se quedó sin marcar
 - [ ] Auditoría completa del esquema de Supabase (FKs faltantes) —
       hacer después de terminar el diseño de contexto/herramientas de
       la IA
@@ -134,8 +128,8 @@ se traga en silencio.
       función se llamaba igual de mal desde otros 13 sitios.
 - [ ] Stripe (Pieza B) — falta crear la cuenta de Stripe; resto del
       código ya preparado (ver `docs/estado/creditos-facturacion.md`)
-- [ ] Migrar `create_trial_account`/flujo de Google OAuth al RPC
-      `crear_cuenta_completa` (delicado, toca login real)
+- [x] Migrar `create_trial_account` al RPC `crear_cuenta_completa` — ya
+      estaba: la función no existe ni en el código ni en la base de datos
 - [x] Columna `plans.dias_trial` editable — hecho (10-09-2026). El 14
       estaba dentro de la función `crear_cuenta_completa` de la base de
       datos, no en el código de la app. Ahora es una columna del plan,
@@ -147,9 +141,15 @@ se traga en silencio.
       de los pasos 0, 2, 4 y 5 del onboarding, que solo hacían
       `console.error` — invisible en producción. Verificado: cero fallos
       mudos en onboarding.ts, usuarios.ts y sucursales.ts
-- [ ] Verificar `invitarUsuario` de principio a fin (mismo patrón ya
-      probado para vendedor/admin_trial). Ya lleva validación de email y
-      registro de errores; falta la prueba de alta real
+- [ ] Verificar `invitarUsuario` de principio a fin. **Media prueba hecha**
+      (10-09-2026) contra la app real: crear rol → invitar → la invitación
+      nace con el tenant, el tipo y el rol correctos. La otra mitad (que
+      el invitado al registrarse entre en ESA organización y no en una
+      nueva) no se pudo automatizar: `signupTrial` recibe `FormData` y no
+      se puede invocar bien desde un script. Prueba manual, 2 minutos:
+      invitar a un agente desde /dashboard/usuarios, registrarse con ese
+      email en /registro-trial y comprobar que aparece en la lista de
+      usuarios de la organización que invitó
 - [x] Modal muerto de `/dashboard/sucursales` eliminado, junto con la
       acción `crearSucursal` que solo él usaba. Ya solo hay una forma de
       crear una sucursal: el asistente

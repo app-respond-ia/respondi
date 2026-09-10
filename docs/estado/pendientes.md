@@ -67,10 +67,19 @@ se traga en silencio.
       que caduquen de verdad hace falta migración
 
 ## Sueltos — sin bloquear nada, hacer cuando encaje
-- [ ] Cron `disparador-ia-agrupador` (jobid 6) corre **cada 10 segundos**
-      y `cron-procesar-politicas` (jobid 8) cada minuto. Revisar si esa
-      frecuencia es necesaria antes de que haya tráfico real: son
-      ~8.600 ejecuciones al día del primero
+- [x] Cron `disparador-ia-agrupador` — revisado (10-09-2026). No puede ser
+      reactivo: su trabajo es esperar a que el cliente lleve N segundos sin
+      escribir (`tiempo_agrupacion_seg`, 30 por defecto) para agrupar varios
+      mensajes en una sola respuesta, y esperar un silencio obliga a
+      comprobar cada cierto tiempo. Se bajó a 20 segundos (la mitad de
+      ejecuciones) y se añadió un índice parcial que cubre su filtro.
+      Pendiente para cuando haya tráfico: guardar en `conversations` quién
+      escribió el último mensaje, para quitar la subconsulta por
+      conversación. No se hace ahora porque exige un disparador en la
+      inserción de mensajes, el camino más caliente de la app
+- [x] Días de prueba: solo el plan Trial los tiene. Los de pago pasan a 0,
+      y `dias_trial = 0` significa alta activa con un mes de vigencia, no
+      una cuenta vencida el mismo día que nace
 - [x] Linter de Supabase: 13 funciones con `search_path` mutable y la
       vista `saldos_actuales_ia` (único aviso de nivel ERROR, dejaba ver
       el saldo de créditos de TODAS las organizaciones) — corregidos y

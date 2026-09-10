@@ -722,7 +722,8 @@ export default function OnboardingPage() {
                     <span className="text-xs font-semibold uppercase tracking-wider text-brand-600">Horarios de atención</span>
                   </div>
                   <h1 className="font-display font-bold text-2xl text-ink-900 mb-1.5">¿Cuándo atiende tu negocio?</h1>
-                  <p className="text-ink-500 mb-6">Añade hasta 4 franjas por día. Fuera de este horario, la IA enviará un mensaje de aviso.</p>
+                  <p className="text-ink-500 mb-4">Añade hasta 4 franjas por día. Fuera de este horario, la IA enviará un mensaje de aviso.</p>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-slate-100 text-slate-600 mb-2">Negocio</span>
 
                   <div className="space-y-4">
                     {s2.map((h, i) => (

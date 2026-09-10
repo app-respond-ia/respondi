@@ -38,6 +38,19 @@ solo la lista viva).
   fidelización van después, una vez validado lo anterior)
 
 ## Sueltos — sin bloquear nada, hacer cuando encaje
+- [ ] Unificar `onboarding/page.tsx` para que reutilice el componente
+      compartido `EditorHorarios` (`src/components/sucursales/
+      EditorHorarios.tsx`) en vez de su propia implementación
+      duplicada del editor de horarios (franjas, "copiar a...", etc.,
+      hoy repetida a mano dentro del Paso 2 del wizard). También
+      reemplazar su checkbox simplificado de 2 opciones para el
+      horario de la IA por el selector completo de 3 modos
+      (`mismo_negocio`/`siempre_activa`/`personalizado`) que ya usa
+      `perfil-sucursal`, si tiene sentido ofrecerlo desde el alta
+      inicial. Aplazado a propósito: onboarding es el flujo más
+      crítico de la app (alta de cuentas reales), y este cambio
+      merece su propio tramo con testing dedicado end-to-end, no
+      mezclado con ajustes de claridad visual menores.
 - [ ] Auditoría completa del esquema de Supabase (FKs faltantes) —
       hacer después de terminar el diseño de contexto/herramientas de
       la IA

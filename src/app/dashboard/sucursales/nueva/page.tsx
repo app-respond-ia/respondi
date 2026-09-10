@@ -738,6 +738,11 @@ export default function NuevaSucursalPage() {
                       <div className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${iaActivaFueraHorario ? 'translate-x-5' : 'translate-x-0'}`}></div>
                     </div>
                   </label>
+                  {iaActivaFueraHorario ? (
+                    <p className="text-xs text-ink-500 mt-1">La IA responde en cualquier momento del día, todos los días, sin restricción de horario.</p>
+                  ) : (
+                    <p className="text-xs text-ink-500 mt-1">La IA seguirá el horario del negocio configurado arriba.</p>
+                  )}
                   <label className={`flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50 transition ${iaActivaFueraHorario ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100'}`}>
                     <div>
                       <p className="text-sm font-500 text-ink-900">Abrir caso automáticamente fuera de horario</p>
@@ -768,10 +773,11 @@ export default function NuevaSucursalPage() {
               <p className="text-ink-500 text-sm mb-6">Añade los horarios para esta sucursal. Puedes copiar franjas entre días.</p>
 
               <div className="mt-4 border border-slate-200 rounded-xl overflow-hidden">
-                <EditorHorarios 
+                <EditorHorarios
                   horarios={horarios}
                   onChange={setHorarios}
                   nivelPermiso="escritura"
+                  variant="negocio"
                 />
               </div>
             </div>

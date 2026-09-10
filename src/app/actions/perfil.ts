@@ -7,6 +7,7 @@ import { getAuthContext } from '@/lib/auth-context'
 import { revalidatePath } from 'next/cache'
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { registrosAHorarios } from '@/lib/horarios'
+import { registrarError } from '@/lib/errores'
 import { getMisPermisos } from './permisos'
 
 export async function getPerfilSucursal() {
@@ -47,42 +48,71 @@ export async function getPerfilSucursal() {
 // así que se hacían ~15 idas y vueltas para pintar una pantalla. Aquí la
 // sesión se resuelve una vez y el resto de consultas van en paralelo.
 export async function getDatosPerfilSucursal() {
-  const supabase = await createClient()
+  try {
+    const supabase = await createClient()
 
-  const [auth, permisos] = await Promise.all([
-    getAuthContext(supabase),
-    getMisPermisos()
-  ])
+    const [auth, permisos] = await Promise.all([
+      getAuthContext(supabase),
+      getMisPermisos()
+    ])
 
-  if (auth.error) return { success: false, error: auth.error }
-
-  const branchId = auth.branch_id
-  const tenantId = auth.tenant_id
-
-  const [
-    { data: sucursal },
-    { data: businessProfile },
-    { data: filasNegocio },
-    { data: filasIA },
-    { data: tiposNovedad }
-  ] = await Promise.all([
-    supabase.from('sucursales').select('id, nombre, direccion, pais, timezone').eq('id', branchId).eq('tenant_id', tenantId).single(),
-    supabase.from('business_profiles').select('id, servicios, politicas, idioma_base, tono, msg_fuera_horario, abrir_caso_fuera_horario, modo_horario_ia').eq('branch_id', branchId).single(),
-    supabase.from('business_hours').select('*').eq('branch_id', branchId).eq('tipo', 'negocio').order('dia_semana', { ascending: true }).order('orden', { ascending: true }),
-    supabase.from('business_hours').select('*').eq('branch_id', branchId).eq('tipo', 'ia').order('dia_semana', { ascending: true }).order('orden', { ascending: true }),
-    supabase.from('tipos_novedad').select('*').eq('branch_id', branchId).order('created_at', { ascending: true })
-  ])
-
-  return {
-    success: true,
-    data: {
-      sucursal: sucursal || null,
-      perfil: businessProfile || null,
-      horarios: registrosAHorarios(filasNegocio),
-      horariosIA: registrosAHorarios(filasIA),
-      tiposNovedad: tiposNovedad || [],
-      permisos
+    if (auth.error) {
+      await registrarError({
+        origen: 'app',
+        descripcion: 'getDatosPerfilSucursal: getAuthContext falló',
+        stacktrace: JSON.stringify({ authError: auth.error, permisos })
+      })
+      return { success: false, error: auth.error }
     }
+
+    const branchId = auth.branch_id
+    const tenantId = auth.tenant_id
+
+    const [
+      { data: sucursal, error: errSucursal },
+      { data: businessProfile, error: errPerfil },
+      { data: filasNegocio, error: errHoras },
+      { data: filasIA, error: errHorasIA },
+      { data: tiposNovedad, error: errTipos }
+    ] = await Promise.all([
+      supabase.from('sucursales').select('id, nombre, direccion, pais, timezone').eq('id', branchId).eq('tenant_id', tenantId).single(),
+      supabase.from('business_profiles').select('id, servicios, politicas, idioma_base, tono, msg_fuera_horario, abrir_caso_fuera_horario, modo_horario_ia').eq('branch_id', branchId).single(),
+      supabase.from('business_hours').select('*').eq('branch_id', branchId).eq('tipo', 'negocio').order('dia_semana', { ascending: true }).order('orden', { ascending: true }),
+      supabase.from('business_hours').select('*').eq('branch_id', branchId).eq('tipo', 'ia').order('dia_semana', { ascending: true }).order('orden', { ascending: true }),
+      supabase.from('tipos_novedad').select('*').eq('branch_id', branchId).order('created_at', { ascending: true })
+    ])
+
+    // Solo se registra si algo falló de verdad; PGRST116 (0 filas en un
+    // .single()) es esperable en cuentas recién creadas y no es un error.
+    const fallos = Object.entries({ errSucursal, errPerfil, errHoras, errHorasIA, errTipos })
+      .filter(([, e]) => e && (e as any).code !== 'PGRST116')
+    if (fallos.length > 0) {
+      await registrarError({
+        origen: 'app',
+        descripcion: 'getDatosPerfilSucursal: fallo en alguna consulta',
+        stacktrace: JSON.stringify({ branchId, tenantId, fallos }),
+        tenant_id: tenantId
+      })
+    }
+
+    return {
+      success: true,
+      data: {
+        sucursal: sucursal || null,
+        perfil: businessProfile || null,
+        horarios: registrosAHorarios(filasNegocio),
+        horariosIA: registrosAHorarios(filasIA),
+        tiposNovedad: tiposNovedad || [],
+        permisos
+      }
+    }
+  } catch (err: any) {
+    await registrarError({
+      origen: 'app',
+      descripcion: 'getDatosPerfilSucursal: excepción no controlada',
+      stacktrace: JSON.stringify({ message: err?.message, stack: err?.stack?.slice(0, 1500) })
+    })
+    return { success: false, error: err?.message || 'Error desconocido' }
   }
 }
 

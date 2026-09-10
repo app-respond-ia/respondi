@@ -172,8 +172,21 @@ export async function generarRespuesta(conv: any) {
     systemPrompt += `\n`;
   }
 
+  // El idioma sale de dos ajustes que hasta ahora no hacía nada ninguno: la
+  // skill "Idioma multi" no se consultaba en el motor, y `idioma_base` se
+  // configuraba en Perfil de sucursal, se guardaba en la base y nadie la leía.
+  const NOMBRE_IDIOMA: Record<string, string> = {
+    es: 'español', en: 'inglés', pt: 'portugués', fr: 'francés',
+    it: 'italiano', de: 'alemán', ca: 'catalán', gl: 'gallego', eu: 'euskera'
+  }
+  const idiomaBase = NOMBRE_IDIOMA[profile?.idioma_base || 'es'] || profile?.idioma_base || 'español'
+
   systemPrompt += `\nINSTRUCCIONES ESTRICTAS:\n`
-  systemPrompt += `- Responde SIEMPRE en el mismo idioma en el que el cliente te escribe, sea cual sea, sin excepción.\n`
+  if (activeSkills.has('idioma_multi')) {
+    systemPrompt += `- Responde SIEMPRE en el mismo idioma en el que el cliente te escribe, sea cual sea, sin excepción. Si no queda claro en qué idioma escribe, responde en ${idiomaBase}.\n`
+  } else {
+    systemPrompt += `- Responde SIEMPRE en ${idiomaBase}, aunque el cliente te escriba en otro idioma.\n`
+  }
   systemPrompt += `- No inventes información. Si no lo sabes, indícalo${canEscalate ? ' o usa escalar_humano' : ''}.\n`
   systemPrompt += `- Eres un asistente, responde de manera concisa y natural.\n`
   if (canEscalate) {

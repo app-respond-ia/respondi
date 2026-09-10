@@ -506,3 +506,21 @@ De paso, dos mejoras del mismo bloque:
 Verificado con ficheros reales subidos al bucket: la IA lee un cartel con
 texto y guarda su descripción, transcribe un audio y responde a lo que se
 dice en él, y ante un PDF avisa al cliente y crea el caso.
+
+## Los ajustes de idioma no hacían nada (resuelto)
+Dos cosas que el cliente configura y que el motor ignoraba por completo:
+
+- **`business_profiles.idioma_base`**: se elige en Perfil de sucursal y en el
+  alta de sucursal, se guarda en la base... y `generarRespuesta` nunca lo
+  leía. Ni siquiera venía en la consulta de `/api/ai/process`.
+- **La skill "Idioma multi"**: aparece en el panel como una capacidad más de
+  la IA, pero no había ni una sola referencia a ella en el motor. Apagarla no
+  cambiaba nada.
+
+En la práctica la IA siempre respondía en el idioma del cliente, que es lo
+que hace la skill activada — así que por casualidad el comportamiento visible
+era el correcto mientras nadie tocara nada. Pero eran dos campos muertos.
+
+Ahora: con "Idioma multi" activa se responde en el idioma del cliente y, si
+no queda claro en cuál escribe, en el idioma base. Con la skill apagada se
+responde siempre en el idioma base. Verificado con las dos configuraciones.

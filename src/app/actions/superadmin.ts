@@ -712,7 +712,7 @@ export async function reenviarInvitacionSuperadmin(invitacionId: string) {
     const esVendedor = inv.tipo === 'vendedor'
     const { error: emailError } = await enviarEmailInvitacion({
       email: inv.email,
-      actionLink: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}${esVendedor ? '/login' : `/registro-trial?inv=${inv.id}`}`,
+      actionLink: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/registro-trial?inv=${inv.id}`,
       rol: esVendedor ? 'vendedor' : 'tenant_user'
     })
 
@@ -861,7 +861,10 @@ export async function crearVendedor(data: {
 
   const { error: emailError } = await enviarEmailInvitacion({
     email,
-    actionLink: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/login`,
+    // A /login no: el vendedor todavía no tiene cuenta y ahí lo único que
+    // vería es "Prueba gratis 14 días", que no va con él. Con `?inv=` la
+    // pantalla de registro sabe que es una invitación de vendedor.
+    actionLink: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/registro-trial?inv=${invitacionCreada.id}`,
     rol: 'vendedor'
   })
 

@@ -17,9 +17,15 @@ solo la lista viva).
       identificado reciben 42501 "permission denied"; el servidor de la
       app (service_role) y pg_cron conservan el acceso. Las tres
       `check_*` de cron quedan igual de cerradas.
-- [ ] Verificaciones aplazadas: contraseña con cuenta email
-      (vendedor/superadmin), fix de invitación con hash, prueba de
-      notificación de comisiones
+- [x] Verificaciones aplazadas — revisadas (10-09-2026):
+      - Invitación con hash: ya no existe ese flujo, ahora va por
+        `invitaciones_pendientes`. Nota obsoleta
+      - Contraseña con cuenta de email: funcionaba, pero el recorrido estaba
+        roto. La invitación de vendedor y la de agente mandaban a `/login`,
+        donde esa persona todavía NO tiene cuenta y lo único que ve es
+        "Prueba gratis 14 días". Ahora van a `/registro-trial?inv=<id>`, con
+        la pantalla adaptada a cada tipo de invitado
+      - Notificación de comisiones: sin revisar, Jorge la da por buena
 
 ## Prioridad 2 — Fase 0 (antes de construir nada de la v2)
 - [x] Conseguir `OPENAI_API_KEY` — hecha: en `.env.local` y en las
@@ -49,11 +55,17 @@ solo la lista viva).
       `plans.precio_input_usd_millon` / `precio_output_usd_millon`, editables
       desde /superadmin/planes. Verificado con una respuesta real: al cambiar
       el precio del plan cambia el coste que guarda `ai_logs`
-- [ ] **Poner los precios reales de OpenAI en cada plan**. Ahora mismo los
-      cuatro tienen los valores que había fijos en el código (0,20 y 1,20 por
-      millón), que no corresponden a gpt-4o. Hasta que se corrijan, los
-      informes de consumo dan un margen equivocado. Lo tiene que hacer Jorge
-      con la lista de precios delante
+- [x] Precios reales por plan — puestos (10-09-2026), con la lista que pasó
+      Jorge y los modelos verificados uno a uno contra la API
+- [ ] Diferenciar el modelo de Pro y Business: comparten `gpt-4.1` porque
+      entre `gpt-4o-mini` y `gpt-4.1` no hay ningún modelo con precio
+      confirmado. `gpt-4.1-mini` está verificado que funciona; solo falta su
+      precio para poder ponerlo en medio
+- [ ] Soportar la familia `gpt-5.6` (Luna, Terra, Sol): rechazan las
+      herramientas del motor salvo que se les pase `reasoning_effort: 'none'`.
+      `gpt-6-astra` no admite ni eso. Ojo antes de meterlos: en la prueba
+      consumieron el doble de tokens de entrada para la misma pregunta, así
+      que su coste real por respuesta es peor que su precio por token
 
 ## Prioridad 3 — Cimientos antes de Shopify
 - [ ] Canal de email: mismo motor de IA, lógica de conversación

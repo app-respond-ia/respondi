@@ -292,12 +292,21 @@ export default function PlanesPage() {
                     <div>
                       <label className="block text-xs font-500 text-ink-600 mb-1.5">Modelo IA asignado</label>
                       <select value={formData.modelo_ia} onChange={e => setFormData({...formData, modelo_ia: e.target.value})} className="w-full h-10 px-3 rounded-lg border border-slate-300 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-100">
-                        {/* Solo modelos de OpenAI: el motor habla únicamente
-                            con su API. Aquí figuraban Claude 3 Haiku y Llama 3,
-                            y elegir cualquiera de los dos dejaba sin IA a todos
-                            los clientes de ese plan, sin ningún aviso. */}
-                        <option value="gpt-4o-mini">GPT-4o mini (rápido y barato)</option>
-                        <option value="gpt-4o">GPT-4o (más capaz, más caro)</option>
+                        {/* Solo modelos de OpenAI y solo los que se ha
+                            comprobado que aceptan las herramientas del motor
+                            (etiquetar, escalar, horario, catálogo). Aquí
+                            figuraban Claude 3 Haiku y Llama 3: elegir
+                            cualquiera de los dos dejaba sin IA a todos los
+                            clientes de ese plan, sin ningún aviso.
+                            Los gpt-5.6 (Luna, Terra, Sol) rechazan las
+                            herramientas salvo que se les pase
+                            reasoning_effort:'none', y gpt-6-astra no admite
+                            ni eso: quedan fuera hasta tocar el motor. */}
+                        <option value="gpt-4.1-nano">GPT-4.1 Nano — el más barato ($0,10 / $0,40)</option>
+                        <option value="gpt-4o-mini">GPT-4o mini — barato ($0,15 / $0,60)</option>
+                        <option value="gpt-4.1-mini">GPT-4.1 mini — intermedio</option>
+                        <option value="gpt-4o">GPT-4o — capaz</option>
+                        <option value="gpt-4.1">GPT-4.1 — el más capaz ($2,00 / $8,00)</option>
                       </select>
                     </div>
                     <div className="col-span-2 grid grid-cols-2 gap-4 p-3 rounded-xl bg-slate-50 border border-slate-200">

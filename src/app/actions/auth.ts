@@ -98,15 +98,29 @@ export async function getInvitacionParaRegistro(id: string) {
     .from('invitaciones_pendientes')
     .select('email, datos, aceptada, tipo')
     .eq('id', id)
-    .eq('tipo', 'admin_trial')
     .eq('aceptada', false)
     .maybeSingle()
 
   if (!data) return null
 
+  const datos = (data.datos as any) || {}
+  let nombre_organizacion: string | null = datos.nombre_organizacion || null
+
+  // A un agente se le invita a una organización que ya existe, así que el
+  // nombre hay que buscarlo; en las de cliente viene en la propia invitación.
+  if (!nombre_organizacion && datos.tenant_id) {
+    const { data: org } = await supabaseAdmin
+      .from('organizaciones')
+      .select('nombre')
+      .eq('id', datos.tenant_id)
+      .maybeSingle()
+    nombre_organizacion = org?.nombre || null
+  }
+
   return {
     email: data.email,
-    nombre_organizacion: (data.datos as any)?.nombre_organizacion || null
+    tipo: data.tipo as 'admin_trial' | 'vendedor' | 'usuario_organizacion',
+    nombre_organizacion
   }
 }
 

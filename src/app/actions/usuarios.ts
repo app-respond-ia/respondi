@@ -128,7 +128,9 @@ export async function invitarUsuario(data: { email: string, nombre: string | nul
 
   const { error: emailError } = await enviarEmailInvitacion({
     email: data.email,
-    actionLink: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/login`,
+    // Mismo motivo que en las de vendedor: quien recibe esto aún no tiene
+    // cuenta, así que /login no le sirve de nada.
+    actionLink: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/registro-trial?inv=${invitacionCreada.id}`,
     rol: 'agente'
   })
 

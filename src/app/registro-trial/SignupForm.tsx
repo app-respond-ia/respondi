@@ -6,7 +6,7 @@ import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
 import { traducirError } from '@/lib/traducirError'
 
-type Invitacion = { email: string, nombre_organizacion: string | null } | null
+type Invitacion = { email: string, tipo: string, nombre_organizacion: string | null } | null
 
 export default function SignupForm({ invitacion = null }: { invitacion?: Invitacion }) {
   const [showPassword, setShowPassword] = useState(false)
@@ -16,9 +16,14 @@ export default function SignupForm({ invitacion = null }: { invitacion?: Invitac
   async function handleSubmit(formData: FormData) {
     const terms = formData.get('terms')
     const risk = formData.get('risk')
+    // El aviso de WhatsApp no se le enseña a un vendedor (él no conecta ningún
+    // número), así que tampoco se le puede exigir que lo acepte.
+    const necesitaAceptarWhatsapp = invitacion?.tipo !== 'vendedor'
 
-    if (!terms || !risk) {
-      setError('Debes aceptar los términos y la conexión de WhatsApp para continuar.')
+    if (!terms || (necesitaAceptarWhatsapp && !risk)) {
+      setError(necesitaAceptarWhatsapp
+        ? 'Debes aceptar los términos y la conexión de WhatsApp para continuar.'
+        : 'Debes aceptar los términos para continuar.')
       return
     }
 
@@ -122,6 +127,7 @@ export default function SignupForm({ invitacion = null }: { invitacion?: Invitac
           </span>
         </label>
 
+        {invitacion?.tipo !== 'vendedor' && (
         <label className="flex items-start gap-3 cursor-pointer select-none rounded-xl border border-amber-200 bg-amber-50 p-3.5">
           <input name="risk" type="checkbox" className="mt-0.5 w-4 h-4 rounded border-amber-300 text-amber-600 focus:ring-amber-400 shrink-0" required />
           <span className="text-sm text-amber-900 leading-relaxed">
@@ -132,6 +138,7 @@ export default function SignupForm({ invitacion = null }: { invitacion?: Invitac
             Durante el trial, WhatsApp se conecta por un método no oficial de Meta. Entiendo y acepto que Meta podría suspender el número sin previo aviso, bajo mi responsabilidad.
           </span>
         </label>
+        )}
 
         {error && <p className="text-red-500 text-sm">{error}</p>}
 

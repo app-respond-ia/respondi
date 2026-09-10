@@ -30,14 +30,14 @@ export default async function RegistroTrialPage({
 
         <div className="relative max-w-md mx-auto text-center">
           <h2 className="font-display font-700 text-3xl leading-tight">
-            {invitacion
-              ? `Te estamos esperando en ${invitacion.nombre_organizacion || 'Respondi'}`
-              : 'Empieza gratis. Sin tarjeta, sin compromiso.'}
+            {!invitacion ? 'Empieza gratis. Sin tarjeta, sin compromiso.'
+              : invitacion.tipo === 'vendedor' ? 'Bienvenido al programa de vendedores'
+              : `Te estamos esperando en ${invitacion.nombre_organizacion || 'Respondi'}`}
           </h2>
           <p className="text-brand-200 mt-4 leading-relaxed">
-            {invitacion
-              ? 'Crea tu contraseña y tendrás la cuenta lista, con la configuración que ya han dejado preparada para ti.'
-              : '14 días para que tu agente de IA atienda a tus clientes y veas el tiempo que recupera para ti.'}
+            {!invitacion ? '14 días para que tu agente de IA atienda a tus clientes y veas el tiempo que recupera para ti.'
+              : invitacion.tipo === 'vendedor' ? 'Crea tu contraseña y tendrás acceso a tu panel: tus clientes, tus comisiones y tus invitaciones.'
+              : 'Crea tu contraseña y tendrás la cuenta lista, con la configuración que ya han dejado preparada para ti.'}
           </p>
 
           <ul className="mt-8 space-y-3 text-left max-w-xs mx-auto">
@@ -81,13 +81,14 @@ export default async function RegistroTrialPage({
             <div className="mb-7">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-100 text-brand-700 text-xs font-600 mb-3">
                 <span className="w-1.5 h-1.5 rounded-full bg-brand-600"></span>
-                {invitacion ? 'Invitación' : '14 días gratis'}
+                {!invitacion ? '14 días gratis' : invitacion.tipo === 'vendedor' ? 'Invitación de vendedor' : 'Invitación'}
               </div>
               <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Crea tu cuenta</h1>
               <p className="text-ink-500 mt-2">
-                {invitacion
-                  ? <>Te estás uniendo a <strong className="text-ink-900">{invitacion.nombre_organizacion || 'Respondi'}</strong>. Solo falta tu contraseña.</>
-                  : 'Activa tu prueba y empieza a atender con IA hoy mismo.'}
+                {!invitacion ? 'Activa tu prueba y empieza a atender con IA hoy mismo.'
+                  : invitacion.tipo === 'vendedor'
+                    ? <>Te has unido como <strong className="text-ink-900">vendedor</strong>. Solo falta tu contraseña.</>
+                    : <>Te estás uniendo a <strong className="text-ink-900">{invitacion.nombre_organizacion || 'Respondi'}</strong>. Solo falta tu contraseña.</>}
               </p>
             </div>
             

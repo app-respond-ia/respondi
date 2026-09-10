@@ -23,7 +23,7 @@ export async function getUsuarios() {
 
   const { data: organizacion, error: comErr } = await supabase
     .from('organizaciones')
-    .select('plan_id, plans(nombre, usuarios_max)')
+    .select('plan_id, plans!plan_id(nombre, usuarios_max)')
     .eq('id', auth.tenant_id)
     .single()
 

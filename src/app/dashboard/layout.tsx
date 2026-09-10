@@ -100,7 +100,7 @@ export default async function DashboardLayout({
   let creditos = null
   if (userData?.tenant_id) {
     const [{ data: org }, { data: quotas }] = await Promise.all([
-      supabase.from('organizaciones').select('trial_activo, plans(creditos_diarios_trial, creditos_mensuales)').eq('id', userData.tenant_id).single(),
+      supabase.from('organizaciones').select('trial_activo, plans!plan_id(creditos_diarios_trial, creditos_mensuales)').eq('id', userData.tenant_id).single(),
       supabase.from('message_quotas').select('saldo').eq('tenant_id', userData.tenant_id).order('timestamp', { ascending: false }).limit(1).maybeSingle()
     ])
     if (org) {

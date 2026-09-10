@@ -21,7 +21,7 @@ export async function getCanales() {
 
   const { data: organizacion } = await supabase
     .from('organizaciones')
-    .select('plan_id, plans(canales_max)')
+    .select('plan_id, plans!plan_id(canales_max)')
     .eq('id', auth.tenant_id)
     .single()
   const plan = Array.isArray(organizacion?.plans) ? organizacion.plans[0] : organizacion?.plans

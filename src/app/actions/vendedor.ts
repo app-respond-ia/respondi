@@ -39,7 +39,7 @@ export async function getVendedorClientes() {
     // requireVendedor() ya autenticó, y filtramos por su propio vendedor_id.
     const { data, error } = await supabaseAdmin
       .from('vendedor_clientes')
-      .select(`*, organizaciones (nombre, estado, plan_id, plans(nombre))`)
+      .select(`*, organizaciones (nombre, estado, plan_id, plans!plan_id(nombre))`)
       .eq('vendedor_id', vendedor.id)
       .order('fecha_vinculacion', { ascending: false })
     if (error) return { success: false, error: error.message }
@@ -125,7 +125,7 @@ export async function getVendedorDashboard() {
     // Mismo motivo que en getVendedorClientes.
     const [{ data: clientes }, { data: comisiones }] = await Promise.all([
       supabaseAdmin.from('vendedor_clientes')
-        .select(`*, organizaciones (nombre, estado, plan_id, plans(nombre, precio_usd))`)
+        .select(`*, organizaciones (nombre, estado, plan_id, plans!plan_id(nombre, precio_usd))`)
         .eq('vendedor_id', vendedor.id),
       supabaseAdmin.from('comisiones')
         .select('tipo, importe, moneda, estado, mes_referencia')

@@ -248,7 +248,7 @@ export default function NuevaSucursalPage() {
       }
       if (!modulo || modulo === 'configuracion_ia') {
         if (d.modo_horario_ia !== undefined) setIaActivaFueraHorario(d.modo_horario_ia === 'siempre_activa')
-        if (d.caso_fuera_horario !== undefined) setCasoFueraHorario(d.caso_fuera_horario)
+        if (d.abrir_caso_fuera_horario !== undefined) setCasoFueraHorario(d.abrir_caso_fuera_horario)
         if (d.msg_fuera_horario) setMsgFueraHorario(d.msg_fuera_horario)
         if (d.idioma_base) setIdiomaBase(d.idioma_base)
         if (d.tono) setTono(d.tono)
@@ -327,7 +327,7 @@ export default function NuevaSucursalPage() {
       idioma_base: idiomaBase,
       tono,
       msg_fuera_horario: msgFueraHorario,
-      caso_fuera_horario: casoFueraHorario,
+      abrir_caso_fuera_horario: casoFueraHorario,
       modo_horario_ia: iaActivaFueraHorario ? 'siempre_activa' : 'mismo_negocio',
       horarios: horarios.flatMap(h => {
         if (h.cerrado) return [{ dia_semana: h.dia_semana, apertura: null, cierre: null, cerrado: true, orden: 0 }] as { dia_semana: number, apertura: string | null, cierre: string | null, cerrado: boolean, orden: number }[]

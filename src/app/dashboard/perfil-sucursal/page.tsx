@@ -70,7 +70,7 @@ export default function PerfilSucursalPage() {
     idioma_base: 'es',
     tono: 'cercano',
     msg_fuera_horario: '',
-    caso_fuera_horario: false,
+    abrir_caso_fuera_horario: false,
     modo_horario_ia: 'mismo_negocio'
   })
   const [horarios, setHorarios] = useState<any[]>([])
@@ -164,7 +164,7 @@ export default function PerfilSucursalPage() {
           idioma_base: resPerfil.data.perfil?.idioma_base || 'es',
           tono: resPerfil.data.perfil?.tono || 'cercano',
           msg_fuera_horario: resPerfil.data.perfil?.msg_fuera_horario || '',
-          caso_fuera_horario: resPerfil.data.perfil?.caso_fuera_horario ?? false,
+          abrir_caso_fuera_horario: resPerfil.data.perfil?.abrir_caso_fuera_horario ?? false,
           modo_horario_ia: resPerfil.data.perfil?.modo_horario_ia || 'mismo_negocio'
         })
       }
@@ -714,13 +714,13 @@ export default function PerfilSucursalPage() {
                   <div className="relative ml-4 shrink-0">
                     <input
                       type="checkbox"
-                      checked={formData.caso_fuera_horario}
-                      onChange={e => setFormData({...formData, caso_fuera_horario: e.target.checked})}
+                      checked={formData.abrir_caso_fuera_horario}
+                      onChange={e => setFormData({...formData, abrir_caso_fuera_horario: e.target.checked})}
                       disabled={nivelPermiso !== 'escritura'}
                       className="peer sr-only"
                     />
-                    <div className={`w-11 h-6 rounded-full transition-colors ${formData.caso_fuera_horario ? 'bg-brand-600' : 'bg-slate-300'} peer-disabled:opacity-50`}></div>
-                    <div className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${formData.caso_fuera_horario ? 'translate-x-5' : 'translate-x-0'}`}></div>
+                    <div className={`w-11 h-6 rounded-full transition-colors ${formData.abrir_caso_fuera_horario ? 'bg-brand-600' : 'bg-slate-300'} peer-disabled:opacity-50`}></div>
+                    <div className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${formData.abrir_caso_fuera_horario ? 'translate-x-5' : 'translate-x-0'}`}></div>
                   </div>
                 </label>
               </div>

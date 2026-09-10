@@ -26,7 +26,7 @@ export async function getPerfilSucursal() {
   // 2. Obtener datos del business_profile
   const { data: businessProfile } = await supabase
     .from('business_profiles')
-    .select('id, servicios, politicas, idioma_base, tono, msg_fuera_horario, caso_fuera_horario, modo_horario_ia')
+    .select('id, servicios, politicas, idioma_base, tono, msg_fuera_horario, abrir_caso_fuera_horario, modo_horario_ia')
     .eq('branch_id', branchId)
     .single()
 
@@ -49,7 +49,7 @@ export async function savePerfilSucursal(data: {
   idioma_base: string, 
   tono: string, 
   msg_fuera_horario: string,
-  caso_fuera_horario: boolean,
+  abrir_caso_fuera_horario: boolean,
   modo_horario_ia: string
 }) {
   if (data.servicios && data.servicios.length > 500) {
@@ -107,7 +107,7 @@ export async function savePerfilSucursal(data: {
         idioma_base: data.idioma_base,
         tono: data.tono,
         msg_fuera_horario: data.msg_fuera_horario,
-        caso_fuera_horario: data.caso_fuera_horario,
+        abrir_caso_fuera_horario: data.abrir_caso_fuera_horario,
         modo_horario_ia: data.modo_horario_ia
       })
       .eq('branch_id', branchId)
@@ -124,7 +124,7 @@ export async function savePerfilSucursal(data: {
         idioma_base: data.idioma_base,
         tono: data.tono,
         msg_fuera_horario: data.msg_fuera_horario,
-        caso_fuera_horario: data.caso_fuera_horario,
+        abrir_caso_fuera_horario: data.abrir_caso_fuera_horario,
         modo_horario_ia: data.modo_horario_ia
       })
       

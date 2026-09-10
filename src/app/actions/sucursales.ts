@@ -343,7 +343,7 @@ export async function getDatosSucursalParaCopiar(branchIdOrigen: string) {
     supabase.from('skills').select('nombre, activo, skill_global_id').eq('branch_id', branchIdOrigen),
     supabase.from('price_list').select('nombre, tipo, precio, precio_tipo, descripcion').eq('branch_id', branchIdOrigen).eq('disponible', true),
     supabase.from('tipos_novedad').select('nombre, icono, color').eq('branch_id', branchIdOrigen).eq('tenant_id', userData.tenant_id),
-    supabase.from('business_profiles').select('servicios, politicas, msg_fuera_horario, idioma_base, tono, caso_fuera_horario, modo_horario_ia').eq('branch_id', branchIdOrigen).maybeSingle()
+    supabase.from('business_profiles').select('servicios, politicas, msg_fuera_horario, idioma_base, tono, abrir_caso_fuera_horario, modo_horario_ia').eq('branch_id', branchIdOrigen).maybeSingle()
   ])
 
   if (!sucursal) return { success: false, error: 'Sucursal no encontrada' }
@@ -363,7 +363,7 @@ export async function getDatosSucursalParaCopiar(branchIdOrigen: string) {
       msg_fuera_horario: businessProfile?.msg_fuera_horario ?? null,
       idioma_base: businessProfile?.idioma_base ?? null,
       tono: businessProfile?.tono ?? null,
-      caso_fuera_horario: businessProfile?.caso_fuera_horario ?? false,
+      abrir_caso_fuera_horario: businessProfile?.abrir_caso_fuera_horario ?? false,
       modo_horario_ia: businessProfile?.modo_horario_ia ?? 'mismo_negocio'
     }
   }
@@ -379,7 +379,7 @@ export async function crearSucursalConDatos(data: {
   idioma_base?: string
   tono?: string
   msg_fuera_horario?: string
-  caso_fuera_horario?: boolean
+  abrir_caso_fuera_horario?: boolean
   modo_horario_ia?: string
   horarios?: { dia_semana: number, apertura: string | null, cierre: string | null, cerrado: boolean, orden: number }[]
   skills?: { idName?: string, skill_global_id: string, nombre: string, activo: boolean }[]
@@ -450,7 +450,7 @@ export async function crearSucursalConDatos(data: {
         idioma_base: data.idioma_base || 'es',
         tono: data.tono || 'cercano',
         msg_fuera_horario: data.msg_fuera_horario || null,
-        caso_fuera_horario: data.caso_fuera_horario ?? false,
+        abrir_caso_fuera_horario: data.abrir_caso_fuera_horario ?? false,
         modo_horario_ia: data.modo_horario_ia || 'mismo_negocio'
       }).then(({ error }) => {
         if (error) return registrarError({ origen: 'app', descripcion: 'Fallo al crear business_profiles durante alta de sucursal', stacktrace: error.message, tenant_id: userData!.tenant_id })

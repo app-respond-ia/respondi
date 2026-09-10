@@ -2,7 +2,8 @@
 import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
-import { getVendedorClientes, actualizarClienteSeguimiento } from '@/app/actions/vendedor'
+import { getVendedorClientes, actualizarClienteSeguimiento, getInvitacionesVendedor, reenviarInvitacionCliente, cancelarInvitacionCliente } from '@/app/actions/vendedor'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { useToast } from '@/components/ui/Toast'
 
 const ESTADOS = ['trial', 'negociacion', 'activo', 'en_riesgo', 'perdido'] as const
@@ -24,14 +25,37 @@ export default function VendedorClientesPage() {
   const [editEstado, setEditEstado] = useState<EstadoSeguimiento>('trial')
   const [editNotas, setEditNotas] = useState('')
   const [saving, setSaving] = useState(false)
+  const [invitaciones, setInvitaciones] = useState<any[]>([])
+  const [invitacionACancelar, setInvitacionACancelar] = useState<any>(null)
+  const [accionInvitacion, setAccionInvitacion] = useState<string | null>(null)
   const { showToast } = useToast()
   useEffect(() => { cargar() }, [])
 
   const cargar = async () => {
     setLoading(true)
-    const res = await getVendedorClientes()
+    const [res, resInv] = await Promise.all([getVendedorClientes(), getInvitacionesVendedor()])
     if (res.success && res.clientes) setClientes(res.clientes)
+    if (resInv.success && resInv.invitaciones) setInvitaciones(resInv.invitaciones)
     setLoading(false)
+  }
+
+  const handleReenviar = async (inv: any) => {
+    setAccionInvitacion(inv.id)
+    const res = await reenviarInvitacionCliente(inv.id)
+    showToast(res.success ? `Invitación reenviada a ${inv.email} ✓` : (res.error || 'Error al reenviar'), res.success ? 'success' : 'error')
+    setAccionInvitacion(null)
+  }
+
+  const handleCancelar = async () => {
+    if (!invitacionACancelar) return
+    const res = await cancelarInvitacionCliente(invitacionACancelar.id)
+    if (res.success) {
+      setInvitaciones(prev => prev.filter(i => i.id !== invitacionACancelar.id))
+      showToast('Invitación cancelada ✓', 'success')
+    } else {
+      showToast(res.error || 'Error al cancelar', 'error')
+    }
+    setInvitacionACancelar(null)
   }
 
   const openModal = (c: any) => {
@@ -60,6 +84,8 @@ export default function VendedorClientesPage() {
   const clientesFiltrados = filtroEstado
     ? clientes.filter(c => c.estado_seguimiento === filtroEstado)
     : clientes
+
+  const invitacionesAbiertas = invitaciones.filter(i => !i.aceptada)
 
   const formatFecha = (d: string) => new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })
 
@@ -94,6 +120,41 @@ export default function VendedorClientesPage() {
           )
         })}
       </div>
+
+      {/* Invitaciones enviadas que aún no se han registrado */}
+      {invitacionesAbiertas.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200">
+          <div className="px-5 py-4 border-b border-slate-100">
+            <h2 className="font-600 text-ink-900">Invitaciones enviadas</h2>
+            <p className="text-sm text-ink-500 mt-0.5">Todavía no se han dado de alta. Aparecerán arriba como clientes en cuanto se registren.</p>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {invitacionesAbiertas.map(inv => (
+              <div key={inv.id} className="flex items-center gap-4 p-4 flex-wrap">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-600 text-ink-900 text-sm">{inv.nombre_organizacion || 'Sin nombre'}</p>
+                    <span className={`text-[10px] font-600 px-1.5 py-0.5 rounded ${inv.estado === 'caducada' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+                      {inv.estado === 'caducada' ? 'Caducada' : 'Pendiente'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-ink-500 mt-0.5 truncate">{inv.email} · enviada el {formatFecha(inv.created_at)}</p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button type="button" onClick={() => handleReenviar(inv)} disabled={accionInvitacion === inv.id}
+                    className="px-3 h-9 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-600 text-ink-700 transition disabled:opacity-50">
+                    {accionInvitacion === inv.id ? 'Enviando...' : 'Reenviar'}
+                  </button>
+                  <button type="button" onClick={() => setInvitacionACancelar(inv)}
+                    className="px-3 h-9 rounded-lg border border-slate-200 bg-white hover:bg-red-50 hover:text-red-600 hover:border-red-200 text-xs font-600 text-ink-700 transition">
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Lista */}
       <div className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100">
@@ -179,6 +240,17 @@ export default function VendedorClientesPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={!!invitacionACancelar}
+        title="Cancelar invitación"
+        message={`Se eliminará la invitación enviada a ${invitacionACancelar?.email || ''}. Si esa persona intenta registrarse después, se le creará una cuenta sin vincular a ti.`}
+        confirmText="Cancelar invitación"
+        cancelText="Volver"
+        type="danger"
+        onConfirm={handleCancelar}
+        onClose={() => setInvitacionACancelar(null)}
+      />
     </div>
   )
 }

@@ -2,17 +2,19 @@
 import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
-import { getVendedorDashboard } from '@/app/actions/vendedor'
+import { getVendedorDashboard, getEmbudoVendedor } from '@/app/actions/vendedor'
 import { traducirError } from '@/lib/traducirError'
 
 export default function VendedorDashboard() {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [embudo, setEmbudo] = useState<any>(null)
 
   useEffect(() => {
     const cargar = async () => {
-      const res = await getVendedorDashboard()
+      const [res, resEmbudo] = await Promise.all([getVendedorDashboard(), getEmbudoVendedor()])
+      if (resEmbudo.success) setEmbudo(resEmbudo.embudo)
       if (res.success && res.data) {
         setData(res.data)
       } else {
@@ -69,6 +71,42 @@ export default function VendedorDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Embudo de captación */}
+      {embudo && embudo.enviadas > 0 && (
+        <div>
+          <h2 className="font-600 text-sm text-ink-500 uppercase tracking-wide mb-3">Tu embudo de captación</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="bg-white rounded-2xl border border-slate-200 p-5">
+              <p className="text-sm text-ink-500 mb-1">Invitaciones enviadas</p>
+              <p className="font-display font-700 text-3xl text-ink-900">{embudo.enviadas}</p>
+              {embudo.pendientes > 0 && (
+                <p className="text-xs text-amber-600 mt-1">{embudo.pendientes} sin registrar</p>
+              )}
+              {embudo.caducadas > 0 && (
+                <p className="text-xs text-red-600 mt-0.5">{embudo.caducadas} caducadas</p>
+              )}
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-200 p-5">
+              <p className="text-sm text-ink-500 mb-1">Se registraron</p>
+              <p className="font-display font-700 text-3xl text-ink-900">{embudo.registradas}</p>
+              <p className="text-xs text-ink-400 mt-1">{embudo.tasaRegistro}% de las enviadas</p>
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-200 p-5">
+              <p className="text-sm text-ink-500 mb-1">Clientes activos</p>
+              <p className="font-display font-700 text-3xl text-emerald-600">{embudo.activas}</p>
+              <p className="text-xs text-ink-400 mt-1">{embudo.tasaConversion}% de los registrados</p>
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-200 p-5">
+              <p className="text-sm text-ink-500 mb-1">Cierre total</p>
+              <p className="font-display font-700 text-3xl text-ink-900">
+                {embudo.enviadas > 0 ? Math.round((embudo.activas / embudo.enviadas) * 100) : 0}%
+              </p>
+              <p className="text-xs text-ink-400 mt-1">de invitación a cliente activo</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Métricas de comisiones */}
       <div>

@@ -6,6 +6,7 @@ import { registrarAuditoria } from '@/lib/auditoria'
 import { crearNotificacion, notificarATodosLosSuperadmins } from '@/lib/notificaciones'
 import { registrarError } from '@/lib/errores'
 import { enviarEmailInvitacion } from '@/lib/email'
+import { emailValido, normalizarEmail, estadoInvitacion, calcularEmbudo } from '@/lib/invitaciones'
 
 async function requireVendedor() {
   const supabase = await createClient()
@@ -28,6 +29,134 @@ async function requireVendedor() {
 
   if (!vendedor) throw new Error('Vendedor no encontrado')
   return { supabase, vendedor, userId: user.id, avatarUrl: userData.avatar_url, apodo: userData.apodo, color: userData.color }
+}
+
+// Invitaciones de cliente enviadas por este vendedor, con su estado.
+// Hasta ahora no había forma de verlas: una invitación no aparece en ningún
+// sitio hasta que la persona se registra, así que un email mal escrito se
+// perdía sin dejar rastro visible.
+export async function getInvitacionesVendedor() {
+  try {
+    const { vendedor } = await requireVendedor()
+
+    // RLS de invitaciones_pendientes es solo para super_admin; filtramos por
+    // el vendedor_id que guarda la propia invitación en `datos`.
+    const { data, error } = await supabaseAdmin
+      .from('invitaciones_pendientes')
+      .select('id, email, tipo, datos, aceptada, created_at')
+      .eq('tipo', 'admin_trial')
+      .eq('datos->>vendedor_id', vendedor.id)
+      .order('created_at', { ascending: false })
+
+    if (error) return { success: false, error: error.message }
+
+    const invitaciones = (data || []).map(inv => ({
+      ...inv,
+      nombre_organizacion: (inv.datos as any)?.nombre_organizacion || null,
+      estado: estadoInvitacion(inv)
+    }))
+
+    return { success: true, invitaciones }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
+
+// Embudo de captación del vendedor: invitaciones enviadas -> altas
+// registradas -> clientes activos, con sus tasas.
+export async function getEmbudoVendedor() {
+  try {
+    const { vendedor } = await requireVendedor()
+
+    const [{ data: invitaciones }, { data: clientes }] = await Promise.all([
+      supabaseAdmin.from('invitaciones_pendientes')
+        .select('aceptada, created_at')
+        .eq('tipo', 'admin_trial')
+        .eq('datos->>vendedor_id', vendedor.id),
+      supabaseAdmin.from('vendedor_clientes')
+        .select('estado_seguimiento, organizaciones(estado)')
+        .eq('vendedor_id', vendedor.id)
+    ])
+
+    return { success: true, embudo: calcularEmbudo(invitaciones || [], clientes || []) }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
+
+export async function reenviarInvitacionCliente(invitacionId: string) {
+  try {
+    const { vendedor } = await requireVendedor()
+
+    const { data: inv } = await supabaseAdmin
+      .from('invitaciones_pendientes')
+      .select('id, email, datos, aceptada')
+      .eq('id', invitacionId)
+      .single()
+
+    if (!inv || (inv.datos as any)?.vendedor_id !== vendedor.id) {
+      return { success: false, error: 'Invitación no encontrada.' }
+    }
+    if (inv.aceptada) return { success: false, error: 'Esa invitación ya fue aceptada.' }
+
+    const { error: emailError } = await enviarEmailInvitacion({
+      email: inv.email,
+      actionLink: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/registro-trial`,
+      rol: 'tenant_user'
+    })
+
+    if (emailError) {
+      await registrarError({
+        origen: 'app',
+        descripcion: 'Fallo al reenviar invitación de cliente',
+        stacktrace: JSON.stringify(emailError)
+      })
+      return { success: false, error: 'No se pudo enviar el email. Revisa la configuración de correo.' }
+    }
+
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
+
+export async function cancelarInvitacionCliente(invitacionId: string) {
+  try {
+    const { vendedor, userId } = await requireVendedor()
+
+    const { data: inv } = await supabaseAdmin
+      .from('invitaciones_pendientes')
+      .select('id, email, datos, aceptada')
+      .eq('id', invitacionId)
+      .single()
+
+    if (!inv || (inv.datos as any)?.vendedor_id !== vendedor.id) {
+      return { success: false, error: 'Invitación no encontrada.' }
+    }
+    if (inv.aceptada) {
+      return { success: false, error: 'Esa invitación ya fue aceptada, no se puede cancelar.' }
+    }
+
+    const { error } = await supabaseAdmin
+      .from('invitaciones_pendientes')
+      .delete()
+      .eq('id', invitacionId)
+
+    if (error) return { success: false, error: error.message }
+
+    await registrarAuditoria({
+      tenant_id: null,
+      user_id: userId,
+      accion: `el vendedor "${vendedor.nombre}" canceló la invitación a "${inv.email}"`,
+      tabla_afectada: 'invitaciones_pendientes',
+      registro_id: invitacionId,
+      valor_anterior: inv
+    })
+
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
 }
 
 export async function getVendedorClientes() {
@@ -158,17 +287,40 @@ export async function crearCuentaTrial(data: {
   nombre_admin?: string
 }) {
   try {
-    const { supabase, vendedor } = await requireVendedor()
-    // Usar supabaseAdmin importado estáticamente para crear usuarios
+    const { vendedor } = await requireVendedor()
+
+    if (!data.nombre_organizacion?.trim()) {
+      return { success: false, error: 'El nombre del negocio es obligatorio.' }
+    }
+    if (!emailValido(data.email_admin)) {
+      return { success: false, error: 'El email no tiene un formato válido. Revísalo antes de enviar la invitación.' }
+    }
+
+    const email = normalizarEmail(data.email_admin)
+
+    // Sin esto se podían crear invitaciones duplicadas para el mismo email,
+    // o invitar a alguien que ya tiene cuenta (la invitación no se usaría nunca).
+    const { data: yaRegistrado } = await supabaseAdmin
+      .from('users').select('id').eq('email', email).maybeSingle()
+    if (yaRegistrado) {
+      return { success: false, error: 'Ese email ya tiene una cuenta en Respondi.' }
+    }
+
+    const { data: yaInvitado } = await supabaseAdmin
+      .from('invitaciones_pendientes')
+      .select('id').eq('email', email).eq('aceptada', false).maybeSingle()
+    if (yaInvitado) {
+      return { success: false, error: 'Ya hay una invitación pendiente para ese email.' }
+    }
 
     const { data: invitacionCreada, error: invitacionError } = await supabaseAdmin
       .from('invitaciones_pendientes')
       .insert({
-        email: data.email_admin,
+        email,
         tipo: 'admin_trial',
         datos: {
           nombre: data.nombre_admin || null,
-          nombre_organizacion: data.nombre_organizacion,
+          nombre_organizacion: data.nombre_organizacion.trim(),
           vendedor_id: vendedor.id
         },
         creado_por: vendedor.user_id
@@ -181,7 +333,7 @@ export async function crearCuentaTrial(data: {
     }
 
     const { error: emailError } = await enviarEmailInvitacion({
-      email: data.email_admin,
+      email,
       actionLink: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/registro-trial`,
       rol: 'tenant_user'
     })
@@ -200,7 +352,7 @@ export async function crearCuentaTrial(data: {
       accion: `el vendedor "${vendedor.nombre}" invitó a crear la cuenta trial "${data.nombre_organizacion}"`,
       tabla_afectada: 'invitaciones_pendientes',
       registro_id: invitacionCreada.id,
-      valor_nuevo: { email: data.email_admin, nombre_organizacion: data.nombre_organizacion }
+      valor_nuevo: { email, nombre_organizacion: data.nombre_organizacion }
     })
 
     return { success: true, pendiente: true }

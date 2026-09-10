@@ -46,6 +46,22 @@ export default async function DashboardLayout({
 
   if (userData.rol === 'vendedor') redirect('/vendedor')
 
+  // El middleware ya obliga a terminar el onboarding, pero su redirección
+  // sobre las peticiones de Server Actions dejaba al usuario atrapado en una
+  // pantalla del panel cuyos datos nunca llegaban. Repetimos aquí la misma
+  // comprobación para sacarlo antes de que se pinte nada.
+  if (userData.rol === 'tenant_user' && userData.tenant_id) {
+    const { data: primeraSucursal } = await supabase
+      .from('sucursales')
+      .select('onboarding_completado')
+      .eq('tenant_id', userData.tenant_id)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .single()
+
+    if (!primeraSucursal?.onboarding_completado) redirect('/onboarding')
+  }
+
   const permisosRes = await getMisPermisos()
   const esAdmin = (permisosRes.success && (permisosRes as any).esAdmin) || false
   const permisos = (permisosRes.success && permisosRes.data) ? permisosRes.data : []

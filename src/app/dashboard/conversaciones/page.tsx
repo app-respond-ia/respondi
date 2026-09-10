@@ -1,5 +1,6 @@
 'use client'
 import Loading from '@/components/Loading'
+import { ErrorCarga } from '@/components/ui/ErrorCarga'
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
@@ -14,6 +15,7 @@ export default function ConversacionesPage() {
   const isFirstMount = useRef(true)
   const [isFetching, setIsFetching] = useState(false)
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
+  const [errorCarga, setErrorCarga] = useState(false)
   
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -77,6 +79,7 @@ export default function ConversacionesPage() {
 
       if (res.success) setConversaciones(res.data || [])
 
+      if (!permisosRes.success) setErrorCarga(true)
       if (permisosRes.success) {
         if ((permisosRes as any).esAdmin) {
           setNivelPermiso('escritura')
@@ -92,7 +95,7 @@ export default function ConversacionesPage() {
       }
       setIsFetching(false)
     }
-    cargar()
+    cargar().catch(() => setErrorCarga(true))
   }, [estadoFilter, canalFilter, debouncedSearch, iaPausada, dateRange, sortOrder])
 
   const getCanalIcon = (canal: string) => {
@@ -126,6 +129,8 @@ export default function ConversacionesPage() {
     }
     return d.toLocaleDateString([], { day: 'numeric', month: 'short' })
   }
+
+  if (errorCarga) return <ErrorCarga />
 
   if (loading || nivelPermiso === null) {
     return <Loading />

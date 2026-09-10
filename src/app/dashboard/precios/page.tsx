@@ -1,5 +1,6 @@
 'use client'
 import Loading from '@/components/Loading'
+import { ErrorCarga } from '@/components/ui/ErrorCarga'
 
 import { useState, useEffect } from 'react'
 import { getPrecios, crearPrecio, actualizarPrecio, eliminarPrecio, importarPreciosMasivo, PrecioData } from '@/app/actions/precios'
@@ -14,6 +15,7 @@ export default function ListaPreciosPage() {
   const [items, setItems] = useState<any[]>([])
   const [filtroTipo, setFiltroTipo] = useState<'todos' | 'producto' | 'servicio'>('todos')
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
+  const [errorCarga, setErrorCarga] = useState(false)
   
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -61,6 +63,7 @@ export default function ListaPreciosPage() {
     }
 
     const permisosRes = await getMisPermisos()
+    if (!permisosRes.success) setErrorCarga(true)
     if (permisosRes.success) {
       if ((permisosRes as any).esAdmin) {
         setNivelPermiso('escritura')
@@ -74,8 +77,8 @@ export default function ListaPreciosPage() {
   }
 
   useEffect(() => {
-    cargar()
-    cargarCategorias()
+    cargar().catch(() => setErrorCarga(true))
+    cargarCategorias().catch(() => setErrorCarga(true))
   }, [])
 
   const itemsFiltrados = items.filter(item => {
@@ -446,6 +449,8 @@ export default function ListaPreciosPage() {
     if (item.precio_tipo === 'desde') return `Desde ${numeroStr}`
     return numeroStr
   }
+
+  if (errorCarga) return <ErrorCarga />
 
   if (loading || nivelPermiso === null) {
     return <Loading />

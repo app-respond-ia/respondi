@@ -1,5 +1,6 @@
 'use client'
 import Loading from '@/components/Loading'
+import { ErrorCarga } from '@/components/ui/ErrorCarga'
 
 import { useState, useEffect } from 'react'
 import {
@@ -81,6 +82,7 @@ export default function ContactosPage() {
   
   const { showToast } = useToast()
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
+  const [errorCarga, setErrorCarga] = useState(false)
   
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -121,6 +123,7 @@ export default function ContactosPage() {
       setContactos(contactosRes.data)
     }
 
+    if (!permisosRes.success) setErrorCarga(true)
     if (permisosRes.success) {
       if ((permisosRes as any).esAdmin) {
         setNivelPermiso('escritura')
@@ -134,7 +137,7 @@ export default function ContactosPage() {
   }
 
   useEffect(() => {
-    cargar()
+    cargar().catch(() => setErrorCarga(true))
   }, [])
 
   // Limpiar filtro modo si se selecciona 'normales'
@@ -244,6 +247,8 @@ export default function ContactosPage() {
     const pasaModo = filtroModo === 'todos' || c.modo === filtroModo
     return pasaTrato && pasaModo
   })
+
+  if (errorCarga) return <ErrorCarga />
 
   if (loading || nivelPermiso === null) {
     return <Loading />

@@ -1,5 +1,6 @@
 'use client'
 import Loading from '@/components/Loading'
+import { ErrorCarga } from '@/components/ui/ErrorCarga'
 
 import { useState, useEffect } from 'react'
 import { getAuditLog } from '@/app/actions/audit-log'
@@ -12,6 +13,7 @@ export default function AuditLogPage() {
   const [loading, setLoading] = useState(true)
   const [errorMsg, setErrorMsg] = useState('')
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
+  const [errorCarga, setErrorCarga] = useState(false)
 
   const [busqueda, setBusqueda] = useState('')
   const [filtroUser, setFiltroUser] = useState('todos')
@@ -20,7 +22,7 @@ export default function AuditLogPage() {
   const [fechaFin, setFechaFin] = useState('')
 
   useEffect(() => {
-    cargarDatos()
+    cargarDatos().catch(() => setErrorCarga(true))
   }, [fechaInicio, fechaFin])
 
   const cargarDatos = async () => {
@@ -33,6 +35,7 @@ export default function AuditLogPage() {
       getMisPermisos()
     ])
     
+    if (!permisosRes.success) setErrorCarga(true)
     if (permisosRes.success) {
       if ((permisosRes as any).esAdmin) {
         setNivelPermiso('escritura')
@@ -189,6 +192,8 @@ export default function AuditLogPage() {
     if (!agrupadas[group]) agrupadas[group] = []
     agrupadas[group].push(e)
   })
+
+  if (errorCarga) return <ErrorCarga />
 
   if (loading || nivelPermiso === null) {
     return <Loading />

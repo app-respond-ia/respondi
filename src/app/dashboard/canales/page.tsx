@@ -1,5 +1,6 @@
 'use client'
 import Loading from '@/components/Loading'
+import { ErrorCarga } from '@/components/ui/ErrorCarga'
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
@@ -27,6 +28,7 @@ export default function CanalesPage() {
   const [loading, setLoading] = useState(true)
   const [canales, setCanales] = useState<Canal[]>([])
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
+  const [errorCarga, setErrorCarga] = useState(false)
   const [canalesMax, setCanalesMax] = useState<number | null>(null)
   const [canalesActivosCount, setCanalesActivosCount] = useState<number>(0)
   const { showToast } = useToast()
@@ -55,6 +57,7 @@ export default function CanalesPage() {
     }
 
     const permisosRes = await getMisPermisos()
+    if (!permisosRes.success) setErrorCarga(true)
     if (permisosRes.success) {
       if ((permisosRes as any).esAdmin) {
         setNivelPermiso('escritura')
@@ -68,7 +71,7 @@ export default function CanalesPage() {
   }
 
   useEffect(() => {
-    cargar()
+    cargar().catch(() => setErrorCarga(true))
   }, [])
 
   const limitReached = canalesMax !== null && canalesActivosCount >= canalesMax
@@ -128,6 +131,8 @@ export default function CanalesPage() {
     }
     setCanalADesconectar(null)
   }
+
+  if (errorCarga) return <ErrorCarga />
 
   if (loading || nivelPermiso === null) {
     return <Loading />

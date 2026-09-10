@@ -1,5 +1,6 @@
 'use client'
 import Loading from '@/components/Loading'
+import { ErrorCarga } from '@/components/ui/ErrorCarga'
 
 import { useState, useEffect } from 'react'
 import { getMisPermisos } from '@/app/actions/permisos'
@@ -10,16 +11,18 @@ export default function SkillsPage() {
   const [loading, setLoading] = useState(true)
   const [items, setItems] = useState<any[]>([])
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
+  const [errorCarga, setErrorCarga] = useState(false)
   const [branchId, setBranchId] = useState<string | null>(null)
   const [tenantId, setTenantId] = useState<string | null>(null)
   const { showToast } = useToast()
 
-  useEffect(() => { cargar() }, [])
+  useEffect(() => { cargar().catch(() => setErrorCarga(true)) }, [])
 
   const cargar = async () => {
     setLoading(true)
     const permisosRes = await getMisPermisos()
 
+    if (!permisosRes.success) setErrorCarga(true)
     if (permisosRes.success) {
       if ((permisosRes as any).esAdmin) {
         setNivelPermiso('escritura')
@@ -54,6 +57,8 @@ export default function SkillsPage() {
       showToast(res.error || 'Error al actualizar', 'error')
     }
   }
+
+  if (errorCarga) return <ErrorCarga />
 
   if (loading || nivelPermiso === null) {
     return <Loading />

@@ -1,5 +1,6 @@
 'use client'
 import Loading from '@/components/Loading'
+import { ErrorCarga } from '@/components/ui/ErrorCarga'
 import Link from 'next/link'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
@@ -91,6 +92,7 @@ export default function NovedadesManager() {
   const [tipos, setTipos] = useState<TipoNovedadData[]>([])
   const [filtro, setFiltro] = useState<'vigentes' | 'expiradas' | 'todas'>('vigentes')
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
+  const [errorCarga, setErrorCarga] = useState(false)
   
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -132,6 +134,7 @@ export default function NovedadesManager() {
       setItems(resNovedades.data)
     }
 
+    if (!permisosRes.success) setErrorCarga(true)
     if (permisosRes.success) {
       if ((permisosRes as any).esAdmin) {
         setNivelPermiso('escritura')
@@ -145,7 +148,7 @@ export default function NovedadesManager() {
   }
 
   useEffect(() => {
-    cargar()
+    cargar().catch(() => setErrorCarga(true))
   }, [])
 
   const openAñadir = () => {
@@ -246,6 +249,8 @@ export default function NovedadesManager() {
     }
     setSaving(false)
   }
+
+  if (errorCarga) return <ErrorCarga />
 
   if (loading || nivelPermiso === null) {
     return <Loading />

@@ -1,5 +1,6 @@
 'use client'
 import Loading from '@/components/Loading'
+import { ErrorCarga } from '@/components/ui/ErrorCarga'
 import Link from 'next/link'
 
 import { useState, useEffect, useMemo } from 'react'
@@ -60,6 +61,7 @@ export default function PerfilSucursalPage() {
   const [saving, setSaving] = useState(false)
   const { showToast } = useToast()
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
+  const [errorCarga, setErrorCarga] = useState(false)
 
   const [formData, setFormData] = useState({
     nombreSucursal: '',
@@ -145,6 +147,7 @@ export default function PerfilSucursalPage() {
           getMisPermisos()
         ])
       
+      if (!permisosRes.success) setErrorCarga(true)
       if (permisosRes.success) {
         if ((permisosRes as any).esAdmin) {
           setNivelPermiso('escritura')
@@ -192,6 +195,7 @@ export default function PerfilSucursalPage() {
       }
       } catch (error) {
         console.error("Error al cargar datos del perfil:", error)
+        setErrorCarga(true)
       } finally {
         setLoading(false)
       }
@@ -282,6 +286,8 @@ export default function PerfilSucursalPage() {
     }
     setSaving(false)
   }
+
+  if (errorCarga) return <ErrorCarga />
 
   if (loading || nivelPermiso === null) {
     return <Loading />

@@ -1,5 +1,6 @@
 'use client'
 import Loading from '@/components/Loading'
+import { ErrorCarga } from '@/components/ui/ErrorCarga'
 
 import { useState, useEffect } from 'react'
 import { getRolesPersonalizados, crearRolPersonalizado, actualizarRolPersonalizado, eliminarRolPersonalizado } from '@/app/actions/roles'
@@ -52,6 +53,7 @@ export default function RolesPage() {
   const [roles, setRoles] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
+  const [errorCarga, setErrorCarga] = useState(false)
   const [myLevel, setMyLevel] = useState<number>(5)
   const { showToast } = useToast()
   const [searchQuery, setSearchQuery] = useState('')
@@ -67,7 +69,7 @@ export default function RolesPage() {
   const [nivel, setNivel] = useState(5)
   const [permisos, setPermisos] = useState<PermisoUI[]>(SECCIONES_DEFAULT)
 
-  useEffect(() => { cargar() }, [])
+  useEffect(() => { cargar().catch(() => setErrorCarga(true)) }, [])
 
   const cargar = async () => {
     setLoading(true)
@@ -76,6 +78,7 @@ export default function RolesPage() {
       getMisPermisos()
     ])
     if (resRoles.success && resRoles.data) setRoles(resRoles.data)
+    if (!permisosRes.success) setErrorCarga(true)
     if (permisosRes.success) {
       if ((permisosRes as any).esAdmin) {
         setNivelPermiso('escritura')
@@ -171,6 +174,8 @@ export default function RolesPage() {
     if (lectura > 0) parts.push(`${lectura} lectura`)
     return parts.join(' · ')
   }
+
+  if (errorCarga) return <ErrorCarga />
 
   if (loading || nivelPermiso === null) {
     return <Loading />

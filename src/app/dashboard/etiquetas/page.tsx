@@ -1,5 +1,6 @@
 'use client'
 import Loading from '@/components/Loading'
+import { ErrorCarga } from '@/components/ui/ErrorCarga'
 
 import { useState, useEffect } from 'react'
 import {
@@ -185,6 +186,7 @@ export default function EtiquetasPage() {
   const [filtro, setFiltro] = useState<'todas' | 'activas' | 'inactivas'>('todas')
   const [activeId, setActiveId] = useState<string | null>(null)
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
+  const [errorCarga, setErrorCarga] = useState(false)
   
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -216,6 +218,7 @@ export default function EtiquetasPage() {
     }
 
     const permisosRes = await getMisPermisos()
+    if (!permisosRes.success) setErrorCarga(true)
     if (permisosRes.success) {
       if ((permisosRes as any).esAdmin) {
         setNivelPermiso('escritura')
@@ -229,7 +232,7 @@ export default function EtiquetasPage() {
   }
 
   useEffect(() => {
-    cargar()
+    cargar().catch(() => setErrorCarga(true))
   }, [])
 
   const openAñadir = () => {
@@ -342,6 +345,8 @@ export default function EtiquetasPage() {
     }
     setSaving(false)
   }
+
+  if (errorCarga) return <ErrorCarga />
 
   if (loading || nivelPermiso === null) {
     return <Loading />

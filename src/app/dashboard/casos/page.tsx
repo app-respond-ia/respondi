@@ -1,5 +1,6 @@
 'use client'
 import Loading from '@/components/Loading'
+import { ErrorCarga } from '@/components/ui/ErrorCarga'
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
@@ -15,6 +16,7 @@ export default function CasosPage() {
   const [isFetching, setIsFetching] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
+  const [errorCarga, setErrorCarga] = useState(false)
   
   const [agentesOpciones, setAgentesOpciones] = useState<any[]>([])
   const [agentesFilter, setAgentesFilter] = useState<string[]>([])
@@ -91,6 +93,7 @@ export default function CasosPage() {
 
       if (res.success) setCasos(res.data || [])
 
+      if (!permisosRes.success) setErrorCarga(true)
       if (permisosRes.success) {
         if ((permisosRes as any).esAdmin) {
           setNivelPermiso('escritura')
@@ -105,7 +108,7 @@ export default function CasosPage() {
       }
       setIsFetching(false)
     }
-    cargar()
+    cargar().catch(() => setErrorCarga(true))
   }, [estadoFilter, canalFilter, debouncedSearch, agentesFilter, dateRange, sortOrder])
 
   const getCanalIcon = (canal: string) => {
@@ -173,6 +176,8 @@ export default function CasosPage() {
       default: return 'bg-blue-50 text-blue-700 ring-blue-200'
     }
   }
+
+  if (errorCarga) return <ErrorCarga />
 
   if (loading || nivelPermiso === null) {
     return <Loading />

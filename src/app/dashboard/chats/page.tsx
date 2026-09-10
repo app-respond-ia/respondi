@@ -1,5 +1,6 @@
 'use client'
 import Loading from '@/components/Loading'
+import { ErrorCarga } from '@/components/ui/ErrorCarga'
 
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
@@ -54,6 +55,7 @@ function ChatsContent() {
   const [etiquetasTenant, setEtiquetasTenant] = useState<any[]>([])
   const [agentFilterSearch, setAgentFilterSearch] = useState('')
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
+  const [errorCarga, setErrorCarga] = useState(false)
   
   // Contexto adicional
   const [contexto, setContexto] = useState<any>(null)
@@ -158,6 +160,7 @@ function ChatsContent() {
       showToast(res.error || 'Error al cargar chats', 'error')
     }
 
+    if (!permisosRes.success) setErrorCarga(true)
     if (permisosRes.success) {
       if ((permisosRes as any).esAdmin) {
         setNivelPermiso('escritura')
@@ -187,7 +190,7 @@ function ChatsContent() {
   }
 
   useEffect(() => {
-    cargarConversaciones()
+    cargarConversaciones().catch(() => setErrorCarga(true))
   }, [filtroActivo, debouncedSearch, canalFilter, iaFilter, casoFilter, asignadosAMi, agentesIds, etiquetasIds, dateRange, sortOrder])
 
   useEffect(() => {
@@ -450,6 +453,8 @@ function ChatsContent() {
   }
 
   const selectedConv = conversaciones.find(c => c.id === selectedConvId)
+
+  if (errorCarga) return <ErrorCarga />
 
   if (loadingChats || nivelPermiso === null) {
     return <Loading />

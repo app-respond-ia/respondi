@@ -1,5 +1,6 @@
 'use client'
 import Loading from '@/components/Loading'
+import { ErrorCarga } from '@/components/ui/ErrorCarga'
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
@@ -16,6 +17,7 @@ export default function SucursalesPage() {
   const [sucursalesActivasCount, setSucursalesActivasCount] = useState<number>(0)
   const { showToast } = useToast()
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
+  const [errorCarga, setErrorCarga] = useState(false)
   // CAMBIO 6: Modal de confirmación para desactivar
   const [confirmarDesactivar, setConfirmarDesactivar] = useState<any | null>(null)
 
@@ -33,6 +35,7 @@ export default function SucursalesPage() {
       getMisPermisos()
     ])
 
+    if (!permisosRes.success) setErrorCarga(true)
     if (permisosRes.success) {
       if ((permisosRes as any).esAdmin) {
         setNivelPermiso('escritura')
@@ -53,7 +56,7 @@ export default function SucursalesPage() {
   }
 
   useEffect(() => {
-    cargar()
+    cargar().catch(() => setErrorCarga(true))
   }, [])
 
   const handleOpenModal = () => {
@@ -105,6 +108,8 @@ export default function SucursalesPage() {
       showToast(res.error || 'Error al desactivar la sucursal', 'error')
     }
   }
+
+  if (errorCarga) return <ErrorCarga />
 
   if (loading || nivelPermiso === null) {
     return <Loading />

@@ -1,5 +1,6 @@
 'use client'
 import Loading from '@/components/Loading'
+import { ErrorCarga } from '@/components/ui/ErrorCarga'
 
 import { useState, useEffect } from 'react'
 import {
@@ -26,6 +27,7 @@ export default function UsuariosPage() {
 
   const { showToast } = useToast()
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
+  const [errorCarga, setErrorCarga] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterRol, setFilterRol] = useState<string>('todos')
   const [filterEstado, setFilterEstado] = useState<string>('todos')
@@ -56,6 +58,7 @@ export default function UsuariosPage() {
       getRolesPersonalizados()
     ])
 
+    if (!permisosRes.success) setErrorCarga(true)
     if (permisosRes.success) {
       if ((permisosRes as any).esAdmin) {
         setNivelPermiso('escritura')
@@ -84,7 +87,7 @@ export default function UsuariosPage() {
   }
 
   useEffect(() => {
-    cargar()
+    cargar().catch(() => setErrorCarga(true))
   }, [])
 
   const handleOpenInvite = () => {
@@ -210,6 +213,8 @@ export default function UsuariosPage() {
   }
 
   const limitReached = usuariosMax !== null && usuariosActivosCount >= usuariosMax
+
+  if (errorCarga) return <ErrorCarga />
 
   if (loading || nivelPermiso === null) {
     return <Loading />

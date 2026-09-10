@@ -1,5 +1,6 @@
 'use client'
 import Loading from '@/components/Loading'
+import { ErrorCarga } from '@/components/ui/ErrorCarga'
 import { useState, useEffect } from 'react'
 import { getMisPermisos } from '@/app/actions/permisos'
 import { getMetricas, getMovimientosCreditosCliente } from '@/app/actions/metricas'
@@ -23,13 +24,14 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 export default function FacturacionPage() {
   const [loading, setLoading] = useState(true)
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
+  const [errorCarga, setErrorCarga] = useState(false)
   
   const [metricasCreditos, setMetricasCreditos] = useState<any>(null)
   const [movimientos, setMovimientos] = useState<any[]>([])
   
   const [filtros, setFiltros] = useState<{ tipo?: 'abono' | 'debito', origen?: string }>({})
 
-  useEffect(() => { cargar() }, [filtros])
+  useEffect(() => { cargar().catch(() => setErrorCarga(true)) }, [filtros])
 
   const cargar = async () => {
     setLoading(true)
@@ -38,6 +40,7 @@ export default function FacturacionPage() {
     const permisosRes = await getMisPermisos()
     let pNivel: 'ninguno' | 'lectura' | 'escritura' = 'ninguno'
     
+    if (!permisosRes.success) setErrorCarga(true)
     if (permisosRes.success) {
       if ((permisosRes as any).esAdmin) {
         pNivel = 'escritura'
@@ -66,6 +69,8 @@ export default function FacturacionPage() {
     
     setLoading(false)
   }
+
+  if (errorCarga) return <ErrorCarga />
 
   if (loading || nivelPermiso === null) return <Loading />
 

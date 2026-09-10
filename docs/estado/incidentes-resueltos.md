@@ -211,3 +211,40 @@ Verificación final en producción: anónimo → 401/42501; usuario identificado
 con sesión real → 403/42501; `service_role` → entra y llega a la lógica de
 la función; pg_cron (rol `postgres`, dueño de las funciones) → conserva
 acceso.
+
+## `traducirError` destruía los mensajes buenos de la app (resuelto)
+Cualquier `showToast(msg, 'error')` pasaba `msg` por `traducirError()`, y esa
+función terminaba en un `return` genérico —"Ha ocurrido un error inesperado.
+Si persiste, contacta con soporte."— cuando el texto no coincidía con ninguno
+de sus patrones (`23505`, `23502`, `42501`...). Como los mensajes que escribe
+la app están en español y esos patrones son de Postgres en inglés, **ningún
+mensaje propio coincidía nunca**: todos acababan en el genérico.
+
+Repro real: `actualizarRegla` (`src/app/actions/reglas.ts`) bloquea
+correctamente editar una regla `es_protegida` con el mensaje "Esta regla es
+del sistema y no se puede editar ni desactivar.", pero en `/dashboard/reglas`
+el usuario solo veía el genérico.
+
+Al investigarlo apareció que el problema era más ancho que el Toast:
+`traducirError` se llamaba igual de mal desde **otros 13 sitios**
+(`dashboard/metricas`, `dashboard/page`, `audit-log`, `politicas`,
+`vendedor/page`, los formularios de login/registro/recuperación...), muchos
+con la forma `traducirError(res.error || 'Error al cargar métricas')`, donde
+ese literal perfectamente escrito también acababa convertido en el genérico.
+Por eso el arreglo se hizo en `traducirError` y no en `Toast.tsx`.
+
+La causa de fondo es que la función hacía dos trabajos con el mismo código:
+traducir un **objeto de error** técnico, y sanear un **texto** que casi
+siempre ya era un mensaje humano. Ahora los distingue:
+- objeto de error no reconocido → genérico (no se filtran detalles internos);
+- texto no reconocido → se devuelve tal cual, salvo que tenga rastros
+  técnicos evidentes (`violates`, `constraint`, `PGRST`, `JWT`, `syntax
+  error`...), en cuyo caso también cae al genérico.
+
+Verificado con 17 casos: mensajes reales de la app salen intactos, los
+errores crudos siguen traduciéndose, y el ruido técnico no reconocido sigue
+sin llegar a la pantalla.
+
+Los "manejos de error local" que se añadieron en el commit `75db8e0` para
+esquivar el problema en 5 pantallas ya no hacen falta como parche, pero se
+dejan: con la función arreglada hacen justo lo correcto.

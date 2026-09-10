@@ -1,6 +1,16 @@
 import SignupForm from './SignupForm'
+import { getInvitacionParaRegistro } from '@/app/actions/auth'
 
-export default function RegistroTrialPage() {
+// Si se llega desde el enlace de una invitación (`?inv=<id>`), la pantalla
+// sabe a quién está dando de alta: enseña el nombre del negocio y trae el
+// email ya puesto, en vez de hablarle de una prueba genérica y pedirle que
+// escriba un correo que ya conocemos.
+export default async function RegistroTrialPage({
+  searchParams
+}: { searchParams: Promise<{ inv?: string }> }) {
+  const { inv } = await searchParams
+  const invitacion = inv ? await getInvitacionParaRegistro(inv) : null
+
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-2">
       {/* ============ PANEL DE MARCA (solo ordenador) ============ */}
@@ -20,10 +30,14 @@ export default function RegistroTrialPage() {
 
         <div className="relative max-w-md mx-auto text-center">
           <h2 className="font-display font-700 text-3xl leading-tight">
-            Empieza gratis. Sin tarjeta, sin compromiso.
+            {invitacion
+              ? `Te estamos esperando en ${invitacion.nombre_organizacion || 'Respondi'}`
+              : 'Empieza gratis. Sin tarjeta, sin compromiso.'}
           </h2>
           <p className="text-brand-200 mt-4 leading-relaxed">
-            14 días para que tu agente de IA atienda a tus clientes y veas el tiempo que recupera para ti.
+            {invitacion
+              ? 'Crea tu contraseña y tendrás la cuenta lista, con la configuración que ya han dejado preparada para ti.'
+              : '14 días para que tu agente de IA atienda a tus clientes y veas el tiempo que recupera para ti.'}
           </p>
 
           <ul className="mt-8 space-y-3 text-left max-w-xs mx-auto">
@@ -67,13 +81,17 @@ export default function RegistroTrialPage() {
             <div className="mb-7">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-100 text-brand-700 text-xs font-600 mb-3">
                 <span className="w-1.5 h-1.5 rounded-full bg-brand-600"></span>
-                14 días gratis
+                {invitacion ? 'Invitación' : '14 días gratis'}
               </div>
               <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Crea tu cuenta</h1>
-              <p className="text-ink-500 mt-2">Activa tu prueba y empieza a atender con IA hoy mismo.</p>
+              <p className="text-ink-500 mt-2">
+                {invitacion
+                  ? <>Te estás uniendo a <strong className="text-ink-900">{invitacion.nombre_organizacion || 'Respondi'}</strong>. Solo falta tu contraseña.</>
+                  : 'Activa tu prueba y empieza a atender con IA hoy mismo.'}
+              </p>
             </div>
             
-            <SignupForm />
+            <SignupForm invitacion={invitacion} />
 
           </div>
         </div>

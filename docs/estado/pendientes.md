@@ -153,8 +153,11 @@ se traga en silencio.
 - [x] Modal muerto de `/dashboard/sucursales` eliminado, junto con la
       acción `crearSucursal` que solo él usaba. Ya solo hay una forma de
       crear una sucursal: el asistente
-- [ ] Pantalla de registro simplificada para invitados (sin "nombre de
-      negocio" ni textos de prueba gratis)
+- [x] Pantalla de registro para invitados — hecho (10-09-2026). El enlace
+      del correo lleva `?inv=<id>`, así que la pantalla sabe a quién da de
+      alta: enseña el nombre del negocio, trae el email puesto y bloqueado
+      (era lo único que enlazaba la invitación con el alta) y oculta el
+      botón de Google, que habría creado una cuenta sin vincular
 - [x] Rutas huérfanas — `src/app/auth/verificar/route.ts` ya no existe y
       `auth/procesar-hash` sí se usa (desde `auth/callback` y
       `usuarios-globales`). La nota estaba desfasada

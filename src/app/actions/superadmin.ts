@@ -712,7 +712,7 @@ export async function reenviarInvitacionSuperadmin(invitacionId: string) {
     const esVendedor = inv.tipo === 'vendedor'
     const { error: emailError } = await enviarEmailInvitacion({
       email: inv.email,
-      actionLink: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}${esVendedor ? '/login' : '/registro-trial'}`,
+      actionLink: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}${esVendedor ? '/login' : `/registro-trial?inv=${inv.id}`}`,
       rol: esVendedor ? 'vendedor' : 'tenant_user'
     })
 

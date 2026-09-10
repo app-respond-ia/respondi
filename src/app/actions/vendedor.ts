@@ -136,7 +136,7 @@ export async function reenviarInvitacionCliente(invitacionId: string) {
 
     const { error: emailError } = await enviarEmailInvitacion({
       email: inv.email,
-      actionLink: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/registro-trial`,
+      actionLink: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/registro-trial?inv=${inv.id}`,
       rol: 'tenant_user'
     })
 
@@ -369,7 +369,9 @@ export async function crearCuentaTrial(data: {
 
     const { error: emailError } = await enviarEmailInvitacion({
       email,
-      actionLink: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/registro-trial`,
+      // El id viaja en el enlace para que la pantalla de registro sepa a quién
+      // está dando de alta y no dependa de que el cliente teclee bien su email.
+      actionLink: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/registro-trial?inv=${invitacionCreada.id}`,
       rol: 'tenant_user'
     })
 

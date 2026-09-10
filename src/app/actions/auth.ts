@@ -84,6 +84,32 @@ export async function registroTrial(data: {
 }
 
 // Compatibilidad con formularios existentes de registro (SignupForm.tsx)
+// Datos mínimos de una invitación para pintar la pantalla de registro.
+// Se consulta por id (un uuid que solo viaja en el enlace del correo) y solo
+// devuelve el email y el nombre del negocio: nada más sale de aquí.
+//
+// Existe porque el email es lo único que enlaza la invitación con el alta. Si
+// la persona se registraba escribiendo su correo con cualquier variación, se
+// le creaba una organización suelta, sin vincular al vendedor que la trajo y
+// sin la configuración que este había dejado preparada. Ahora el email viene
+// dado y no se puede tocar.
+export async function getInvitacionParaRegistro(id: string) {
+  const { data } = await supabaseAdmin
+    .from('invitaciones_pendientes')
+    .select('email, datos, aceptada, tipo')
+    .eq('id', id)
+    .eq('tipo', 'admin_trial')
+    .eq('aceptada', false)
+    .maybeSingle()
+
+  if (!data) return null
+
+  return {
+    email: data.email,
+    nombre_organizacion: (data.datos as any)?.nombre_organizacion || null
+  }
+}
+
 export async function signupTrial(formData: FormData) {
   const email = formData.get('email') as string
   const password = formData.get('password') as string

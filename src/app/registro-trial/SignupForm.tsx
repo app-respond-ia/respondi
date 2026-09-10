@@ -6,7 +6,9 @@ import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
 import { traducirError } from '@/lib/traducirError'
 
-export default function SignupForm() {
+type Invitacion = { email: string, nombre_organizacion: string | null } | null
+
+export default function SignupForm({ invitacion = null }: { invitacion?: Invitacion }) {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -53,6 +55,9 @@ export default function SignupForm() {
 
   return (
     <>
+      {/* Con invitación no se ofrece Google: si entrase con otra cuenta, se le
+          crearía una organización suelta, sin vincular a quien le invitó. */}
+      {!invitacion && (
       <form onSubmit={handleGoogle}>
         <button type="submit" className="w-full flex items-center justify-center gap-3 h-12 rounded-xl border border-slate-300 bg-white font-500 text-ink-700 hover:bg-slate-50 hover:border-slate-400 transition">
           <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -67,12 +72,15 @@ export default function SignupForm() {
           Al continuar, aceptas la <Link href="/privacidad" target="_blank" className="font-500 hover:text-ink-700 underline">Política de Privacidad</Link> y los <Link href="/terminos" target="_blank" className="font-500 hover:text-ink-700 underline">Términos de Servicio</Link>.
         </p>
       </form>
+      )}
 
+      {!invitacion && (
       <div className="flex items-center gap-4 my-6">
         <div className="flex-1 h-px bg-slate-200"></div>
         <span className="text-xs text-ink-400 font-500">o con tu correo</span>
         <div className="flex-1 h-px bg-slate-200"></div>
       </div>
+      )}
 
       <form action={handleSubmit} className="space-y-4">
         <div>
@@ -80,8 +88,15 @@ export default function SignupForm() {
           <div className="relative">
             <svg className="w-5 h-5 text-ink-400 absolute left-3.5 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
             <input name="email" type="email" placeholder="tucorreo@tunegocio.com" required
-              className="w-full h-12 pl-11 pr-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition" />
+              defaultValue={invitacion?.email}
+              readOnly={!!invitacion}
+              className={`w-full h-12 pl-11 pr-4 rounded-xl border border-slate-300 placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition ${invitacion ? 'bg-slate-50 text-ink-600 cursor-not-allowed' : 'bg-white'}`} />
           </div>
+          {invitacion && (
+            <p className="text-xs text-ink-500 mt-1.5">
+              Es el correo al que te invitaron. Tiene que ser este para que tu cuenta quede vinculada.
+            </p>
+          )}
         </div>
 
         <div>
@@ -112,7 +127,7 @@ export default function SignupForm() {
           <span className="text-sm text-amber-900 leading-relaxed">
             <span className="flex items-center gap-1.5 font-600 mb-0.5">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0L3.16 16.25A2 2 0 005 19z"/></svg>
-              Conexión de WhatsApp en la prueba
+              {invitacion ? 'Conexión de WhatsApp' : 'Conexión de WhatsApp en la prueba'}
             </span>
             Durante el trial, WhatsApp se conecta por un método no oficial de Meta. Entiendo y acepto que Meta podría suspender el número sin previo aviso, bajo mi responsabilidad.
           </span>
@@ -122,7 +137,7 @@ export default function SignupForm() {
 
         <button type="submit" disabled={isLoading}
           className="w-full h-12 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-600 shadow-lg shadow-brand-600/30 transition mt-2 disabled:opacity-50">
-          {isLoading ? 'Creando cuenta...' : 'Empezar mis 14 días gratis'}
+          {isLoading ? 'Creando cuenta...' : invitacion ? 'Crear mi cuenta' : 'Empezar mis 14 días gratis'}
         </button>
       </form>
 

@@ -41,8 +41,23 @@ Socios al 50/50: Atsura (Andreina — diseño/comercial) y Propulse System LLC
   en su propia sesión/rama. Nunca "haz todo lo pendiente" de una vez.
 - Verificación siempre en producción (respondi.vercel.app), nunca en local —
   así es como Jorge comprueba las cosas.
-- Cambios en la base de datos de producción: proponer el SQL/migración y
-  esperar confirmación explícita antes de ejecutar.
+- Cambios en la base de datos de producción: **siempre** como archivo de
+  migración en `supabase/migrations/`, aplicado con `supabase db push`.
+  Nunca escribiendo por MCP: el MCP va en modo `--read-only` a propósito y
+  no tiene herramienta de migraciones, así que un `execute_sql` de escritura
+  entraría en la base sin quedar registrado en el historial y los `.sql` del
+  repo dejarían de coincidir con la realidad.
+  - **Se aplican sin preguntar** (verificando después y contando el
+    resultado): índices, columnas nuevas con valor por defecto, arreglos de
+    políticas RLS, permisos (`GRANT`/`REVOKE`). Es decir, lo reversible y
+    que no toca datos ya guardados.
+  - **Se propone y se espera confirmación explícita**: borrar o renombrar
+    columnas/tablas, cualquier cosa que modifique datos existentes, y todo
+    lo que toque cuentas, contraseñas o accesos.
+- Verificar SIEMPRE después de aplicar una migración, no dar por bueno el
+  "aplicada sin errores". Caso real: un `REVOKE ... FROM anon, authenticated`
+  se ejecutó limpiamente y no cambió nada, porque el permiso venía de
+  `PUBLIC`. Solo se vio comprobando el estado real después.
 - Jorge no tenía experiencia previa de programación — explica en lenguaje
   sencillo qué se está haciendo y por qué, no des por hecho jerga.
 

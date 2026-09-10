@@ -203,7 +203,13 @@ export async function generarRespuesta(conv: any) {
       systemPrompt += `- ID: ${c.id} | Nombre: ${c.nombre} | Info: ${c.descripcion_intencion || ''}\n`
     })
     if (fallbackName) {
-      systemPrompt += `\nNota: La categoría '${fallbackName}' es la opción de respaldo y SOLO debe usarse cuando ninguna de las otras encaja claramente.\n`
+      // Sin decirle que SIEMPRE tiene que etiquetar, el modelo se saltaba el
+      // etiquetado justo en los mensajes que no encajaban en ninguna categoría
+      // — que son precisamente los que hay que poder contar para saber qué
+      // pregunta la gente y qué falta configurar.
+      systemPrompt += `\nDEBES etiquetar SIEMPRE la conversación, sin excepción, incluso si el mensaje no tiene nada que ver con el negocio. La categoría '${fallbackName}' es la de respaldo: úsala únicamente cuando ninguna de las otras encaje claramente, pero úsala.\n`
+    } else {
+      systemPrompt += `\nDEBES etiquetar la conversación con la categoría que mejor encaje con la intención del cliente.\n`
     }
   }
   

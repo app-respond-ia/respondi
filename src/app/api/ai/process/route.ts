@@ -202,8 +202,18 @@ export async function POST(req: Request) {
       await supabaseAdmin.from('conversations').update({ ia_intentos_fallidos: 0 }).eq('id', conversationId)
     }
 
-    await supabaseAdmin.rpc('descontar_cuota_ia', { 
-      p_tenant_id: conv.tenant_id, 
+    // `reason` viene puesto cuando la IA terminó bien pero SIN responder nada:
+    // no había mensajes nuevos, o los que había no eran del cliente. Antes se
+    // cobraba el crédito igualmente, así que cualquier pasada de más del cron
+    // (por ejemplo al caducar el candado de "procesando") le restaba saldo al
+    // cliente sin que nadie hubiera recibido una respuesta.
+    if (aiResult.reason) {
+      await liberarCandado()
+      return NextResponse.json({ status: `Sin respuesta que enviar (${aiResult.reason}), no se cobra crédito` })
+    }
+
+    await supabaseAdmin.rpc('descontar_cuota_ia', {
+      p_tenant_id: conv.tenant_id,
       p_cantidad: 1,
       p_descripcion: 'Mensaje respondido por IA',
       p_branch_id: conv.branch_id,

@@ -75,9 +75,15 @@ se traga en silencio.
       `saldos_actuales_ia` con SECURITY DEFINER, 13 funciones con
       `search_path` mutable, extensión `vector` en el esquema `public`,
       y protección de contraseñas filtradas desactivada en Auth
-- [ ] Tramo D de horarios: la copia de sucursal en `crearSucursal` usa
-      `.limit(7)` y no copia `orden` ni `tipo`, así que al duplicar una
-      sucursal se pierden las franjas múltiples y el horario de la IA
+- [x] Tramo D de horarios — resuelto (10-09-2026). Al auditarlo salieron
+      6 fallos más en la misma función, ver `incidentes-resueltos.md`
+- [ ] **Hay dos formas de crear una sucursal**: el modal rápido de
+      `/dashboard/sucursales` (`crearSucursal`, copia campo a campo) y el
+      asistente `/dashboard/sucursales/nueva` (`crearSucursalConDatos`).
+      Todos los fallos del tramo D venían de que la primera se quedó atrás
+      respecto a la segunda. Mientras existan las dos, volverán a
+      desincronizarse. Decidir con Jorge si el modal rápido pasa a ser un
+      enlace al asistente y se elimina `crearSucursal`.
 - [ ] Unificar `onboarding/page.tsx` para que reutilice el componente
       compartido `EditorHorarios` (`src/components/sucursales/
       EditorHorarios.tsx`) en vez de su propia implementación

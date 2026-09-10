@@ -103,7 +103,12 @@ export async function crearSucursal(nombre: string, direccion?: string, copiarDe
       nombre: nombre.trim(),
       direccion: direccion?.trim() || null,
       pais: pais || null,
-      activa: true
+      activa: true,
+      // Sin esto la sucursal nace con el onboarding "sin terminar", y en
+      // cuanto alguien la pone como sucursal activa, el siguiente inicio de
+      // sesión lo manda al asistente de alta inicial (ver auth-redirect.ts).
+      // El asistente de sucursal nueva ya lo marcaba; este camino no.
+      onboarding_completado: true
     })
     .select()
     .single()
@@ -115,7 +120,7 @@ export async function crearSucursal(nombre: string, direccion?: string, copiarDe
     // 1. business_profiles
     const { data: bp, error: errSelBp } = await supabase
       .from('business_profiles')
-      .select('descripcion, politicas, servicios, idioma_base, tono, disclaimer_texto, msg_fuera_horario, msg_cuota_agotada, msg_pausa_automatica')
+      .select('descripcion, politicas, servicios, idioma_base, tono, disclaimer_texto, msg_fuera_horario, msg_cuota_agotada, msg_pausa_automatica, abrir_caso_fuera_horario, modo_horario_ia')
       .eq('branch_id', copiarDesdeId)
       .single()
       
@@ -134,12 +139,19 @@ export async function crearSucursal(nombre: string, direccion?: string, copiarDe
     }
 
     // 2. business_hours
+    // El `.limit(7)` de antes daba por hecho "una fila por día de la semana",
+    // pero desde que hay varias franjas por día y dos tipos de horario
+    // (`negocio` e `ia`) una sucursal puede tener hasta 56 filas. Truncaba a 7
+    // al azar, y como no copiaba `tipo` (que por defecto vale 'negocio') las
+    // filas del horario de la IA que sobrevivían se insertaban etiquetadas
+    // como horario de negocio: no era solo pérdida, era corrupción.
     const { data: bh, error: errSelBh } = await supabase
       .from('business_hours')
-      .select('dia_semana, apertura, cierre, cerrado')
+      .select('dia_semana, apertura, cierre, cerrado, orden, tipo')
       .eq('branch_id', copiarDesdeId)
-      .limit(7)
-      
+      .order('dia_semana', { ascending: true })
+      .order('orden', { ascending: true })
+
     if (errSelBh) {
       await registrarError({ origen: 'app', descripcion: 'Fallo al leer business_hours para copiar sucursal', stacktrace: errSelBh.message, tenant_id: auth.tenant_id })
     }
@@ -155,7 +167,10 @@ export async function crearSucursal(nombre: string, direccion?: string, copiarDe
     // 3. case_rules
     const { data: cr, error: errSelCr } = await supabase
       .from('case_rules')
-      .select('nombre, descripcion_intencion, tipo_caso, activa, es_plantilla')
+      // `es_protegida` es imprescindible: sin ella las reglas del sistema se
+      // copian como si fueran normales y en la sucursal nueva se pueden
+      // editar y borrar, que es justo lo que impide el candado.
+      .select('nombre, descripcion_intencion, tipo_caso, activa, es_plantilla, orden, prioridad_default, es_protegida')
       .eq('branch_id', copiarDesdeId)
       .eq('tenant_id', auth.tenant_id)
       
@@ -174,7 +189,10 @@ export async function crearSucursal(nombre: string, direccion?: string, copiarDe
     // 4. price_list
     const { data: pl, error: errSelPl } = await supabase
       .from('price_list')
-      .select('nombre, precio, precio_tipo, moneda, descripcion, disponible')
+      // `categoria_id` se deja fuera a propósito: apunta a una categoría de la
+      // sucursal de origen, y copiarla dejaría los precios de la sucursal
+      // nueva colgando de datos que no son suyos.
+      .select('nombre, tipo, precio, precio_tipo, moneda, descripcion, disponible, etiquetas, visible_ia')
       .eq('branch_id', copiarDesdeId)
       .eq('tenant_id', auth.tenant_id)
       
@@ -193,7 +211,10 @@ export async function crearSucursal(nombre: string, direccion?: string, copiarDe
     // 5. message_categories
     const { data: mc, error: errSelMc } = await supabase
       .from('message_categories')
-      .select('nombre, descripcion_intencion, color, activa, es_plantilla, orden')
+      // Igual que en las reglas: sin `es_protegida` se pierde el candado, y
+      // sin `es_fallback` la sucursal nueva se queda sin etiqueta por defecto
+      // para lo que la IA no sepa clasificar.
+      .select('nombre, descripcion_intencion, color, activa, es_plantilla, orden, es_fallback, es_protegida')
       .eq('branch_id', copiarDesdeId)
       .eq('tenant_id', auth.tenant_id)
       
@@ -212,7 +233,9 @@ export async function crearSucursal(nombre: string, direccion?: string, copiarDe
     // 6. skills
     const { data: sk, error: errSelSk } = await supabase
       .from('skills')
-      .select('nombre, descripcion, activo, orden, skill_global_id')
+      // `configuracion` guarda los ajustes de cada skill; sin ella la sucursal
+      // nueva hereda la skill activada pero sin configurar.
+      .select('nombre, descripcion, activo, orden, skill_global_id, configuracion')
       .eq('branch_id', copiarDesdeId)
       .eq('tenant_id', auth.tenant_id)
       
@@ -225,6 +248,26 @@ export async function crearSucursal(nombre: string, direccion?: string, copiarDe
       const { error: errInsSk } = await supabase.from('skills').insert(inserts)
       if (errInsSk) {
         await registrarError({ origen: 'app', descripcion: 'Fallo al copiar skills en nueva sucursal', stacktrace: errInsSk.message, tenant_id: auth.tenant_id })
+      }
+    }
+
+    // 7. tipos_novedad — no se copiaba en absoluto por este camino, aunque el
+    // asistente de sucursal nueva sí lo hace.
+    const { data: tn, error: errSelTn } = await supabase
+      .from('tipos_novedad')
+      .select('nombre, icono, color')
+      .eq('branch_id', copiarDesdeId)
+      .eq('tenant_id', auth.tenant_id)
+
+    if (errSelTn) {
+      await registrarError({ origen: 'app', descripcion: 'Fallo al leer tipos_novedad para copiar sucursal', stacktrace: errSelTn.message, tenant_id: auth.tenant_id })
+    }
+
+    if (tn && tn.length > 0) {
+      const inserts = tn.map((t: any) => ({ tenant_id: auth.tenant_id, branch_id: nuevaSucursal.id, ...t }))
+      const { error: errInsTn } = await supabase.from('tipos_novedad').insert(inserts)
+      if (errInsTn) {
+        await registrarError({ origen: 'app', descripcion: 'Fallo al copiar tipos_novedad en nueva sucursal', stacktrace: errInsTn.message, tenant_id: auth.tenant_id })
       }
     }
   }

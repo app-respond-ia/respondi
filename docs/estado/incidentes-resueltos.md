@@ -248,3 +248,43 @@ sin llegar a la pantalla.
 Los "manejos de error local" que se añadieron en el commit `75db8e0` para
 esquivar el problema en 5 pantallas ya no hacen falta como parche, pero se
 dejan: con la función arreglada hacen justo lo correcto.
+
+## Copiar una sucursal perdía y corrompía datos (resuelto)
+`crearSucursal` (el modal rápido de `/dashboard/sucursales`, distinto del
+asistente `/dashboard/sucursales/nueva`) copia los datos de otra sucursal
+campo a campo, y se había quedado atrás respecto al esquema. Se buscaba un
+solo fallo —el `.limit(7)` de los horarios— y aparecieron siete:
+
+1. **`business_hours`**: `.limit(7)` daba por hecho "una fila por día", pero
+   con varias franjas por día y dos tipos de horario una sucursal puede tener
+   hasta 56 filas. Además no copiaba `tipo`, que por defecto vale `'negocio'`:
+   las filas del horario de la IA que sobrevivían al recorte se insertaban
+   **etiquetadas como horario de negocio**. No era solo pérdida, era
+   corrupción. Medido sobre datos reales: de una sucursal con 14 filas (7 de
+   negocio + 7 de IA) se copiaban 7, ninguna de la IA.
+2. **`onboarding_completado`** no se ponía a `true`. La sucursal nacía con el
+   alta "sin terminar" y, en cuanto alguien la elegía como sucursal activa,
+   el siguiente inicio de sesión lo mandaba al asistente de onboarding
+   (`auth-redirect.ts`). El asistente de sucursal nueva sí lo marcaba.
+3. **`business_profiles`**: no copiaba `modo_horario_ia` ni
+   `abrir_caso_fuera_horario`, justo los dos ajustes de los tramos A/B/C.
+4. **`case_rules`**: no copiaba `es_protegida`, `orden` ni
+   `prioridad_default`. Sin `es_protegida`, las reglas del sistema llegaban
+   a la sucursal nueva como reglas normales, editables y borrables — se
+   perdía el candado.
+5. **`message_categories`**: no copiaba `es_protegida` ni `es_fallback` (la
+   etiqueta a la que va lo que la IA no sabe clasificar).
+6. **`price_list`**: no copiaba `tipo`, `visible_ia` ni `etiquetas`.
+   `categoria_id` se deja fuera a propósito: apunta a una categoría de la
+   sucursal de origen.
+7. **`tipos_novedad`**: no se copiaba en absoluto.
+
+Rastro del bug en producción: la sucursal "m" del tenant
+`8f75616e-98ff-4a77-84c1-0ef3204f7792` tiene 7 horarios y 0 de IA, copiada
+de una que sí tenía los 14.
+
+Lección de fondo, y el pendiente que queda: **la causa no es ninguno de los
+siete fallos, es que hay dos caminos para crear una sucursal.** El asistente
+(`crearSucursalConDatos`) hacía todo esto bien; el modal rápido se fue
+quedando atrás cada vez que se añadió una columna. Mientras existan los dos,
+volverán a desincronizarse.

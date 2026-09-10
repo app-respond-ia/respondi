@@ -5,19 +5,32 @@ archivo de `docs/estado/` que corresponda (no aquí — este archivo es
 solo la lista viva).
 
 ## Prioridad 1 — Antes de la ronda de pruebas grande de Fase 0
-- [ ] UI de horarios: no distingue horario del negocio vs. horario de
-      respuesta de la IA
-- [ ] Falta botón de políticas en el perfil de sucursal
+- [x] UI de horarios: no distingue horario del negocio vs. horario de
+      respuesta de la IA — resuelto (tramos A/B/C de horarios)
+- [x] Falta botón de políticas en el perfil de sucursal — resuelto
 - [x] Bug de permisos: un admin/dueño de organización no podía hacer
       ciertas acciones en su propio panel — resuelto, ver
       `docs/estado/incidentes-resueltos.md`
+- [ ] **Verificar dominio en Resend.** Hoy la cuenta está en modo prueba y
+      solo puede enviar a `app.respond.ia@gmail.com`; cualquier invitación
+      a otra dirección se guarda pero el correo se rechaza con un 403. Es
+      el motivo real de "invité a alguien y no llegó ningún email".
+      Bloquea toda prueba de alta con personas reales.
+- [ ] **`OPENAI_API_KEY` en Vercel.** La clave ya está en `.env.local`
+      (local), pero producción es donde se verifica todo: hay que
+      añadirla también en las variables de entorno de Vercel.
+- [ ] `crear_cuenta_completa` es ejecutable por los roles `anon` y
+      `authenticated` vía `/rest/v1/rpc/`. La FK `users.id → auth.users`
+      impide inventarse usuarios, pero cualquiera con una cuenta puede
+      llamarla y crear organizaciones (con sus créditos de trial) en
+      bucle, o para el id de otra persona. Revocar el EXECUTE.
 - [ ] Verificaciones aplazadas: contraseña con cuenta email
       (vendedor/superadmin), fix de invitación con hash, prueba de
       notificación de comisiones
 
 ## Prioridad 2 — Fase 0 (antes de construir nada de la v2)
-- [ ] Conseguir `OPENAI_API_KEY` (bloquea pruebas reales end-to-end de
-      créditos y del motor de IA)
+- [x] Conseguir `OPENAI_API_KEY` — hecha, en `.env.local`. Falta
+      subirla a Vercel (ver Prioridad 1)
 - [ ] Papeleo de canales (verificación de Atsura, registro como
       partner de Gupshup para el BSP)
 - [ ] Ronda de pruebas rigurosa, escenario por escenario, de toda la
@@ -37,25 +50,31 @@ solo la lista viva).
 - (Catálogo conversacional, recuperación de carritos, devoluciones y
   fidelización van después, una vez validado lo anterior)
 
-## Invitaciones pendientes — invisibles en toda la app
-Una invitación vive en `invitaciones_pendientes` hasta que la persona se
-registra; solo entonces aparece la fila en `vendedores`/`organizaciones`.
-Como ninguna pantalla consulta esa tabla, quien invita no tiene **ninguna**
-señal de que la invitación existe: no puede verla, ni reenviarla, ni
-cancelarla, ni detectar que escribió mal el email. Detectado probando el
-alta real de vendedor y cliente (10-09-2026), donde un email mal escrito
-(`n8n@propulsesytem.com`) pasó desapercibido hasta revisar la base.
-- [ ] `/superadmin/vendedores`: mostrar invitaciones de vendedor pendientes
-      (fecha, reenviar, cancelar)
-- [ ] `/vendedor/clientes` ("Mis clientes"): mostrar las invitaciones de
-      cliente pendientes de ese vendedor
-- [ ] Panel de superadmin: alguna forma de ver cuándo un vendedor invita a
-      un cliente (por decidir: aviso, contador o listado)
-- [ ] `crearCuentaTrial` no valida el formato del email — hay una invitación
-      real con el email `mmm`. Validar antes de crear, y de paso limpiar las
-      invitaciones basura de las pruebas
+## Invitaciones pendientes — cerrado (10-09-2026)
+Todo el bloque está hecho: `PanelInvitaciones` compartido en
+`/vendedor/clientes`, `/superadmin/vendedores`, `/superadmin/organizaciones`
+y la ficha de cada vendedor; métricas de invitaciones y tasa de cierre en
+"Rendimiento de vendedores"; validación de email; reconciliación contra
+cuentas ya existentes; aviso de errata; y el fallo de envío de email ya no
+se traga en silencio.
+- [ ] Limpiar las invitaciones basura de las pruebas (`mmm`, `mmmm` y
+      `n8n@propulsesytem.com`) desde el panel, con el botón Cancelar
+- [ ] Caducidad real de invitaciones: hoy `DIAS_CADUCIDAD_INVITACION` (14)
+      solo pinta el estado en pantalla; no bloquea el alta. Si se quiere
+      que caduquen de verdad hace falta migración
 
 ## Sueltos — sin bloquear nada, hacer cuando encaje
+- [ ] Cron `disparador-ia-agrupador` (jobid 6) corre **cada 10 segundos**
+      y `cron-procesar-politicas` (jobid 8) cada minuto. Revisar si esa
+      frecuencia es necesaria antes de que haya tráfico real: son
+      ~8.600 ejecuciones al día del primero
+- [ ] Avisos del linter de Supabase sin atender: vista
+      `saldos_actuales_ia` con SECURITY DEFINER, 13 funciones con
+      `search_path` mutable, extensión `vector` en el esquema `public`,
+      y protección de contraseñas filtradas desactivada en Auth
+- [ ] Tramo D de horarios: la copia de sucursal en `crearSucursal` usa
+      `.limit(7)` y no copia `orden` ni `tipo`, así que al duplicar una
+      sucursal se pierden las franjas múltiples y el horario de la IA
 - [ ] Unificar `onboarding/page.tsx` para que reutilice el componente
       compartido `EditorHorarios` (`src/components/sucursales/
       EditorHorarios.tsx`) en vez de su propia implementación

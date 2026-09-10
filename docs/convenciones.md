@@ -31,6 +31,17 @@ siempre los métodos nativos: `toLocaleDateString()`, `toLocaleString()`.
   fallos silenciosos que dejaban registros a medias sin que nadie se
   enterara (ver `docs/estado/incidentes-resueltos.md`).
 
+## Server Actions (`'use server'`)
+Un archivo con `'use server'` arriba **solo puede exportar funciones
+`async`**. Next convierte todos sus exports en referencias de servidor, así
+que una reexportación de tipos (`export type { X }`) genera código que en
+tiempo de ejecución busca un valor que no existe y revienta el módulo
+entero, llevándose por delante cualquier pantalla que lo importe. Solo se
+nota en build de producción, no en `next dev`. Los tipos van en `src/lib/`
+y se importan desde ahí. `export interface X {}` y `export type X = ...`
+(declaraciones, no reexportaciones) sí son seguros. Ver el incidente de
+`perfil-sucursal` en `docs/estado/incidentes-resueltos.md`.
+
 ## Sistemas de filtros
 Patrón consistente en toda la app: búsqueda + pills de estado siempre
 visibles; filtros secundarios ocultos detrás de un botón

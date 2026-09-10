@@ -6,6 +6,7 @@ import { canManageRole } from './roles'
 import { registrarAuditoria } from '@/lib/auditoria'
 import { enviarEmailInvitacion } from '@/lib/email'
 import { registrarError } from '@/lib/errores'
+import { emailValido, normalizarEmail } from '@/lib/invitaciones'
 
 import { getAuthContext } from '@/lib/auth-context'
 
@@ -56,6 +57,14 @@ export async function invitarUsuario(data: { email: string, nombre: string | nul
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
+
+  // El email es lo único que enlaza la invitación con el alta posterior: si
+  // está mal escrito no sale el correo y la invitación no se puede aceptar
+  // nunca. Mismo control que en las invitaciones de vendedor y de cliente.
+  if (!emailValido(data.email)) {
+    return { success: false, error: 'Introduce una dirección de email válida.' }
+  }
+  data = { ...data, email: normalizarEmail(data.email) }
 
   const { data: targetRole } = await supabaseAdmin
     .from('roles_personalizados')
@@ -108,6 +117,12 @@ export async function invitarUsuario(data: { email: string, nombre: string | nul
     .single()
 
   if (invitacionError) {
+    await registrarError({
+      origen: 'app',
+      descripcion: 'invitarUsuario: fallo al crear la invitación',
+      stacktrace: JSON.stringify({ email: data.email, error: invitacionError }),
+      tenant_id: auth.tenant_id
+    })
     return { success: false, error: 'Error al crear la invitación. Inténtalo de nuevo.' }
   }
 
@@ -191,14 +206,39 @@ export async function actualizarUsuario(id: string, data: Partial<{ nombre: stri
   if (error) return { success: false, error: error.message }
 
   if (data.branch_ids) {
-    await supabaseAdmin.from('user_branches')
+    // Este bloque borraba y reinsertaba las sucursales del usuario sin mirar
+    // si alguna de las dos operaciones fallaba. Si el borrado iba bien y la
+    // inserción no, el usuario se quedaba SIN NINGUNA sucursal asignada y no
+    // quedaba rastro en ningún sitio: ni error en pantalla ni en error_logs.
+    const { error: errBorrado } = await supabaseAdmin.from('user_branches')
       .delete().eq('user_id', id)
+
+    if (errBorrado) {
+      await registrarError({
+        origen: 'app',
+        descripcion: 'actualizarUsuario: fallo al borrar las sucursales del usuario',
+        stacktrace: JSON.stringify({ userId: id, error: errBorrado }),
+        tenant_id: auth.tenant_id
+      })
+      return { success: false, error: 'No se pudieron actualizar las sucursales del usuario.' }
+    }
+
     if (data.branch_ids.length > 0) {
-      await supabaseAdmin.from('user_branches').insert(
+      const { error: errInsercion } = await supabaseAdmin.from('user_branches').insert(
         data.branch_ids.map(bid => ({
           user_id: id, branch_id: bid
         }))
       )
+
+      if (errInsercion) {
+        await registrarError({
+          origen: 'app',
+          descripcion: 'actualizarUsuario: fallo al asignar sucursales (el usuario se ha quedado sin ninguna)',
+          stacktrace: JSON.stringify({ userId: id, branch_ids: data.branch_ids, error: errInsercion }),
+          tenant_id: auth.tenant_id
+        })
+        return { success: false, error: 'El usuario se ha quedado sin sucursales asignadas. Vuelve a asignárselas.' }
+      }
     }
   }
 

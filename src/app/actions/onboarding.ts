@@ -111,10 +111,22 @@ export async function getOnboardingState() {
 
     if (branch) {
       branchId = branch.id
-      await supabaseAdmin
+      // Sin comprobación, si esto falla el usuario se queda sin sucursal
+      // activa y el onboarding vuelve a empezar de cero en cada recarga,
+      // sin ninguna pista de por qué.
+      const { error: errBranch } = await supabaseAdmin
         .from('users')
         .update({ branch_id: branchId })
         .eq('id', user.id)
+
+      if (errBranch) {
+        await registrarError({
+          origen: 'app',
+          descripcion: 'onboarding: fallo al fijar la sucursal activa del usuario',
+          stacktrace: JSON.stringify({ userId: user.id, branchId, error: errBranch }),
+          tenant_id: userData.tenant_id
+        })
+      }
     }
   }
 
@@ -213,7 +225,7 @@ export async function saveStep0(data: {
 
     return { success: true }
   } catch (err: any) {
-    console.error('saveStep0 error:', err.message)
+    await registrarError({ origen: 'app', descripcion: 'Excepción general en Paso 0 de onboarding (datos personales)', stacktrace: err.message, tenant_id: null })
     return { success: false, error: err.message }
   }
 }
@@ -406,7 +418,7 @@ export async function saveStep2(data: {
 
     return { success: true }
   } catch (error: any) {
-    console.error('Error en paso Horarios (saveStep2):', error, JSON.stringify(error, Object.getOwnPropertyNames(error || {})))
+    await registrarError({ origen: 'app', descripcion: 'Excepción general en Paso 2 de onboarding (horarios)', stacktrace: error.message, tenant_id: null })
     throw error
   }
 }
@@ -612,7 +624,7 @@ export async function saveStep4(data: {
 
     return { success: true }
   } catch (error: any) {
-    console.error('Error en paso Mensaje fuera de horario (saveStep4):', error, JSON.stringify(error, Object.getOwnPropertyNames(error || {})))
+    await registrarError({ origen: 'app', descripcion: 'Excepción general en Paso 4 de onboarding (mensaje fuera de horario)', stacktrace: error.message, tenant_id: null })
     throw error
   }
 }
@@ -665,7 +677,7 @@ export async function saveStep5(data: {
 
     return { success: true }
   } catch (error: any) {
-    console.error('Error en paso Lista de Precios (saveStep5):', error, JSON.stringify(error, Object.getOwnPropertyNames(error || {})))
+    await registrarError({ origen: 'app', descripcion: 'Excepción general en Paso 5 de onboarding (lista de precios)', stacktrace: error.message, tenant_id: null })
     throw error
   }
 }

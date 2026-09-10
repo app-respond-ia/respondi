@@ -15,17 +15,34 @@ async function vincularPropietariosASucursal(supabase: any, tenantId: string, su
     .eq('roles_personalizados.es_propietario', true)
 
   if (error) {
-    console.error('Error buscando propietarios para vincular a sucursal:', JSON.stringify(error))
+    // Antes esto era un console.error, que en producción se pierde: nadie lo
+    // lee nunca. Si falla, los propietarios no quedan vinculados a la
+    // sucursal nueva y no pueden entrar en ella.
+    await registrarError({
+      origen: 'app',
+      descripcion: 'Fallo al buscar propietarios para vincular a la sucursal nueva',
+      stacktrace: JSON.stringify(error),
+      tenant_id: tenantId
+    })
     return
   }
 
   if (propietarios && propietarios.length > 0) {
-    await supabase.from('user_branches').insert(
+    const { error: errVinculo } = await supabase.from('user_branches').insert(
       propietarios.map((p: any) => ({
         user_id: p.id,
         branch_id: sucursalId
       }))
     )
+
+    if (errVinculo) {
+      await registrarError({
+        origen: 'app',
+        descripcion: 'Fallo al vincular a los propietarios con la sucursal nueva (no podrán acceder a ella)',
+        stacktrace: JSON.stringify({ sucursalId, error: errVinculo }),
+        tenant_id: tenantId
+      })
+    }
   }
 }
 
@@ -568,7 +585,11 @@ export async function crearSucursalConDatos(data: {
           precio: p.precio,
           precio_tipo: p.precio_tipo || 'exacto',
           descripcion: p.descripcion || null,
-          activo: true
+          // La columna se llama `disponible`, no `activo`. Con el nombre mal
+          // TODA la inserción fallaba ("column activo does not exist"), así que
+          // al crear una sucursal copiando precios no se copiaba ninguno. La
+          // sucursal se creaba igual y nadie se enteraba de que faltaban.
+          disponible: true
         }))
       ).then(({ error }) => {
         if (error) return registrarError({ origen: 'app', descripcion: 'Fallo al crear price_list durante alta de sucursal', stacktrace: error.message, tenant_id: userData!.tenant_id })

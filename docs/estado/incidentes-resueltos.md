@@ -288,3 +288,41 @@ siete fallos, es que hay dos caminos para crear una sucursal.** El asistente
 (`crearSucursalConDatos`) hacía todo esto bien; el modal rápido se fue
 quedando atrás cada vez que se añadió una columna. Mientras existan los dos,
 volverán a desincronizarse.
+
+## Los precios no se copiaban al crear una sucursal (resuelto)
+`crearSucursalConDatos` —el asistente de `/dashboard/sucursales/nueva`, el
+camino que sí usan los clientes— insertaba en `price_list` una columna
+`activo` que no existe: la columna se llama `disponible`. Postgres rechaza la
+sentencia entera, así que al crear una sucursal copiando precios **no se
+copiaba ninguno**. La sucursal se creaba con normalidad y nada en pantalla
+avisaba de que faltaban.
+
+Se encontró leyendo el código por otro motivo, no por un informe de fallo,
+así que llevaba ahí desde que se escribió esa función.
+
+Después se barrió **todo** `src/` comparando las claves de cada `.insert()` /
+`.update()` contra las columnas reales de las 50 tablas del esquema. Este era
+el único caso: los otros tres avisos eran claves dentro de la columna `datos`
+de `invitaciones_pendientes`, que es jsonb y admite cualquier contenido. El
+script está en el scratchpad de la sesión y merece la pena repetirlo cada vez
+que se añadan tablas.
+
+## Fallos mudos al guardar (resuelto)
+Tres sitios guardaban en la base de datos sin comprobar siquiera si la
+operación había funcionado, así que un fallo no dejaba rastro en ninguna
+parte: ni error en pantalla, ni fila en `error_logs`, ni nada.
+
+- `usuarios.ts` (`actualizarUsuario`): borraba las sucursales del usuario y
+  las reinsertaba. Si el borrado iba bien y la inserción no, el usuario se
+  quedaba **sin ninguna sucursal asignada** en silencio.
+- `onboarding.ts` (`getOnboardingState`): al fijar la sucursal activa. Si
+  fallaba, el onboarding volvía a empezar de cero en cada recarga sin pista
+  de por qué.
+- `sucursales.ts` (`vincularPropietariosASucursal`): al vincular a los
+  propietarios con la sucursal nueva. Si fallaba, no podían entrar en ella.
+  Además usaba `console.error`, que en producción no lo lee nadie.
+
+Aparte, los `catch` de los pasos 0, 2, 4 y 5 del onboarding solo hacían
+`console.error` antes de relanzar. El error llegaba a la pantalla, pero no
+quedaba registrado en `error_logs`, que es lo único consultable después. Los
+pasos 1 y 3 ya lo hacían bien. Ahora los seis registran.

@@ -116,14 +116,20 @@ se traga en silencio.
       `crear_cuenta_completa` (delicado, toca login real)
 - [ ] Columna `plans.dias_trial` editable (hoy los 14 días están
       hardcodeados)
-- [ ] Aplicar `registrarError()` al resto de funciones ya
-      inventariadas con el mismo patrón de riesgo: `crearSucursal`
-      (11 operaciones sin capturar, además del hallazgo de
-      `eq('rol','admin')` en vez de `es_propietario`), `saveStep1`/
-      `saveStep3` (onboarding.ts), `invitarUsuario` (usuarios.ts),
-      `cambiarRolUsuario` (usuarios-globales.ts, menor prioridad)
+- [x] Aplicar `registrarError()` a las funciones de riesgo — hecho
+      (10-09-2026). Varias notas estaban desfasadas: `crearSucursal` ya
+      registraba y lo de `eq('rol','admin')` ya estaba corregido. Lo que
+      quedaba: 3 fallos mudos (guardaban sin comprobar nada) y los `catch`
+      de los pasos 0, 2, 4 y 5 del onboarding, que solo hacían
+      `console.error` — invisible en producción. Verificado: cero fallos
+      mudos en onboarding.ts, usuarios.ts y sucursales.ts
 - [ ] Verificar `invitarUsuario` de principio a fin (mismo patrón ya
-      probado para vendedor/admin_trial)
+      probado para vendedor/admin_trial). Ya lleva validación de email y
+      registro de errores; falta la prueba de alta real
+- [ ] Borrar el modal muerto de `/dashboard/sucursales` (`handleOpenModal`
+      no lo llama nadie, así que `crearSucursal` es inalcanzable desde la
+      interfaz). Aplazado: no molesta a nadie y confunde explicarlo. El
+      botón "Añadir sucursal" ya lleva al asistente
 - [ ] Pantalla de registro simplificada para invitados (sin "nombre de
       negocio" ni textos de prueba gratis)
 - [ ] Limpieza de rutas huérfanas sin tráfico:

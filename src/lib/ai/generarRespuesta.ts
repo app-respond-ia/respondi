@@ -2,6 +2,7 @@ import OpenAI from 'openai'
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { crearCasoDesdeSistema } from '@/lib/casos/crearCasoDesdeSistema'
 import { registrarAuditoria } from '@/lib/auditoria'
+import { registrarError } from '@/lib/errores'
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || 'sk-test-placeholder'
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY })
@@ -177,8 +178,14 @@ export async function generarRespuesta(conv: any) {
   systemPrompt += `- Eres un asistente, responde de manera concisa y natural.\n`
   if (canEscalate) {
     systemPrompt += `- Si el usuario envía un archivo no soportado (ej. PDF o Word), invoca escalar_humano.\n`
+    // Sin esto, el modelo contesta "te paso con una persona del equipo" y se
+    // queda tan ancho: no invoca la herramienta, no se crea ningún caso y
+    // nadie se entera. El cliente espera a alguien que nunca va a llegar.
+    // Detectado probando el motor con un cliente pidiendo hablar con alguien.
+    systemPrompt += `- Si el mensaje del cliente encaja con alguna de las Reglas de Caso listadas más abajo, DEBES invocar escalar_humano con el ID de esa regla.\n`
+    systemPrompt += `- NUNCA digas que vas a avisar al equipo, pasar la conversación a una persona, derivar el caso o similar sin haber invocado antes escalar_humano. Si no invocas la herramienta, no se avisa a nadie y el cliente se queda esperando.\n`
   }
-  
+
   if (canTag || canEscalate) {
     const actions = []
     if (canTag) actions.push('etiquetado')
@@ -504,20 +511,42 @@ export async function generarRespuesta(conv: any) {
         if (!rule) {
           toolResult = 'Error: rule_id no válido para esta sucursal.'
         } else {
-          await crearCasoDesdeSistema(
+          // OJO con los dos "tipo" que se llaman igual y NO son lo mismo:
+          //  - `case_rules.tipo_caso` es el motivo de negocio que configura el
+          //    cliente (derivacion_solicitada, queja, consulta...).
+          //  - `cases.tipo` es un enum del sistema con otros valores
+          //    (normal, fallo_llm, fallo_entrega, blacklist_sugerida).
+          // Aquí se pasaba el primero como si fuera el segundo, y Postgres
+          // rechazaba la inserción: NINGUNA regla de escalado llegó nunca a
+          // crear un caso. Un caso nacido de una regla de negocio es 'normal';
+          // el motivo concreto se guarda en la descripción, que es lo que lee
+          // la persona que lo atiende.
+          const idCaso = await crearCasoDesdeSistema(
             conversationId,
             tenantId,
             branchId,
             contactId,
-            args.resumen_problema,
-            rule.tipo_caso,
+            `[${rule.nombre}] ${args.resumen_problema}`,
+            'normal',
             rule.prioridad_default
           )
-          const { error } = await supabaseAdmin.from('conversations').update({ ia_pausada: true }).eq('id', conversationId)
-          if (error) {
-            console.error('Error pausando IA al escalar:', error)
+
+          if (!idCaso) {
+            // Si no hay caso, no se puede decir que lo hay: la IA no debe
+            // prometerle al cliente una atención que no va a llegar.
+            toolResult = 'No se ha podido derivar el caso a una persona. NO le digas al cliente que le vas a pasar con alguien; discúlpate y pídele que lo intente de nuevo más tarde.'
+          } else {
+            const { error } = await supabaseAdmin.from('conversations').update({ ia_pausada: true }).eq('id', conversationId)
+            if (error) {
+              await registrarError({
+                origen: 'app',
+                descripcion: 'Fallo al pausar la IA tras escalar a un humano (la IA seguirá contestando encima del agente)',
+                stacktrace: JSON.stringify({ conversationId, error }),
+                tenant_id: tenantId
+              })
+            }
+            toolResult = 'Caso escalado a humano y respuestas automáticas pausadas.'
           }
-          toolResult = 'Caso escalado a humano y respuestas automáticas pausadas.'
         }
       }
       else if (toolCall.function.name === 'guardar_descripcion_imagen') {

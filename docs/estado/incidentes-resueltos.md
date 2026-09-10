@@ -412,3 +412,59 @@ Verificado con 31 escenarios (reloj congelado): apertura y cierre justos,
 cola del día anterior, día sin franja propia que hereda la cola del
 anterior, lunes de madrugada cerrado porque el domingo no abre, husos
 horarios distintos, y los 7 casos de validación.
+
+## El escalado a un humano nunca creó ningún caso (resuelto)
+Encontrado en la ronda de pruebas del motor de IA (10-09-2026). Es el fallo
+más grave de los que han salido: la IA le decía al cliente "ahora mismo te
+paso con una persona del equipo", **no se creaba ningún caso, no se avisaba a
+nadie**, y el cliente se quedaba esperando a alguien que nunca iba a llegar.
+
+Causa: dos campos que se llaman parecido y no son lo mismo.
+- `case_rules.tipo_caso` es el motivo de negocio que configura el cliente:
+  `derivacion_solicitada`, `documento_no_procesable`, `queja`, `consulta`.
+- `cases.tipo` es un enum del sistema con otros valores completamente
+  distintos: `normal`, `fallo_llm`, `fallo_entrega`, `blacklist_sugerida`.
+
+El motor pasaba el primero como si fuera el segundo, y Postgres rechazaba la
+inserción con `invalid input value for enum tipo_caso`. Los dos catálogos no
+comparten **ni un solo valor**, así que **ninguna regla de escalado llegó
+nunca a crear un caso**, en ninguna sucursal.
+
+Se salvaban los escalados que NO vienen de una regla (fuera de horario, cuota
+agotada, contacto marcado para derivar), porque esos usan el valor por
+defecto `'normal'`, que sí es válido. Por eso la ronda de pruebas de la
+jerarquía los daba por buenos: el fallo estaba solo en el camino de las
+reglas.
+
+Y una segunda mitad que lo hacía invisible: `crearCasoDesdeSistema` se comía
+el error con un `console.error` y devolvía `null`, pero quien llamaba no
+miraba el resultado y le respondía a la IA "Caso escalado a humano y
+respuestas automáticas pausadas". La IA daba por hecho que estaba hecho y se
+lo prometía al cliente.
+
+Arreglo:
+- Un caso nacido de una regla de negocio se crea como `'normal'`, y el motivo
+  concreto va en la descripción con el nombre de la regla delante
+  (`[Cliente quiere hablar con un humano] ...`), que es lo que lee la persona
+  que lo atiende.
+- `crearCasoDesdeSistema` registra el fallo en `error_logs` en vez de
+  perderlo por consola.
+- Si el caso no se crea, se le dice explícitamente a la IA que NO prometa una
+  atención humana que no va a existir.
+
+Verificado: 11 escenarios del motor, todos correctos, con el caso creado y la
+IA pausada.
+
+## Ronda de pruebas del motor de IA (10-09-2026)
+Primera prueba real del motor con clave de OpenAI. Se monta un negocio
+completo de prueba (horario partido, catálogo con etiquetas, políticas con
+sus embeddings, etiquetas de conversación, reglas de escalado y novedades del
+día), se lanzan preguntas de cliente contra `/api/ai/process` y se comprueba
+lo que hace. Guion en el scratchpad de la sesión.
+
+Los 11 escenarios pasan: horario real por día (incluido el día cerrado),
+precio exacto del catálogo, búsqueda por característica ("algo vegano"),
+políticas por RAG (devoluciones y mascotas), novedades del día tenidas en
+cuenta, respuesta en el idioma del cliente, escalado con creación de caso,
+etiquetado con una categoría real de la sucursal, y agrupación de varios
+mensajes seguidos en una sola respuesta.

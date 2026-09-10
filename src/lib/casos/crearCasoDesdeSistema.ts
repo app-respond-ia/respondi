@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { notificarAAdminsDeOrganizacion } from '@/lib/notificaciones'
+import { registrarError } from '@/lib/errores'
 
 export async function crearCasoDesdeSistema(
   conversationId: string, 
@@ -39,7 +40,17 @@ export async function crearCasoDesdeSistema(
     .single()
 
   if (error) {
-    console.error('Error insertando caso derivado automáticamente:', error)
+    // Antes esto era un console.error y un `return null` que nadie miraba, así
+    // que cuando fallaba se le decía igualmente a la IA que el caso estaba
+    // creado. Resultado: la IA contestaba "te paso con una persona" y no había
+    // ningún caso ni ningún aviso. Ahora queda registrado y quien llama puede
+    // enterarse de que falló.
+    await registrarError({
+      origen: 'app',
+      descripcion: 'Fallo al crear el caso derivado automáticamente (el cliente se queda sin atención humana)',
+      stacktrace: JSON.stringify({ conversationId, tipoCaso, prioridad, error }),
+      tenant_id: tenantId
+    })
     return null
   }
 

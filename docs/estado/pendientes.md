@@ -11,26 +11,32 @@ solo la lista viva).
 - [x] Bug de permisos: un admin/dueño de organización no podía hacer
       ciertas acciones en su propio panel — resuelto, ver
       `docs/estado/incidentes-resueltos.md`
-- [ ] **Verificar dominio en Resend.** Hoy la cuenta está en modo prueba y
-      solo puede enviar a `app.respond.ia@gmail.com`; cualquier invitación
-      a otra dirección se guarda pero el correo se rechaza con un 403. Es
-      el motivo real de "invité a alguien y no llegó ningún email".
-      Bloquea toda prueba de alta con personas reales.
-- [ ] **`OPENAI_API_KEY` en Vercel.** La clave ya está en `.env.local`
-      (local), pero producción es donde se verifica todo: hay que
-      añadirla también en las variables de entorno de Vercel.
 - [ ] `crear_cuenta_completa` es ejecutable por los roles `anon` y
       `authenticated` vía `/rest/v1/rpc/`. La FK `users.id → auth.users`
       impide inventarse usuarios, pero cualquiera con una cuenta puede
       llamarla y crear organizaciones (con sus créditos de trial) en
-      bucle, o para el id de otra persona. Revocar el EXECUTE.
+      bucle, o para el id de otra persona. Revocar el EXECUTE: las 3
+      llamadas de la app usan `supabaseAdmin` (service role), que se
+      salta los GRANT, así que revocar no rompe nada. OJO: no tocar
+      `get_resumen_creditos`, esa sí se llama con el cliente de sesión
+      (`superadmin.ts`).
 - [ ] Verificaciones aplazadas: contraseña con cuenta email
       (vendedor/superadmin), fix de invitación con hash, prueba de
       notificación de comisiones
 
 ## Prioridad 2 — Fase 0 (antes de construir nada de la v2)
-- [x] Conseguir `OPENAI_API_KEY` — hecha, en `.env.local`. Falta
-      subirla a Vercel (ver Prioridad 1)
+- [x] Conseguir `OPENAI_API_KEY` — hecha: en `.env.local` y en las
+      variables de entorno de Vercel (09-09-2026)
+- [ ] **Verificar dominio en Resend** — antes de que se registren
+      personas de fuera, no antes. Hoy la cuenta está en modo prueba y
+      solo envía a `app.respond.ia@gmail.com`; cualquier invitación a
+      otra dirección se guarda pero el correo se rechaza con un 403.
+      Es el motivo real de "invité a alguien y no llegó ningún email".
+      No bloquea las pruebas internas: Jorge y Andreina las hacen con
+      sus propias cuentas de Gmail/Facebook y móviles, y el alta se
+      puede completar entrando a `/registro-trial` con el mismo email
+      de la invitación — el sistema la vincula por email, sin
+      necesidad de abrir ningún correo.
 - [ ] Papeleo de canales (verificación de Atsura, registro como
       partner de Gupshup para el BSP)
 - [ ] Ronda de pruebas rigurosa, escenario por escenario, de toda la

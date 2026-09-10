@@ -45,10 +45,15 @@ solo la lista viva).
       de 22:00 a 02:00 ya se puede configurar; el editor marca la franja
       como "del día siguiente" y el cálculo mira también la cola del día
       anterior. 31 escenarios verificados
-- [ ] `PRICING` en `generarRespuesta.ts` está fijo (0,20 y 1,20 por millón
-      de tokens) mientras el modelo ya es configurable por plan: el coste
-      estimado de `ai_logs` será incorrecto para cualquier modelo que no
-      cueste eso
+- [x] Coste por token configurable por plan — hecho (10-09-2026).
+      `plans.precio_input_usd_millon` / `precio_output_usd_millon`, editables
+      desde /superadmin/planes. Verificado con una respuesta real: al cambiar
+      el precio del plan cambia el coste que guarda `ai_logs`
+- [ ] **Poner los precios reales de OpenAI en cada plan**. Ahora mismo los
+      cuatro tienen los valores que había fijos en el código (0,20 y 1,20 por
+      millón), que no corresponden a gpt-4o. Hasta que se corrijan, los
+      informes de consumo dan un margen equivocado. Lo tiene que hacer Jorge
+      con la lista de precios delante
 
 ## Prioridad 3 — Cimientos antes de Shopify
 - [ ] Canal de email: mismo motor de IA, lógica de conversación
@@ -110,13 +115,6 @@ se traga en silencio.
     sesión devuelven null/false
 - [x] Tramo D de horarios — resuelto (10-09-2026). Al auditarlo salieron
       6 fallos más en la misma función, ver `incidentes-resueltos.md`
-- [ ] **Hay dos formas de crear una sucursal**: el modal rápido de
-      `/dashboard/sucursales` (`crearSucursal`, copia campo a campo) y el
-      asistente `/dashboard/sucursales/nueva` (`crearSucursalConDatos`).
-      Todos los fallos del tramo D venían de que la primera se quedó atrás
-      respecto a la segunda. Mientras existan las dos, volverán a
-      desincronizarse. Decidir con Jorge si el modal rápido pasa a ser un
-      enlace al asistente y se elimina `crearSucursal`.
 - [x] Unificar el editor de horarios del onboarding — ya estaba hecho en
       el tramo C: `onboarding/page.tsx` usa `EditorHorarios` (paso 2) y
       `ConfiguracionMensajeIA` con el selector de 3 modos (paso 4). La

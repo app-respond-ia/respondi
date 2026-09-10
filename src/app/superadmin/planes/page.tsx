@@ -22,7 +22,9 @@ export default function PlanesPage() {
   const defaultFormData = {
     nombre: '', precio_usd: 0, creditos_mensuales: 1000, canales_max: 1, sucursales_max: 1, 
     usuarios_max: 1, precio_credito_adicional: 0.005, precio_sucursal_extra: 15, 
-    dias_retencion_mensajes: 30, dias_trial: 14, modelo_ia: 'gpt-4o-mini', activo: false, acumula_creditos: false, stripe_price_id: ''
+    dias_retencion_mensajes: 30, dias_trial: 14, modelo_ia: 'gpt-4o-mini',
+    precio_input_usd_millon: 0.20, precio_output_usd_millon: 1.20,
+    activo: false, acumula_creditos: false, stripe_price_id: ''
   }
   
   const [formData, setFormData] = useState({ ...defaultFormData })
@@ -52,6 +54,8 @@ export default function PlanesPage() {
         dias_retencion_mensajes: plan.dias_retencion_mensajes || 30,
         dias_trial: plan.dias_trial ?? 14,
         modelo_ia: plan.modelo_ia || 'gpt-4o-mini',
+        precio_input_usd_millon: plan.precio_input_usd_millon ?? 0.20,
+        precio_output_usd_millon: plan.precio_output_usd_millon ?? 1.20,
         activo: plan.activo ?? true,
         acumula_creditos: plan.acumula_creditos ?? false,
         stripe_price_id: plan.stripe_price_id || ''
@@ -288,11 +292,34 @@ export default function PlanesPage() {
                     <div>
                       <label className="block text-xs font-500 text-ink-600 mb-1.5">Modelo IA asignado</label>
                       <select value={formData.modelo_ia} onChange={e => setFormData({...formData, modelo_ia: e.target.value})} className="w-full h-10 px-3 rounded-lg border border-slate-300 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-100">
-                        <option value="gpt-4o-mini">GPT-4o mini (Rápido)</option>
-                        <option value="gpt-4o">GPT-4o (Complejo)</option>
-                        <option value="claude-3-haiku">Claude 3 Haiku</option>
-                        <option value="llama-3">Llama 3</option>
+                        {/* Solo modelos de OpenAI: el motor habla únicamente
+                            con su API. Aquí figuraban Claude 3 Haiku y Llama 3,
+                            y elegir cualquiera de los dos dejaba sin IA a todos
+                            los clientes de ese plan, sin ningún aviso. */}
+                        <option value="gpt-4o-mini">GPT-4o mini (rápido y barato)</option>
+                        <option value="gpt-4o">GPT-4o (más capaz, más caro)</option>
                       </select>
+                    </div>
+                    <div className="col-span-2 grid grid-cols-2 gap-4 p-3 rounded-xl bg-slate-50 border border-slate-200">
+                      <div className="col-span-2">
+                        <p className="text-xs font-600 text-ink-700">Coste del modelo (USD por millón de tokens)</p>
+                        <p className="text-[11px] text-ink-400 mt-0.5">
+                          El cliente siempre gasta 1 crédito por respuesta. Esto es lo que le cuesta a Respondi,
+                          y sirve para calcular el margen en los informes de consumo. Ponlo según la lista de precios de OpenAI.
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-500 text-ink-600 mb-1.5">Entrada</label>
+                        <input type="number" step="0.01" min="0" value={formData.precio_input_usd_millon}
+                          onChange={e => setFormData({...formData, precio_input_usd_millon: parseFloat(e.target.value) || 0})}
+                          className="w-full h-10 px-3 rounded-lg border border-slate-300 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-100" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-500 text-ink-600 mb-1.5">Salida</label>
+                        <input type="number" step="0.01" min="0" value={formData.precio_output_usd_millon}
+                          onChange={e => setFormData({...formData, precio_output_usd_millon: parseFloat(e.target.value) || 0})}
+                          className="w-full h-10 px-3 rounded-lg border border-slate-300 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-100" />
+                      </div>
                     </div>
                     <div>
                       <label className="block text-xs font-500 text-ink-600 mb-1.5">Retención mensajes (días)</label>

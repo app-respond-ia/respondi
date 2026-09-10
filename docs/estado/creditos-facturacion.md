@@ -100,3 +100,29 @@ sobre los límites del plan.
 Bloque 2.1 (traducir errores crudos de Postgres a mensajes
 entendibles) — pausado a propósito hasta cerrar la auditoría de
 esquema y la estrategia de errores/seguridad.
+
+## Modelo de cobro de la IA (confirmado 10-09-2026)
+**1 crédito de Respondi = 1 respuesta de la IA**, sea cual sea el modelo. Lo
+que cambia entre planes es QUÉ modelo se usa —los más caros solo en los
+planes altos—, no cuántos créditos gasta el cliente por responder.
+
+De ahí que el margen dependa del plan: una respuesta de gpt-4o cuesta bastante
+más que una de gpt-4o-mini y el cliente paga lo mismo. Por eso el precio por
+token vive en el plan (`plans.precio_input_usd_millon` y
+`precio_output_usd_millon`), junto a `modelo_ia`, y los tres se editan desde
+`/superadmin/planes`. `generarRespuesta` los lee de ahí para calcular el
+`costo_estimado_usd` de cada respuesta en `ai_logs`.
+
+Dos avisos:
+- Si dos planes usan el mismo modelo hay que poner el mismo precio en los dos.
+  Se acepta esa duplicación a cambio de no montar un catálogo de modelos con
+  su propia pantalla.
+- Los cuatro planes arrancan con 0,20 y 1,20 por millón, que son los valores
+  que estaban fijos en el código. **No corresponden a gpt-4o**: hay que
+  ponerles los precios reales antes de fiarse de los informes de consumo.
+
+El selector de modelo solo ofrece modelos de OpenAI. Ofrecía también "Claude
+3 Haiku" y "Llama 3", pero el motor únicamente habla con la API de OpenAI:
+elegir cualquiera de los dos dejaba sin IA a todos los clientes de ese plan,
+sin ningún aviso. Si algún día se añade otro proveedor, hay que tocar el
+motor antes que el desplegable.

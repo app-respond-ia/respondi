@@ -6,10 +6,12 @@ import { registrarAuditoria } from '@/lib/auditoria'
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || 'sk-test-placeholder'
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY })
 
-const PRICING = {
-  input: 0.20 / 1000000,
-  output: 1.20 / 1000000
-}
+// Precio de reserva por si el plan no lo tiene puesto. El bueno viene de
+// `plans.precio_input_usd_millon` / `precio_output_usd_millon`, editables por
+// plan desde /superadmin/planes: el cliente siempre paga 1 crédito por
+// respuesta, pero a Respondi le cuesta distinto según el modelo del plan, y
+// de ahí sale el margen.
+const PRECIO_POR_DEFECTO = { input: 0.20, output: 1.20 }
 
 export async function generarRespuesta(conv: any) {
   const conversationId = conv.id
@@ -28,12 +30,16 @@ export async function generarRespuesta(conv: any) {
   // plans (plan_id y plan_pendiente_id) y sin indicar cuál, la consulta falla.
   const { data: orgPlan } = await supabaseAdmin
     .from('organizaciones')
-    .select('plans!plan_id(modelo_ia)')
+    .select('plans!plan_id(modelo_ia, precio_input_usd_millon, precio_output_usd_millon)')
     .eq('id', tenantId)
     .single()
 
   const planRel: any = Array.isArray(orgPlan?.plans) ? orgPlan?.plans[0] : orgPlan?.plans
   const MODELO_IA = planRel?.modelo_ia || 'gpt-4o-mini'
+  const PRECIO = {
+    input: Number(planRel?.precio_input_usd_millon ?? PRECIO_POR_DEFECTO.input) / 1000000,
+    output: Number(planRel?.precio_output_usd_millon ?? PRECIO_POR_DEFECTO.output) / 1000000
+  }
 
   // 1. Obtener mensajes sin agrupar
   const { data: ungrouped } = await supabaseAdmin
@@ -685,7 +691,7 @@ export async function generarRespuesta(conv: any) {
   }
 
   // 11. Registrar Coste
-  const costeTotal = (tokensInput * PRICING.input) + (tokensOutput * PRICING.output)
+  const costeTotal = (tokensInput * PRECIO.input) + (tokensOutput * PRECIO.output)
   
   const { error: errorLog } = await supabaseAdmin.from('ai_logs').insert({
     tenant_id: tenantId,

@@ -20,6 +20,21 @@ export async function generarRespuesta(conv: any) {
   const branch = Array.isArray(conv.sucursales) ? conv.sucursales[0] : conv.sucursales
   const profile = Array.isArray(branch?.business_profiles) ? branch?.business_profiles[0] : branch?.business_profiles
 
+  // El modelo lo manda el plan de la organización (`plans.modelo_ia`), que se
+  // edita por plan desde /superadmin/planes. Estaba escrito a fuego en cuatro
+  // sitios de este archivo, así que ese campo del panel no hacía nada y todos
+  // los clientes usaban el mismo modelo, pagaran lo que pagaran.
+  // `plans!plan_id` es obligatorio: organizaciones tiene dos claves hacia
+  // plans (plan_id y plan_pendiente_id) y sin indicar cuál, la consulta falla.
+  const { data: orgPlan } = await supabaseAdmin
+    .from('organizaciones')
+    .select('plans!plan_id(modelo_ia)')
+    .eq('id', tenantId)
+    .single()
+
+  const planRel: any = Array.isArray(orgPlan?.plans) ? orgPlan?.plans[0] : orgPlan?.plans
+  const MODELO_IA = planRel?.modelo_ia || 'gpt-4o-mini'
+
   // 1. Obtener mensajes sin agrupar
   const { data: ungrouped } = await supabaseAdmin
     .from('messages')
@@ -350,7 +365,7 @@ export async function generarRespuesta(conv: any) {
   let responseMsg
   try {
     const response = await openai.chat.completions.create({
-      model: 'gpt-5.6-luna',
+      model: MODELO_IA,
       messages: openAiMessages,
       tools: tools
     })
@@ -364,7 +379,7 @@ export async function generarRespuesta(conv: any) {
     await supabaseAdmin.from('ai_logs').insert({
       tenant_id: tenantId,
       branch_id: branchId,
-      modelo_ia: 'gpt-5.6-luna',
+      modelo_ia: MODELO_IA,
       resultado: 'fallo',
       contexto_snapshot: { step: 1, error: error?.message || 'OpenAI API Error' }
     })
@@ -621,7 +636,7 @@ export async function generarRespuesta(conv: any) {
     // 9. Llamada a OpenAI (Paso 2)
     try {
       const secondResponse = await openai.chat.completions.create({
-        model: 'gpt-5.6-luna',
+        model: MODELO_IA,
         messages: openAiMessages
       })
       responseMsg = secondResponse.choices[0].message
@@ -632,7 +647,7 @@ export async function generarRespuesta(conv: any) {
       await supabaseAdmin.from('ai_logs').insert({
         tenant_id: tenantId,
         branch_id: branchId,
-        modelo_ia: 'gpt-5.6-luna',
+        modelo_ia: MODELO_IA,
         resultado: 'fallo',
         contexto_snapshot: { step: 2, error: error?.message || 'OpenAI API Error Step 2' }
       })
@@ -676,7 +691,7 @@ export async function generarRespuesta(conv: any) {
     tenant_id: tenantId,
     branch_id: branchId,
     message_id: insertId, 
-    modelo_ia: 'gpt-5.6-luna',
+    modelo_ia: MODELO_IA,
     tokens_input: tokensInput,
     tokens_output: tokensOutput,
     costo_estimado_usd: costeTotal,
@@ -684,13 +699,12 @@ export async function generarRespuesta(conv: any) {
   })
   if (errorLog) console.error('Error insertando ai_log:', errorLog)
 
-  // Descontar cuota IA (1 unidad)
-  const { error: errorRpc } = await supabaseAdmin.rpc('descontar_cuota_ia', {
-    p_tenant_id: tenantId,
-    p_cantidad: 1,
-    p_descripcion: 'consumo por agrupacion de mensajes'
-  })
-  if (errorRpc) console.error('Error al descontar cuota:', errorRpc)
+  // OJO: aquí NO se descuenta la cuota. Lo hace quien llama a esta función
+  // (`/api/ai/process`), y solo si la respuesta salió bien. Antes se descontaba
+  // en los dos sitios, así que cada respuesta de la IA gastaba 2 créditos en
+  // vez de 1 y los clientes se quedaban sin saldo al doble de velocidad.
+  // El descuento de `route.ts` es además el bueno: guarda la sucursal y el
+  // origen del movimiento, que este no rellenaba.
 
   // 12. Simular N8N webhook
   if (finalContent) {

@@ -326,3 +326,68 @@ Aparte, los `catch` de los pasos 0, 2, 4 y 5 del onboarding solo hacían
 `console.error` antes de relanzar. El error llegaba a la pantalla, pero no
 quedaba registrado en `error_logs`, que es lo único consultable después. Los
 pasos 1 y 3 ya lo hacían bien. Ahora los seis registran.
+
+## El motor de IA no podía responder a nadie (resuelto)
+Encontrado en la ronda de pruebas de la jerarquía (10-09-2026), antes de
+tener clientes reales. Dos fallos en el mismo sitio:
+
+**1. El modelo estaba escrito a fuego.** `generarRespuesta.ts` llamaba a
+OpenAI con `model: 'gpt-5.6-luna'` en cuatro sitios, ignorando por completo
+la columna `plans.modelo_ia` que se edita por plan desde
+`/superadmin/planes`. Dos consecuencias: ese campo del panel no servía para
+nada (todos los clientes usaban el mismo modelo, pagaran lo que pagaran) y,
+sobre todo, **OpenAI rechazaba la llamada**:
+
+    400 Function tools with reasoning_effort are not supported for
+    gpt-5.6-luna in /v1/chat/completions
+
+Como el motor usa herramientas (etiquetar, escalar, consultar horario y
+catálogo), la petición fallaba siempre. La IA no podía contestar a nadie.
+Ahora lee `plans.modelo_ia` con `plans!plan_id` (organizaciones tiene dos
+claves hacia plans y sin especificarla la consulta falla) y cae a
+`gpt-4o-mini` si el plan no tiene modelo.
+
+**2. Cada respuesta descontaba 2 créditos en vez de 1.** Se llamaba a
+`descontar_cuota_ia` en dos sitios para la misma respuesta: dentro de
+`generarRespuesta` ("consumo por agrupacion de mensajes") y otra vez en
+`/api/ai/process` ("Mensaje respondido por IA"). Confirmado en
+`message_quotas`: dos apuntes seguidos con 0,2 segundos de diferencia. Los
+clientes se quedaban sin saldo al doble de velocidad de lo que dice
+`docs/arquitectura.md` ("1 mensaje respondido por la IA = 1 crédito"). Se
+quita el de `generarRespuesta`; el de `route.ts` es el bueno porque además
+guarda la sucursal y el origen del movimiento, y solo corre si la respuesta
+salió bien.
+
+Verificado después del arreglo con una conversación real: la IA contesta,
+`ai_logs` registra `modelo_ia: gpt-4o` con su coste, y el saldo baja
+exactamente 1.
+
+## Ronda de pruebas de la jerarquía de pausa/horario (10-09-2026)
+15 escenarios contra el endpoint real `/api/ai/process`, todos correctos:
+prioridad de la pausa manual sobre la sucursal apagada, trato del contacto
+(derivar y respuesta automática), sucursal apagada vs. automática, los tres
+modos de horario de la IA (`mismo_negocio`, `siempre_activa`,
+`personalizado`, incluido el caso de `personalizado` sin horario de IA
+configurado), mensaje y apertura de caso fuera de horario, y créditos
+agotados. Guion en el scratchpad de la sesión; merece la pena repetirlo
+cuando se toque la jerarquía.
+
+Y 18 escenarios de `isFueraDeHorario` (función pura, con el reloj
+congelado): franjas partidas, límites exactos de apertura y cierre, día
+cerrado, sin horario configurado, husos horarios distintos para el mismo
+instante y zona horaria inválida. Todos correctos salvo el horario que
+cruza medianoche, que se documenta abajo como limitación conocida.
+
+## Limitación conocida: horarios que cruzan la medianoche
+Un negocio de noche (un bar de 22:00 a 02:00, una farmacia de guardia, un
+soporte 24h por turnos) no puede configurar su horario real:
+`validarHorarios` exige que la hora de apertura sea anterior a la de cierre,
+así que la pantalla lo rechaza. Si se saltara esa validación, tampoco
+funcionaría: `isFueraDeHorario` compara minutos dentro del mismo día y daría
+"fuera de horario" las 24 horas.
+
+No es un fallo silencioso —la pantalla avisa— pero sí una limitación real
+para un tipo de cliente que entra dentro del público de Respondi. Arreglarlo
+supone permitir el cruce de día en la validación y, en `isFueraDeHorario`,
+mirar también las franjas del día anterior que se prolongan más allá de
+medianoche. Pendiente de decidir.

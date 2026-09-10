@@ -36,11 +36,18 @@ solo la lista viva).
       necesidad de abrir ningún correo.
 - [ ] Papeleo de canales (verificación de Atsura, registro como
       partner de Gupshup para el BSP)
-- [ ] Ronda de pruebas rigurosa, escenario por escenario, de toda la
-      jerarquía de pausa/horario de la IA — incluye los 3 modos nuevos
-      de horario (`mismo_negocio`/`personalizado`/`siempre_activa`),
-      reescritos pero nunca probados con el mismo rigor que el resto
-      de la jerarquía
+- [x] Ronda de pruebas de la jerarquía de pausa/horario — hecha
+      (10-09-2026): 15 escenarios contra el endpoint real + 18 de la
+      función de horarios con el reloj congelado. Todos correctos. Por el
+      camino salieron dos fallos graves del motor de IA, ver
+      `incidentes-resueltos.md`
+- [ ] **Horarios que cruzan medianoche** (bar de 22:00 a 02:00, farmacia
+      de guardia): hoy no se pueden configurar. Ver la limitación en
+      `incidentes-resueltos.md`. Decidir si se soporta
+- [ ] `PRICING` en `generarRespuesta.ts` está fijo (0,20 y 1,20 por millón
+      de tokens) mientras el modelo ya es configurable por plan: el coste
+      estimado de `ai_logs` será incorrecto para cualquier modelo que no
+      cueste eso
 
 ## Prioridad 3 — Cimientos antes de Shopify
 - [ ] Canal de email: mismo motor de IA, lógica de conversación

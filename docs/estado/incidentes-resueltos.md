@@ -468,3 +468,41 @@ políticas por RAG (devoluciones y mascotas), novedades del día tenidas en
 cuenta, respuesta en el idioma del cliente, escalado con creación de caso,
 etiquetado con una categoría real de la sucursal, y agrupación de varios
 mensajes seguidos en una sola respuesta.
+
+## Multimedia: fotos, audios y documentos nunca llegaron a la IA (resuelto)
+`messages.media_tipo` guarda el **tipo MIME** que manda n8n (`image/jpeg`,
+`audio/ogg`, `application/pdf`...), pero el motor comparaba con las palabras
+exactas `'image'` y `'audio'`:
+
+```ts
+if (m.media_tipo === 'image')        // nunca cierto: vale 'image/jpeg'
+else if (m.media_tipo === 'audio')   // nunca cierto: vale 'audio/ogg'
+```
+
+Consecuencias, todas silenciosas:
+- Las **fotos** no se enviaban a la IA. El cliente mandaba una imagen y a la
+  IA le llegaba un mensaje vacío.
+- Los **audios** no se transcribían. Igual: mensaje vacío.
+- Los **documentos y vídeos** llegaban también vacíos, así que la IA ni
+  siquiera podía saber que había llegado un archivo y derivarlo a una
+  persona, que es lo que dicen sus instrucciones.
+
+Es decir: **todo el bloque de multimedia del motor no había funcionado
+nunca**. No había salido antes porque en la base de datos no hay ni un solo
+mensaje con adjunto: nunca se había probado.
+
+Arreglado comparando por familia MIME (`image/…`, `audio/…`) y añadiendo un
+tercer caso para lo que la IA no puede abrir (PDF, Word, vídeo), donde ahora
+se le inyecta una nota explícita para que avise al cliente y derive el caso.
+
+De paso, dos mejoras del mismo bloque:
+- Una imagen del historial que ya tiene su descripción guardada se manda como
+  texto, no como foto. Mirar la misma imagen en cada turno multiplicaba el
+  coste sin aportar nada, y contradecía el diseño de `docs/arquitectura.md`
+  ("directo a la IA la primera vez; después se cachea la descripción").
+- El fallo al transcribir un audio se registra en `error_logs` en vez de
+  perderse por consola.
+
+Verificado con ficheros reales subidos al bucket: la IA lee un cartel con
+texto y guarda su descripción, transcribe un audio y responde a lo que se
+dice en él, y ante un PDF avisa al cliente y crea el caso.

@@ -226,7 +226,24 @@ export async function generarRespuesta(conv: any) {
 
   for (const m of allMessages) {
     let role = m.remitente === 'cliente' ? 'user' : 'assistant'
-    if (m.media_tipo === 'image') {
+
+    // `messages.media_tipo` guarda el tipo MIME que manda n8n ('image/jpeg',
+    // 'audio/ogg', 'application/pdf'...), no las palabras 'image' o 'audio'.
+    // Aquí se comparaba con esas palabras exactas, así que NUNCA coincidía:
+    // las fotos no llegaban a la IA, los audios no se transcribían y los
+    // documentos pasaban como un mensaje vacío. Se compara por familia.
+    const familia = (m.media_tipo || '').split('/')[0]
+    const esImagen = familia === 'image'
+    const esAudio = familia === 'audio'
+    const esAdjuntoNoProcesable = !!m.media_tipo && !esImagen && !esAudio
+
+    // Una imagen del historial que ya tiene su descripción guardada se manda
+    // como texto, no como foto: mirar la misma imagen en cada turno multiplica
+    // el coste sin aportar nada. Es el diseño descrito en docs/arquitectura.md
+    // ("directo a la IA la primera vez; después se cachea la descripción").
+    const imagenYaDescrita = esImagen && m.agrupado === true && !!m.contenido
+
+    if (esImagen && !imagenYaDescrita) {
       hasImage = true
       const path = m.media_url?.replace(/.*?\/storage\/v1\/object\/public\/whatsapp_media\//, '')
       let finalUrl = m.media_url
@@ -241,7 +258,7 @@ export async function generarRespuesta(conv: any) {
           { type: 'image_url', image_url: { url: finalUrl } }
         ]
       })
-    } else if (m.media_tipo === 'audio' && m.agrupado === false && m.media_url) {
+    } else if (esAudio && m.agrupado === false && m.media_url) {
       // Transcripción de audio con Whisper
       try {
         const path = m.media_url.replace(/.*?\/storage\/v1\/object\/public\/whatsapp_media\//, '')
@@ -264,9 +281,25 @@ export async function generarRespuesta(conv: any) {
         await supabaseAdmin.from('messages').update({ contenido: textoExtraido }).eq('id', m.id)
         openAiMessages.push({ role, content: textoExtraido })
       } catch (err) {
-        console.error(`Error transcribiendo audio (ID: ${m.id}):`, err)
+        await registrarError({
+          origen: 'app',
+          descripcion: 'Fallo al transcribir un audio del cliente',
+          stacktrace: JSON.stringify({ messageId: m.id, error: (err as any)?.message }),
+          tenant_id: tenantId
+        })
         openAiMessages.push({ role, content: '[Nota: Audio ininteligible o fallo en transcripción]' })
       }
+    } else if (imagenYaDescrita) {
+      openAiMessages.push({ role, content: `[Imagen que envió el cliente, ya descrita antes] ${m.contenido}` })
+    } else if (esAdjuntoNoProcesable) {
+      // Vídeos, PDF, Word... El motor no los procesa, pero la IA tiene que
+      // ENTERARSE de que ha llegado algo: si no, le llega un mensaje vacío,
+      // no entiende nada y no puede derivar el caso a una persona como se le
+      // pide en las instrucciones.
+      openAiMessages.push({
+        role,
+        content: `[El cliente ha enviado un archivo adjunto de tipo ${m.media_tipo} que no puedes abrir ni leer. Dile que lo has recibido pero que no puedes procesarlo, y deriva el caso a una persona.]${m.contenido ? ` Texto que lo acompaña: ${m.contenido}` : ''}`
+      })
     } else {
       openAiMessages.push({ role, content: m.contenido || '' })
     }

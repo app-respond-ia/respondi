@@ -4,8 +4,17 @@ Ver `docs/arquitectura.md` para el diseño de fondo (jerarquía de
 pausa, herramientas, RAG). Aquí va el estado real de construcción.
 
 ## Modelo
-OpenAI GPT-5.6 Luna (no Anthropic/Claude) — decisión tomada tras
-comparar costes.
+OpenAI, y **lo define el plan** (`plans.modelo_ia`), editable desde
+`/superadmin/planes`: los modelos más capaces solo en los planes altos. El
+cliente paga 1 crédito por respuesta sea cual sea el modelo, así que el
+margen depende del plan; por eso el precio por token vive también ahí
+(`precio_input_usd_millon` / `precio_output_usd_millon`).
+
+Modelos verificados contra la API con las herramientas del motor:
+`gpt-4.1-nano`, `gpt-4o-mini`, `gpt-4.1-mini`, `gpt-4o` y `gpt-4.1`. La
+familia `gpt-5.6` (Luna, Terra, Sol) rechaza las herramientas salvo que se le
+pase `reasoning_effort: 'none'`, y `gpt-6-astra` no admite ni eso: quedan
+fuera del selector hasta tocar el motor.
 
 ## Jerarquía de pausa/horario — estado
 Reescrita la lógica de horario en `route.ts` (Fase 1) para separar el
@@ -65,10 +74,26 @@ las demás, pero sin ninguna herramienta real detrás todavía (hoy solo
 reutiliza `consultar_catalogo`). Construir la herramienta real es
 tarea aparte, futura.
 
-## Pendiente — Bloqueado por falta de credenciales
-Toda prueba real end-to-end del motor de IA (créditos incluidos) está
-bloqueada por falta de `OPENAI_API_KEY` — ver
-`docs/estado/pendientes.md`, Prioridad 2 (Fase 0).
+## Probado de punta a punta (10-09-2026)
+Ya no está bloqueado: con la clave puesta se hicieron tres rondas de pruebas
+reales contra `/api/ai/process`, en total 30 escenarios. Guiones en el
+scratchpad de la sesión, merece la pena repetirlos al tocar el motor.
+
+- **Herramientas** (11): horario por día, precio exacto del catálogo,
+  búsqueda por característica, políticas por RAG, novedades del día, idioma
+  del cliente, escalado con caso, etiquetado y agrupación de mensajes.
+- **Comportamiento** (15): agrupación y marcado de mensajes, no cobrar sin
+  responder, producto oculto a la IA, filtro por precio, etiqueta de
+  respaldo, sucursal sin nada configurado, memoria de conversaciones
+  anteriores, resúmenes (con y sin caso pendiente), seguridad de los
+  endpoints y recuperación tras 3 fallos seguidos de OpenAI.
+- **Multimedia** (4): imagen leída y descrita, audio transcrito y contestado,
+  PDF avisado y derivado.
+
+Por el camino salieron cinco fallos graves, todos corregidos y documentados
+en `incidentes-resueltos.md`: el modelo escrito a fuego que impedía responder,
+el doble cobro de créditos, el escalado que nunca creaba caso, el cobro sin
+respuesta y el bloque entero de multimedia.
 
 ## Sueltos relacionados (ver `docs/estado/pendientes.md`)
 - Auditoría completa de FKs faltantes en el esquema (ej.

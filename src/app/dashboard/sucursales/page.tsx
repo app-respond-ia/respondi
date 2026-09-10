@@ -4,11 +4,10 @@ import { ErrorCarga } from '@/components/ui/ErrorCarga'
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { getSucursales, crearSucursal, desactivarSucursal, reactivarSucursal } from '@/app/actions/sucursales'
+import { getSucursales, desactivarSucursal, reactivarSucursal } from '@/app/actions/sucursales'
 import { getMisPermisos } from '@/app/actions/permisos'
 import { useToast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
-import { PAISES } from '@/lib/paises'
 
 export default function SucursalesPage() {
   const [loading, setLoading] = useState(true)
@@ -20,13 +19,6 @@ export default function SucursalesPage() {
   const [errorCarga, setErrorCarga] = useState(false)
   // CAMBIO 6: Modal de confirmación para desactivar
   const [confirmarDesactivar, setConfirmarDesactivar] = useState<any | null>(null)
-
-  // Modal Crear
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [modalLoading, setModalLoading] = useState(false)
-  const [modalData, setModalData] = useState<{ nombre: string, direccion: string, pais: string, copiarDesdeId: string }>({
-    nombre: '', direccion: '', pais: '', copiarDesdeId: ''
-  })
 
   const cargar = async () => {
     setLoading(true)
@@ -58,27 +50,6 @@ export default function SucursalesPage() {
   useEffect(() => {
     cargar().catch(() => setErrorCarga(true))
   }, [])
-
-  const handleOpenModal = () => {
-    setModalData({ nombre: '', direccion: '', pais: '', copiarDesdeId: '' })
-    setIsModalOpen(true)
-  }
-
-  const handleCrear = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setModalLoading(true)
-
-    const res = await crearSucursal(modalData.nombre, modalData.direccion, modalData.copiarDesdeId || undefined, modalData.pais)
-
-    if (res.success && res.data) {
-      setIsModalOpen(false)
-      showToast('Sucursal creada correctamente ✓', 'success')
-      setSucursales([...sucursales, res.data])
-    } else {
-      showToast(res.error || 'Error al crear sucursal', 'error')
-    }
-    setModalLoading(false)
-  }
 
   const handleToggleActivo = async (sucursal: any) => {
     if (sucursal.activa) {
@@ -227,76 +198,6 @@ export default function SucursalesPage() {
       {/* =========================================================
            POPUP · Añadir sucursal
            ========================================================= */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50">
-          <div className="absolute inset-0 bg-ink-900/50 backdrop-blur-sm" onClick={() => !modalLoading && setIsModalOpen(false)}></div>
-        
-          <div className="relative min-h-full flex items-center justify-center p-4 pointer-events-none">
-            <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl pointer-events-auto flex flex-col max-h-[90vh]">
-              
-              <form onSubmit={handleCrear} className="flex flex-col h-full overflow-hidden">
-                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
-                  <h2 className="font-display font-700 text-lg text-ink-900">Añadir sucursal</h2>
-                  <button type="button" onClick={() => !modalLoading && setIsModalOpen(false)} className="p-1.5 rounded-lg text-ink-400 hover:text-ink-700 hover:bg-slate-100 transition" aria-label="Cerrar">
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                  </button>
-                </div>
-        
-                <div className="px-6 py-5 space-y-4 overflow-y-auto">
-                  
-                  <div>
-                    <label className="block text-sm font-500 text-ink-700 mb-1.5">Nombre</label>
-                    <input type="text" placeholder="Ej: Sucursal Centro" required
-                      value={modalData.nombre} onChange={e => setModalData({...modalData, nombre: e.target.value})}
-                      className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm" />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-500 text-ink-700 mb-1.5">Dirección <span className="text-ink-400 font-400">· opcional</span></label>
-                    <input type="text" placeholder="Calle principal 123"
-                      value={modalData.direccion} onChange={e => setModalData({...modalData, direccion: e.target.value})}
-                      className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm" />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-500 text-ink-700 mb-1.5">País</label>
-                    <select
-                      value={modalData.pais} onChange={e => setModalData({...modalData, pais: e.target.value})}
-                      className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm"
-                    >
-                      <option value="">Selecciona un país</option>
-                      {PAISES.map(p => <option key={p.codigo} value={p.codigo}>{p.bandera} {p.nombre}</option>)}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-500 text-ink-700 mb-1.5">Copiar configuración desde <span className="text-ink-400 font-400">· opcional</span></label>
-                    <select
-                      value={modalData.copiarDesdeId}
-                      onChange={e => setModalData({...modalData, copiarDesdeId: e.target.value})}
-                      className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm"
-                    >
-                      <option value="">No copiar (empezar vacía)</option>
-                      {sucursales.map(s => (
-                        <option key={s.id} value={s.id}>{s.nombre}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-        
-                <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100 shrink-0">
-                  <button type="button" disabled={modalLoading} onClick={() => setIsModalOpen(false)} className="px-5 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition disabled:opacity-50">
-                    Cancelar
-                  </button>
-                  <button type="submit" disabled={modalLoading || modalData.nombre.trim().length === 0} className="px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition disabled:opacity-50">
-                    {modalLoading ? 'Guardando...' : 'Guardar sucursal'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
 
       <ConfirmModal
         isOpen={!!confirmarDesactivar}

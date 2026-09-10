@@ -71,10 +71,23 @@ se traga en silencio.
       y `cron-procesar-politicas` (jobid 8) cada minuto. Revisar si esa
       frecuencia es necesaria antes de que haya tráfico real: son
       ~8.600 ejecuciones al día del primero
-- [ ] Avisos del linter de Supabase sin atender: vista
-      `saldos_actuales_ia` con SECURITY DEFINER, 13 funciones con
-      `search_path` mutable, extensión `vector` en el esquema `public`,
-      y protección de contraseñas filtradas desactivada en Auth
+- [x] Linter de Supabase: 13 funciones con `search_path` mutable y la
+      vista `saldos_actuales_ia` (único aviso de nivel ERROR, dejaba ver
+      el saldo de créditos de TODAS las organizaciones) — corregidos y
+      verificados con RLS real
+- [ ] **Activar la protección de contraseñas filtradas** en el panel de
+      Supabase (Authentication → Passwords). Es un clic, lo tiene que
+      hacer Jorge
+- Avisos del linter que se dejan a propósito, con motivo:
+  - `vector` en el esquema `public`: moverlo obligaría a recrear la
+    columna `embedding` de `policy_fragments` y rehacer los embeddings.
+    No compensa por un aviso de estilo
+  - `auth_rol` / `auth_is_admin` / `auth_tenant_id` /
+    `auth_has_permission` / `is_super_admin` ejecutables por `anon` y
+    `authenticated`: **no se pueden cerrar**. 56 políticas de RLS son
+    `TO public` (que incluye a `anon`) y las invocan; sin EXECUTE se cae
+    el acceso a media aplicación. Además no filtran nada: llamadas sin
+    sesión devuelven null/false
 - [x] Tramo D de horarios — resuelto (10-09-2026). Al auditarlo salieron
       6 fallos más en la misma función, ver `incidentes-resueltos.md`
 - [ ] **Hay dos formas de crear una sucursal**: el modal rápido de
@@ -114,8 +127,10 @@ se traga en silencio.
       código ya preparado (ver `docs/estado/creditos-facturacion.md`)
 - [ ] Migrar `create_trial_account`/flujo de Google OAuth al RPC
       `crear_cuenta_completa` (delicado, toca login real)
-- [ ] Columna `plans.dias_trial` editable (hoy los 14 días están
-      hardcodeados)
+- [x] Columna `plans.dias_trial` editable — hecho (10-09-2026). El 14
+      estaba dentro de la función `crear_cuenta_completa` de la base de
+      datos, no en el código de la app. Ahora es una columna del plan,
+      editable desde /superadmin/planes
 - [x] Aplicar `registrarError()` a las funciones de riesgo — hecho
       (10-09-2026). Varias notas estaban desfasadas: `crearSucursal` ya
       registraba y lo de `eq('rol','admin')` ya estaba corregido. Lo que
@@ -126,15 +141,15 @@ se traga en silencio.
 - [ ] Verificar `invitarUsuario` de principio a fin (mismo patrón ya
       probado para vendedor/admin_trial). Ya lleva validación de email y
       registro de errores; falta la prueba de alta real
-- [ ] Borrar el modal muerto de `/dashboard/sucursales` (`handleOpenModal`
-      no lo llama nadie, así que `crearSucursal` es inalcanzable desde la
-      interfaz). Aplazado: no molesta a nadie y confunde explicarlo. El
-      botón "Añadir sucursal" ya lleva al asistente
+- [x] Modal muerto de `/dashboard/sucursales` eliminado, junto con la
+      acción `crearSucursal` que solo él usaba. Ya solo hay una forma de
+      crear una sucursal: el asistente
 - [ ] Pantalla de registro simplificada para invitados (sin "nombre de
       negocio" ni textos de prueba gratis)
-- [ ] Limpieza de rutas huérfanas sin tráfico:
-      `src/app/auth/verificar/route.ts`, plantilla "Invite user" en
-      Supabase
+- [x] Rutas huérfanas — `src/app/auth/verificar/route.ts` ya no existe y
+      `auth/procesar-hash` sí se usa (desde `auth/callback` y
+      `usuarios-globales`). La nota estaba desfasada
+- [ ] Plantilla "Invite user" en Supabase, sin usar (limpieza en el panel)
 - [ ] Excedentes sobre límites del plan (`plans.precio_credito_adicional`,
       `plans.precio_sucursal_extra`) — existen en el formulario pero
       sin flujo de cobro real todavía

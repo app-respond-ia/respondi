@@ -22,7 +22,7 @@ export default function PlanesPage() {
   const defaultFormData = {
     nombre: '', precio_usd: 0, creditos_mensuales: 1000, canales_max: 1, sucursales_max: 1, 
     usuarios_max: 1, precio_credito_adicional: 0.005, precio_sucursal_extra: 15, 
-    dias_retencion_mensajes: 30, modelo_ia: 'gpt-4o-mini', activo: false, acumula_creditos: false, stripe_price_id: ''
+    dias_retencion_mensajes: 30, dias_trial: 14, modelo_ia: 'gpt-4o-mini', activo: false, acumula_creditos: false, stripe_price_id: ''
   }
   
   const [formData, setFormData] = useState({ ...defaultFormData })
@@ -50,6 +50,7 @@ export default function PlanesPage() {
         precio_credito_adicional: plan.precio_credito_adicional || 0,
         precio_sucursal_extra: plan.precio_sucursal_extra || 0,
         dias_retencion_mensajes: plan.dias_retencion_mensajes || 30,
+        dias_trial: plan.dias_trial ?? 14,
         modelo_ia: plan.modelo_ia || 'gpt-4o-mini',
         activo: plan.activo ?? true,
         acumula_creditos: plan.acumula_creditos ?? false,
@@ -278,6 +279,11 @@ export default function PlanesPage() {
                     <div>
                       <label className="block text-xs font-500 text-ink-600 mb-1.5">Usuarios máximos</label>
                       <input type="number" value={formData.usuarios_max} onChange={e => setFormData({...formData, usuarios_max: parseInt(e.target.value)})} className="w-full h-10 px-3 rounded-lg border border-slate-300 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-100" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-500 text-ink-600 mb-1.5">Días de prueba</label>
+                      <input type="number" min="0" value={formData.dias_trial} onChange={e => setFormData({...formData, dias_trial: parseInt(e.target.value) || 0})} className="w-full h-10 px-3 rounded-lg border border-slate-300 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-100" />
+                      <p className="text-[11px] text-ink-400 mt-1">Duración del periodo de prueba al dar de alta con este plan.</p>
                     </div>
                     <div>
                       <label className="block text-xs font-500 text-ink-600 mb-1.5">Modelo IA asignado</label>

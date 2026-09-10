@@ -13,7 +13,7 @@ export async function getAuditLog(filtros?: { userId?: string, tabla?: string, b
     .from('audit_log')
     .select(`
       *,
-      users (
+      users!user_id (
         id,
         nombre,
         email
@@ -73,7 +73,7 @@ export async function getLogsAuditoria(tablaAfectada: 'cases' | 'conversations',
       accion,
       timestamp,
       tabla_afectada,
-      users (
+      users!user_id (
         nombre,
         email
       )

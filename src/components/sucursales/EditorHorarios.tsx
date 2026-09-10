@@ -2,18 +2,7 @@
 
 import React, { useState } from 'react'
 import { DIAS_SEMANA } from '@/lib/dias-semana'
-
-interface Franja {
-  apertura: string
-  cierre: string
-  orden: number
-}
-
-interface HorarioDia {
-  dia_semana: number
-  cerrado: boolean
-  franjas: Franja[]
-}
+import { MAX_FRANJAS_POR_DIA, type HorarioDia } from '@/lib/horarios'
 
 interface EditorHorariosProps {
   horarios: HorarioDia[]
@@ -143,7 +132,7 @@ export function EditorHorarios({ horarios, onChange, nivelPermiso, variant }: Ed
                     )}
                   </div>
                 ))}
-                {nivelPermiso === 'escritura' && (
+                {nivelPermiso === 'escritura' && h.franjas.length < MAX_FRANJAS_POR_DIA && (
                   <button
                     type="button"
                     onClick={() => handleAddFranja(h.dia_semana)}

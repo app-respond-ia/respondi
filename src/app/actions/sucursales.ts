@@ -5,6 +5,7 @@ import { canManageRole } from './roles'
 import { registrarAuditoria } from '@/lib/auditoria'
 import { getAuthContext } from '@/lib/auth-context'
 import { registrarError } from '@/lib/errores'
+import { validarHorarios, horariosARegistros, registrosAHorarios, type HorarioDia } from '@/lib/horarios'
 
 async function vincularPropietariosASucursal(supabase: any, tenantId: string, sucursalId: string) {
   const { data: propietarios, error } = await supabase
@@ -381,7 +382,7 @@ export async function crearSucursalConDatos(data: {
   msg_fuera_horario?: string
   abrir_caso_fuera_horario?: boolean
   modo_horario_ia?: string
-  horarios?: { dia_semana: number, apertura: string | null, cierre: string | null, cerrado: boolean, orden: number }[]
+  horarios?: HorarioDia[]
   skills?: { idName?: string, skill_global_id: string, nombre: string, activo: boolean }[]
   precios?: { nombre: string, tipo: string, precio: number | null, precio_tipo: string, descripcion?: string }[]
   etiquetas?: { nombre: string, descripcion_intencion?: string | null, color: string, activa: boolean, es_plantilla: boolean, orden: number, es_fallback?: boolean, es_protegida?: boolean }[]
@@ -402,6 +403,11 @@ export async function crearSucursalConDatos(data: {
 
   if (!tienePermiso) {
     return { success: false, error: 'No tienes permisos para crear sucursales' }
+  }
+
+  if (data.horarios && data.horarios.length > 0) {
+    const errorValidacion = validarHorarios(data.horarios)
+    if (errorValidacion) return { success: false, error: errorValidacion }
   }
 
   // DEFENSA: Comprobar idempotencia por nombre en los últimos 10 segundos
@@ -462,7 +468,7 @@ export async function crearSucursalConDatos(data: {
   if (data.horarios && data.horarios!.length > 0) {
     insertPromises.push(
       supabase.from('business_hours').insert(
-        data.horarios!.map(h => ({ ...h, branch_id: newBranch.id }))
+        horariosARegistros(data.horarios!, newBranch.id, 'negocio')
       ).then(({ error }) => {
         if (error) return registrarError({ origen: 'app', descripcion: 'Fallo al crear business_hours durante alta de sucursal', stacktrace: error.message, tenant_id: userData!.tenant_id })
       })

@@ -7,6 +7,7 @@ import { getSucursales, getDatosSucursalParaCopiar, crearSucursalConDatos } from
 import { useToast } from '@/components/ui/Toast'
 import { EditorHorarios } from '@/components/sucursales/EditorHorarios'
 import { DIAS_SEMANA } from '@/lib/dias-semana'
+import { registrosAHorarios } from '@/lib/horarios'
 import { PAISES } from '@/lib/paises'
 
 // CAMBIO 1: Husos horarios completos LATAM + España, ordenados de GMT-6 a GMT+1
@@ -200,21 +201,7 @@ export default function NuevaSucursalPage() {
 
       if (!modulo || modulo === 'horarios') {
         if (d.horarios && d.horarios.length > 0) {
-          const mapped = DIAS_SEMANA.map(def => {
-            const filas = d.horarios.filter((h: any) => h.dia_semana === def.id)
-            if (filas.length === 0) return { dia_semana: def.id, cerrado: true, franjas: [{apertura: '09:00', cierre: '18:00', orden: 0}] }
-            const primera = filas[0]
-            return {
-              dia_semana: def.id,
-              cerrado: primera.cerrado,
-              franjas: filas.map((f: any, idx: number) => ({
-                apertura: f.apertura ? f.apertura.substring(0, 5) : '09:00',
-                cierre: f.cierre ? f.cierre.substring(0, 5) : '18:00',
-                orden: idx
-              }))
-            }
-          })
-          setHorarios(mapped)
+          setHorarios(registrosAHorarios(d.horarios))
         }
       }
       if (!modulo || modulo === 'skills') {
@@ -329,16 +316,7 @@ export default function NuevaSucursalPage() {
       msg_fuera_horario: msgFueraHorario,
       abrir_caso_fuera_horario: casoFueraHorario,
       modo_horario_ia: iaActivaFueraHorario ? 'siempre_activa' : 'mismo_negocio',
-      horarios: horarios.flatMap(h => {
-        if (h.cerrado) return [{ dia_semana: h.dia_semana, apertura: null, cierre: null, cerrado: true, orden: 0 }] as { dia_semana: number, apertura: string | null, cierre: string | null, cerrado: boolean, orden: number }[]
-        return h.franjas.map((f, i) => ({
-          dia_semana: h.dia_semana,
-          apertura: f.apertura.length === 5 ? `${f.apertura}:00` : f.apertura,
-          cierre: f.cierre.length === 5 ? `${f.cierre}:00` : f.cierre,
-          cerrado: false,
-          orden: i
-        })) as { dia_semana: number, apertura: string | null, cierre: string | null, cerrado: boolean, orden: number }[]
-      }),
+      horarios,
       // Enviamos solo nombre y activo para no incluir el campo 'fija' interno
       skills: skills.map(s => ({ skill_global_id: s.skill_global_id, nombre: s.nombre, activo: s.activo })),
       precios,

@@ -347,7 +347,17 @@ export default function OnboardingPage() {
           setStep(2)
         }
       } else if (step === 2) {
-        const res = await saveStep2({ branchId, horarios: s2 })
+        // Puente temporal: el estado local aún usa `activo`; el contrato
+        // compartido usa `cerrado`. Desaparece cuando este paso adopte
+        // EditorHorarios (Tramo C).
+        const res = await saveStep2({
+          branchId,
+          horarios: s2.map(h => ({
+            dia_semana: h.dia_semana,
+            cerrado: !h.activo,
+            franjas: h.franjas.map((f, idx) => ({ ...f, orden: idx }))
+          }))
+        })
         if (res.success) setStep(3)
       } else if (step === 3) {
         const payload = {

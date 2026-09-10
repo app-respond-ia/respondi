@@ -94,3 +94,83 @@ permisos contra un array vacío. Lección: cualquier limpieza de datos
 de prueba debe verificar explícitamente que sigue existiendo al menos
 una cuenta con `es_propietario: true` en `superadmin_roles` antes de
 darse por terminada.
+
+## Bug de permisos — propietario con `rol` legacy desincronizado (resuelto)
+Un admin/dueño de organización real (`roles_personalizados.es_propietario
+= true`) con la columna legacy `users.rol` desincronizada (`'tenant_user'`
+en vez de `'admin'`) no podía completar ciertas acciones de gestión en su
+propio panel. Reproducido y verificado con datos reales vía Supabase MCP.
+Resultó ser **tres bugs independientes**, no uno solo — la sospecha
+inicial (RLS de `roles_personalizados` sin fallback a `es_propietario`)
+no era la causa real: esa tabla ya tenía una segunda política
+(`usuario_ver_roles`) que cubre la lectura para cualquier usuario del
+tenant.
+
+Causas reales encontradas:
+- `src/app/actions/usuarios.ts` (`desactivarUsuario`/`reactivarUsuario`,
+  ya eliminadas): usaban el cliente de sesión sin comprobación de
+  permisos propia, dependiendo de la política RLS `users_admin_manage`
+  (`auth_rol() = 'admin'`, sin fallback a `es_propietario`). Sustituidas
+  por `actualizarUsuario(id, {activo})`, que ya usa `supabaseAdmin` +
+  `canManageRole` correctamente.
+- `src/app/actions/politicas.ts` (gestión de políticas del RAG): escribía
+  en `policy_sources` con el cliente de sesión. La política RLS de esa
+  tabla exigía `auth_is_admin()` — función cuyo nombre es engañoso: en
+  realidad comprueba `rol = 'super_admin'`, no `'admin'` de tenant. Esto
+  bloqueaba a **cualquier** usuario de organización, no solo a
+  propietarios desincronizados. Corregido pasando esas Server Actions a
+  `supabaseAdmin` + comprobación explícita de permisos, y con una
+  migración (`20260910120000_fix_policy_sources_write_policy.sql`) que
+  sustituye `auth_is_admin()` por `auth_has_permission()` en la política.
+- `src/app/actions/skills-globales.ts` (`toggleSkillCliente`): el
+  `upsert` a `skills` no incluía `tenant_id` ni `nombre` (ambas `NOT
+  NULL` sin default). Para cualquier combinación branch/skill sin fila
+  previa, esto producía una violación de RLS real ("new row violates
+  row-level security policy for table skills"), confirmada en los logs
+  de Postgres de producción — no el error de `NOT NULL` que cabría
+  esperar a priori. Como el interceptor central de `Toast.tsx` pasa
+  todo error por `traducirError()`, ese error de política se mostraba
+  literalmente como "No tienes permiso para realizar esta acción.",
+  aunque la causa no tenía nada que ver con el rol del usuario.
+
+Lección: cuando un error de "permisos" no cuadra con la lógica de
+permisos revisada, comprobar los logs reales de Postgres
+(`postgres_logs` vía MCP) antes de seguir asumiendo la causa por el
+texto del mensaje — el interceptor de Toast puede traducir errores
+técnicos no relacionados con RLS a un texto que parece de permisos.
+
+Se hizo auditoría completa de las 23 tablas con `tenant_id NOT NULL`
+en el esquema y de los 3 `.upsert()` de todo el repo — el bug de
+`skills` era un caso aislado, no un patrón repetido.
+
+## Perfil de sucursal en 500 — `export type` dentro de un `'use server'` (resuelto)
+`/dashboard/perfil-sucursal` devolvía 500 en producción con el mensaje
+genérico "An error occurred in the Server Components render". No aparecía
+nada en `error_logs` pese a tener la Server Action instrumentada de punta
+a punta, y las 6 consultas que hace la pantalla daban 200 una a una con
+una sesión real. Es decir: el fallo ocurría **antes** de que corriera
+ninguna línea del código propio.
+
+Causa: `src/app/actions/horarios.ts` tenía `export type { Franja,
+HorarioDia }` en un archivo marcado `'use server'`. Next.js convierte
+**todos** los exports de un módulo `'use server'` en referencias de
+servidor, y una reexportación de tipos genera código que en tiempo de
+ejecución busca un valor `Franja` que no existe (los tipos se borran al
+compilar). El módulo entero petaba al evaluarse —`ReferenceError: Franja
+is not defined`— y se llevaba por delante a `perfil-sucursal`, que
+importa `saveHorarios` de ahí.
+
+Solo se reproduce en build de producción: en `next dev` con Turbopack la
+pantalla funciona con normalidad. Regla a respetar: **un archivo
+`'use server'` solo puede exportar funciones `async`**. `export interface`
+y `export type X = ...` (declaraciones) sí se borran y son seguros; lo
+que rompe es la reexportación `export type { ... }`.
+
+Cómo se encontró, por si hace falta repetirlo: se levantó un build de
+producción en local, se generó una cookie de sesión real del cliente
+(`/auth/v1/admin/generate_link` → `/auth/v1/verify` → cookie en formato
+`@supabase/ssr`), se sacó el id de la Server Action del manifiesto de
+`.next` y se invocó con `curl` igual que lo hace el navegador. Ahí sí
+aparece el stacktrace completo en la consola del servidor. Lección: ante
+un 500 de Server Action sin rastro en `error_logs`, reproducir con
+`npm run build && npm start` en local antes de seguir instrumentando.

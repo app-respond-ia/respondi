@@ -8,11 +8,14 @@ import {
   validarHorarios,
   horariosARegistros,
   registrosAHorarios,
-  type Franja,
   type HorarioDia
 } from '@/lib/horarios'
 
-export type { Franja, HorarioDia }
+// OJO: en un archivo 'use server' NO se pueden reexportar tipos
+// (`export type { ... }`). Next convierte todos los exports del módulo en
+// referencias de servidor y al arrancar busca un valor real que no existe,
+// así que el módulo entero revienta y se lleva por delante cualquier
+// pantalla que lo importe. Los tipos se importan de '@/lib/horarios'.
 
 export async function getHorarios(tipo: 'negocio' | 'ia' = 'negocio') {
   const supabase = await createClient()

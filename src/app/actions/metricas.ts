@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { resolveBranchId } from '@/lib/active-branch'
 import { getAuthContext } from '@/lib/auth-context'
+import { ESTADOS_CASO_TERMINADOS } from '@/lib/casos/estados'
 
 export async function getMetricas(periodo: 'hoy' | 'semana' | 'mes' | 'total' = 'mes') {
   const supabase = await createClient()
@@ -101,7 +102,7 @@ export async function getMetricas(periodo: 'hoy' | 'semana' | 'mes' | 'total' = 
     .eq('branch_id', branchId)
     .gte('fecha_apertura', desde)
 
-  const CERRADOS = ['resuelto', 'cerrado']
+  const CERRADOS: string[] = [...ESTADOS_CASO_TERMINADOS]
   const totalCasos = casosData?.length || 0
   const casosAbiertos = casosData?.filter(c => !CERRADOS.includes(c.estatus)).length || 0
   const casosCerrados = casosData?.filter(c => CERRADOS.includes(c.estatus)).length || 0

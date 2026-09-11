@@ -4,6 +4,9 @@ import { createClient } from '@/utils/supabase/server'
 import { getAuthContext } from '@/lib/auth-context'
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { crearNotificacion, notificarAAdminsDeOrganizacion } from '@/lib/notificaciones'
+import { after } from 'next/server'
+import { cerrarConversacionYCaso, resumirConversacionCerrada } from '@/lib/conversaciones/cierre'
+import { casoTerminado } from '@/lib/casos/estados'
 
 export async function getCasos(filtros?: { estado?: string, canal?: string, search?: string, agentesIds?: string[], dateRange?: { from: string, to: string }, sort?: 'asc' | 'desc' }) {
   const supabase = await createClient()
@@ -168,8 +171,15 @@ export async function tomarCaso(casoId: string) {
   if (auth.error) return { success: false, error: auth.error }
   const userData = { tenant_id: auth.tenant_id }
   const user = { id: auth.user_id }
-  const { data: caso } = await supabase.from('cases').select('conversation_id').eq('id', casoId).single()
-  
+  const { data: caso } = await supabase.from('cases').select('conversation_id, estatus').eq('id', casoId).eq('tenant_id', auth.tenant_id).maybeSingle()
+
+  if (!caso) return { success: false, error: 'Caso no encontrado' }
+  // Tomar un caso resuelto lo dejaría "atendiendo" colgado de una conversación
+  // cerrada; para volver a trabajarlo está "Reabrir caso".
+  if (casoTerminado(caso.estatus)) {
+    return { success: false, error: 'Este caso ya está resuelto. Reábrelo si hay que volver a atenderlo.' }
+  }
+
   const { error } = await supabase
     .from('cases')
     .update({ estatus: 'atendiendo', agente_id: user.id })
@@ -212,11 +222,12 @@ export async function cerrarCaso(casoId: string) {
     .eq('id', casoId)
     .eq('tenant_id', userData?.tenant_id)
 
-  if (caso?.conversation_id) {
-    await supabase
-      .from('conversations')
-      .update({ estado: 'cerrada' })
-      .eq('id', caso.conversation_id)
+  // Resolver el caso cierra también su conversación, por el camino común: con
+  // fecha de cierre y con su resumen, para que la IA recuerde a este cliente.
+  if (!error && caso?.conversation_id) {
+    await cerrarConversacionYCaso(supabase, caso.conversation_id, userData.tenant_id, 'Resuelto al cerrar el caso')
+    const convId = caso.conversation_id
+    after(() => resumirConversacionCerrada(convId))
   }
 
   if (!error) {
@@ -233,94 +244,129 @@ export async function cerrarCaso(casoId: string) {
   return { success: !error, error: error?.message }
 }
 
-export async function enviarMensajeAgente(conversationId: string, contenido: string) {
-  const supabase = await createClient()
-  const auth = await getAuthContext(supabase)
-  if (auth.error) return { success: false, error: auth.error }
-  const userData = { tenant_id: auth.tenant_id }
-  const user = { id: auth.user_id }
-
-  const { error } = await supabase
-    .from('messages')
-    .insert({
-      tenant_id: userData?.tenant_id,
-      conversation_id: conversationId,
-      remitente: 'agente',
-      contenido: contenido
-    })
-
-  return { success: !error, error: error?.message }
-}
-
+// Un caso abierto tiene que poder atenderse, y eso significa poder escribir al
+// cliente, que solo se puede en una conversación abierta. Al reabrir:
+//   · si su conversación sigue abierta, se queda en ella;
+//   · si está cerrada pero el cliente ya ha vuelto a escribir (tiene otra
+//     abierta por el mismo canal), el caso se lleva a esa;
+//   · si no hay ninguna abierta, se reabre también la suya.
+// En los tres casos la IA queda en pausa: hay una persona encargándose.
+// Antes, en el último caso el caso se reabría colgado de una conversación
+// cerrada (el agente no tenía dónde escribir), y en el segundo fallaba con un
+// error de base de datos si esa otra conversación ya tenía su propio caso.
 export async function reabrirCaso(casoId: string) {
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
-  const userData = { tenant_id: auth.tenant_id }
-  const user = { id: auth.user_id }
-  const { data: caso } = await supabase.from('cases').select(`
-    agente_id, 
-    conversation_id, 
-    contact_id, 
-    branch_id,
-    conversations ( canal )
-  `).eq('id', casoId).single()
-  
-  const nuevoEstatus = caso?.agente_id ? 'atendiendo' : 'pendiente'
 
-  // Buscar si el contacto ya tiene una conversación nueva y activa
-  let nuevaActiva = null
-  const canalViejo = Array.isArray(caso?.conversations) 
-    ? (caso?.conversations[0] as any)?.canal 
-    : (caso?.conversations as any)?.canal
+  const { data: caso } = await supabase
+    .from('cases')
+    .select('id, estatus, agente_id, conversation_id, contact_id, branch_id, conversations ( canal, estado )')
+    .eq('id', casoId)
+    .eq('tenant_id', auth.tenant_id)
+    .maybeSingle()
 
-  if (caso?.contact_id && caso?.branch_id && canalViejo) {
+  if (!caso) return { success: false, error: 'Caso no encontrado' }
+  if (!casoTerminado(caso.estatus)) return { success: true }
+
+  const convDelCaso: any = Array.isArray(caso.conversations) ? caso.conversations[0] : caso.conversations
+  let destino: string | null = caso.conversation_id
+  let reabrirSuConversacion = false
+
+  if (caso.conversation_id && convDelCaso?.estado !== 'activa') {
     const { data: activa } = await supabase
       .from('conversations')
       .select('id')
       .eq('contact_id', caso.contact_id)
       .eq('branch_id', caso.branch_id)
-      .eq('canal', canalViejo)
+      .eq('canal', convDelCaso?.canal)
       .eq('estado', 'activa')
+      .limit(1)
       .maybeSingle()
-    
+
     if (activa) {
-      nuevaActiva = activa.id
+      // Una conversación tiene como mucho un caso: si la actual del cliente ya
+      // tiene el suyo, se trabaja desde ese.
+      const { data: casoDeLaActiva } = await supabase
+        .from('cases')
+        .select('id')
+        .eq('conversation_id', activa.id)
+        .neq('estatus', 'cerrado')
+        .limit(1)
+        .maybeSingle()
+
+      if (casoDeLaActiva) {
+        return { success: false, error: 'El cliente ya tiene un caso en su conversación actual. Atiéndelo desde ese caso.' }
+      }
+      destino = activa.id
+    } else {
+      reabrirSuConversacion = true
     }
   }
 
-  const caseUpdatePayload: any = { estatus: nuevoEstatus, fecha_cierre: null }
-  if (nuevaActiva) {
-    caseUpdatePayload.conversation_id = nuevaActiva
+  if (reabrirSuConversacion && destino) {
+    const { error: errConv } = await supabase
+      .from('conversations')
+      .update({
+        estado: 'activa',
+        fecha_cierre: null,
+        motivo_bloqueo: null,
+        bloqueada_desde: null,
+        ia_procesando_desde: null,
+        fecha_ultimo_mensaje: new Date().toISOString()
+      })
+      .eq('id', destino)
+      .eq('tenant_id', auth.tenant_id)
+
+    if (errConv) {
+      return {
+        success: false,
+        error: errConv.code === '23505'
+          ? 'El cliente acaba de escribir y ya tiene otra conversación abierta. Vuelve a intentarlo.'
+          : errConv.message
+      }
+    }
   }
 
   const { error } = await supabase
     .from('cases')
-    .update(caseUpdatePayload)
+    .update({
+      estatus: caso.agente_id ? 'atendiendo' : 'pendiente',
+      fecha_cierre: null,
+      conversation_id: destino
+    })
     .eq('id', casoId)
-    .eq('tenant_id', userData?.tenant_id)
+    .eq('tenant_id', auth.tenant_id)
 
-  // Si reenganchamos a una nueva conversación activa, pausamos su IA para que el agente pueda trabajar
-  if (nuevaActiva) {
+  if (error) return { success: false, error: error.message }
+
+  if (destino) {
     await supabase
       .from('conversations')
-      .update({ ia_pausada: true })
-      .eq('id', nuevaActiva)
-  }
-  // IMPORTANTE: Si no había nuevaActiva, NO tocamos nada de la tabla conversations (la vieja se queda igual).
-
-  if (!error) {
-    const { registrarAuditoria } = await import('@/lib/auditoria')
-    await registrarAuditoria({
-      tenant_id: userData?.tenant_id,
-      user_id: user.id,
-      accion: 'reabrió el caso',
-      tabla_afectada: 'cases',
-      registro_id: casoId
-    })
+      .update({ ia_pausada: true, atendida_por: caso.agente_id })
+      .eq('id', destino)
+      .eq('tenant_id', auth.tenant_id)
   }
 
-  return { success: !error, error: error?.message }
+  await supabase.from('case_notes').insert({
+    tenant_id: auth.tenant_id,
+    case_id: casoId,
+    user_id: auth.user_id,
+    nota: destino !== caso.conversation_id
+      ? 'Caso reabierto y llevado a la conversación actual del cliente.'
+      : 'Caso reabierto.'
+  })
+
+  const { registrarAuditoria } = await import('@/lib/auditoria')
+  await registrarAuditoria({
+    tenant_id: auth.tenant_id,
+    user_id: auth.user_id,
+    accion: 'reabrió el caso',
+    tabla_afectada: 'cases',
+    registro_id: casoId
+  })
+
+  return { success: true }
 }
 
 export async function crearCasoDesdeConversacion(conversationId: string, agenteId: string | null) {
@@ -333,22 +379,34 @@ export async function crearCasoDesdeConversacion(conversationId: string, agenteI
   // 1. Obtener datos de la conversación para rellenar el caso
   const { data: conv, error: convError } = await supabase
     .from('conversations')
-    .select('contact_id, branch_id')
+    .select('contact_id, branch_id, estado')
     .eq('id', conversationId)
     .eq('tenant_id', userData.tenant_id)
     .single()
 
   if (convError || !conv) return { success: false, error: 'Conversación no encontrada' }
+  if (conv.estado !== 'activa') {
+    return { success: false, error: 'La conversación está cerrada. Reábrela para poder atender al cliente.' }
+  }
 
-  // 2. Verificar que no exista ya un caso para esta conversación
+  // 2. Una conversación tiene como mucho un caso
   const { data: existingCase } = await supabase
     .from('cases')
-    .select('id')
+    .select('id, estatus')
     .eq('conversation_id', conversationId)
     .eq('tenant_id', userData.tenant_id)
+    .order('fecha_apertura', { ascending: false })
+    .limit(1)
     .maybeSingle()
 
-  if (existingCase) return { success: false, error: 'Esta conversación ya tiene un caso asociado' }
+  if (existingCase) {
+    return {
+      success: false,
+      error: casoTerminado(existingCase.estatus)
+        ? 'Esta conversación ya tuvo un caso y está resuelto. Usa «Reabrir caso».'
+        : 'Esta conversación ya tiene un caso abierto.'
+    }
+  }
 
   // 3. Crear el caso
   const { data: nuevoCaso, error } = await supabase
@@ -366,6 +424,16 @@ export async function crearCasoDesdeConversacion(conversationId: string, agenteI
     }])
     .select('id')
     .single()
+
+  // Igual que al tomar un caso: si nace ya con agente, hay una persona
+  // atendiendo esta conversación y la IA se aparta.
+  if (!error && agenteId) {
+    await supabase
+      .from('conversations')
+      .update({ ia_pausada: true, atendida_por: agenteId })
+      .eq('id', conversationId)
+      .eq('tenant_id', userData.tenant_id)
+  }
 
   if (!error) {
     let accionMsg = 'creó el caso (en cola)'
@@ -448,11 +516,27 @@ export async function soltarCaso(casoId: string) {
   const userData = { tenant_id: auth.tenant_id }
   const user = { id: auth.user_id }
 
+  const { data: caso } = await supabase.from('cases').select('estatus, conversation_id').eq('id', casoId).eq('tenant_id', auth.tenant_id).maybeSingle()
+  if (!caso) return { success: false, error: 'Caso no encontrado' }
+  if (casoTerminado(caso.estatus)) return { success: false, error: 'Este caso ya está resuelto.' }
+
+  // Soltar un caso lo devuelve a la cola: sin agente y pendiente. Antes se
+  // quitaba el agente pero seguía "atendiendo", un estado sin nadie detrás
+  // que no aparecía en el filtro de pendientes. La IA sigue en pausa: el
+  // cliente sigue esperando a una persona.
   const { error } = await supabase
     .from('cases')
-    .update({ agente_id: null })
+    .update({ agente_id: null, estatus: 'pendiente' })
     .eq('id', casoId)
     .eq('tenant_id', userData?.tenant_id)
+
+  if (!error && caso.conversation_id) {
+    await supabase
+      .from('conversations')
+      .update({ atendida_por: null })
+      .eq('id', caso.conversation_id)
+      .eq('tenant_id', auth.tenant_id)
+  }
 
   if (!error) {
     const { registrarAuditoria } = await import('@/lib/auditoria')

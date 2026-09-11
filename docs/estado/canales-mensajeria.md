@@ -49,6 +49,13 @@ en n8n. n8n sigue llamando directo a las APIs de Meta/Whaticket para
 el envío de mensajes (toca los tokens) — pendiente revisar
 endurecimiento de seguridad de este punto más adelante.
 
+**Ojo (11-09-2026): la salida no está conectada.** La app no avisa a n8n
+de ningún mensaje saliente: `generarRespuesta` deja un registro
+`SIMULACION_N8N_WEBHOOK` en la auditoría en lugar de enviar, no hay
+trigger en `messages`, y `messages.entregado` nace en `true`. Ni las
+respuestas de la IA ni las de los agentes llegan hoy al WhatsApp del
+cliente. Ver `pendientes.md`, Prioridad 1.
+
 ## Ventana de 24h (WhatsApp oficial)
 Pendiente para cuando Meta oficial esté conectado de verdad: en el
 panel de Chats, cuando un agente abra una conversación cuya ventana

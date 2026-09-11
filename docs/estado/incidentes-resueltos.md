@@ -548,26 +548,63 @@ Corregido por el camino: al reabrir, la IA **repetía el aviso de "estamos
 cerrados"** que seguía en el historial, justo cuando el negocio ya había
 abierto. Ahora se le indica que no repita los avisos automáticos.
 
-## Cada mensaje entrante abre un caso — decisión pendiente
+## Cada mensaje entrante abría un caso (resuelto, 11-09-2026)
 `resolve_incoming_message_context` (la función que llama n8n al llegar cada
-mensaje) inserta **siempre** una fila en `cases` con `estatus = 'pendiente'`
-y sin descripción, además de crear el contacto y la conversación.
+mensaje) insertaba **siempre** una fila en `cases`, vacía, además de crear el
+contacto y la conversación. Consecuencias: la cola de casos se llenaba de
+casos vacíos indistinguibles de un escalado real, y como el cierre por
+inactividad no cierra conversaciones con caso abierto, **ninguna conversación
+se cerraba sola y la IA nunca tenía memoria** de conversaciones anteriores.
 
-Verificado llamándola directamente: un simple "hola" de un cliente nuevo deja
-un caso abierto.
+La misma función tampoco ponía `fecha_ultimo_mensaje` al crear una
+conversación nueva, así que **el primer mensaje de un cliente nuevo no lo
+contestaba nunca el cron** (solo lo recoge si esa fecha existe). Las pruebas
+anteriores no lo vieron porque creaban la conversación a mano.
 
-Dos consecuencias:
-1. La bandeja "Mis casos" del agente —que según `core-plataforma.md` es su
-   cola de trabajo, con SLA— se llena de un caso vacío por conversación,
-   indistinguible de un escalado real.
-2. Más grave: `/api/ai/summarize` solo cierra la conversación **si no hay
-   casos pendientes**. Como siempre hay uno, **ninguna conversación se cierra
-   sola**. Y como el motor lee la memoria de conversaciones anteriores de las
-   que están `cerradas`, **la IA nunca tendrá memoria de conversaciones
-   pasadas en producción**. Esa función existe y está probada, pero no se
-   llegaría a usar nunca.
+Decidido con Jorge: el caso solo cuando hace falta una persona. Migración
+`20260911100000`. De paso se unificaron los cuatro caminos de cierre (cada uno
+hacía una cosa distinta) en `src/lib/conversaciones/cierre.ts`, y los estados
+"terminado/abierto" de un caso en una sola definición
+(`src/lib/casos/estados.ts`). Reglas completas en `docs/arquitectura.md`,
+sección "Chats, conversaciones y casos".
 
-No se toca sin decidirlo con Jorge: cambia lo que ve el agente en su bandeja.
+## La IA y las personas se pisaban (resuelto, 11-09-2026)
+Salieron al probar el modelo nuevo con choques entre caminos, no uno a uno:
+
+- **Un segundo mensaje enviado mientras la IA contestaba el primero no se
+  contestaba nunca.** El cron solo recogía la conversación si el último
+  mensaje era del cliente, y la respuesta de la IA quedaba guardada después.
+  Ahora mira si hay mensajes del cliente sin contestar (migración
+  `20260911110000`).
+- **Un agente podía escribir con la IA activa**, y el cliente recibía las dos
+  respuestas. Ahora escribir pausa la IA y da por contestado lo anterior.
+- **Si una persona pausaba la IA mientras pensaba, la respuesta salía
+  igual.** Ahora se descarta y no se cobra.
+- **El cierre de 24 h rompía la promesa de "te contestamos al abrir"**: un
+  mensaje del sábado se cerraba el domingo y el lunes no había nada que
+  contestar. Esas conversaciones ya no se cierran solas, y la respuesta de la
+  IA cuenta como actividad.
+- **Reabrir una conversación** fallaba con un error de base de datos si el
+  cliente ya tenía otra abierta, y si arrastraba un bloqueo viejo la IA se
+  quedaba muda para siempre.
+- **Reabrir un caso** lo dejaba colgado de una conversación cerrada (el agente
+  no tenía dónde escribir) o fallaba si la conversación actual ya tenía caso.
+- **Soltar un caso** le quitaba el agente pero lo dejaba "atendiendo", un
+  estado sin nadie detrás. **Tomar un caso resuelto** lo dejaba "atendiendo"
+  sobre una conversación cerrada.
+- En Chats, si cerrar o reabrir fallaba, la ventana no decía nada.
+
+Verificado con `contrato-conversaciones` (36 comprobaciones: los mensajes
+entran por la misma puerta que un WhatsApp real y las acciones de las
+personas se hacen con la sesión de un usuario real).
+
+Lección sobre las pruebas: el cron de producción comparte base de datos con
+las pruebas locales y cogía las mismas conversaciones de prueba, contestando
+a la vez con el código viejo. Las pruebas ahora ponen el candado
+`ia_procesando_desde` igual que el cron. Y la limpieza fallaba en silencio
+(los registros de `ai_logs` apuntan a los mensajes y no dejan borrarlos), así
+que cada ejecución arrancaba con restos de la anterior; ahora se borran antes
+y se comprueba que no queda nada.
 
 ## La pantalla de Métricas nunca funcionó (resuelto)
 `src/app/actions/metricas.ts` estaba escrito contra un esquema que no existe.

@@ -50,13 +50,56 @@ Orden de prioridad para si la IA responde a un mensaje:
 2. Trato/modo del contacto
 3. Apagado manual de la sucursal (`sucursales.modo_pausa`: solo
    controla 'apagada' vs 'ninguna')
-4. Horario comercial (el comportamiento fuera de horario lo decide
-   `business_profiles.ia_activa_fuera_horario`, NO `modo_pausa`)
+4. Horario comercial (el comportamiento fuera de horario lo deciden
+   `business_profiles.modo_horario_ia` y `abrir_caso_fuera_horario`, NO
+   `modo_pausa`)
 5. Responde normal
 
 El horario real del negocio (consultable por la IA bajo demanda) está
 separado del horario en que responde la IA (3 modos:
 `mismo_negocio`/`personalizado`/`siempre_activa`, en `route.ts` Fase 1).
+
+## Chats, conversaciones y casos
+Tres cosas distintas que no hay que mezclar:
+- **Chat** = una persona (el contacto). *Paso 2, pendiente:* la lista de
+  Chats todavía saca una fila por conversación, no una por persona.
+- **Conversación** = una sesión con esa persona. Es lo que resume la IA y lo
+  que recuerda la próxima vez.
+- **Caso** = una tarea para una persona del equipo. Solo existe cuando hace
+  falta alguien.
+
+Reglas (decididas con Jorge el 11-09-2026, verificadas con
+`contrato-conversaciones`, 36 comprobaciones):
+- La conversación nace con el primer mensaje y **no abre caso**. Un caso lo
+  abren: el escalado de la IA, fuera de horario con "abrir caso" activado, los
+  créditos agotados, el trato "derivar" del contacto, tres fallos seguidos de
+  la IA, o una persona a mano.
+- **Una conversación, como mucho un caso** (índice `unique_active_case`). Un
+  segundo motivo se anota en el caso; un escalado sobre un caso resuelto lo
+  reabre (`crearCasoDesdeSistema`).
+- **Cerrar la conversación resuelve su caso y resolver el caso cierra la
+  conversación**, por cualquier camino, y siempre se genera el resumen
+  (`src/lib/conversaciones/cierre.ts`).
+- Se cierra sola tras **24 h sin actividad**; cuenta cualquier mensaje, también
+  los de la IA y los agentes. Excepción: si espera a que abra el negocio
+  (`motivo_bloqueo = 'fuera_horario'`) no se cierra, porque al cliente se le
+  prometió respuesta al abrir.
+- **La IA y las personas no se pisan:**
+  - La IA contesta los mensajes del cliente que nadie ha contestado
+    (`agrupado` sin marcar y posteriores al último mensaje de un agente). Un
+    mensaje que llega mientras la IA contesta el anterior se recoge en la
+    pasada siguiente.
+  - Cuando una persona escribe, la IA se pausa en esa conversación y lo que
+    el cliente había escrito queda como contestado.
+  - Si una persona toma la conversación mientras la IA está pensando, la
+    respuesta de la IA se descarta y no se cobra.
+  - Tomar un caso o ponerlo "atendiendo" pausa la IA. Soltarlo lo devuelve a
+    la cola (pendiente, sin agente) y la IA sigue en pausa.
+- **Reabrir**: una conversación reabierta vuelve con la IA en pausa y sin
+  bloqueos viejos, y no se puede si el cliente ya tiene otra abierta por ese
+  canal. Un caso reabierto se queda en su conversación si sigue abierta, se
+  lleva a la actual del cliente si ya ha vuelto a escribir, o reabre la suya;
+  nunca queda colgado de una conversación cerrada.
 
 ## Herramientas de la IA
 La IA (fase 2 del motor) tiene herramientas propias, no solo texto:

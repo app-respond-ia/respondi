@@ -26,6 +26,24 @@ solo la lista viva).
         "Prueba gratis 14 días". Ahora van a `/registro-trial?inv=<id>`, con
         la pantalla adaptada a cada tipo de invitado
       - Notificación de comisiones: sin revisar, Jorge la da por buena
+- [ ] **Las respuestas no salen hacia WhatsApp** (visto el 11-09-2026). Donde
+      debería enviarse la respuesta de la IA, `generarRespuesta` solo escribe
+      un registro `SIMULACION_N8N_WEBHOOK` en la auditoría; no hay trigger en
+      `messages` ni llamada desde la app que avise a n8n, y
+      `messages.entregado` nace en `true`, así que todo aparece como
+      entregado. Lo mismo con los mensajes que escribe un agente en Chats.
+      Hace falta ver el flujo de n8n y construir la salida (Whaticket / Meta
+      del propio cliente). Bloquea las pruebas con móviles reales
+- [x] Modelo de chats, conversaciones y casos — paso 1 hecho (11-09-2026):
+      el caso solo cuando hace falta una persona, cierres unificados, y la IA
+      y las personas ya no se pisan. Ver `docs/arquitectura.md`
+- [ ] Paso 2: Chats agrupado por persona (una fila por contacto, con sus
+      conversaciones dentro). Primero una maqueta para que la vea Andreina
+- [ ] Paso 3: las notas internas de una persona visibles en todas sus
+      conversaciones (hoy solo se ven las de la conversación abierta)
+- [ ] Borrar código muerto: `src/app/actions/agente-casos.ts` y
+      `agente-caso-detalle.ts` (ninguna pantalla los usa; los agentes
+      trabajan desde Casos)
 
 ## Prioridad 2 — Fase 0 (antes de construir nada de la v2)
 - [x] Conseguir `OPENAI_API_KEY` — hecha: en `.env.local` y en las

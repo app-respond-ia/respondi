@@ -20,10 +20,19 @@ fuera del selector hasta tocar el motor.
 Reescrita la lógica de horario en `route.ts` (Fase 1) para separar el
 horario real del negocio (consultable por la IA bajo demanda) del
 horario en que responde la IA (3 modos: `mismo_negocio`/
-`personalizado`/`siempre_activa`). **En producción, pero sin la misma
-ronda de pruebas reales escenario-por-escenario que sí se hizo para
-el resto de la jerarquía** — ver `docs/estado/pendientes.md`,
-Prioridad 2.
+`personalizado`/`siempre_activa`). Probada escenario por escenario el
+10-09-2026 (ver `incidentes-resueltos.md`).
+
+## Qué contesta la IA y cuándo se aparta
+Resumen; el detalle y el porqué están en `docs/arquitectura.md`, sección
+"Chats, conversaciones y casos".
+- El cron (`disparar_webhook_ia`, cada 20 s) recoge una conversación cuando
+  hay mensajes del cliente sin contestar, ha pasado la ventana de agrupación
+  y no han pasado 6 h.
+- Antes de guardar su respuesta, la IA vuelve a mirar la conversación: si
+  mientras pensaba una persona la pausó o la cerró, la respuesta se descarta
+  (queda en `ai_logs` como `pausa` con su coste) y no se cobra crédito.
+- Su respuesta cuenta como actividad para el cierre de 24 h.
 
 ## Herramientas de la IA (Fase 2 del motor)
 - Etiquetar conversación → usa `message_categories` configuradas por

@@ -459,6 +459,10 @@ export async function generarRespuesta(conv: any) {
 
   openAiMessages.push(responseMsg)
 
+  // La propia IA pausa la conversación cuando escala. Esa pausa no debe
+  // impedir que salga su aviso de "te paso con una persona" (ver paso 10).
+  let escaladoEnEstaPasada = false
+
   // 8. Manejo de Tool Calls
   if (responseMsg.tool_calls) {
     for (const toolCall of responseMsg.tool_calls) {
@@ -603,6 +607,7 @@ export async function generarRespuesta(conv: any) {
                 tenant_id: tenantId
               })
             }
+            escaladoEnEstaPasada = true
             toolResult = 'Caso escalado a humano y respuestas automáticas pausadas.'
           }
         }
@@ -758,6 +763,31 @@ export async function generarRespuesta(conv: any) {
     isFallback = true
   }
 
+  // ¿Sigue siendo el turno de la IA? Entre leer los mensajes y tener la
+  // respuesta pasan varios segundos, y en ese rato una persona puede haber
+  // escrito al cliente, pausado la IA o cerrado la conversación. Mandar la
+  // respuesta entonces sería hablar encima de esa persona, así que se descarta
+  // (y no se cobra: quien llama no descuenta crédito si viene `reason`).
+  const { data: estadoActual } = await supabaseAdmin
+    .from('conversations')
+    .select('estado, ia_pausada')
+    .eq('id', conversationId)
+    .single()
+
+  if (estadoActual && (estadoActual.estado !== 'activa' || (estadoActual.ia_pausada && !escaladoEnEstaPasada))) {
+    await supabaseAdmin.from('ai_logs').insert({
+      tenant_id: tenantId,
+      branch_id: branchId,
+      modelo_ia: MODELO_IA,
+      tokens_input: tokensInput,
+      tokens_output: tokensOutput,
+      costo_estimado_usd: (tokensInput * PRECIO.input) + (tokensOutput * PRECIO.output),
+      resultado: 'pausa',
+      contexto_snapshot: { descartada: 'Una persona tomó la conversación mientras la IA preparaba la respuesta' }
+    })
+    return { success: true, reason: 'Humano_Tomo_El_Control' }
+  }
+
   const { data: newMsg, error: errorMsg } = await supabaseAdmin.from('messages').insert({
     tenant_id: tenantId,
     conversation_id: conversationId,
@@ -771,11 +801,22 @@ export async function generarRespuesta(conv: any) {
   }
   if (newMsg) insertId = newMsg.id
 
-  // Marcar los mensajes origen como agrupados
+  // Marcar los mensajes origen como agrupados. Solo los que la IA ha leído: si
+  // el cliente escribió otra cosa mientras tanto, se queda sin marcar y el
+  // cron la recoge en la siguiente pasada.
   const ungroupedIds = ungrouped.map(m => m.id)
   if (ungroupedIds.length > 0) {
     await supabaseAdmin.from('messages').update({ agrupado: true }).in('id', ungroupedIds)
   }
+
+  // La respuesta de la IA también cuenta como actividad. Si no, una
+  // conversación que la IA contesta al abrir el negocio (tras un fin de semana
+  // esperando) se cerraba por "24 h sin actividad" nada más contestar, porque
+  // el reloj seguía contando desde el mensaje del sábado.
+  await supabaseAdmin
+    .from('conversations')
+    .update({ fecha_ultimo_mensaje: new Date().toISOString() })
+    .eq('id', conversationId)
 
   // 11. Registrar Coste
   const costeTotal = (tokensInput * PRECIO.input) + (tokensOutput * PRECIO.output)

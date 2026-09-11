@@ -338,13 +338,19 @@ function ChatsContent() {
       const res = await cerrarConversacion(selectedConvId)
       if (res.success && res.data) {
         setConversaciones(prev => prev.map(c => c.id === selectedConvId ? { ...c, estado: res.data.estado } : c))
+        cargarContexto(selectedConvId)
         success = true
+      } else {
+        showToast(res.error || 'No se pudo cerrar la conversación', 'error')
       }
     } else if (modalState.action === 'reabrir_conv') {
       const res = await reabrirConversacion(selectedConvId)
       if (res.success && res.data) {
-        setConversaciones(prev => prev.map(c => c.id === selectedConvId ? { ...c, estado: res.data.estado } : c))
+        setConversaciones(prev => prev.map(c => c.id === selectedConvId ? { ...c, estado: res.data.estado, ia_pausada: res.data.ia_pausada } : c))
+        cargarContexto(selectedConvId)
         success = true
+      } else {
+        showToast(res.error || 'No se pudo reabrir la conversación', 'error')
       }
     } else if (modalState.action === 'reabrir_caso') {
       const selectedConv = conversaciones.find(c => c.id === selectedConvId)
@@ -352,14 +358,13 @@ function ChatsContent() {
       if (casoId) {
         const res = await reabrirCaso(casoId)
         if (res.success) {
-          // Update local case status
-          setConversaciones(prev => prev.map(c => {
-            if (c.id === selectedConvId && c.cases?.[0]) {
-              return { ...c, cases: [{ ...c.cases[0], estatus: 'atendiendo' }] }
-            }
-            return c
-          }))
+          // Reabrir el caso puede reabrir también la conversación o llevar el
+          // caso a la conversación actual del cliente: se recarga todo.
+          cargarConversaciones()
+          cargarContexto(selectedConvId)
           success = true
+        } else {
+          showToast(res.error || 'No se pudo reabrir el caso', 'error')
         }
       }
     } else if (modalState.action === 'asignar_mi' || modalState.action === 'asignar_otro' || modalState.action === 'cola') {
@@ -433,6 +438,11 @@ function ChatsContent() {
     if (res.success) {
       setMensajeText('')
       cargarMensajes(selectedConvId)
+      if (res.iaPausadaAhora) {
+        setConversaciones(prev => prev.map(c => c.id === selectedConvId ? { ...c, ia_pausada: true } : c))
+        cargarContexto(selectedConvId)
+        showToast('Has escrito tú: la IA queda en pausa en este chat.', 'info')
+      }
     } else {
       showToast(res.error || 'Error al enviar mensaje', 'error')
     }
@@ -1066,9 +1076,9 @@ function ChatsContent() {
             'Confirmar acción'
           }
           message={
-            modalState.action === 'reabrir_caso' ? 'El caso asociado volverá a estar activo (se te asignará si ya lo tenías, o irá a la cola).' :
-            modalState.action === 'reabrir_conv' ? 'La conversación volverá a estar activa y podrás enviar mensajes.' : 
-            modalState.action === 'cerrar_conv' ? 'La conversación se cerrará.' : 
+            modalState.action === 'reabrir_caso' ? 'El caso vuelve a estar abierto, con el agente que lo llevaba o en la cola si no tenía. Si su conversación estaba cerrada se reabre también, con la IA en pausa.' :
+            modalState.action === 'reabrir_conv' ? 'La conversación vuelve a estar activa para que escribas tú al cliente. La IA queda en pausa; puedes reactivarla cuando quieras.' :
+            modalState.action === 'cerrar_conv' ? 'La conversación se cerrará y, si tiene un caso abierto, se dará por resuelto.' :
             modalState.action === 'asignar_mi' ? 'Se creará un nuevo caso para esta conversación y quedarás como el agente responsable.' :
             modalState.action === 'asignar_otro' ? 'Se creará un nuevo caso para esta conversación y será asignado al agente seleccionado.' :
             modalState.action === 'asignar_mi_existente' ? 'Pasarás a ser el agente responsable de este caso.' :

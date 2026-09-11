@@ -170,28 +170,70 @@ export async function reanudarIA(convId: string) {
   return { success: !error, error: error?.message }
 }
 
+// Cuando una persona escribe al cliente, la IA se aparta: se pausa en esa
+// conversación y da por contestado todo lo que el cliente había escrito hasta
+// ahora. Antes la IA seguía activa y el cliente podía recibir a la vez la
+// respuesta del agente y la de la IA.
 export async function enviarMensajeAgenteConv(convId: string, contenido: string) {
+  const texto = contenido?.trim()
+  if (!texto) return { success: false, error: 'El mensaje no puede estar vacío.' }
+
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
-  const userData = { tenant_id: auth.tenant_id }
-  const user = { id: auth.user_id }
+
+  const { data: conv } = await supabase
+    .from('conversations')
+    .select('id, estado, ia_pausada')
+    .eq('id', convId)
+    .eq('tenant_id', auth.tenant_id)
+    .maybeSingle()
+
+  if (!conv) return { success: false, error: 'Conversación no encontrada' }
+  if (conv.estado !== 'activa') {
+    return { success: false, error: 'La conversación está cerrada. Reábrela para escribir al cliente.' }
+  }
 
   const { error } = await supabase
     .from('messages')
     .insert({
-      tenant_id: userData?.tenant_id,
+      tenant_id: auth.tenant_id,
       conversation_id: convId,
       remitente: 'agente',
-      contenido: contenido,
-      agente_id: user.id
+      contenido: texto,
+      agente_id: auth.user_id,
+      agrupado: true
     })
 
-  // Actualizar la fecha del último mensaje
+  if (error) return { success: false, error: error.message }
+
+  // Lo que el cliente había escrito ya lo ha contestado una persona: la IA no
+  // debe volver sobre ello si más adelante se reactiva.
+  await supabase
+    .from('messages')
+    .update({ agrupado: true })
+    .eq('conversation_id', convId)
+    .eq('agrupado', false)
+
+  const iaPausadaAhora = !conv.ia_pausada
   await supabase
     .from('conversations')
-    .update({ fecha_ultimo_mensaje: new Date().toISOString() })
+    .update({
+      fecha_ultimo_mensaje: new Date().toISOString(),
+      ...(iaPausadaAhora ? { ia_pausada: true, atendida_por: auth.user_id } : {})
+    })
     .eq('id', convId)
 
-  return { success: !error, error: error?.message }
+  if (iaPausadaAhora) {
+    const { registrarAuditoria } = await import('@/lib/auditoria')
+    await registrarAuditoria({
+      tenant_id: auth.tenant_id,
+      user_id: auth.user_id,
+      accion: 'pausó la IA al escribir al cliente',
+      tabla_afectada: 'conversations',
+      registro_id: convId
+    })
+  }
+
+  return { success: true, iaPausadaAhora }
 }

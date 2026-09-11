@@ -4,6 +4,8 @@ import { createClient } from '@/utils/supabase/server'
 import { resolveBranchId } from '@/lib/active-branch'
 
 import { getAuthContext } from '@/lib/auth-context'
+import { after } from 'next/server'
+import { cerrarConversacionYCaso, resumirConversacionCerrada } from '@/lib/conversaciones/cierre'
 
 export async function getConversaciones(filtros?: { 
   estado?: string, 
@@ -236,14 +238,24 @@ export async function cerrarConversacion(conversationId: string) {
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
-  const { data, error } = await supabase
+  // Camino común de cierre: si la conversación tenía un caso abierto se da por
+  // resuelto (antes se quedaba abierto, colgado de una conversación cerrada, y
+  // el aviso de "caso sin resolver" saltaba para siempre), y se genera el
+  // resumen para que la IA recuerde a este cliente.
+  const { data: propia } = await supabase
     .from('conversations')
-    .update({ 
-      estado: 'cerrada',
-      fecha_cierre: new Date().toISOString()
-    })
+    .select('id')
     .eq('id', conversationId)
     .eq('branch_id', auth.branch_id)
+    .maybeSingle()
+  if (!propia) return { success: false, error: 'Conversación no encontrada' }
+
+  const cierre = await cerrarConversacionYCaso(supabase, conversationId, auth.tenant_id, 'Resuelto al cerrar la conversación desde Chats')
+  if (!cierre.success) return { success: false, error: cierre.error }
+  after(() => resumirConversacionCerrada(conversationId))
+
+  const { data, error } = await supabase
+    .from('conversations')
     .select(`
       *,
       contacts (
@@ -252,6 +264,7 @@ export async function cerrarConversacion(conversationId: string) {
         canal
       )
     `)
+    .eq('id', conversationId)
     .single()
 
   if (!error) {
@@ -269,17 +282,53 @@ export async function cerrarConversacion(conversationId: string) {
   return { success: true, data }
 }
 
+// Reabrir una conversación es algo que hace una persona para seguir hablando
+// ella con el cliente, así que la IA vuelve en pausa (se puede reactivar desde
+// el propio chat). Antes volvía activa y podía contestar de golpe mensajes
+// viejos, o quedarse muda para siempre si la conversación arrastraba un
+// bloqueo antiguo (fuera de horario, sin créditos...).
 export async function reabrirConversacion(conversationId: string) {
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
+  const { data: conv } = await supabase
+    .from('conversations')
+    .select('id, estado, contact_id, canal')
+    .eq('id', conversationId)
+    .eq('branch_id', auth.branch_id)
+    .maybeSingle()
+
+  if (!conv) return { success: false, error: 'Conversación no encontrada' }
+
+  // Un cliente solo puede tener una conversación abierta por canal: si ya ha
+  // vuelto a escribir, lo suyo sigue en esa, no en la vieja.
+  const yaTieneOtraAbierta = 'Este cliente ya tiene otra conversación abierta por este canal. Continúa en esa.'
+  const { data: otraAbierta } = await supabase
+    .from('conversations')
+    .select('id')
+    .eq('contact_id', conv.contact_id)
+    .eq('branch_id', auth.branch_id)
+    .eq('canal', conv.canal)
+    .eq('estado', 'activa')
+    .neq('id', conversationId)
+    .limit(1)
+    .maybeSingle()
+
+  if (otraAbierta) return { success: false, error: yaTieneOtraAbierta }
+
   const { data, error } = await supabase
     .from('conversations')
-    .update({ 
+    .update({
       estado: 'activa',
       fecha_cierre: null,
-      ia_pausada: false
+      ia_pausada: true,
+      atendida_por: auth.user_id,
+      motivo_bloqueo: null,
+      bloqueada_desde: null,
+      ia_procesando_desde: null,
+      // Reabrir cuenta como actividad: el plazo de 24 h empieza ahora.
+      fecha_ultimo_mensaje: new Date().toISOString()
     })
     .eq('id', conversationId)
     .eq('branch_id', auth.branch_id)
@@ -304,6 +353,9 @@ export async function reabrirConversacion(conversationId: string) {
     })
   }
 
+  // Si justo entre la comprobación y el cambio entra un mensaje nuevo del
+  // cliente, se habrá abierto otra conversación y la base de datos lo impide.
+  if (error?.code === '23505') return { success: false, error: yaTieneOtraAbierta }
   if (error) return { success: false, error: error.message }
   return { success: true, data }
 }

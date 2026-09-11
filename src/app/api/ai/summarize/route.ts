@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { generarResumen } from '@/lib/ai/generarResumen'
 import crypto from 'crypto'
+import { casoTerminado } from '@/lib/casos/estados'
 
 export async function POST(req: Request) {
   let conversationIdToUnlock: string | null = null
@@ -39,12 +40,18 @@ export async function POST(req: Request) {
     // 1. Doble validación de condiciones
     const { data: conv } = await supabaseAdmin
       .from('conversations')
-      .select('estado, fecha_ultimo_mensaje, fecha_ultimo_resumen, contact_id, branch_id, tenant_id')
+      .select('estado, fecha_ultimo_mensaje, fecha_ultimo_resumen, contact_id, branch_id, tenant_id, motivo_bloqueo')
       .eq('id', conversation_id)
       .single()
 
     if (!conv || conv.estado !== 'activa') {
       return NextResponse.json({ status: 'Ignorado (No está activa)' })
+    }
+
+    // Al cliente se le dijo "estamos cerrados, te contestamos al abrir": no se
+    // cierra por inactividad mientras espera a que abra el negocio.
+    if (conv.motivo_bloqueo === 'fuera_horario') {
+      return NextResponse.json({ status: 'Ignorado (Esperando a que abra el negocio)' })
     }
 
     const hoursInactiva = (new Date().getTime() - new Date(conv.fecha_ultimo_mensaje).getTime()) / (1000 * 60 * 60)
@@ -58,7 +65,7 @@ export async function POST(req: Request) {
       .select('estatus')
       .eq('conversation_id', conversation_id)
 
-    const tieneCasoPendiente = cases?.some(c => !['cerrado', 'resuelto'].includes(c.estatus))
+    const tieneCasoPendiente = cases?.some(c => !casoTerminado(c.estatus))
 
     // 3. Generar el resumen interactuando con OpenAI
     const resumen = await generarResumen(conversation_id, conv.tenant_id, conv.branch_id)

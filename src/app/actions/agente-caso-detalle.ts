@@ -3,6 +3,10 @@
 import { createClient } from '@/utils/supabase/server'
 
 import { getAuthContext } from '@/lib/auth-context'
+import { after } from 'next/server'
+import { cerrarConversacionYCaso, resumirConversacionCerrada } from '@/lib/conversaciones/cierre'
+import { casoTerminado } from '@/lib/casos/estados'
+import { reabrirCaso } from './casos'
 
 export async function getCasoDetalle(caseId: string) {
   const supabase = await createClient()
@@ -116,13 +120,32 @@ export async function actualizarEstadoCaso(caseId: string, estatus: 'pendiente' 
     return { success: false, error: auth.error }
   }
 
-  const payload: any = { estatus }
-  
-  if (estatus === 'resuelto') {
-    payload.fecha_cierre = new Date().toISOString()
-  } else {
-    payload.fecha_cierre = null
+  // Solo el agente que lleva el caso puede cambiar su estado.
+  const { data: actual } = await supabase
+    .from('cases')
+    .select('id, estatus, conversation_id')
+    .eq('id', caseId)
+    .eq('tenant_id', auth.tenant_id)
+    .eq('agente_id', auth.user_id)
+    .maybeSingle()
+
+  if (!actual) return { success: false, error: 'No puedes cambiar el estado de un caso que no llevas tú.' }
+
+  // Reabrir un caso ya resuelto va por el mismo camino que "Reabrir caso" en
+  // Chats: si el cliente ya tiene otra conversación activa, el caso se engancha
+  // a ella. Hacerlo aquí con un simple cambio de estado dejaba el caso colgado
+  // de una conversación cerrada.
+  if (estatus !== 'resuelto' && casoTerminado(actual.estatus)) {
+    const res = await reabrirCaso(caseId)
+    if (!res.success) return { success: false, error: res.error }
+    // Al reabrir, el caso puede haberse llevado a la conversación actual del
+    // cliente: a partir de aquí se trabaja con esa.
+    const { data: movido } = await supabase.from('cases').select('conversation_id').eq('id', caseId).single()
+    if (movido) actual.conversation_id = movido.conversation_id
   }
+
+  const payload: any = { estatus }
+  payload.fecha_cierre = estatus === 'resuelto' ? new Date().toISOString() : null
 
   const { data, error } = await supabase
     .from('cases')
@@ -135,6 +158,23 @@ export async function actualizarEstadoCaso(caseId: string, estatus: 'pendiente' 
 
   if (error) {
     return { success: false, error: error.message }
+  }
+
+  // Ponerse a atender el caso es lo mismo que tomarlo: la IA se aparta.
+  if (estatus === 'atendiendo' && actual.conversation_id) {
+    await supabase
+      .from('conversations')
+      .update({ ia_pausada: true, atendida_por: auth.user_id })
+      .eq('id', actual.conversation_id)
+      .eq('tenant_id', auth.tenant_id)
+  }
+
+  // Resolver el caso desde aquí hace lo mismo que desde Casos: cierra su
+  // conversación (antes se quedaba abierta) y genera el resumen.
+  if (estatus === 'resuelto' && actual.conversation_id) {
+    await cerrarConversacionYCaso(supabase, actual.conversation_id, auth.tenant_id, 'Resuelto desde el detalle del caso')
+    const convId = actual.conversation_id
+    after(() => resumirConversacionCerrada(convId))
   }
 
   return { success: true, data }
@@ -171,49 +211,6 @@ export async function agregarNotaCaso(caseId: string, nota: string) {
   if (error) {
     return { success: false, error: error.message }
   }
-
-  return { success: true, data }
-}
-
-export async function enviarMensaje(conversationId: string, contenido: string) {
-  if (!contenido || contenido.trim().length === 0) {
-    return { success: false, error: 'El mensaje no puede estar vacío' }
-  }
-
-  const supabase = await createClient()
-  const auth = await getAuthContext(supabase)
-  
-  if (auth.error) {
-    return { success: false, error: auth.error }
-  }
-
-  const timestamp = new Date().toISOString()
-
-  // 1. Insertar el mensaje
-  const { data, error } = await supabase
-    .from('messages')
-    .insert({
-      tenant_id: auth.tenant_id,
-      conversation_id: conversationId,
-      remitente: 'agente',
-      contenido: contenido.trim(),
-      timestamp: timestamp,
-      entregado: false,
-      agente_id: auth.user_id
-    })
-    .select()
-    .single()
-
-  if (error) {
-    return { success: false, error: error.message }
-  }
-
-  // 2. Actualizar fecha_ultimo_mensaje en conversations
-  await supabase
-    .from('conversations')
-    .update({ fecha_ultimo_mensaje: timestamp })
-    .eq('id', conversationId)
-    .eq('tenant_id', auth.tenant_id)
 
   return { success: true, data }
 }

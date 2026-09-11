@@ -680,6 +680,16 @@ crea queda asignado. Verificado con `probar-configuracion` (20
 comprobaciones con un agente de permisos mezclados, por la app y atacando
 la base de datos, incluido llenar el plan hasta 5 sucursales).
 
+## Los mensajes no salían hacia el WhatsApp del cliente (resuelto, 11-09-2026)
+Donde debía enviarse la respuesta de la IA, `generarRespuesta` solo dejaba un
+registro `SIMULACION_N8N_WEBHOOK` en la auditoría: ni las respuestas de la IA,
+ni las de los agentes, ni los avisos automáticos llegaban a ningún WhatsApp, y
+`messages.entregado` nacía en `true`, así que todo parecía entregado. Tampoco
+había ningún flujo de n8n montado. Jorge decidió quitar n8n y conectar la app
+directamente con Meta (migración `20260911140000`, ver
+`canales-mensajeria.md`). Cada mensaje que sale guarda ahora su estado real de
+envío.
+
 ## La IA prometía una persona sin avisar a nadie (resuelto, 11-09-2026)
 En una ronda de pruebas, ante "quiero hablar con una persona de verdad", la
 IA contestó "te pongo en contacto con una persona de nuestro equipo" sin

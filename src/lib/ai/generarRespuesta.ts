@@ -1,8 +1,8 @@
 import OpenAI from 'openai'
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { crearCasoDesdeSistema } from '@/lib/casos/crearCasoDesdeSistema'
-import { registrarAuditoria } from '@/lib/auditoria'
 import { registrarError } from '@/lib/errores'
+import { enviarMensajeSaliente } from '@/lib/canales/salida'
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || 'sk-test-placeholder'
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY })
@@ -278,7 +278,7 @@ export async function generarRespuesta(conv: any) {
   for (const m of allMessages) {
     let role = m.remitente === 'cliente' ? 'user' : 'assistant'
 
-    // `messages.media_tipo` guarda el tipo MIME que manda n8n ('image/jpeg',
+    // `messages.media_tipo` guarda el tipo MIME que manda el canal ('image/jpeg',
     // 'audio/ogg', 'application/pdf'...), no las palabras 'image' o 'audio'.
     // Aquí se comparaba con esas palabras exactas, así que NUNCA coincidía:
     // las fotos no llegaban a la IA, los audios no se transcribían y los
@@ -929,21 +929,12 @@ export async function generarRespuesta(conv: any) {
   // El descuento de `route.ts` es además el bueno: guarda la sucursal y el
   // origen del movimiento, que este no rellenaba.
 
-  // 12. Simular N8N webhook
-  if (finalContent) {
-    await registrarAuditoria({
-      tenant_id: tenantId,
-      user_id: null,
-      accion: 'SIMULACION_N8N_WEBHOOK',
-      tabla_afectada: 'messages',
-      registro_id: insertId || conversationId,
-      branch_id: branchId,
-      valor_nuevo: {
-        event: 'message.sent',
-        conversation_id: conversationId,
-        content: finalContent
-      }
-    })
+  // 12. Enviar la respuesta al cliente por el canal de la sucursal. Antes aquí
+  // solo se dejaba una anotación de "simulación" y la respuesta no salía hacia
+  // ningún WhatsApp. Si el envío falla, queda apuntado en el propio mensaje
+  // (lo ve el agente en Chats) y, si es algo pasajero, se reintenta solo.
+  if (insertId) {
+    await enviarMensajeSaliente(insertId)
   }
 
   return { success: true }

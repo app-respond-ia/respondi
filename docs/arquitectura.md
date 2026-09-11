@@ -61,22 +61,22 @@ sucursal no se comparten con las demás.
   monta su propia conexión directa a la Meta Cloud API y mete sus propias
   credenciales/tokens en su panel de Respondi — sin BSP, sin que Atsura sea
   Tech Provider ni haga Embedded Signup centralizado.
-- n8n es un simple conector de mensajes (relay). Toda la lógica de
-  negocio (decisión IA-vs-humano, resolución de canal, creación de
-  contacto/caso, transcripción de audio) vive en Next.js/Supabase.
-- n8n sigue llamando directo a las APIs de Meta/Whaticket para el
-  envío de mensajes (por ahora) — revisar endurecimiento de seguridad
-  más adelante.
+- **Sin n8n** (decidido por Jorge el 11-09-2026): la app recibe y envía
+  los mensajes directamente con cada proveedor. Un sistema menos que
+  mantener, y las claves de cada cliente solo están en Respondi, cifradas
+  en la caja fuerte (Vault). Detalle en `docs/estado/canales-mensajeria.md`.
+- Hoy funciona **WhatsApp con Meta** (Cloud API): dirección propia por
+  canal para los avisos, firma comprobada, estados de envío y reintentos.
+  **Whaticket queda en espera**: su API documentada solo envía, no avisa
+  de los mensajes que entran.
 - Canal de **email** (pendiente de construir, antes de Shopify): mismo
   motor de IA y mismas herramientas que WhatsApp, pero lógica de
   conversación distinta — sin ventana de 24h, hilos con asunto en vez
-  de mensajes en tiempo real, proveedor de correo entrante en vez de
-  n8n como puente. `channels.tipo` ya está preparado como enum para
-  añadir este valor.
-- Pendiente: cuando Meta oficial esté conectado de verdad, la UI de
-  Chats debe avisar cuando la ventana de 24h esté cerrada y ofrecer
-  elegir plantilla aprobada, en vez de dejar que el envío falle sin
-  explicación.
+  de mensajes en tiempo real, proveedor de correo entrante que avise a la
+  app. `channels.tipo` ya está preparado como enum para añadir este valor.
+- Pendiente: fuera de la ventana de 24 h de WhatsApp, un mensaje de un
+  agente falla y el agente ve el motivo; falta poder elegir y enviar una
+  plantilla aprobada desde Chats.
 
 ## Multimedia entrante
 - Imágenes: se pasan directo a la IA la primera vez; después se
@@ -84,7 +84,7 @@ sucursal no se comparten con las demás.
   historial sin volver a mandar la imagen.
 - Audio: se transcribe solo bajo demanda (cuando la IA lo necesita),
   no automáticamente al llegar; la transcripción se cachea igual, una
-  sola vez, y vive en Next.js, no en n8n.
+  sola vez, y vive en Next.js.
 - Documentos (PDF, Word): la IA no los procesa por ahora — el agente
   confirma la recepción y el caso se marca para revisión humana.
 

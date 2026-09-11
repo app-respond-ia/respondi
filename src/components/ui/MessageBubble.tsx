@@ -17,6 +17,16 @@ function formatTime(dateStr: string) {
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
+// Cómo va el envío de un mensaje hacia el cliente (IA o agente)
+const ESTADO_ENVIO: Record<string, { texto: string; clase: string; titulo: string }> = {
+  pendiente: { texto: '🕓', clase: 'text-ink-400', titulo: 'Enviando…' },
+  reintentar: { texto: '🕓', clase: 'text-amber-600', titulo: 'No se pudo enviar; se está reintentando' },
+  enviado: { texto: '✓', clase: 'text-ink-400', titulo: 'Enviado' },
+  entregado: { texto: '✓✓', clase: 'text-ink-400', titulo: 'Entregado' },
+  leido: { texto: '✓✓', clase: 'text-sky-500', titulo: 'Leído' },
+  fallido: { texto: '⚠ No enviado', clase: 'text-rose-600', titulo: 'No ha llegado al cliente' }
+}
+
 export function MessageBubble({ msg, contactName, channelId }: MessageBubbleProps) {
   const isCliente = msg.remitente === 'cliente'
   const isIA = msg.remitente === 'ia'
@@ -50,7 +60,15 @@ export function MessageBubble({ msg, contactName, channelId }: MessageBubbleProp
               {isIA ? 'IA' : (msg.users?.nombre || 'Agente')}
             </span>
             <span className="text-[11px] text-ink-400">{formatTime(msg.timestamp)}</span>
+            {msg.estado_envio && ESTADO_ENVIO[msg.estado_envio] && (
+              <span className={`text-[11px] font-600 ${ESTADO_ENVIO[msg.estado_envio].clase}`} title={msg.error_envio || ESTADO_ENVIO[msg.estado_envio].titulo}>
+                {ESTADO_ENVIO[msg.estado_envio].texto}
+              </span>
+            )}
           </div>
+          {msg.estado_envio === 'fallido' && msg.error_envio && (
+            <p className="text-[11px] text-rose-600 mt-0.5 mr-1 text-right max-w-xs ml-auto">{msg.error_envio}</p>
+          )}
         </div>
       </div>
     )

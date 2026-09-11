@@ -26,14 +26,16 @@ solo la lista viva).
         "Prueba gratis 14 días". Ahora van a `/registro-trial?inv=<id>`, con
         la pantalla adaptada a cada tipo de invitado
       - Notificación de comisiones: sin revisar, Jorge la da por buena
-- [ ] **Las respuestas no salen hacia WhatsApp** (visto el 11-09-2026). Donde
-      debería enviarse la respuesta de la IA, `generarRespuesta` solo escribe
-      un registro `SIMULACION_N8N_WEBHOOK` en la auditoría; no hay trigger en
-      `messages` ni llamada desde la app que avise a n8n, y
-      `messages.entregado` nace en `true`, así que todo aparece como
-      entregado. Lo mismo con los mensajes que escribe un agente en Chats.
-      Hace falta ver el flujo de n8n y construir la salida (Whaticket / Meta
-      del propio cliente). Bloquea las pruebas con móviles reales
+- [x] **Las respuestas no salían hacia WhatsApp** — resuelto (11-09-2026):
+      WhatsApp directo con Meta, sin n8n. Ver `canales-mensajeria.md`
+- [ ] **Probar con un número de verdad**: crear la app de prueba de Meta
+      (número de prueba gratis, hasta 5 móviles) y conectarla en Canales
+- [ ] Whaticket: preguntar a su soporte si pueden avisar a Respondi de los
+      mensajes que entran (su API documentada solo envía)
+- [ ] Plantillas de WhatsApp desde Chats para escribir fuera de la ventana
+      de 24 h
+- [ ] Token permanente de Meta: el de prueba caduca en 24 h; explicar en
+      Canales cómo crear el de "usuario del sistema"
 - [x] Modelo de chats, conversaciones y casos — paso 1 hecho (11-09-2026):
       el caso solo cuando hace falta una persona, cierres unificados, y la IA
       y las personas ya no se pisan. Ver `docs/arquitectura.md`
@@ -77,6 +79,8 @@ solo la lista viva).
       necesidad de abrir ningún correo.
 - [ ] Papeleo de canales (verificación de Atsura, registro como
       partner de Gupshup para el BSP)
+- [ ] Pasar Vercel a Pro antes de cobrar a clientes: el plan Hobby es solo
+      para uso personal, no comercial
 - [x] Ronda de pruebas de la jerarquía de pausa/horario — hecha
       (10-09-2026): 15 escenarios contra el endpoint real + 18 de la
       función de horarios con el reloj congelado. Todos correctos. Por el

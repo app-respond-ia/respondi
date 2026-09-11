@@ -4,7 +4,7 @@ import { ErrorCarga } from '@/components/ui/ErrorCarga'
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { getCanales, conectarCanal, desconectarCanal } from '@/app/actions/canales'
+import { getCanales, conectarCanal, desconectarCanal, conectarWhatsAppMeta } from '@/app/actions/canales'
 import { getMisPermisos } from '@/app/actions/permisos'
 import { useToast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
@@ -22,6 +22,19 @@ interface Canal {
   calidad_mensajeria?: 'GREEN' | 'YELLOW' | 'RED' | 'UNKNOWN' | null
   calidad_actualizada_en?: string | null
   fecha_conexion?: string
+  meta_phone_number_id?: string | null
+  numero_visible?: string | null
+  nombre_verificado?: string | null
+  ultimo_error?: string | null
+  webhook_url?: string | null
+  verify_token?: string | null
+}
+
+// Lo que el cliente pega en su app de Meta para que avise a Respondi
+interface DatosAviso {
+  webhook_url: string
+  verify_token: string
+  numero_visible?: string | null
 }
 
 export default function CanalesPage() {
@@ -44,6 +57,13 @@ export default function CanalesPage() {
   const [aceptaRiesgo, setAceptaRiesgo] = useState(false)
   const [conexionConfirmada, setConexionConfirmada] = useState(false)
   const [mostrarRequisitos, setMostrarRequisitos] = useState(false)
+
+  // Conexión de WhatsApp con Meta: elegir método → pegar claves → datos del aviso
+  const [pasoMeta, setPasoMeta] = useState<'metodo' | 'claves' | 'aviso'>('metodo')
+  const [phoneNumberId, setPhoneNumberId] = useState('')
+  const [accessToken, setAccessToken] = useState('')
+  const [appSecret, setAppSecret] = useState('')
+  const [datosAviso, setDatosAviso] = useState<DatosAviso | null>(null)
 
   const cargar = async () => {
     setLoading(true)
@@ -82,6 +102,11 @@ export default function CanalesPage() {
     setModalMetodo('oficial')
     setAceptaRiesgo(false)
     setConexionConfirmada(false)
+    setPasoMeta('metodo')
+    setPhoneNumberId('')
+    setAccessToken('')
+    setAppSecret('')
+    setDatosAviso(null)
     if (tipo !== 'whatsapp') {
       setMostrarRequisitos(true)
     } else {
@@ -94,6 +119,12 @@ export default function CanalesPage() {
     if (!modalTipo) return
     if (modalMetodo === 'whaticket' && !aceptaRiesgo) return
 
+    // WhatsApp con Meta: el cliente pega sus propias claves
+    if (modalTipo === 'whatsapp' && modalMetodo === 'oficial') {
+      setPasoMeta('claves')
+      return
+    }
+
     setModalLoading(true)
     const res = await conectarCanal(modalTipo, modalMetodo === 'oficial' ? 'meta_oficial' : 'whaticket')
     if (res.success) {
@@ -103,6 +134,53 @@ export default function CanalesPage() {
       showToast(res.error || 'Error al conectar canal', 'error')
     }
     setModalLoading(false)
+  }
+
+  const handleGuardarClavesMeta = async () => {
+    setModalLoading(true)
+    const res = await conectarWhatsAppMeta({ phoneNumberId, accessToken, appSecret })
+    setModalLoading(false)
+    if (!res.success || !res.data) {
+      showToast(res.error || 'No se ha podido conectar', 'error')
+      return
+    }
+    setAccessToken('')
+    setAppSecret('')
+    setDatosAviso({ webhook_url: res.data.webhook_url, verify_token: res.data.verify_token, numero_visible: res.data.numero_visible })
+    setPasoMeta('aviso')
+    cargar()
+  }
+
+  const abrirDatosAviso = (canal: Canal) => {
+    if (!canal.webhook_url || !canal.verify_token) return
+    setModalTipo('whatsapp')
+    setDatosAviso({ webhook_url: canal.webhook_url, verify_token: canal.verify_token, numero_visible: canal.numero_visible })
+    setPasoMeta('aviso')
+    setConexionConfirmada(false)
+    setMostrarRequisitos(false)
+    setIsModalOpen(true)
+  }
+
+  const abrirCambiarClaves = (canal: Canal) => {
+    if (nivelPermiso !== 'escritura') return
+    setModalTipo('whatsapp')
+    setModalMetodo('oficial')
+    setPhoneNumberId(canal.meta_phone_number_id || '')
+    setAccessToken('')
+    setAppSecret('')
+    setPasoMeta('claves')
+    setConexionConfirmada(false)
+    setMostrarRequisitos(false)
+    setIsModalOpen(true)
+  }
+
+  const copiar = async (texto: string) => {
+    try {
+      await navigator.clipboard.writeText(texto)
+      showToast('Copiado', 'success')
+    } catch {
+      showToast('No se ha podido copiar; selecciónalo y cópialo a mano', 'error')
+    }
   }
 
   const handleCerrarConfirmacion = () => {
@@ -171,13 +249,17 @@ export default function CanalesPage() {
                     Error de conexión
                   </span>
                 </div>
-                <p className="text-sm text-ink-600">Hubo un problema al conectar este canal o la sesión ha expirado.</p>
+                <p className="text-sm text-ink-600">{canal.ultimo_error || 'Hubo un problema al conectar este canal o la sesión ha expirado.'}</p>
               </div>
             </div>
           </div>
           <div className="flex items-center justify-end gap-2 px-5 py-3.5 bg-red-50 border-t border-red-100">
             <button onClick={() => handleDesconectar(canal.id)} disabled={nivelPermiso !== 'escritura'} className="text-sm font-600 text-red-700 hover:text-red-800 hover:underline underline-offset-2 transition disabled:opacity-50 disabled:cursor-not-allowed">Eliminar conexión</button>
-            <button onClick={() => handleOpenModal(tipo)} disabled={limitReached || nivelPermiso !== 'escritura'} className={`px-4 py-1.5 rounded-lg bg-red-600 text-white text-sm font-600 transition ${limitReached || nivelPermiso !== 'escritura' ? 'opacity-50 cursor-not-allowed' : 'hover:bg-red-700'}`}>Reconectar</button>
+            {canal.metodo === 'meta_oficial' ? (
+              <button onClick={() => abrirCambiarClaves(canal)} disabled={nivelPermiso !== 'escritura'} className="px-4 py-1.5 rounded-lg bg-red-600 text-white text-sm font-600 transition hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed">Cambiar claves</button>
+            ) : (
+              <button onClick={() => handleOpenModal(tipo)} disabled={limitReached || nivelPermiso !== 'escritura'} className={`px-4 py-1.5 rounded-lg bg-red-600 text-white text-sm font-600 transition ${limitReached || nivelPermiso !== 'escritura' ? 'opacity-50 cursor-not-allowed' : 'hover:bg-red-700'}`}>Reconectar</button>
+            )}
           </div>
         </article>
       )
@@ -208,11 +290,14 @@ export default function CanalesPage() {
                 </div>
                 {isActivo && (
                   <>
-                    <p className="text-sm text-ink-600">{canal.identificador_externo || 'Sin identificador'} · Conectado vía {canal.metodo === 'meta_oficial' ? 'Meta oficial' : 'Whaticket'}</p>
+                    <p className="text-sm text-ink-600">{canal.numero_visible || canal.identificador_externo || 'Sin identificador'}{canal.nombre_verificado ? ` (${canal.nombre_verificado})` : ''} · Conectado vía {canal.metodo === 'meta_oficial' ? 'Meta oficial' : 'Whaticket'}</p>
                     <p className="text-xs text-ink-400 mt-1">Desde el {canal.fecha_conexion ? new Date(canal.fecha_conexion).toLocaleDateString() : 'Desconocido'}</p>
                   </>
                 )}
-                {isPendiente && (
+                {isPendiente && canal.metodo === 'meta_oficial' && (
+                  <p className="text-sm text-ink-600">{canal.numero_visible ? `${canal.numero_visible} · ` : ''}Falta un paso: pega la dirección y el código en tu app de Meta para que te avise de los mensajes. En cuanto Meta los compruebe, aparecerá como conectado.</p>
+                )}
+                {isPendiente && canal.metodo !== 'meta_oficial' && (
                   <p className="text-sm text-ink-500">Esperando configuración...</p>
                 )}
               </div>
@@ -252,12 +337,18 @@ export default function CanalesPage() {
             )}
           </div>
           {/* Acciones */}
-          {isActivo && (
-            <div className="flex items-center justify-end gap-2 px-5 py-3.5 bg-slate-50 border-t border-slate-200">
-              {tipo === 'whatsapp' && (
+          {(isActivo || (isPendiente && canal.metodo === 'meta_oficial')) && (
+            <div className="flex items-center justify-end gap-3 px-5 py-3.5 bg-slate-50 border-t border-slate-200 flex-wrap">
+              {tipo === 'whatsapp' && isActivo && (
                 <Link href="/dashboard/canales/whatsapp-plantillas" className="text-sm font-600 text-brand-600 hover:text-brand-700 hover:underline underline-offset-2 transition mr-auto">
                   Gestionar plantillas
                 </Link>
+              )}
+              {canal.metodo === 'meta_oficial' && (
+                <>
+                  <button onClick={() => abrirDatosAviso(canal)} className="text-sm font-600 text-ink-700 hover:text-ink-900 hover:underline underline-offset-2 transition">Datos para Meta</button>
+                  <button onClick={() => abrirCambiarClaves(canal)} disabled={nivelPermiso !== 'escritura'} className="text-sm font-600 text-ink-700 hover:text-ink-900 hover:underline underline-offset-2 transition disabled:opacity-50 disabled:cursor-not-allowed">Cambiar claves</button>
+                </>
               )}
               <button onClick={() => handleDesconectar(canal.id)} disabled={nivelPermiso !== 'escritura'} className="text-sm font-600 text-red-600 hover:text-red-700 hover:underline underline-offset-2 transition disabled:opacity-50 disabled:cursor-not-allowed">Desconectar</button>
             </div>
@@ -356,7 +447,7 @@ export default function CanalesPage() {
             <p className="font-600 text-ink-900">
               Plan activo · {canalesMax === null ? 'Canales ilimitados' : `${canalesMax} canales disponibles`}
             </p>
-            <p className="text-sm text-ink-600">Puedes elegir cómo conectar cada canal: vía Whaticket (sin costo extra, con riesgo) o vía Meta oficial (sin riesgo).</p>
+            <p className="text-sm text-ink-600">WhatsApp se conecta con la API oficial de Meta, con tu propia cuenta: tus claves se guardan cifradas y solo las usa Respondi para enviar y recibir tus mensajes.</p>
           </div>
         </div>
       </div>
@@ -382,7 +473,63 @@ export default function CanalesPage() {
                 </button>
               </div>
 
-              {conexionConfirmada ? (
+              {modalTipo === 'whatsapp' && pasoMeta === 'claves' ? (
+                <>
+                  <div className="px-6 py-5 space-y-4">
+                    <p className="text-sm text-ink-600">
+                      Copia estos tres datos de tu app de Meta (<a href="https://developers.facebook.com/apps" target="_blank" rel="noopener noreferrer" className="text-brand-600 font-600 hover:underline">developers.facebook.com</a>). Los comprobamos con Meta antes de guardarlos y quedan cifrados: nadie los vuelve a ver.
+                    </p>
+                    <div>
+                      <label htmlFor="meta-phone-id" className="block text-sm font-600 text-ink-900 mb-1">Identificador del número de teléfono</label>
+                      <input id="meta-phone-id" value={phoneNumberId} onChange={e => setPhoneNumberId(e.target.value)} inputMode="numeric" autoComplete="off" placeholder="Ej. 123456789012345" className="w-full h-11 px-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500" />
+                      <p className="text-xs text-ink-500 mt-1">En tu app → WhatsApp → Configuración de la API. Son solo cifras (no es tu número de teléfono).</p>
+                    </div>
+                    <div>
+                      <label htmlFor="meta-token" className="block text-sm font-600 text-ink-900 mb-1">Token de acceso</label>
+                      <input id="meta-token" type="password" value={accessToken} onChange={e => setAccessToken(e.target.value)} autoComplete="off" placeholder="EAA…" className="w-full h-11 px-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500" />
+                      <p className="text-xs text-ink-500 mt-1">En la misma pantalla. El token de prueba caduca en 24 h; para uso real, crea uno permanente de "usuario del sistema".</p>
+                    </div>
+                    <div>
+                      <label htmlFor="meta-secret" className="block text-sm font-600 text-ink-900 mb-1">Clave secreta de la app</label>
+                      <input id="meta-secret" type="password" value={appSecret} onChange={e => setAppSecret(e.target.value)} autoComplete="off" placeholder="32 caracteres" className="w-full h-11 px-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500" />
+                      <p className="text-xs text-ink-500 mt-1">En tu app → Configuración de la app → Básica → Clave secreta de la app.</p>
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100">
+                    <button onClick={() => setIsModalOpen(false)} disabled={modalLoading} className="px-5 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition disabled:opacity-50">Cancelar</button>
+                    <button onClick={handleGuardarClavesMeta} disabled={modalLoading || !phoneNumberId || !accessToken || !appSecret} className="px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition disabled:opacity-50">
+                      {modalLoading ? 'Comprobando con Meta…' : 'Comprobar y guardar'}
+                    </button>
+                  </div>
+                </>
+              ) : modalTipo === 'whatsapp' && pasoMeta === 'aviso' && datosAviso ? (
+                <>
+                  <div className="px-6 py-5 space-y-4">
+                    <p className="text-sm text-ink-600">
+                      {datosAviso.numero_visible ? <><strong className="text-ink-900">{datosAviso.numero_visible}</strong> está listo. </> : null}
+                      Último paso: en tu app de Meta → WhatsApp → Configuración → <strong>Webhook</strong> → Editar, pega estos dos datos, pulsa «Verificar y guardar» y, en «Campos del webhook», activa <strong>messages</strong>.
+                    </p>
+                    <div>
+                      <p className="text-sm font-600 text-ink-900 mb-1">URL de devolución de llamada</p>
+                      <div className="flex gap-2">
+                        <code className="flex-1 min-w-0 px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-ink-700 break-all">{datosAviso.webhook_url}</code>
+                        <button onClick={() => copiar(datosAviso.webhook_url)} className="shrink-0 px-3 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700">Copiar</button>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-sm font-600 text-ink-900 mb-1">Token de verificación</p>
+                      <div className="flex gap-2">
+                        <code className="flex-1 min-w-0 px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-ink-700 break-all">{datosAviso.verify_token}</code>
+                        <button onClick={() => copiar(datosAviso.verify_token)} className="shrink-0 px-3 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700">Copiar</button>
+                      </div>
+                    </div>
+                    <p className="text-xs text-ink-500">En cuanto Meta compruebe la dirección, este canal pasará solo a «Conectado». Puedes volver a ver estos datos en la tarjeta del canal.</p>
+                  </div>
+                  <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100">
+                    <button onClick={() => { setIsModalOpen(false); cargar() }} className="px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition">Hecho</button>
+                  </div>
+                </>
+              ) : conexionConfirmada ? (
                 <>
                   <div className="px-6 py-10 text-center">
                     <div className="w-16 h-16 rounded-full bg-brand-100 flex items-center justify-center mx-auto mb-5">
@@ -474,38 +621,25 @@ export default function CanalesPage() {
                         <p className="font-600 text-sm text-ink-900">Conexión oficial con Meta</p>
                         <span className="text-[10px] font-600 text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded uppercase tracking-wide">Recomendado</span>
                       </div>
-                      <p className="text-xs text-ink-600 mb-2">Autoriza tu página desde Meta. Sin riesgo de baneo, conexión estable y respaldada oficialmente. Tras elegir esta opción, nuestro equipo de soporte te contactará para completar la autorización junto a ti.</p>
+                      <p className="text-xs text-ink-600 mb-2">{modalTipo === 'whatsapp' ? 'Con tu propia app de Meta: pegas tres datos y listo. Sin riesgo de bloqueo, conexión estable y respaldada oficialmente.' : 'Autoriza tu página desde Meta. Sin riesgo de baneo, conexión estable y respaldada oficialmente.'}</p>
                       <p className="text-xs text-emerald-700 font-500">Sin costo adicional</p>
                     </div>
                   </div>
                 </label>
 
-                {/* Opción 2: Whaticket */}
-                <label className={`relative block rounded-2xl border-2 p-4 cursor-pointer transition ${modalMetodo === 'whaticket' ? 'border-amber-500 bg-amber-50/40 ring-4 ring-amber-100' : 'border-slate-200 bg-white hover:border-amber-300'}`}>
-                  <input type="radio" name="metodo" value="whaticket" className="sr-only" checked={modalMetodo === 'whaticket'} onChange={() => setModalMetodo('whaticket')} />
-                  {modalMetodo === 'whaticket' && (
-                    <span className="absolute top-3 right-3 w-5 h-5 rounded-full bg-amber-600 flex items-center justify-center">
-                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
-                    </span>
-                  )}
-                  <div className="flex items-start gap-3 pr-8">
-                    <svg className="w-6 h-6 text-amber-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0L3.16 16.25A2 2 0 005 19z"/></svg>
+                {/* Opción 2: Whaticket — todavía no disponible */}
+                <div className="relative block rounded-2xl border-2 border-slate-200 bg-slate-50 p-4 opacity-80">
+                  <div className="flex items-start gap-3">
+                    <svg className="w-6 h-6 text-slate-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     <div className="flex-1">
-                      <p className="font-600 text-sm text-ink-900 mb-1">Conexión vía Whaticket</p>
-                      <p className="text-xs text-ink-600 mb-2">Se conecta escaneando un código QR desde tu propio celular. Más rápido de activar, pero al no ser un canal oficial de Meta, existe riesgo de que la cuenta sea detectada y bloqueada. Tras elegir esta opción, nuestro equipo de soporte te contactará para guiarte en el escaneo del código.</p>
-                      <p className="text-xs text-amber-700 font-500">Requiere aceptación de riesgo</p>
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <p className="font-600 text-sm text-ink-700">Conexión vía Whaticket</p>
+                        <span className="text-[10px] font-600 text-slate-600 bg-slate-200 px-1.5 py-0.5 rounded uppercase tracking-wide">Todavía no disponible</span>
+                      </div>
+                      <p className="text-xs text-ink-600">Estamos confirmando con Whaticket que pueda avisar a Respondi de los mensajes que te llegan, sin lo cual la IA no podría contestarlos. De momento, conecta tu WhatsApp con Meta.</p>
                     </div>
                   </div>
-                </label>
-                
-                {modalMetodo === 'whaticket' && (
-                  <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={aceptaRiesgo} onChange={e => setAceptaRiesgo(e.target.checked)} className="w-4 h-4 text-brand-600 rounded border-slate-300 focus:ring-brand-500" />
-                      <span className="text-sm font-500 text-ink-700">Entiendo y acepto el riesgo de baneo por usar esta conexión no oficial.</span>
-                    </label>
-                  </div>
-                )}
+                </div>
 
               </div>
                   <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100">

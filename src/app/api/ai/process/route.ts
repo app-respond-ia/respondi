@@ -9,6 +9,7 @@ export const revalidate = 0
 
 import { crearCasoDesdeSistema } from '@/lib/casos/crearCasoDesdeSistema'
 import { isFueraDeHorario } from '@/lib/horarios'
+import { enviarMensajeSaliente } from '@/lib/canales/salida'
 
 export async function POST(req: Request) {
   // ============================================================================
@@ -73,6 +74,18 @@ export async function POST(req: Request) {
   const fichaContacto = ficha || { trato: 'normal', modo: null, respuesta_auto: null, nota: null }
   ;(conv as any).ficha_contacto = fichaContacto
 
+  // Los avisos automáticos (respuesta fija a un contacto, fuera de horario,
+  // sin créditos) también tienen que llegar al cliente: se guardan y se envían
+  // por el canal de la sucursal, como cualquier respuesta.
+  const avisoAutomatico = async (texto: string) => {
+    const { data } = await supabaseAdmin
+      .from('messages')
+      .insert({ tenant_id: conv.tenant_id, conversation_id: conversationId, remitente: 'ia', contenido: texto })
+      .select('id')
+      .single()
+    if (data) await enviarMensajeSaliente(data.id)
+  }
+
   const liberarCandado = async () => {
     await supabaseAdmin.from('conversations').update({ ia_procesando_desde: null }).eq('id', conversationId)
   }
@@ -115,9 +128,7 @@ export async function POST(req: Request) {
         await crearCasoDesdeSistema(conversationId, conv.tenant_id, conv.branch_id, conv.contact_id, 'Contacto configurado para derivar a humano sin pasar por IA.')
       } else if (modoEfectivo === 'respuesta_automatica') {
         const msg = contact.respuesta_auto || branch?.trato_contactos_respuesta_auto || 'En este momento no podemos atenderte.'
-        await supabaseAdmin.from('messages').insert({
-          tenant_id: conv.tenant_id, conversation_id: conversationId, remitente: 'ia', contenido: msg
-        })
+        await avisoAutomatico(msg)
       }
       
       await bloquearConversacion('derivacion_contacto')
@@ -140,9 +151,7 @@ export async function POST(req: Request) {
         
         if (isFueraDeHorario(branch.timezone, horasAFiltrar)) {
           if (profile.msg_fuera_horario) {
-            await supabaseAdmin.from('messages').insert({
-              tenant_id: conv.tenant_id, conversation_id: conversationId, remitente: 'ia', contenido: profile.msg_fuera_horario
-            })
+            await avisoAutomatico(profile.msg_fuera_horario)
           }
           if (profile.abrir_caso_fuera_horario) {
             await crearCasoDesdeSistema(conversationId, conv.tenant_id, conv.branch_id, conv.contact_id, 'Contacto fuera de horario comercial.')
@@ -169,9 +178,7 @@ export async function POST(req: Request) {
 
     if (saldo <= 0) {
       const msg = profile?.msg_cuota_agotada || 'En este momento nuestros agentes están experimentando demoras. Te atenderemos lo antes posible.'
-      await supabaseAdmin.from('messages').insert({
-        tenant_id: conv.tenant_id, conversation_id: conversationId, remitente: 'ia', contenido: msg
-      })
+      await avisoAutomatico(msg)
       await crearCasoDesdeSistema(conversationId, conv.tenant_id, conv.branch_id, conv.contact_id, 'Cuota de mensajes agotada. Requiere atención manual.')
       await bloquearConversacion('sin_cuota')
       await logRechazo('sin_cuota')

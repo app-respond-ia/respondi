@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { getAuthContext } from '@/lib/auth-context'
+import { enviarMensajeSaliente } from '@/lib/canales/salida'
 
 export async function getConversaciones(filtros?: { estado?: string, canal?: string, search?: string, iaPausada?: boolean, dateRange?: { from: string, to: string }, sort?: 'asc' | 'desc' }) {
   const supabase = await createClient()
@@ -208,7 +209,7 @@ export async function enviarMensajeAgenteConv(convId: string, contenido: string)
     return { success: false, error: 'La conversación está cerrada. Reábrela para escribir al cliente.' }
   }
 
-  const { error } = await supabase
+  const { data: nuevo, error } = await supabase
     .from('messages')
     .insert({
       tenant_id: auth.tenant_id,
@@ -218,6 +219,8 @@ export async function enviarMensajeAgenteConv(convId: string, contenido: string)
       agente_id: auth.user_id,
       agrupado: true
     })
+    .select('id')
+    .single()
 
   if (error) return { success: false, error: error.message }
 
@@ -249,5 +252,8 @@ export async function enviarMensajeAgenteConv(convId: string, contenido: string)
     })
   }
 
-  return { success: true, iaPausadaAhora }
+  // Y ahora sí, hacia el WhatsApp del cliente
+  const envio = await enviarMensajeSaliente(nuevo.id)
+
+  return { success: true, iaPausadaAhora, envio: envio.estado, errorEnvio: envio.error || null }
 }

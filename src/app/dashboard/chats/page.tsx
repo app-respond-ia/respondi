@@ -280,7 +280,9 @@ function ChatsContent() {
               const updatedConvs = [...prev]
               const target = { ...updatedConvs[idx] }
               
-              target.fecha_ultimo_mensaje = newMsg.created_at
+              // En `messages` la fecha se llama `timestamp` (antes se leía
+              // `created_at`, que no existe, y la hora desaparecía)
+              target.fecha_ultimo_mensaje = newMsg.timestamp
               // Actualizar el previo
               if (target.messages) {
                 target.messages = [{ contenido: newMsg.contenido }]
@@ -299,6 +301,19 @@ function ChatsContent() {
               
               return updatedConvs
             })
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'messages' },
+          (payload) => {
+            // Cómo va el envío (enviado → entregado → leído, o fallido) llega
+            // después de escribir el mensaje: se actualiza la burbuja al vuelo
+            const actualizado = payload.new as any
+            if (actualizado.conversation_id !== selectedConvIdRef.current) return
+            setMensajes(prev => prev.map(m => m.id === actualizado.id
+              ? { ...m, estado_envio: actualizado.estado_envio, error_envio: actualizado.error_envio }
+              : m))
           }
         )
         .on(
@@ -442,6 +457,11 @@ function ChatsContent() {
         setConversaciones(prev => prev.map(c => c.id === selectedConvId ? { ...c, ia_pausada: true } : c))
         cargarContexto(selectedConvId)
         showToast('Has escrito tú: la IA queda en pausa en este chat.', 'info')
+      }
+      if (res.envio === 'fallido') {
+        showToast(`El mensaje se ha guardado pero no ha llegado al cliente: ${res.errorEnvio}`, 'error')
+      } else if (res.envio === 'reintentar') {
+        showToast('No se ha podido enviar ahora mismo; se volverá a intentar solo en un minuto.', 'info')
       }
     } else {
       showToast(res.error || 'Error al enviar mensaje', 'error')

@@ -12,13 +12,16 @@ Socios al 50/50: Atsura (Andreina — diseño/comercial) y Propulse System LLC
 - Next.js + TypeScript + Tailwind CSS
 - Supabase (PostgreSQL + RLS + Realtime + Storage + pg_cron)
 - Vercel (Hobby plan) — producción en respondi.vercel.app
-- n8n como conector de mensajería (relay), NUNCA lógica de negocio
+- Sin n8n (decidido el 11-09-2026): la app recibe y envía los mensajes
+  directamente con cada proveedor (Meta Cloud API y Whaticket)
 - Repo: `app-respond-ia/respondi`
 
 ## Reglas de oro (nunca las rompas sin preguntar primero)
-1. n8n es solo relay de mensajes. Toda la lógica de negocio (decisión
-   IA-vs-humano, resolución de canal, creación de contacto/caso, transcripción)
-   vive en Next.js/Supabase.
+1. Toda la lógica de negocio (decisión IA-vs-humano, resolución de canal,
+   creación de contacto/caso, transcripción, envío y recepción de mensajes)
+   vive en Next.js/Supabase. Ya no hay n8n: Jorge decidió el 11-09-2026 que la
+   app hable directamente con Meta y con Whaticket (un sistema menos que
+   mantener, y las claves de cada cliente quedan solo en Respondi).
 2. La IA nunca inventa etiquetas ni reglas de escalado — solo usa las que
    existen de verdad en `message_categories`/`case_rules` para esa sucursal.
 3. Usa `supabaseAdmin` solo cuando el cliente normal esté bloqueado por RLS.

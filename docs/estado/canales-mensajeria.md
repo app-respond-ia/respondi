@@ -24,16 +24,17 @@ formulario donde el cliente pega sus propias claves (App ID, token de
 acceso, número verificado, etc.), no un flujo de Embedded Signup
 gestionado por Atsura.
 
-## Whaticket
-Proveedor: whaticket.com. Decidido usar Whaticket en vez de montar
-servidor propio (Evolution API/Baileys) para la conexión WhatsApp por
-QR — menos margen a cambio de menos complejidad de mantenimiento.
-
-**Decidido arrancar con clientes reales facturando sobre Whaticket
-ya** (clientes informados de que Whaticket puede bloquearles el
-número), en paralelo a la verificación de Atsura y el registro como
-partner de Gupshup para el BSP — para no perder ingresos durante las
-semanas de espera de esa aprobación.
+## Whaticket — en espera (11-09-2026)
+Proveedor: whaticket.com. Se había decidido arrancar con clientes reales
+sobre Whaticket, pero al integrarlo directamente se vio que, según su
+documentación pública, **su API solo envía**: no hay forma documentada de que
+Whaticket avise a otra aplicación de los mensajes que entran, así que la IA
+de Respondi no podría contestarlos. Además, en conexiones por QR cada mensaje
+enviado por API gasta créditos de Whaticket (en conexiones de API Cloud cobra
+Meta). Envío: `POST https://api.whaticket.com/api/v1/messages` con token.
+Pendiente: preguntar a su soporte si pueden mandar cada mensaje entrante a
+una dirección nuestra. Hasta entonces la opción aparece en Canales como
+"todavía no disponible".
 
 ## Meta oficial — BSP elegido (papeleo, no código)
 Gupshup, no 360dialog — sin cuota mensual fija, solo pago por mensaje
@@ -41,20 +42,32 @@ Gupshup, no 360dialog — sin cuota mensual fija, solo pago por mensaje
 plantilla, no los de sesión/conversación normal). Encaja mejor sin
 tener aún clientes que la cuota fija de 360dialog (250-1.000€/mes).
 
-## Relay n8n ↔ Next.js/Supabase
-n8n es simple conector de mensajes. Toda la lógica de negocio
-(decisión IA-vs-humano, resolución de canal, creación de
-contacto/caso, transcripción de audio) vive en Next.js/Supabase, no
-en n8n. n8n sigue llamando directo a las APIs de Meta/Whaticket para
-el envío de mensajes (toca los tokens) — pendiente revisar
-endurecimiento de seguridad de este punto más adelante.
-
-**Ojo (11-09-2026): la salida no está conectada.** La app no avisa a n8n
-de ningún mensaje saliente: `generarRespuesta` deja un registro
-`SIMULACION_N8N_WEBHOOK` en la auditoría en lugar de enviar, no hay
-trigger en `messages`, y `messages.entregado` nace en `true`. Ni las
-respuestas de la IA ni las de los agentes llegan hoy al WhatsApp del
-cliente. Ver `pendientes.md`, Prioridad 1.
+## WhatsApp directo con Meta, sin n8n (11-09-2026)
+Jorge decidió quitar n8n: la app habla directamente con la API de WhatsApp
+de Meta (Cloud API, versión 25).
+- **Conectar** (Canales): el cliente pega tres datos de su propia app de
+  Meta: identificador del número, token de acceso y clave secreta de la app.
+  Se comprueban con Meta antes de guardarlos y van cifrados a la caja fuerte
+  de Supabase (Vault; `guardar/leer/borrar_credenciales_canal`, solo el
+  servidor). Nunca vuelven a la pantalla.
+- **Recibir**: cada canal tiene su dirección,
+  `/api/whatsapp/meta/<id del canal>`, que el cliente pega en su app de Meta
+  con el "verify token" que le da Respondi. Al verificarla Meta, el canal
+  pasa a activo solo. Cada aviso se comprueba con la firma
+  `X-Hub-Signature-256`. Los archivos (fotos, audios, documentos) se
+  descargan de Meta y se guardan en el almacén privado `whatsapp_media`. Un
+  aviso repetido no duplica el mensaje.
+- **Enviar** (`src/lib/canales/salida.ts`): las respuestas de la IA, los
+  mensajes de los agentes y los avisos automáticos (fuera de horario, sin
+  créditos, respuesta fija a un contacto) salen por el canal de la sucursal.
+  Cada mensaje guarda `estado_envio` (pendiente → enviado → entregado →
+  leído, o fallido) y el motivo si falla; los estados llegan en los avisos
+  de Meta. Los fallos pasajeros se reintentan solos (cron
+  `reintentar-envios-whatsapp`, hasta 3 intentos). Fuera de la ventana de
+  24 h no se reintenta y se explica que hace falta una plantilla. Si Meta
+  rechaza el token, el canal pasa a "error" con el motivo.
+- **Pruebas**: `probar-whatsapp` (23 comprobaciones) contra un Meta
+  simulado (`WHATSAPP_GRAPH_URL`).
 
 ## Ventana de 24h (WhatsApp oficial)
 Pendiente para cuando Meta oficial esté conectado de verdad: en el

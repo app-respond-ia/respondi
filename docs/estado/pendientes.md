@@ -39,10 +39,12 @@ solo la lista viva).
 - [x] Modelo de chats, conversaciones y casos — paso 1 hecho (11-09-2026):
       el caso solo cuando hace falta una persona, cierres unificados, y la IA
       y las personas ya no se pisan. Ver `docs/arquitectura.md`
-- [ ] Paso 2: Chats agrupado por persona (una fila por contacto, con sus
-      conversaciones dentro). Primero una maqueta para que la vea Andreina
-- [ ] Paso 3: las notas internas de una persona visibles en todas sus
-      conversaciones (hoy solo se ven las de la conversación abierta)
+- [x] Paso 2: Chats con una fila por persona — hecho (11-09-2026): su
+      conversación abierta (o la última) y cuántas lleva; los filtros miran
+      esa conversación
+- [x] Paso 3: las notas internas son de la persona — hecho (11-09-2026): se
+      ven en todas sus conversaciones de la sucursal, marcadas con la fecha
+      de la conversación en que se escribieron
 - [x] Borrado el código muerto: `agente-casos.ts`, `agente-caso-detalle.ts`
       y `OperarioLayout.tsx` (11-09-2026)
 - [x] Cada sucursal ve solo lo suyo — hecho (11-09-2026), también la
@@ -55,14 +57,11 @@ solo la lista viva).
       (ver `docs/arquitectura.md`, "Permisos y roles")
 - [ ] Borrar las columnas obsoletas `contacts.trato/modo/respuesta_auto/nota`
       (ya no se usan; se borran con el OK de Jorge)
-- [ ] Hilo del cliente en Conversaciones — maqueta hecha
-      (https://claude.ai/code/artifact/2339cc2a-07c6-4b98-98e8-b70feb6962db),
-      decidido: solo las conversaciones de esa sucursal. Pendiente de que la
-      vea Andreina; se construye junto con el paso 2
-- [ ] Chats en tiempo real: al llegar un mensaje se pierde la hora del
-      último mensaje (lee `created_at`, que en `messages` se llama
-      `timestamp`) y un cliente nuevo no aparece hasta recargar. Va con el
-      paso 2
+- [x] Historial del cliente en Conversaciones — hecho (11-09-2026) según la
+      maqueta (https://claude.ai/code/artifact/2339cc2a-07c6-4b98-98e8-b70feb6962db):
+      solo las conversaciones de esa sucursal. Falta que lo vea Andreina
+- [x] Chats en tiempo real — hecho (11-09-2026): la hora del último mensaje
+      ya no se pierde y un chat nuevo aparece sin recargar
 
 ## Prioridad 2 — Fase 0 (antes de construir nada de la v2)
 - [x] Conseguir `OPENAI_API_KEY` — hecha: en `.env.local` y en las

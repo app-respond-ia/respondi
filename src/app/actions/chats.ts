@@ -23,7 +23,7 @@ export async function getConversaciones(filtros?: {
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
-  let query = supabase
+  const { data: rawData, error } = await supabase
     .from('conversations')
     .select(`
       *,
@@ -48,35 +48,55 @@ export async function getConversaciones(filtros?: {
     .eq('branch_id', auth.branch_id)
     .order('timestamp', { foreignTable: 'messages', ascending: false })
     .limit(1, { foreignTable: 'messages' })
-    .order('fecha_ultimo_mensaje', { ascending: filtros?.sort === 'asc', nullsFirst: false })
+
+  if (error) return { success: false, error: error.message }
+
+  // Una fila por persona. Antes salía una fila por cada conversación, así que
+  // un cliente que había escrito cuatro veces aparecía cuatro veces. De cada
+  // persona se enseña su conversación abierta (si la tiene) o la última, y
+  // cuántas lleva en total con esta sucursal; el historial completo está en
+  // su ficha (Conversaciones). Los filtros miran esa conversación, la que
+  // cuenta ahora: alguien que está hablando no sale en "Cerradas" por tener
+  // conversaciones antiguas cerradas.
+  const porPersona = new Map<string, any>()
+  const totales: Record<string, number> = {}
+  const idsPorPersona: Record<string, string[]> = {}
+  for (const c of rawData || []) {
+    totales[c.contact_id] = (totales[c.contact_id] || 0) + 1
+    ;(idsPorPersona[c.contact_id] ||= []).push(c.id)
+    const actual = porPersona.get(c.contact_id)
+    const mejor = !actual ||
+      (c.estado === 'activa' && actual.estado !== 'activa') ||
+      (c.estado === actual.estado && String(c.fecha_ultimo_mensaje || c.fecha_inicio) > String(actual.fecha_ultimo_mensaje || actual.fecha_inicio))
+    if (mejor) porPersona.set(c.contact_id, c)
+  }
+
+  let result = [...porPersona.values()]
 
   if (filtros?.estado && filtros.estado !== 'Todas') {
     const est = filtros.estado === 'Activas' ? 'activa' : filtros.estado === 'Cerradas' ? 'cerrada' : null
-    if (est) query = query.eq('estado', est)
+    if (est) result = result.filter(c => c.estado === est)
   }
 
   if (filtros?.canal && filtros.canal !== 'Todos') {
-    query = query.eq('canal', filtros.canal.toLowerCase())
+    const canal = filtros.canal.toLowerCase()
+    result = result.filter(c => c.canal === canal)
   }
 
   if (filtros?.iaPausada && filtros.iaPausada !== 'Todas') {
-    query = query.eq('ia_pausada', filtros.iaPausada === 'Pausada')
+    const pausada = filtros.iaPausada === 'Pausada'
+    result = result.filter(c => !!c.ia_pausada === pausada)
   }
 
   if (filtros?.dateRange?.from) {
-    query = query.gte('fecha_ultimo_mensaje', filtros.dateRange.from)
+    const desde = filtros.dateRange.from
+    result = result.filter(c => c.fecha_ultimo_mensaje && c.fecha_ultimo_mensaje >= desde)
   }
   if (filtros?.dateRange?.to) {
-    query = query.lte('fecha_ultimo_mensaje', filtros.dateRange.to + 'T23:59:59.999Z')
+    const hasta = new Date(filtros.dateRange.to + 'T23:59:59.999Z').getTime()
+    result = result.filter(c => c.fecha_ultimo_mensaje && new Date(c.fecha_ultimo_mensaje).getTime() <= hasta)
   }
 
-  const { data: rawData, error } = await query
-
-  if (error) return { success: false, error: error.message }
-  
-  let result = rawData || []
-
-  // Memory filtering for complex joins
   if (filtros?.tieneCaso && filtros.tieneCaso !== 'Todas') {
     result = result.filter(c => {
       const hasCase = c.cases && c.cases.length > 0
@@ -85,10 +105,7 @@ export async function getConversaciones(filtros?: {
   }
 
   if (filtros?.asignadosAMi) {
-    result = result.filter(c => {
-      const isAgent = c.cases?.some((cas: any) => cas.agente_id === auth.user_id)
-      return isAgent
-    })
+    result = result.filter(c => c.cases?.some((cas: any) => cas.agente_id === auth.user_id))
   }
 
   if (filtros?.agentesIds && filtros.agentesIds.length > 0) {
@@ -114,7 +131,7 @@ export async function getConversaciones(filtros?: {
     result = result.filter(c => {
       const contact = Array.isArray(c.contacts) ? c.contacts[0] : c.contacts
       return (
-        c.id.toLowerCase().includes(s) ||
+        (idsPorPersona[c.contact_id] || [c.id]).some(id => id.toLowerCase().includes(s)) ||
         (contact?.nombre && contact.nombre.toLowerCase().includes(s)) ||
         (contact?.identificador_canal && contact.identificador_canal.toLowerCase().includes(s)) ||
         (contact?.canal && contact.canal.toLowerCase().includes(s))
@@ -122,7 +139,21 @@ export async function getConversaciones(filtros?: {
     })
   }
 
-  return { success: true, data: { conversaciones: result } }
+  const asc = filtros?.sort === 'asc'
+  const conversaciones = result
+    .map(c => ({
+      ...c,
+      total_conversaciones: totales[c.contact_id] || 1,
+      // Para abrir el chat de la persona desde cualquiera de sus conversaciones
+      // (por ejemplo, desde un caso de una conversación antigua)
+      ids_conversaciones: idsPorPersona[c.contact_id] || [c.id]
+    }))
+    .sort((a, b) => {
+      const fa = String(a.fecha_ultimo_mensaje || a.fecha_inicio), fb = String(b.fecha_ultimo_mensaje || b.fecha_inicio)
+      return asc ? fa.localeCompare(fb) : fb.localeCompare(fa)
+    })
+
+  return { success: true, data: { conversaciones } }
 }
 
 export async function getEtiquetasTenant() {

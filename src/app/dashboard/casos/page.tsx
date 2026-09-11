@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { getCasos, getAgentesParaCasos } from '@/app/actions/casos'
 import { getMisPermisos } from '@/app/actions/permisos'
+import { EtiquetaPill } from '@/components/ui/EtiquetaPill'
 
 export default function CasosPage() {
   const router = useRouter()
@@ -366,19 +367,9 @@ export default function CasosPage() {
                         #{caso.id.substring(0,8).toUpperCase()}
                       </span>
                       <div className="flex gap-1 mt-1 flex-wrap">
-                        {caso.conversations?.conversation_tags?.map((t:any, i:number) => {
-                          const color = t.message_categories?.color || '#94a3b8'; // default slate-400
-                          return (
-                            <span key={i} className="text-[10px] px-1.5 py-0.5 rounded font-medium border"
-                              style={{ 
-                                backgroundColor: `${color}15`, 
-                                color: color,
-                                borderColor: `${color}30`
-                              }}>
-                              {t.message_categories?.nombre}
-                            </span>
-                          )
-                        })}
+                        {caso.conversations?.conversation_tags?.map((t:any, i:number) => (
+                          <EtiquetaPill key={i} pequena nombre={t.message_categories?.nombre} color={t.message_categories?.color} />
+                        ))}
                       </div>
                     </td>
                     <td className="px-3 py-3 max-w-[180px] 2xl:max-w-[240px] truncate text-slate-600 text-sm">

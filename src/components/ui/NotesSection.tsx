@@ -3,13 +3,17 @@
 import { useState, useEffect } from 'react'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { getNotas, crearNota, eliminarNota } from '@/app/actions/notas'
-import Loading from '@/components/Loading'
+import { useToast } from '@/components/ui/Toast'
 
 interface Nota {
   id: string
   contenido: string
   created_at: string
   user_id: string
+  // Las notas son de la persona: salen también las que se escribieron en sus
+  // otras conversaciones con la tienda, marcadas con la fecha de aquella
+  de_otra_conversacion?: boolean
+  inicio_conversacion?: string | null
   users?: {
     nombre: string
     email: string
@@ -19,15 +23,19 @@ interface Nota {
 interface NotesSectionProps {
   conversationId: string
   canDelete: boolean
+  // Aviso para la pantalla que la contiene cuando se añade o borra una nota
+  // (el historial del cliente enseña las notas también dentro del hilo)
+  onCambio?: () => void
 }
 
-export function NotesSection({ conversationId, canDelete }: NotesSectionProps) {
+export function NotesSection({ conversationId, canDelete, onCambio }: NotesSectionProps) {
   const [notas, setNotas] = useState<Nota[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [newNota, setNewNota] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [notaToDelete, setNotaToDelete] = useState<string | null>(null)
+  const { showToast } = useToast()
 
   useEffect(() => {
     cargarNotas()
@@ -56,6 +64,7 @@ export function NotesSection({ conversationId, canDelete }: NotesSectionProps) {
       // Add new note to the top of the list
       setNotas(prev => [res.data as unknown as Nota, ...prev])
       setNewNota('')
+      onCambio?.()
     } else {
       setError(res.error || 'Error al guardar la nota')
     }
@@ -70,8 +79,9 @@ export function NotesSection({ conversationId, canDelete }: NotesSectionProps) {
     const res = await eliminarNota(currentToDelete)
     if (res.success) {
       setNotas(prev => prev.filter(n => n.id !== currentToDelete))
+      onCambio?.()
     } else {
-      alert(res.error || 'Error al eliminar la nota')
+      showToast(res.error || 'No se pudo eliminar la nota', 'error')
     }
   }
 
@@ -144,7 +154,7 @@ export function NotesSection({ conversationId, canDelete }: NotesSectionProps) {
       <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-slate-50/50">
         {notas.length === 0 ? (
           <div className="text-center py-8">
-            <p className="text-sm text-slate-400 italic">No hay notas internas.</p>
+            <p className="text-sm text-slate-400 italic">No hay notas internas sobre este cliente.</p>
           </div>
         ) : (
           notas.map((nota) => (
@@ -158,6 +168,13 @@ export function NotesSection({ conversationId, canDelete }: NotesSectionProps) {
                 </span>
               </div>
               <p className="text-sm text-amber-900/80 whitespace-pre-wrap break-words">{nota.contenido}</p>
+              {nota.de_otra_conversacion && (
+                <p className="text-[10px] font-medium text-amber-700/70 mt-1.5">
+                  De la conversación del {nota.inicio_conversacion
+                    ? new Date(nota.inicio_conversacion).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })
+                    : 'otro día'}
+                </p>
+              )}
               
               {canDelete && (
                 <button

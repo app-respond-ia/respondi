@@ -4,6 +4,7 @@ import Loading from '@/components/Loading'
 import { useState, useEffect } from 'react'
 import { getMetricas } from '@/app/actions/metricas'
 import { traducirError } from '@/lib/traducirError'
+import { nombreCanal } from '@/lib/canales/nombres'
 
 type Periodo = 'hoy' | 'semana' | 'mes' | 'total'
 
@@ -14,12 +15,6 @@ const CANAL_COLORS: Record<string, string> = {
   desconocido: 'bg-slate-400'
 }
 
-const CANAL_LABELS: Record<string, string> = {
-  whatsapp: 'WhatsApp',
-  instagram: 'Instagram',
-  facebook: 'Facebook',
-  desconocido: 'Desconocido'
-}
 
 function StatCard({ label, value, sub, color = 'text-ink-900' }: {
   label: string, value: string | number, sub?: string, color?: string
@@ -179,7 +174,7 @@ export default function MetricasPage() {
                       <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center gap-2">
                           <div className={`w-2.5 h-2.5 rounded-full ${CANAL_COLORS[canal] || 'bg-slate-400'}`} />
-                          <span className="text-sm font-500 text-ink-700">{CANAL_LABELS[canal] || canal}</span>
+                          <span className="text-sm font-500 text-ink-700">{nombreCanal(canal)}</span>
                         </div>
                         <span className="text-sm font-600 text-ink-900">{count}</span>
                       </div>
@@ -332,7 +327,7 @@ export default function MetricasPage() {
                       <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center gap-2">
                           <div className={`w-2.5 h-2.5 rounded-full ${CANAL_COLORS[canal] || 'bg-slate-400'}`} />
-                          <span className="text-sm font-500 text-ink-700">{CANAL_LABELS[canal] || canal}</span>
+                          <span className="text-sm font-500 text-ink-700">{nombreCanal(canal)}</span>
                         </div>
                         <span className="text-sm font-600 text-ink-900">{count}</span>
                       </div>

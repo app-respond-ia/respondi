@@ -105,15 +105,25 @@ separado del horario en que responde la IA (3 modos:
 
 ## Chats, conversaciones y casos
 Tres cosas distintas que no hay que mezclar:
-- **Chat** = una persona (el contacto). *Paso 2, pendiente:* la lista de
-  Chats todavía saca una fila por conversación, no una por persona.
+- **Chat** = una persona (el contacto). La lista de Chats saca una fila por
+  persona: su conversación abierta o, si no tiene, la última, con cuántas
+  lleva con la sucursal. Los filtros miran esa conversación (quien está
+  hablando no sale en "Cerradas" por tener conversaciones viejas cerradas).
 - **Conversación** = una sesión con esa persona. Es lo que resume la IA y lo
   que recuerda la próxima vez.
+- **Historial del cliente** (`/dashboard/conversaciones/<id>`): todas sus
+  conversaciones con la sucursal en un hilo, de la más antigua a la más
+  reciente; las anteriores plegadas en su resumen. Se llega desde la lista
+  de Conversaciones o con "Ver historial" en Chats. Es para consultar; se
+  atiende en Chats.
+- **Las notas internas son de la persona**: se guardan en la conversación
+  en que se escriben, pero se ven en todas las suyas de la sucursal,
+  marcadas con la fecha de aquella conversación.
 - **Caso** = una tarea para una persona del equipo. Solo existe cuando hace
   falta alguien.
 
 Reglas (decididas con Jorge el 11-09-2026, verificadas con
-`contrato-conversaciones`, 36 comprobaciones):
+`contrato-conversaciones`, 40 comprobaciones):
 - La conversación nace con el primer mensaje y **no abre caso**. Un caso lo
   abren: el escalado de la IA, fuera de horario con "abrir caso" activado, los
   créditos agotados, el trato "derivar" del contacto, tres fallos seguidos de

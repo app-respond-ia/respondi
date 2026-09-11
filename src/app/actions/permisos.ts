@@ -40,6 +40,7 @@ export async function getMisPermisos() {
     return { 
       success: true, 
       esAdmin: true,
+      userId: user.id,
       tenantId: userData.tenant_id,
       branchId: branchId,
       data: [],
@@ -54,6 +55,7 @@ export async function getMisPermisos() {
   return { 
     success: true, 
     esAdmin: false, 
+    userId: user.id,
     tenantId: userData.tenant_id,
     branchId: branchId,
     data: permisos,

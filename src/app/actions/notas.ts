@@ -18,11 +18,33 @@ async function esDeLaTiendaActiva(supabase: any, auth: any, conversationId: stri
   return !!data
 }
 
+// Las notas son de la persona, no solo de una conversación: lo que el equipo
+// apuntó la vez anterior ("prefiere que le llamen por la tarde") sigue
+// sirviendo cuando vuelve a escribir. Se devuelven las de todas sus
+// conversaciones con esta tienda, marcando cuáles son de otra conversación.
+// Las nuevas se guardan en la conversación desde la que se escriben.
 export async function getNotas(conversationId: string) {
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
-  if (!(await esDeLaTiendaActiva(supabase, auth, conversationId))) return { success: false, error: 'Conversación no encontrada' }
+
+  const { data: conv } = await supabase
+    .from('conversations')
+    .select('id, contact_id')
+    .eq('id', conversationId)
+    .eq('tenant_id', auth.tenant_id)
+    .eq('branch_id', auth.branch_id)
+    .maybeSingle()
+  if (!conv) return { success: false, error: 'Conversación no encontrada' }
+
+  const { data: suyas } = await supabase
+    .from('conversations')
+    .select('id, fecha_inicio')
+    .eq('tenant_id', auth.tenant_id)
+    .eq('branch_id', auth.branch_id)
+    .eq('contact_id', conv.contact_id)
+  const inicioDe: Record<string, string> = {}
+  for (const c of suyas || []) inicioDe[c.id] = c.fecha_inicio
 
   const { data, error } = await supabase
     .from('internal_notes')
@@ -31,14 +53,22 @@ export async function getNotas(conversationId: string) {
       contenido,
       created_at,
       user_id,
+      conversation_id,
       users:user_id (nombre, email)
     `)
-    .eq('conversation_id', conversationId)
+    .in('conversation_id', Object.keys(inicioDe).length ? Object.keys(inicioDe) : [conversationId])
     .eq('tenant_id', auth.tenant_id)
     .order('created_at', { ascending: false })
 
   if (error) return { success: false, error: error.message }
-  return { success: true, data }
+  return {
+    success: true,
+    data: (data || []).map((n: any) => ({
+      ...n,
+      de_otra_conversacion: n.conversation_id !== conversationId,
+      inicio_conversacion: inicioDe[n.conversation_id] || null
+    }))
+  }
 }
 
 export async function crearNota(conversationId: string, contenido: string) {

@@ -74,54 +74,6 @@ export async function getConversaciones(filtros?: { estado?: string, canal?: str
   return { success: true, data: result }
 }
 
-export async function getConversacionDetalle(convId: string) {
-  const supabase = await createClient()
-  const auth = await getAuthContext(supabase)
-  if (auth.error) return { success: false, error: auth.error }
-  const tenantId = auth.tenant_id
-  const user = { id: auth.user_id }
-
-  const { data: conv, error } = await supabase
-    .from('conversations')
-    .select(`
-      id,
-      estado,
-      canal,
-      ia_pausada,
-      fecha_inicio,
-      fecha_ultimo_mensaje,
-      resumen,
-      contacts:contact_id (nombre, canal, identificador_canal),
-      conversation_tags (
-        message_categories (nombre, color)
-      ),
-      cases (id)
-    `)
-    .eq('id', convId)
-    .eq('tenant_id', tenantId)
-    .eq('branch_id', auth.branch_id)
-    .single()
-
-  if (error || !conv) return { success: false, error: error?.message || 'Conversación no encontrada' }
-
-  const { data: messages, error: errorMsgs } = await supabase
-    .from('messages')
-    .select('*, users(nombre)')
-    .eq('conversation_id', convId)
-    .order('timestamp', { ascending: true })
-
-  return { 
-    success: true, 
-    data: { 
-      ...conv, 
-      mensajes: messages || [],
-      etiquetas: conv.conversation_tags?.map((t: any) => t.message_categories) || [],
-      caso_asociado_id: conv.cases && conv.cases.length > 0 ? conv.cases[0].id : null,
-      current_user_id: user.id
-    } 
-  }
-}
-
 export async function pausarIA(convId: string) {
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
@@ -256,4 +208,74 @@ export async function enviarMensajeAgenteConv(convId: string, contenido: string)
   const envio = await enviarMensajeSaliente(nuevo.id)
 
   return { success: true, iaPausadaAhora, envio: envio.estado, errorEnvio: envio.error || null }
+}
+
+// La ficha de un cliente: todas sus conversaciones con esta sucursal, de la
+// más antigua a la más reciente, para leerlas de arriba abajo como un hilo.
+// De cada una va lo necesario para verla plegada (fechas, resumen, etiquetas,
+// caso y notas internas); los mensajes se piden al desplegarla, salvo los de
+// la conversación desde la que se ha abierto la ficha. Solo las de esta
+// sucursal: lo que el cliente habló con otra no se comparte.
+export async function getHiloCliente(convId: string) {
+  const supabase = await createClient()
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+
+  const { data: origen } = await supabase
+    .from('conversations')
+    .select('id, contact_id')
+    .eq('id', convId)
+    .eq('tenant_id', auth.tenant_id)
+    .eq('branch_id', auth.branch_id)
+    .maybeSingle()
+  if (!origen) return { success: false, error: 'Conversación no encontrada' }
+
+  const [{ data: contacto }, { data: convs, error }] = await Promise.all([
+    supabase.from('contacts').select('id, nombre, canal, identificador_canal, created_at').eq('id', origen.contact_id).maybeSingle(),
+    supabase
+      .from('conversations')
+      .select(`
+        id, estado, canal, ia_pausada, fecha_inicio, fecha_cierre, fecha_ultimo_mensaje, resumen,
+        conversation_tags ( message_categories (nombre, color) ),
+        cases ( id, estatus, agente:agente_id (nombre) )
+      `)
+      .eq('tenant_id', auth.tenant_id)
+      .eq('branch_id', auth.branch_id)
+      .eq('contact_id', origen.contact_id)
+      .order('fecha_inicio', { ascending: true })
+  ])
+  if (error) return { success: false, error: error.message }
+
+  const ids = (convs || []).map(c => c.id)
+  const { data: notas } = ids.length
+    ? await supabase
+        .from('internal_notes')
+        .select('id, conversation_id, contenido, created_at, users:user_id (nombre, email)')
+        .in('conversation_id', ids)
+        .order('created_at', { ascending: true })
+    : { data: [] as any[] }
+
+  const { data: mensajesActuales } = await supabase
+    .from('messages')
+    .select('*, users(nombre)')
+    .eq('conversation_id', convId)
+    .order('timestamp', { ascending: true })
+
+  const conversaciones = (convs || []).map((c: any) => ({
+    ...c,
+    etiquetas: (c.conversation_tags || []).map((t: any) => t.message_categories).filter(Boolean),
+    caso: c.cases?.[0] || null,
+    notas: (notas || []).filter((n: any) => n.conversation_id === c.id)
+  }))
+
+  return {
+    success: true,
+    data: {
+      contacto,
+      conversaciones,
+      conversacionActual: convId,
+      mensajesActuales: mensajesActuales || [],
+      totalCasos: conversaciones.filter(c => c.caso).length
+    }
+  }
 }

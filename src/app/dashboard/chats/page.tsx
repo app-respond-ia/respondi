@@ -18,6 +18,9 @@ import { AIToggle } from '@/components/ui/AIToggle'
 import { useToast } from '@/components/ui/Toast'
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/client'
+import { EtiquetaPill } from '@/components/ui/EtiquetaPill'
+import { colorEtiqueta } from '@/lib/etiquetas/colores'
+import { nombreCanal } from '@/lib/canales/nombres'
 
 function ChatsContent() {
   const router = useRouter()
@@ -35,6 +38,10 @@ function ChatsContent() {
 
   const [isFetching, setIsFetching] = useState(false)
   const isFirstMount = useRef(true)
+  const conversacionesRef = useRef<any[]>([])
+  useEffect(() => {
+    conversacionesRef.current = conversaciones
+  }, [conversaciones])
   
   const [busqueda, setBusqueda] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -134,7 +141,8 @@ function ChatsContent() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  const cargarConversaciones = async () => {
+  // `porAviso`: la recarga la ha pedido un mensaje que acaba de llegar
+  const cargarConversaciones = async (porAviso = false) => {
     if (isFirstMount.current) setLoadingChats(true)
     setIsFetching(true)
     
@@ -155,7 +163,26 @@ function ChatsContent() {
     ])
 
     if (res.success && res.data) {
-      setConversaciones(res.data.conversaciones || [])
+      let nuevas: any[] = res.data.conversaciones || []
+      // Si la persona abierta ha empezado otra conversación, su fila pasa a ser
+      // la nueva: se sigue en ella en vez de quedarse en la vieja.
+      let abierta = selectedConvIdRef.current
+      if (abierta && !nuevas.some(c => c.id === abierta)) {
+        const suya = nuevas.find(c => c.ids_conversaciones?.includes(abierta))
+        if (suya) {
+          setSelectedConvId(suya.id)
+          abierta = suya.id
+        }
+      }
+      // Se conserva el aviso de "mensaje nuevo" de cada fila, y un chat que
+      // aparece por un mensaje que acaba de llegar también lo lleva
+      const previas = new Map(conversacionesRef.current.map(c => [c.id, c]))
+      nuevas = nuevas.map(c => {
+        const antes = previas.get(c.id)
+        const novedad = c.id !== abierta && (antes ? !!antes.tieneNovedad : porAviso)
+        return novedad ? { ...c, tieneNovedad: true } : c
+      })
+      setConversaciones(nuevas)
     } else {
       showToast(res.error || 'Error al cargar chats', 'error')
     }
@@ -175,9 +202,11 @@ function ChatsContent() {
     }
     
     if (initialChatId && res.success && res.data && isFirstMount.current) {
-      const exists = (res.data.conversaciones || []).find((c: any) => c.id === initialChatId)
-      if (exists) {
-        setSelectedConvId(initialChatId)
+      // Se puede llegar con cualquier conversación de la persona (por ejemplo,
+      // desde un caso antiguo): se abre su chat.
+      const fila = (res.data.conversaciones || []).find((c: any) => c.id === initialChatId || c.ids_conversaciones?.includes(initialChatId))
+      if (fila) {
+        setSelectedConvId(fila.id)
         router.replace('/dashboard/chats', { scroll: false })
       }
     }
@@ -192,6 +221,17 @@ function ChatsContent() {
   useEffect(() => {
     cargarConversaciones().catch(() => setErrorCarga(true))
   }, [filtroActivo, debouncedSearch, canalFilter, iaFilter, casoFilter, asignadosAMi, agentesIds, etiquetasIds, dateRange, sortOrder])
+
+  // Los avisos en directo se preparan una sola vez, así que llaman a la carga
+  // más reciente (con los filtros de ahora) a través de esta referencia. Si
+  // llegan varios mensajes seguidos, se recarga una sola vez.
+  const recargarListaRef = useRef<() => void>(() => {})
+  recargarListaRef.current = () => { cargarConversaciones(true).catch(() => {}) }
+  const recargaPendienteRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const programarRecargaLista = () => {
+    if (recargaPendienteRef.current) clearTimeout(recargaPendienteRef.current)
+    recargaPendienteRef.current = setTimeout(() => recargarListaRef.current(), 800)
+  }
 
   useEffect(() => {
     if (selectedConvId) {
@@ -272,10 +312,19 @@ function ChatsContent() {
               })
             }
 
-            // 2. En cualquier caso, actualizar la lista de conversaciones
+            // 2. Un chat nuevo, o una persona de la lista que ha empezado otra
+            // conversación: se pide la lista otra vez, que ya la agrupa por
+            // persona y la filtra por la sucursal activa. Antes estos mensajes
+            // se ignoraban y el chat no aparecía hasta recargar la página.
+            if (!conversacionesRef.current.some(c => c.id === newMsg.conversation_id)) {
+              programarRecargaLista()
+              return
+            }
+
+            // 3. Si ya está en la lista, se sube arriba con su último mensaje
             setConversaciones(prev => {
               const idx = prev.findIndex(c => c.id === newMsg.conversation_id)
-              if (idx === -1) return prev // Conversación no está en memoria actual
+              if (idx === -1) return prev
 
               const updatedConvs = [...prev]
               const target = { ...updatedConvs[idx] }
@@ -335,6 +384,7 @@ function ChatsContent() {
       if (channel) {
         supabase.removeChannel(channel)
       }
+      if (recargaPendienteRef.current) clearTimeout(recargaPendienteRef.current)
     }
   }, [])
 
@@ -386,7 +436,7 @@ function ChatsContent() {
       let targetAgenteId = null
       if (modalState.action === 'asignar_mi') {
         const perms = await getMisPermisos()
-        targetAgenteId = perms.data?.userId
+        targetAgenteId = (perms as any).userId
       }
       if (modalState.action === 'asignar_otro' && modalState.targetAgenteId) {
         targetAgenteId = modalState.targetAgenteId
@@ -408,7 +458,7 @@ function ChatsContent() {
           let targetAgenteId = null
           if (modalState.action === 'asignar_mi_existente') {
             const perms = await getMisPermisos()
-            targetAgenteId = perms.data?.userId
+            targetAgenteId = (perms as any).userId
           } else if (modalState.action === 'asignar_otro_existente') {
             targetAgenteId = modalState.targetAgenteId
           }
@@ -507,7 +557,9 @@ function ChatsContent() {
                 <h3 className="font-semibold text-ink-900 mb-3 pb-2 border-b border-slate-100 flex justify-between items-center">
                   Cliente
                   <Link href={`/dashboard/conversaciones/${selectedConvId}`} className="text-brand-600 hover:text-brand-700 text-xs font-semibold">
-                    Ver conversación
+                    {(selectedConv?.total_conversaciones || 1) > 1
+                      ? `Ver historial (${selectedConv.total_conversaciones})`
+                      : 'Ver historial'}
                   </Link>
                 </h3>
                 <div className="space-y-3">
@@ -517,16 +569,14 @@ function ChatsContent() {
                   </div>
                   <div>
                     <p className="text-[11px] text-slate-500 font-medium mb-0.5 uppercase tracking-wider">Canal</p>
-                    <p className="font-semibold capitalize text-sm">{contexto.contacts?.canal}</p>
+                    <p className="font-semibold text-sm">{nombreCanal(contexto.contacts?.canal)}</p>
                     <p className="text-xs text-slate-600 mt-0.5">{contexto.contacts?.identificador_canal}</p>
                   </div>
                 </div>
               </div>
 
               {/* Notas Internas */}
-              <div className="bg-white border border-slate-200 rounded-2xl shadow-sm">
-                <NotesSection conversationId={selectedConvId!} canDelete={canDeleteNotes} />
-              </div>
+              <NotesSection conversationId={selectedConvId!} canDelete={canDeleteNotes} />
 
               {/* Etiquetas */}
               <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
@@ -534,17 +584,7 @@ function ChatsContent() {
                 {contexto.etiquetas && contexto.etiquetas.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
                     {contexto.etiquetas.map((t: any) => (
-                      <span 
-                        key={t.id} 
-                        className="px-2.5 py-1 text-xs font-medium rounded-md border"
-                        style={{
-                          backgroundColor: `${t.color}15`,
-                          color: t.color,
-                          borderColor: `${t.color}30`
-                        }}
-                      >
-                        {t.nombre}
-                      </span>
+                      <EtiquetaPill key={t.id} nombre={t.nombre} color={t.color} />
                     ))}
                   </div>
                 ) : (
@@ -705,7 +745,10 @@ function ChatsContent() {
         <div className="px-4 h-20 flex items-center gap-3 border-b border-slate-200 shrink-0">
           <h1 className="font-display font-700 text-xl text-ink-900">Chats</h1>
           <span className="text-xs font-600 px-2 py-0.5 rounded-md bg-brand-100 text-brand-700">
-            {conversaciones.filter(c => c.estado === 'activa').length} activas
+            {(() => {
+              const activas = conversaciones.filter(c => c.estado === 'activa').length
+              return `${activas} ${activas === 1 ? 'activa' : 'activas'}`
+            })()}
           </span>
         </div>
 
@@ -812,7 +855,7 @@ function ChatsContent() {
                               else setEtiquetasIds(prev => [...prev, t.id])
                             }} className="rounded text-brand-600 focus:ring-brand-500 w-3 h-3" />
                             <div className="flex items-center gap-1.5 min-w-0">
-                              <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: t.color }}></div>
+                              <div className={`w-2 h-2 rounded-full shrink-0 ${colorEtiqueta(t.color).square}`}></div>
                               <span className="text-[11px] text-slate-700 truncate">{t.nombre}</span>
                             </div>
                           </label>
@@ -930,8 +973,17 @@ function ChatsContent() {
                     <p className={`text-xs line-clamp-1 mt-0.5 ${conv.estado === 'cerrada' ? 'italic text-ink-400' : 'text-ink-500'}`}>
                       {conv.messages?.[0]?.contenido || conv.resumen || 'Sin mensajes aún'}
                     </p>
-                    {isPausada && conv.estado === 'activa' && (
-                      <span className="inline-block mt-1 text-[10px] font-600 bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">IA pausada</span>
+                    {((isPausada && conv.estado === 'activa') || conv.total_conversaciones > 1) && (
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                        {isPausada && conv.estado === 'activa' && (
+                          <span className="text-[10px] font-600 bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">IA pausada</span>
+                        )}
+                        {conv.total_conversaciones > 1 && (
+                          <span className="text-[10px] font-600 bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded" title="Veces que esta persona ha escrito a la sucursal">
+                            {conv.total_conversaciones} conversaciones
+                          </span>
+                        )}
+                      </div>
                     )}
                   </div>
                 </button>
@@ -944,7 +996,7 @@ function ChatsContent() {
       {/* PANEL DERECHO */}
       <section className={`flex flex-col flex-1 min-w-0 min-h-0 bg-slate-50 lg:h-full ${!selectedConvId ? 'hidden lg:flex items-center justify-center' : 'flex'}`}>
         {!selectedConvId ? (
-          <div className="text-center text-ink-500">Selecciona una conversación para ver el hilo</div>
+          <div className="text-center text-ink-500">Selecciona un chat para ver la conversación</div>
         ) : (
           <>
             {/* Cabecera */}
@@ -959,7 +1011,7 @@ function ChatsContent() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-600 text-ink-900 truncate">{selectedConv?.contacts?.nombre || selectedConv?.contacts?.identificador_canal || 'Desconocido'}</p>
-                <p className="text-xs text-ink-500">{selectedConv?.canal}</p>
+                <p className="text-xs text-ink-500">{nombreCanal(selectedConv?.canal)}</p>
               </div>
               
               <div className="flex items-center gap-3 shrink-0">

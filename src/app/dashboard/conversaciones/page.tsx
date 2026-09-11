@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { getConversaciones } from '@/app/actions/conversaciones'
 import { getMisPermisos } from '@/app/actions/permisos'
+import { EtiquetaPill } from '@/components/ui/EtiquetaPill'
 
 export default function ConversacionesPage() {
   const router = useRouter()
@@ -153,7 +154,7 @@ export default function ConversacionesPage() {
             ?
           </button>
         </div>
-        <p className="text-ink-500 mt-1">Revisa el historial de interacciones con tus clientes.</p>
+        <p className="text-ink-500 mt-1">Todas las conversaciones de esta sucursal. Pulsa una para ver el historial completo de ese cliente.</p>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mb-6 relative">
@@ -331,19 +332,9 @@ export default function ConversacionesPage() {
 
                           <div className="flex gap-1 flex-wrap">
                             {conv.conversation_tags && conv.conversation_tags.length > 0 ? (
-                              conv.conversation_tags.map((t:any, i:number) => {
-                                const color = t.message_categories?.color || '#94a3b8'; // default slate-400
-                                return (
-                                  <span key={i} className="text-[10px] px-1.5 py-0.5 rounded font-medium border"
-                                    style={{ 
-                                      backgroundColor: `${color}15`, 
-                                      color: color,
-                                      borderColor: `${color}30`
-                                    }}>
-                                    {t.message_categories?.nombre}
-                                  </span>
-                                )
-                              })
+                              conv.conversation_tags.map((t:any, i:number) => (
+                                <EtiquetaPill key={i} pequena nombre={t.message_categories?.nombre} color={t.message_categories?.color} />
+                              ))
                             ) : (
                               <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-50 text-slate-400 border border-slate-200 font-medium italic">
                                 Descategorizado
@@ -402,19 +393,19 @@ export default function ConversacionesPage() {
               </button>
             </div>
             <div className="p-6 overflow-y-auto text-sm text-slate-600 space-y-4">
-              <p><strong className="text-ink-900">¿Qué es una conversación?</strong> Es el registro completo e historial de todos los mensajes intercambiados con un cliente.</p>
-              
-              <p><strong className="text-ink-900">IA Activa vs Conversación Abierta:</strong></p>
+              <p><strong className="text-ink-900">¿Qué es una conversación?</strong> Cada vez que un cliente escribe empieza una conversación, que se cierra sola tras 24 horas sin mensajes. Si vuelve otro día, empieza otra. Aquí tienes todas, una por fila.</p>
+
+              <p><strong className="text-ink-900">El historial del cliente:</strong> al pulsar una conversación se abre el historial de ese cliente, con todas sus conversaciones con esta sucursal de la más antigua a la más reciente. Las anteriores salen plegadas en su resumen y se despliegan con un clic. Las notas internas del equipo se ven en todas.</p>
+
+              <p><strong className="text-ink-900">IA y estado:</strong></p>
               <ul className="list-disc pl-5 space-y-1">
-                <li><span className="font-semibold text-ink-800">IA:</span> Puede estar <span className="text-emerald-700 font-medium">Activa</span> (respondiendo sola) o <span className="text-amber-700 font-medium">Pausada</span> (silenciada para que un humano hable).</li>
-                <li><span className="font-semibold text-ink-800">Estado:</span> <span className="text-blue-700 font-medium">Abierta</span> si hay actividad reciente, o Cerrada si el cliente lleva mucho tiempo sin hablar.</li>
+                <li><span className="font-semibold text-ink-800">IA:</span> <span className="text-emerald-700 font-medium">Activa</span> (responde sola) o <span className="text-amber-700 font-medium">Pausada</span> (en silencio porque atiende una persona).</li>
+                <li><span className="font-semibold text-ink-800">Estado:</span> <span className="text-blue-700 font-medium">Abierta</span> mientras hay actividad, o Cerrada tras 24 horas sin mensajes o si alguien la cierra.</li>
               </ul>
-              
-              <p><strong className="text-ink-900">Badge de "Caso":</strong> Cuando veas un pequeño botón de "Caso" junto al nombre del contacto, significa que la IA detectó una urgencia o el cliente pidió ayuda humana. Al pulsarlo irás directo a ese caso.</p>
-              
-              <p><strong className="text-ink-900">Atender un caso manualmente:</strong> Si lees algo que requiere tu atención y no se creó un caso, entra en la conversación y busca el panel derecho para crear uno, pausar la IA y asignártelo.</p>
-              
-              <p><strong className="text-ink-900">Para escribir al cliente:</strong> Esta página es solo de lectura/consulta. Si necesitas enviar mensajes al cliente, debes ir a la página de <strong>Chats</strong>.</p>
+
+              <p><strong className="text-ink-900">Casos:</strong> un caso es una tarea para una persona del equipo. Se abre cuando la IA pasa el cliente a una persona, o a mano desde el historial o desde Chats. Pulsa la etiqueta de "Caso" para ir a él.</p>
+
+              <p><strong className="text-ink-900">Para escribir al cliente:</strong> esta página es de consulta. Para escribirle, ve a <strong>Chats</strong> (en el historial tienes el botón «Abrir en Chats»).</p>
             </div>
             <div className="p-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl flex justify-end">
               <button onClick={() => setShowHelp(false)} className="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-xl transition">Entendido</button>

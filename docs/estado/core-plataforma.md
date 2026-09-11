@@ -22,6 +22,12 @@ mensajes**; Casos y Conversaciones son de solo lectura, con botón
 info del cliente, tags, gestión de caso, toggle de IA, notas, log de
 actividad.
 
+Desde el 11-09-2026: Chats tiene una fila por persona y se actualiza en
+directo (un chat nuevo aparece sin recargar). El detalle de Conversaciones
+es el **historial del cliente**: todas sus conversaciones con la sucursal
+en un hilo, con índice, casos, etiquetas, resúmenes y notas. Las notas
+internas se ven en todas las conversaciones de la persona.
+
 ## Escalado de casos
 `case_rules` con reordenamiento drag-and-drop vía `@dnd-kit`.
 
@@ -37,7 +43,8 @@ desincronización con la columna legacy `rol`.
 Audit Log con exportación CSV vía `supabaseAdmin`.
 
 ## Notas internas y novedades
-Sistema de notas internas por conversación. Novedades con tabla
+Sistema de notas internas: se escriben en una conversación y se ven en
+todas las de esa persona en la sucursal. Novedades con tabla
 dinámica `tipos_novedad` (por sucursal), selector de icono, safelist
 de Tailwind para los colores dinámicos.
 

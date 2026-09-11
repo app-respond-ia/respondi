@@ -11,6 +11,8 @@ import { NotesSection } from '@/components/ui/NotesSection'
 import { ActivityLog } from '@/components/ui/ActivityLog'
 import { getCasoDetalle, tomarCaso, cerrarCaso, reabrirCaso, asignarCaso, soltarCaso, getAgentesParaCasos, actualizarPrioridadCaso, actualizarSLACaso } from '@/app/actions/casos'
 import { getLogsAuditoria } from '@/app/actions/audit-log'
+import { EtiquetaPill } from '@/components/ui/EtiquetaPill'
+import { nombreCanal } from '@/lib/canales/nombres'
 
 
 export default function CasoDetallePage() {
@@ -152,7 +154,9 @@ export default function CasoDetallePage() {
                     caso.contacts?.canal === 'instagram' ? 'text-purple-500' : 'text-[#1877F2]'
 
   return (
-    <div className="h-full flex flex-col p-4 sm:p-6 mx-auto w-full max-w-7xl overflow-hidden">
+    // En el móvil baja la página entera: si no, el lateral (notas, actividad)
+    // quedaba fuera de la pantalla sin forma de llegar a él
+    <div className="lg:h-full flex flex-col sm:p-2 lg:p-6 mx-auto w-full max-w-7xl lg:overflow-hidden">
       <div className="mb-4 shrink-0">
         <Link href="/dashboard/casos" className="text-sm font-semibold text-slate-500 hover:text-brand-600 flex items-center gap-1 w-max">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
@@ -188,9 +192,9 @@ export default function CasoDetallePage() {
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-6">
+      <div className="lg:flex-1 lg:min-h-0 flex flex-col lg:flex-row gap-6">
         {/* PANEL IZQUIERDO: CHAT */}
-        <div className="flex-1 bg-white border border-slate-200 rounded-2xl shadow-sm flex flex-col min-h-0 overflow-hidden">
+        <div className="h-[75vh] lg:h-auto lg:flex-1 lg:min-h-0 bg-white border border-slate-200 rounded-2xl shadow-sm flex flex-col overflow-hidden">
           <div className="bg-slate-50 border-b border-slate-200 p-4 shrink-0">
             <h3 className="font-semibold text-ink-900">Historial de conversación</h3>
           </div>
@@ -223,7 +227,7 @@ export default function CasoDetallePage() {
         </div>
 
         {/* PANEL DERECHO: INFO */}
-        <div className="w-full lg:w-80 flex flex-col gap-4 shrink-0 min-h-0 overflow-y-auto pb-6">
+        <div className="w-full lg:w-80 flex flex-col gap-4 shrink-0 lg:min-h-0 lg:overflow-y-auto pb-6">
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
             <h3 className="font-semibold text-ink-900 mb-4 pb-2 border-b border-slate-100">Información del Cliente</h3>
             <div className="space-y-4">
@@ -233,8 +237,8 @@ export default function CasoDetallePage() {
               </div>
               <div>
                 <p className="text-xs text-slate-500 font-medium mb-1">Canal de contacto</p>
-                <p className={`font-semibold capitalize flex items-center gap-1.5 ${canalIcon}`}>
-                  {caso.contacts?.canal}
+                <p className={`font-semibold flex items-center gap-1.5 ${canalIcon}`}>
+                  {nombreCanal(caso.contacts?.canal)}
                 </p>
                 <p className="text-sm text-slate-600 mt-0.5">{caso.contacts?.identificador_canal}</p>
               </div>
@@ -412,29 +416,17 @@ export default function CasoDetallePage() {
               <h3 className="font-semibold text-ink-900 mb-3 pb-2 border-b border-slate-100">Etiquetas de la charla</h3>
               <div className="flex flex-wrap gap-2">
                 {caso.etiquetas.map((t: any, i: number) => (
-                  <span 
-                    key={i} 
-                    className="text-xs font-medium px-2 py-1 rounded-md border"
-                    style={{
-                      backgroundColor: `${t.color}26`,
-                      color: t.color,
-                      borderColor: t.color
-                    }}
-                  >
-                    {t.nombre}
-                  </span>
+                  <EtiquetaPill key={i} nombre={t.nombre} color={t.color} />
                 ))}
               </div>
             </div>
           )}
 
           {caso.conversation_id && (
-            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm">
-              <NotesSection 
-                conversationId={caso.conversation_id} 
-                canDelete={caso.current_user_is_owner || caso.current_user_level <= 2} 
-              />
-            </div>
+            <NotesSection 
+              conversationId={caso.conversation_id} 
+              canDelete={caso.current_user_is_owner || caso.current_user_level <= 2} 
+            />
           )}
 
           {hasLogPerm && logs.length > 0 && (

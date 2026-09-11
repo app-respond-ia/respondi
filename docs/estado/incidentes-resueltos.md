@@ -702,6 +702,14 @@ Un primer intento con una lista de frases concretas se dejó escapar "voy a
 pasar tu solicitud al equipo para que puedan contactarte"; el filtro quedó
 amplio a propósito, porque solo decide si hace falta la revisión.
 
+## "Asignarme a mí" en Chats dejaba el caso en cola (resuelto, 11-09-2026)
+Chats sacaba el usuario actual de `getMisPermisos().data.userId`, pero `data`
+es la lista de permisos y no tiene `userId`: salía vacío. Crear un caso con
+"Asignarme a mí" lo dejaba en cola sin agente y sin pausar la IA, y
+"Asignarme a mí" sobre un caso ya creado no hacía nada. Ahora
+`getMisPermisos()` devuelve `userId` arriba, y Chats y el historial lo leen
+de ahí.
+
 ## La pantalla de Métricas nunca funcionó (resuelto)
 `src/app/actions/metricas.ts` estaba escrito contra un esquema que no existe.
 Las seis consultas del archivo pedían columnas inventadas:

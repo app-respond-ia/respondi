@@ -37,7 +37,10 @@ export class ErrorCorreo extends Error {
 
 export async function leerContrasenaCorreo(channelId: string): Promise<string | null> {
   const { data, error } = await supabaseAdmin.rpc('leer_credenciales_canal', { p_channel_id: channelId })
-  if (error || !data) return null
+  // Un fallo pasajero de la base de datos (pasó: un 504 de Supabase) no es lo
+  // mismo que no tener contraseña: antes dejaba el canal en error para siempre
+  if (error) throw new ErrorCorreo('No se ha podido leer la contraseña guardada: la base de datos no ha respondido.', 'conexion')
+  if (!data) return null
   try {
     return JSON.parse(data as string)?.contrasena || null
   } catch {

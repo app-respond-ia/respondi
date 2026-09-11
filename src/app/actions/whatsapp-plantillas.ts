@@ -106,7 +106,8 @@ export async function crearPlantillaWhatsApp(data: { nombre: string; contenido: 
     return { success: false, error: 'Pon un ejemplo para cada hueco: Meta los necesita para revisar la plantilla.' }
   }
 
-  const credenciales = await leerCredencialesMeta(canal.id)
+  const credenciales = await leerCredencialesMeta(canal.id).catch((e: any) => e as Error)
+  if (credenciales instanceof Error) return { success: false, error: credenciales.message }
   if (!credenciales) return { success: false, error: 'El canal de WhatsApp no tiene las claves de Meta guardadas. Revisa la conexión en Canales.' }
 
   let enMeta
@@ -179,7 +180,8 @@ export async function borrarPlantillaWhatsApp(id: string) {
 
   // Primero en Meta: si allí sigue, volvería a aparecer al actualizar
   if (plantilla.meta_template_id && canal.meta_waba_id) {
-    const credenciales = await leerCredencialesMeta(canal.id)
+    const credenciales = await leerCredencialesMeta(canal.id).catch((e: any) => e as Error)
+    if (credenciales instanceof Error) return { success: false, error: credenciales.message }
     if (!credenciales) return { success: false, error: 'El canal de WhatsApp no tiene las claves de Meta guardadas. Revisa la conexión en Canales.' }
     try {
       await borrarPlantillaMeta(canal.meta_waba_id, credenciales.access_token, plantilla.nombre, plantilla.meta_template_id)

@@ -50,7 +50,8 @@ export async function sincronizarPlantillas(canal: CanalConCuenta): Promise<{ ok
   if (!canal.meta_waba_id) {
     return { ok: false, error: 'Falta el identificador de tu cuenta de WhatsApp Business. Añádelo en Canales → WhatsApp → Cambiar claves.' }
   }
-  const credenciales = await leerCredencialesMeta(canal.id)
+  const credenciales = await leerCredencialesMeta(canal.id).catch((e: any) => e as Error)
+  if (credenciales instanceof Error) return { ok: false, error: credenciales.message }
   if (!credenciales) return { ok: false, error: 'El canal de WhatsApp no tiene las claves de Meta guardadas. Revisa la conexión en Canales.' }
 
   const deMeta = await listarPlantillasMeta(canal.meta_waba_id, credenciales.access_token)

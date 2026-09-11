@@ -14,7 +14,10 @@ export interface CredencialesMeta {
 // Las claves de un canal, de la caja fuerte (Vault). Nunca salen del servidor.
 export async function leerCredencialesMeta(channelId: string): Promise<CredencialesMeta | null> {
   const { data, error } = await supabaseAdmin.rpc('leer_credenciales_canal', { p_channel_id: channelId })
-  if (error || !data) return null
+  // Un fallo pasajero de la base de datos (pasó: un 504 de Supabase) no es lo
+  // mismo que no tener claves: se lanza como error que se puede reintentar
+  if (error) throw new ErrorMeta('No se han podido leer las claves guardadas: la base de datos no ha respondido. Inténtalo en un momento.', null, 503)
+  if (!data) return null
   try {
     const c = JSON.parse(data as string)
     return c?.access_token && c?.app_secret ? c : null

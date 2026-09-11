@@ -84,7 +84,13 @@ export async function POST(req: Request, { params }: Ctx) {
   const canal = await cargarCanal(id)
   if (!canal || canal.metodo !== 'meta_oficial') return new NextResponse('Not found', { status: 404 })
 
-  const credenciales = await leerCredencialesMeta(canal.id)
+  let credenciales
+  try {
+    credenciales = await leerCredencialesMeta(canal.id)
+  } catch {
+    // La base de datos no ha respondido: Meta vuelve a mandar el aviso
+    return new NextResponse('Service unavailable', { status: 503 })
+  }
   if (!credenciales || !firmaValida(cuerpo, req.headers.get('x-hub-signature-256'), credenciales.app_secret)) {
     return new NextResponse('Unauthorized', { status: 401 })
   }

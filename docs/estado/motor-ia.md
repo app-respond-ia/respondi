@@ -155,6 +155,19 @@ pedía). Para que valga con cualquier modelo:
 Con esto, en varias pasadas de `probar-motor-ia`: Business 100 %; Pro y
 Starter, la mayoría de pasadas perfectas y algún fallo suelto (una novedad
 del día sin mencionar, un inglés). Es el precio de los modelos baratos.
+- **Identificadores que no existen** (12-09-2026): la IA a veces se inventa el
+  identificador de la regla de caso o de la etiqueta (visto con `gpt-4.1` en
+  un correo). Ahora las herramientas solo admiten los identificadores que
+  existen (`enum`), y si en una revisión elige una regla que no existe se
+  escala con la de "quiere hablar con una persona". Si aun así no se puede
+  pasar a nadie, la IA reescribe su respuesta sin prometerlo (antes se
+  cambiaba entera por una frase fija de chat, que en un correo quedaba fatal).
+
+## Correo (11-09-2026)
+Mismo motor y herramientas; cambia la forma de escribir
+(`src/lib/ai/estilo-email.ts`): saludo con el nombre, párrafos, despedida,
+sin formato de chat y sin firma (se añade sola). La IA ve el asunto de cada
+correo del cliente. Detalle del canal en `docs/estado/canales-mensajeria.md`.
 
 ## Ventana de 24 h al abrir (11-09-2026)
 Antes de gastar un crédito, si la conversación es de WhatsApp y han pasado

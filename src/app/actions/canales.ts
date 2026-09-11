@@ -451,7 +451,13 @@ export async function conectarCorreo(datos: {
   const anterior = (existente?.configuracion || null) as ConfigCorreo | null
   const mismoBuzon = !!anterior && existente?.estado !== 'desconectado' && anterior.direccion === direccion && anterior.imap?.host === imap.host
   let contrasena = datos.contrasena || ''
-  if (!contrasena && mismoBuzon && existente) contrasena = (await leerContrasenaCorreo(existente.id)) || ''
+  if (!contrasena && mismoBuzon && existente) {
+    try {
+      contrasena = (await leerContrasenaCorreo(existente.id)) || ''
+    } catch (e: any) {
+      return { success: false, error: `${e?.message} Inténtalo en un momento o vuelve a escribir la contraseña.` }
+    }
+  }
   if (!contrasena) return { success: false, error: 'Escribe la contraseña del buzón.' }
 
   const config: ConfigCorreo = { imap, smtp, usuario, direccion, nombre_remitente: nombreRemitente, firma, lectura: null }

@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { fetchConReintento } from './reintento'
 
 export async function createClient() {
   const cookieStore = await cookies()
@@ -8,6 +9,8 @@ export async function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      // Una lectura que falla por un corte pasajero de Supabase se repite una vez
+      global: { fetch: fetchConReintento },
       cookies: {
         getAll() {
           return cookieStore.getAll()

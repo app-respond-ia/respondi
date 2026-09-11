@@ -486,7 +486,9 @@ export async function generarRespuesta(conv: any) {
         parameters: {
           type: "object",
           properties: {
-            category_id: { type: "string", description: "UUID de la categoría elegida (debe existir en la lista provista)." }
+            // Solo las que existen: los modelos a veces se inventan o
+            // estropean el identificador
+            category_id: { type: "string", enum: (categories || []).map((c: any) => c.id), description: "UUID de la categoría elegida (debe existir en la lista provista)." }
           },
           required: ["category_id"]
         }
@@ -503,7 +505,7 @@ export async function generarRespuesta(conv: any) {
         parameters: {
           type: "object",
           properties: {
-            rule_id: { type: "string", description: "UUID de la regla de escalado (debe existir en la lista provista)." },
+            rule_id: { type: "string", enum: (rules || []).map((r: any) => r.id), description: "UUID de la regla de escalado (debe existir en la lista provista)." },
             resumen_problema: { type: "string", description: "Breve explicación de por qué se escala el caso." }
           },
           required: ["rule_id", "resumen_problema"]
@@ -599,6 +601,18 @@ export async function generarRespuesta(conv: any) {
     }
     escaladoEnEstaPasada = true
     return 'Caso escalado a humano y respuestas automáticas pausadas.'
+  }
+
+  // Escalar desde una revisión: si el modelo elige una regla que no existe
+  // (pasó con gpt-4.1: se inventó el identificador), se usa la de "quiere
+  // hablar con una persona" (o la primera que haya) en vez de no avisar a nadie
+  const escalarConReglaSegura = async (argumentos: string, resumenPorDefecto: string): Promise<string> => {
+    let args: any = {}
+    try { args = JSON.parse(argumentos || '{}') } catch { /* sin argumentos válidos */ }
+    const resultado = await ejecutarEscalado(args)
+    if (escaladoEnEstaPasada || rules?.some(r => r.id === args.rule_id)) return resultado
+    const regla = rules?.find(r => r.tipo_caso === 'derivacion_solicitada') || rules?.[0]
+    return regla ? ejecutarEscalado({ rule_id: regla.id, resumen_problema: args.resumen_problema || resumenPorDefecto }) : resultado
   }
 
   // Poner una etiqueta a la conversación (la llama la herramienta y, si la IA
@@ -945,7 +959,7 @@ export async function generarRespuesta(conv: any) {
       const r: any = revision.choices[0].message
       const llamada: any = r.tool_calls?.find((t: any) => t.type === 'function' && t.function?.name === 'escalar_humano')
       if (llamada) {
-        const resultado = await ejecutarEscalado(JSON.parse(llamada.function.arguments))
+        const resultado = await escalarConReglaSegura(llamada.function.arguments, 'El cliente ha pedido hablar con una persona.')
         // Y la respuesta al cliente, ya sabiendo que se ha pasado (o no) el caso
         openAiMessages.push(r)
         openAiMessages.push({ role: 'tool', tool_call_id: llamada.id, content: resultado })
@@ -989,9 +1003,24 @@ export async function generarRespuesta(conv: any) {
       const r = revision.choices[0].message
       const llamada: any = r.tool_calls?.find((t: any) => t.type === 'function' && t.function?.name === 'escalar_humano')
       if (llamada) {
-        await ejecutarEscalado(JSON.parse(llamada.function.arguments))
-        // Si el caso no se ha podido abrir, la promesa no puede salir
-        if (!escaladoEnEstaPasada) finalContent = 'Ahora mismo no puedo pasarte con una persona del equipo, pero dime en qué te puedo ayudar y lo intento yo.'
+        const resultado = await escalarConReglaSegura(llamada.function.arguments, 'La IA le ha dicho al cliente que le atenderá una persona.')
+        // Si el caso no se ha podido abrir, la promesa no puede salir. Antes se
+        // cambiaba la respuesta entera por una frase fija de chat (en un
+        // correo quedaba fatal y se perdía lo útil); ahora la reescribe ella.
+        if (!escaladoEnEstaPasada) {
+          openAiMessages.push(r as any)
+          for (const t of (r.tool_calls || []) as any[]) {
+            openAiMessages.push({ role: 'tool', tool_call_id: t.id, content: t.id === llamada.id ? resultado : 'Ignorado.' })
+          }
+          openAiMessages.push({ role: 'system', content: 'No se ha podido pasar la conversación a una persona. Escribe de nuevo tu respuesta completa al cliente sin decirle que le va a atender una persona.' })
+          const otra = await openai.chat.completions.create({ model: MODELO_IA, messages: openAiMessages })
+          tokensInput += otra.usage?.prompt_tokens || 0
+          tokensOutput += otra.usage?.completion_tokens || 0
+          const texto = otra.choices[0].message.content || ''
+          finalContent = texto && !parecePrometerPersona(texto)
+            ? texto
+            : 'Ahora mismo no puedo pasarte con una persona del equipo, pero dime en qué te puedo ayudar y lo intento yo.'
+        }
       } else if (r.content) {
         finalContent = r.content
       }

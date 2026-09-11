@@ -26,12 +26,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   }
 
-  const { data: canales } = await supabaseAdmin
+  const { data: canales, error: errCanales } = await supabaseAdmin
     .from('channels')
     .select('id, tenant_id, branch_id, tipo, estado, configuracion')
     .eq('tipo', 'email')
     .eq('metodo', 'imap_smtp')
     .eq('estado', 'activo')
+  // Si la base de datos no responde, se dice (antes parecía "no hay buzones")
+  // y se vuelve a intentar al minuto siguiente
+  if (errCanales) return NextResponse.json({ error: `No se han podido leer los canales: ${errCanales.message || errCanales.code}` }, { status: 503 })
 
   const resumen: Record<string, string> = {}
   const empezar = Date.now()

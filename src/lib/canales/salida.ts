@@ -62,7 +62,12 @@ export async function enviarMensajeSaliente(messageId: string): Promise<Resultad
   if (canal.metodo !== 'meta_oficial') return fallar('Este canal todavía no puede enviar mensajes desde Respondi (solo está disponible la conexión oficial de Meta).')
   if (canal.estado !== 'activo' || !canal.meta_phone_number_id) return fallar('El canal de WhatsApp no está activo. Revisa la conexión en Canales.')
 
-  const credenciales = await leerCredencialesMeta(canal.id)
+  let credenciales
+  try {
+    credenciales = await leerCredencialesMeta(canal.id)
+  } catch (e: any) {
+    return fallar(e?.message || 'No se han podido leer las claves guardadas.', true)
+  }
   if (!credenciales) return fallar('El canal de WhatsApp no tiene las claves de Meta guardadas. Revisa la conexión en Canales.')
 
   // Marcado antes de llamar a Meta: si el proceso se corta a medias, el cron de
@@ -123,7 +128,12 @@ async function enviarPorCorreo(
 ): Promise<Resultado> {
   const config = canal.configuracion as ConfigCorreo
   if (canal.estado !== 'activo' || !config?.smtp) return fallar('El canal de correo no está activo. Revisa la conexión en Canales.')
-  const contrasena = await leerContrasenaCorreo(canal.id)
+  let contrasena
+  try {
+    contrasena = await leerContrasenaCorreo(canal.id)
+  } catch (e: any) {
+    return fallar(e?.message || 'No se ha podido leer la contraseña guardada.', true)
+  }
   if (!contrasena) return fallar('El canal de correo no tiene la contraseña guardada. Vuelve a conectarlo en Canales.')
 
   const { data: hilo } = await supabaseAdmin

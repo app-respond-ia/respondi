@@ -4,6 +4,43 @@ Bugs reales que ya ocurrieron en producción, con su causa raíz.
 Antes de tocar algo parecido, lee esto — muchos son "familia de bug
 repetible" si no se tiene cuidado.
 
+## Supabase devuelve 504 de vez en cuando (12-09-2026)
+Probando el correo en producción, un buzón recién conectado quedó marcado con
+error: "no tiene la contraseña guardada". La contraseña sí estaba. En los logs
+de Supabase: la petición para leerla había devuelto **504** tras 5-7 s
+(PostgREST: "Thread killed by timeout manager"). Pasa unas 2 veces por hora,
+siempre en la primera petición de un proceso que arranca al empezar el minuto,
+cuando saltan a la vez los crons; también le había pasado a la revisión de
+bloqueos (cada 5 min) sin que nadie lo notara.
+
+El fallo de verdad era nuestro: cualquier error al leer las claves se trataba
+como "no hay claves", y eso deja un canal en error para siempre (o da un
+mensaje por fallido sin reintentarlo). Arreglado:
+- Leer claves de Meta o del correo distingue "la base de datos no ha
+  respondido" (se reintenta: el mensaje queda "reintentar", el buzón se
+  vuelve a mirar al minuto, el aviso de Meta recibe un 503 para que lo
+  repita) de "no hay claves".
+- Los dos clientes de Supabase del servidor repiten una vez las lecturas que
+  fallan con 502/503/504 (`src/utils/supabase/reintento.ts`). Las escrituras
+  no se repiten: podrían quedar hechas dos veces.
+- La revisión de correos dice cuándo no ha podido leer los canales (antes
+  parecía "no hay buzones").
+
+**Regla**: un error al leer no es un "no existe". Si la diferencia importa
+(claves, permisos, estado de un canal), hay que mirar `error` antes de
+decidir.
+
+## Carreras con la revisión de correos de cada minuto (11-09-2026)
+- Al conectar un buzón, el canal quedaba "activo" una fracción de segundo
+  antes de guardar la contraseña; si justo pasaba la revisión, lo marcaba con
+  error. Ahora nace "pendiente" y pasa a activo al tener la contraseña.
+- La revisión guardaba la configuración entera del canal tal como la leyó al
+  empezar: si el cliente cambiaba su firma mientras tanto, se perdía. Ahora
+  solo apunta hasta dónde ha leído (`guardar_lectura_correo`).
+- Un boletín se coló y la IA lo contestó: la librería que lee los correos
+  junta las cabeceras `List-*` bajo el nombre `list`, y se buscaba
+  `list-unsubscribe`.
+
 ## Permisos / rol legacy desincronizado
 Causa raíz repetida varias veces: la columna legacy `rol` en `users`
 se queda desincronizada de `roles_personalizados.es_propietario`.

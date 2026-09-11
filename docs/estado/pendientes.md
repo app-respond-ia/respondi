@@ -43,8 +43,9 @@ solo la lista viva).
       y un agente tiene que usar una plantilla. Decidir si la IA debería
       mirar la ventana antes de contestar y usar una plantilla de "ya
       estamos abiertos" elegida por la sucursal
-- [ ] Token permanente de Meta: el de prueba caduca en 24 h; explicar en
-      Canales cómo crear el de "usuario del sistema"
+- [x] Token permanente de Meta — hecho (11-09-2026): guía paso a paso en
+      Canales → Cambiar claves, y al conectar se pregunta a Meta cuándo
+      caduca el token; si caduca, la tarjeta de WhatsApp lo avisa con la fecha
 - [x] Modelo de chats, conversaciones y casos — paso 1 hecho (11-09-2026):
       el caso solo cuando hace falta una persona, cierres unificados, y la IA
       y las personas ya no se pisan. Ver `docs/arquitectura.md`

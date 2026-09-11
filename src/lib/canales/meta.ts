@@ -203,3 +203,17 @@ export async function enviarPlantilla(phoneNumberId: string, token: string, dest
   if (!id) throw new ErrorMeta('Meta no ha devuelto el identificador del mensaje enviado', null, 200)
   return id
 }
+
+// Cuándo caduca un token: una fecha, null si no caduca, o undefined si Meta
+// no lo dice (no se da nada por hecho). El token de prueba de Meta dura 24 h;
+// el de "usuario del sistema" puede no caducar nunca.
+export async function caducidadDelToken(token: string): Promise<Date | null | undefined> {
+  try {
+    const d = await graph(`debug_token?input_token=${encodeURIComponent(token)}&access_token=${encodeURIComponent(token)}`, token)
+    const expira = Number(d?.data?.expires_at)
+    if (d?.data?.is_valid === false || !Number.isFinite(expira)) return undefined
+    return expira > 0 ? new Date(expira * 1000) : null
+  } catch {
+    return undefined
+  }
+}

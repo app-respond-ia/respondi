@@ -8,7 +8,7 @@ import { getAuthContext } from '@/lib/auth-context'
 import crypto from 'crypto'
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { sinPermiso } from '@/lib/permisos-servidor'
-import { comprobarNumero, numeroEsDeLaCuenta, guardarCredencialesMeta, ErrorMeta } from '@/lib/canales/meta'
+import { comprobarNumero, numeroEsDeLaCuenta, guardarCredencialesMeta, caducidadDelToken, ErrorMeta } from '@/lib/canales/meta'
 import { sincronizarPlantillas } from '@/lib/canales/plantillas'
 import { after } from 'next/server'
 
@@ -51,7 +51,7 @@ export async function getCanales() {
 
   const { data: filas, error } = await supabase
     .from('channels')
-    .select('id, tipo, metodo, estado, identificador_externo, calidad_mensajeria, calidad_actualizada_en, fecha_conexion, ultima_actividad, verify_token, meta_phone_number_id, meta_waba_id, numero_visible, nombre_verificado, ultimo_error')
+    .select('id, tipo, metodo, estado, identificador_externo, calidad_mensajeria, calidad_actualizada_en, fecha_conexion, ultima_actividad, verify_token, meta_phone_number_id, meta_waba_id, token_caduca_en, numero_visible, nombre_verificado, ultimo_error')
     .eq('branch_id', auth.branch_id)
     .order('created_at', { ascending: true })
 
@@ -244,6 +244,10 @@ export async function conectarWhatsAppMeta(datos: { phoneNumberId: string; acces
     return { success: false, error: `Meta no ha aceptado el identificador de la cuenta de WhatsApp Business: ${e?.message}.` }
   }
 
+  // Si el token caduca (el de prueba dura 24 h), Canales lo avisará con la
+  // fecha. Si Meta no lo dice, no se avisa de nada.
+  const caduca = await caducidadDelToken(accessToken)
+
   // 2. Un número solo puede estar conectado a un canal (en toda Respondi)
   const { data: yaUsado } = await supabaseAdmin
     .from('channels')
@@ -274,6 +278,7 @@ export async function conectarWhatsAppMeta(datos: { phoneNumberId: string; acces
     identificador_externo: phoneNumberId,
     meta_phone_number_id: phoneNumberId,
     meta_waba_id: wabaId,
+    token_caduca_en: caduca ? caduca.toISOString() : null,
     numero_visible: numero.numeroVisible || null,
     nombre_verificado: numero.nombreVerificado || null,
     calidad_mensajeria: numero.calidad || null,

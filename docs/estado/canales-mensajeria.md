@@ -69,6 +69,14 @@ de Meta (Cloud API, versión 25).
 - **Pruebas**: `probar-whatsapp` (23 comprobaciones) contra un Meta
   simulado (`WHATSAPP_GRAPH_URL`).
 
+## Token de Meta que caduca — hecho el 11-09-2026
+El token de la pantalla de pruebas de Meta dura 24 h. Al conectar (o cambiar
+claves) se pregunta a Meta cuándo caduca (`debug_token`) y se guarda en
+`channels.token_caduca_en`; si caduca, la tarjeta de WhatsApp lo avisa con la
+fecha. Si Meta no lo dice, no se avisa de nada y la conexión sigue igual. En
+"Cambiar claves" hay una guía para crear un token de "usuario del sistema"
+que no caduca.
+
 ## Ventana de 24h y plantillas (WhatsApp oficial) — hecho el 11-09-2026
 WhatsApp solo deja escribir libremente a un cliente durante las 24 h
 siguientes a su último mensaje; después, solo con una plantilla aprobada por

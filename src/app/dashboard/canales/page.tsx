@@ -8,6 +8,7 @@ import { getCanales, conectarCanal, desconectarCanal, conectarWhatsAppMeta } fro
 import { getMisPermisos } from '@/app/actions/permisos'
 import { useToast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
+import { nombreCanal } from '@/lib/canales/nombres'
 
 type TipoCanal = 'instagram' | 'whatsapp' | 'facebook'
 type MetodoCanal = 'whaticket' | 'meta_oficial'
@@ -24,6 +25,7 @@ interface Canal {
   fecha_conexion?: string
   meta_phone_number_id?: string | null
   meta_waba_id?: string | null
+  token_caduca_en?: string | null
   numero_visible?: string | null
   nombre_verificado?: string | null
   ultimo_error?: string | null
@@ -255,6 +257,9 @@ export default function CanalesPage() {
                   </span>
                 </div>
                 <p className="text-sm text-ink-600">{canal.ultimo_error || 'Hubo un problema al conectar este canal o la sesión ha expirado.'}</p>
+                {canal.metodo === 'meta_oficial' && /clave|token/i.test(canal.ultimo_error || '') && (
+                  <p className="text-xs text-ink-500 mt-1">Suele pasar cuando caduca el token de Meta. En «Cambiar claves» te explicamos cómo crear uno que no caduque.</p>
+                )}
               </div>
             </div>
           </div>
@@ -340,11 +345,30 @@ export default function CanalesPage() {
                 </div>
               </div>
             )}
+
+            {/* El token de Meta caduca (el de pruebas dura 24 h) */}
+            {(isActivo || isPendiente) && canal.metodo === 'meta_oficial' && canal.token_caduca_en && (() => {
+              const caduca = new Date(canal.token_caduca_en)
+              const caducado = caduca.getTime() <= Date.now()
+              return (
+                <div className="mt-4 p-4 rounded-xl border bg-amber-50 border-amber-200 flex items-start gap-3">
+                  <svg className="w-5 h-5 shrink-0 mt-0.5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  <div>
+                    <p className="text-sm font-600 text-amber-900">
+                      {caducado ? 'El token de Meta ha caducado' : `El token de Meta caduca el ${caduca.toLocaleString([], { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}`}
+                    </p>
+                    <p className="text-sm mt-1 leading-relaxed text-amber-800">
+                      {caducado ? 'WhatsApp ya no puede enviar mensajes.' : 'Cuando caduque, WhatsApp dejará de poder enviar mensajes.'} Crea uno que no caduque y ponlo en «Cambiar claves», donde te explicamos cómo.
+                    </p>
+                  </div>
+                </div>
+              )
+            })()}
           </div>
           {/* Acciones */}
           {(isActivo || (isPendiente && canal.metodo === 'meta_oficial')) && (
             <div className="flex items-center justify-end gap-3 px-5 py-3.5 bg-slate-50 border-t border-slate-200 flex-wrap">
-              {tipo === 'whatsapp' && isActivo && (
+              {tipo === 'whatsapp' && canal.metodo === 'meta_oficial' && (
                 <Link href="/dashboard/canales/whatsapp-plantillas" className="text-sm font-600 text-brand-600 hover:text-brand-700 hover:underline underline-offset-2 transition mr-auto">
                   Gestionar plantillas
                 </Link>
@@ -472,8 +496,8 @@ export default function CanalesPage() {
           <div className="relative min-h-full flex items-center justify-center p-4">
             <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl z-10">
               <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-                <h2 className="font-display font-700 text-lg text-ink-900 capitalize">
-                  {`Conectar ${modalTipo}`}
+                <h2 className="font-display font-700 text-lg text-ink-900">
+                  {`Conectar ${nombreCanal(modalTipo)}`}
                 </h2>
                 <button onClick={() => !modalLoading && ((conexionConfirmada || mostrarRequisitos) ? handleCerrarConfirmacion() : setIsModalOpen(false))} className="p-1.5 rounded-lg text-ink-400 hover:text-ink-700 hover:bg-slate-100 transition" aria-label="Cerrar">
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -499,7 +523,8 @@ export default function CanalesPage() {
                     <div>
                       <label htmlFor="meta-token" className="block text-sm font-600 text-ink-900 mb-1">Token de acceso</label>
                       <input id="meta-token" type="password" value={accessToken} onChange={e => setAccessToken(e.target.value)} autoComplete="off" placeholder="EAA…" className="w-full h-11 px-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500" />
-                      <p className="text-xs text-ink-500 mt-1">En la misma pantalla. El token de prueba caduca en 24 h; para uso real, crea uno permanente de "usuario del sistema".</p>
+                      <p className="text-xs text-ink-500 mt-1">En la misma pantalla. Ojo: ese token de pruebas caduca en 24 h y después WhatsApp deja de enviar. Para uso real, usa uno que no caduque.</p>
+                      <GuiaTokenPermanente />
                     </div>
                     <div>
                       <label htmlFor="meta-secret" className="block text-sm font-600 text-ink-900 mb-1">Clave secreta de la app</label>
@@ -678,5 +703,22 @@ export default function CanalesPage() {
         onClose={() => setCanalADesconectar(null)}
       />
     </div>
+  )
+}
+
+// Cómo crear en Meta un token que no caduca (de "usuario del sistema"). El que
+// da la pantalla de pruebas de Meta dura 24 h.
+function GuiaTokenPermanente() {
+  return (
+    <details className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-ink-600 group">
+      <summary className="cursor-pointer font-600 text-brand-700 select-none">¿Cómo consigo un token que no caduque?</summary>
+      <ol className="list-decimal pl-4 mt-2 space-y-1.5 leading-relaxed">
+        <li>Entra en <a href="https://business.facebook.com/settings" target="_blank" rel="noopener noreferrer" className="text-brand-600 font-600 hover:underline">la configuración de tu negocio en Meta</a> → Usuarios → <strong>Usuarios del sistema</strong> → Agregar. Ponle un nombre (por ejemplo, «Respondi») y el rol de administrador.</li>
+        <li>En ese usuario, pulsa <strong>Asignar activos</strong>: dale control total sobre tu app y sobre tu cuenta de WhatsApp.</li>
+        <li>Pulsa <strong>Generar token</strong>, elige tu app y, en caducidad, <strong>Nunca</strong>.</li>
+        <li>Marca los permisos <strong>whatsapp_business_messaging</strong> y <strong>whatsapp_business_management</strong> y genera el token.</li>
+        <li>Cópialo en ese momento (Meta solo lo enseña una vez) y pégalo aquí.</li>
+      </ol>
+    </details>
   )
 }

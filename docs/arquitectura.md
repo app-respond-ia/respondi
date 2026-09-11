@@ -27,8 +27,8 @@ sucursal no se comparten con las demás.
 - **La ficha del contacto es de cada sucursal** (`contactos_sucursal`):
   trato (normal / sin IA / bloqueado), modo, respuesta automática y nota.
   Bloquear un número en una sucursal no lo bloquea en otra. El nombre sí
-  es de la persona y se comparte. Las columnas `trato`, `modo`,
-  `respuesta_auto` y `nota` de `contacts` quedan obsoletas.
+  es de la persona y se comparte. Las antiguas columnas `trato`, `modo`,
+  `respuesta_auto` y `nota` de `contacts` se borraron el 11-09-2026.
 - **La memoria de la IA** solo usa lo hablado con esa sucursal.
 - **La app trabaja siempre sobre la sucursal activa**: aunque el
   propietario pueda entrar en todas, cada pantalla enseña solo la elegida

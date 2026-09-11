@@ -11,7 +11,7 @@ import { getAuthContext } from '@/lib/auth-context'
 // la misma en toda la organización (mismo número = mismo contacto, con el
 // mismo nombre), pero lo que decide y anota una tienda no lo ve ni le afecta a
 // otra. Decidido con Jorge el 11-09-2026. La ficha vive en `contactos_sucursal`;
-// las columnas trato/modo/nota de `contacts` quedan obsoletas.
+// las antiguas columnas trato/modo/nota de `contacts` se borraron el mismo día.
 
 export interface ActualizarTratoContactoData {
   canal: string

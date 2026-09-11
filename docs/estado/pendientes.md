@@ -56,10 +56,10 @@ solo la lista viva).
       sucursales y lo comprueba el servidor al conectar
 - [ ] Alinear el enum `seccion_permiso` con las secciones que usa la app
       (ver `docs/arquitectura.md`, "Permisos y roles")
-- [ ] Borrar las columnas obsoletas `contacts.trato/modo/respuesta_auto/nota`
-      — Jorge dio el OK (11-09-2026). Migración escrita
-      (`20260911150000_borrar_columnas_viejas_contacts.sql`), comprobado que
-      nada las usa y que no se pierde ningún dato; falta aplicarla
+- [x] Borradas las columnas obsoletas `contacts.trato/modo/respuesta_auto/nota`
+      (11-09-2026, con el OK de Jorge; migración `20260911150000`). Antes se
+      comprobó que nada las usaba y que no se perdía ningún dato; verificado
+      después en producción (entrada por WhatsApp y fichas por tienda)
 - [x] Historial del cliente en Conversaciones — hecho (11-09-2026) según la
       maqueta (https://claude.ai/code/artifact/2339cc2a-07c6-4b98-98e8-b70feb6962db):
       solo las conversaciones de esa sucursal

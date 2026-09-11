@@ -37,12 +37,11 @@ solo la lista viva).
       las 24 h. Ver `canales-mensajeria.md`
 - [ ] Plantillas con foto/vídeo/documento en la cabecera o con botones que
       cambian: hoy se ven pero no se pueden enviar desde Respondi
-- [ ] Si un cliente escribe con el negocio cerrado y abre más de 24 h
-      después (por ejemplo, el fin de semana), la IA no puede contestarle
-      con texto: el mensaje queda "no enviado" (y el crédito se cobra igual)
-      y un agente tiene que usar una plantilla. Decidir si la IA debería
-      mirar la ventana antes de contestar y usar una plantilla de "ya
-      estamos abiertos" elegida por la sucursal
+- [x] Cliente que escribió con el negocio cerrado y se abre pasadas 24 h —
+      hecho (11-09-2026, decidido con Jorge): antes de gastar un crédito se
+      mira la ventana de WhatsApp; si está cerrada, la IA manda la plantilla
+      de reapertura que elija la sucursal (Canales → Plantillas) sin cobrar,
+      y si no hay, la conversación queda para el equipo
 - [x] Token permanente de Meta — hecho (11-09-2026): guía paso a paso en
       Canales → Cambiar claves, y al conectar se pregunta a Meta cuándo
       caduca el token; si caduca, la tarjeta de WhatsApp lo avisa con la fecha
@@ -64,8 +63,8 @@ solo la lista viva).
       toda la organización (el que se pone en cada plan en el panel de
       superadmin), cuenta los canales no desconectados de todas sus
       sucursales y lo comprueba el servidor al conectar
-- [ ] Alinear el enum `seccion_permiso` con las secciones que usa la app
-      (ver `docs/arquitectura.md`, "Permisos y roles")
+- [x] Enum `seccion_permiso`: añadidas `contactos` y `facturacion`
+      (11-09-2026). Las que sobran se dejan (quitarlas obliga a rehacer el tipo)
 - [x] Borradas las columnas obsoletas `contacts.trato/modo/respuesta_auto/nota`
       (11-09-2026, con el OK de Jorge; migración `20260911150000`). Antes se
       comprobó que nada las usaba y que no se perdía ningún dato; verificado
@@ -115,10 +114,13 @@ solo la lista viva).
       el precio del plan cambia el coste que guarda `ai_logs`
 - [x] Precios reales por plan — puestos (10-09-2026), con la lista que pasó
       Jorge y los modelos verificados uno a uno contra la API
-- [ ] Diferenciar el modelo de Pro y Business: comparten `gpt-4.1` porque
-      entre `gpt-4o-mini` y `gpt-4.1` no hay ningún modelo con precio
-      confirmado. `gpt-4.1-mini` está verificado que funciona; solo falta su
-      precio para poder ponerlo en medio
+- [x] Modelo de Pro diferenciado (11-09-2026): Pro pasa a `gpt-4.1-mini`
+      (0,40 $ / 1,60 $ por millón, precio oficial de OpenAI). Trial
+      `gpt-4.1-nano`, Starter `gpt-4o-mini`, Business `gpt-4.1`. Los modelos
+      baratos siguen algo peor las instrucciones: se añadieron redes de
+      seguridad (etiquetado obligatorio, revisión si el cliente pide una
+      persona, políticas antes de responder, recordatorio de idioma). Ver
+      `motor-ia.md`
 - [ ] Soportar la familia `gpt-5.6` (Luna, Terra, Sol): rechazan las
       herramientas del motor salvo que se les pase `reasoning_effort: 'none'`.
       `gpt-6-astra` no admite ni eso. Ojo antes de meterlos: en la prueba
@@ -143,8 +145,7 @@ y la ficha de cada vendedor; métricas de invitaciones y tasa de cierre en
 "Rendimiento de vendedores"; validación de email; reconciliación contra
 cuentas ya existentes; aviso de errata; y el fallo de envío de email ya no
 se traga en silencio.
-- [ ] Limpiar las invitaciones basura de las pruebas (`mmm`, `mmmm` y
-      `n8n@propulsesytem.com`) desde el panel, con el botón Cancelar
+- [x] Invitaciones basura de las pruebas: ya no existían (11-09-2026)
 - [x] Caducidad real de invitaciones — **se decide no hacerla**. Bloquear
       un alta porque la invitación tiene más de 14 días solo genera
       soporte: el enlace no lleva ningún secreto, la vinculación se hace
@@ -170,19 +171,9 @@ se traga en silencio.
       vista `saldos_actuales_ia` (único aviso de nivel ERROR, dejaba ver
       el saldo de créditos de TODAS las organizaciones) — corregidos y
       verificados con RLS real
-- [ ] **Activar la protección de contraseñas filtradas** en el panel de
-      Supabase (Authentication → Passwords). Es un clic, lo tiene que
-      hacer Jorge
-- Avisos del linter que se dejan a propósito, con motivo:
-  - `vector` en el esquema `public`: moverlo obligaría a recrear la
-    columna `embedding` de `policy_fragments` y rehacer los embeddings.
-    No compensa por un aviso de estilo
-  - `auth_rol` / `auth_is_admin` / `auth_tenant_id` /
-    `auth_has_permission` / `is_super_admin` ejecutables por `anon` y
-    `authenticated`: **no se pueden cerrar**. 56 políticas de RLS son
-    `TO public` (que incluye a `anon`) y las invocan; sin EXECUTE se cae
-    el acceso a media aplicación. Además no filtran nada: llamadas sin
-    sesión devuelven null/false
+- [ ] **Protección de contraseñas filtradas** (HaveIBeenPwned): se intentó
+      activar por la API el 11-09-2026 y Supabase responde que solo está en su
+      plan Pro. Activarla cuando se pase a Pro
 - [x] Tramo D de horarios — resuelto (10-09-2026). Al auditarlo salieron
       6 fallos más en la misma función, ver `incidentes-resueltos.md`
 - [x] Unificar el editor de horarios del onboarding — ya estaba hecho en
@@ -221,15 +212,12 @@ se traga en silencio.
       de los pasos 0, 2, 4 y 5 del onboarding, que solo hacían
       `console.error` — invisible en producción. Verificado: cero fallos
       mudos en onboarding.ts, usuarios.ts y sucursales.ts
-- [ ] Verificar `invitarUsuario` de principio a fin. **Media prueba hecha**
-      (10-09-2026) contra la app real: crear rol → invitar → la invitación
-      nace con el tenant, el tipo y el rol correctos. La otra mitad (que
-      el invitado al registrarse entre en ESA organización y no en una
-      nueva) no se pudo automatizar: `signupTrial` recibe `FormData` y no
-      se puede invocar bien desde un script. Prueba manual, 2 minutos:
-      invitar a un agente desde /dashboard/usuarios, registrarse con ese
-      email en /registro-trial y comprobar que aparece en la lista de
-      usuarios de la organización que invitó
+- [x] Invitar a un usuario de principio a fin — verificado (11-09-2026) con
+      un navegador de verdad (`probar-invitacion`, 7 comprobaciones): la
+      invitación nace con la organización, la sucursal y el rol; el registro
+      trae el email bloqueado; al registrarse entra en ESA organización con su
+      rol y su sucursal, y el propietario lo ve en su lista. Queda pendiente
+      que el correo de invitación llegue (dominio de Resend)
 - [x] Modal muerto de `/dashboard/sucursales` eliminado, junto con la
       acción `crearSucursal` que solo él usaba. Ya solo hay una forma de
       crear una sucursal: el asistente

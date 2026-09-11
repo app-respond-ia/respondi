@@ -3,7 +3,7 @@ import Loading from '@/components/Loading'
 import { ErrorCarga } from '@/components/ui/ErrorCarga'
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
-import { getPlantillasWhatsApp, crearPlantillaWhatsApp, sincronizarPlantillasWhatsApp, borrarPlantillaWhatsApp } from '@/app/actions/whatsapp-plantillas'
+import { getPlantillasWhatsApp, crearPlantillaWhatsApp, sincronizarPlantillasWhatsApp, borrarPlantillaWhatsApp, guardarPlantillaReapertura } from '@/app/actions/whatsapp-plantillas'
 import { getMisPermisos } from '@/app/actions/permisos'
 import { useToast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
@@ -51,7 +51,8 @@ export default function WhatsappPlantillasPage() {
   const [loading, setLoading] = useState(true)
   const [errorCarga, setErrorCarga] = useState(false)
   const [plantillas, setPlantillas] = useState<any[]>([])
-  const [canal, setCanal] = useState<{ id: string; tieneCuenta: boolean } | null>(null)
+  const [canal, setCanal] = useState<{ id: string; tieneCuenta: boolean; plantillaReaperturaId: string | null } | null>(null)
+  const [guardandoReapertura, setGuardandoReapertura] = useState(false)
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
   const [actualizando, setActualizando] = useState(false)
   const [aBorrar, setABorrar] = useState<any>(null)
@@ -154,6 +155,21 @@ export default function WhatsappPlantillasPage() {
     }
   }
 
+  const cambiarReapertura = async (id: string) => {
+    setGuardandoReapertura(true)
+    const r = await guardarPlantillaReapertura(id || null).catch(() => ({ success: false, error: 'No se ha podido conectar. Revisa la conexión.' }))
+    setGuardandoReapertura(false)
+    if (r.success) {
+      setCanal(c => c ? { ...c, plantillaReaperturaId: id || null } : c)
+      showToast(id ? 'Plantilla de reapertura guardada' : 'Sin plantilla de reapertura', 'success')
+    } else {
+      showToast((r as any).error || 'No se ha podido guardar', 'error')
+    }
+  }
+
+  // Las que valen para reabrir: aprobadas, enviables y con como mucho un hueco
+  const paraReabrir = plantillas.filter(p => p.estado === 'aprobada' && p.enviable && (p.huecos?.length || 0) <= 1)
+
   if (errorCarga) return <ErrorCarga />
   if (loading || nivelPermiso === null) return <Loading />
   if (nivelPermiso === 'ninguno') {
@@ -197,7 +213,26 @@ export default function WhatsappPlantillasPage() {
           <p className="text-sm text-amber-800 mb-4">Meta guarda las plantillas en esa cuenta. Añádelo en Canales → WhatsApp → Cambiar claves (está en tu app de Meta, junto al identificador del número).</p>
           <Link href="/dashboard/canales" className="inline-flex px-5 h-10 items-center rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-sm font-600 transition">Ir a Canales</Link>
         </div>
-      ) : plantillas.length === 0 ? (
+      ) : (
+        <>
+        <section className="bg-white border border-slate-200 rounded-2xl p-5 mb-6">
+          <p className="font-600 text-ink-900">Cuando abres y han pasado más de 24 h</p>
+          <p className="text-sm text-ink-500 mt-1 mb-3 max-w-3xl">
+            Si un cliente escribe con el negocio cerrado y abrís más de 24 h después (por ejemplo, tras un fin de semana), WhatsApp no deja contestarle con un mensaje normal. Elige una plantilla y la IA se la mandará al abrir, sin gastar crédito; cuando el cliente conteste, la IA le atenderá con normalidad. Sin plantilla, esas conversaciones quedan para tu equipo.
+          </p>
+          <select
+            id="plantilla-reapertura"
+            value={canal.plantillaReaperturaId || ''}
+            onChange={e => cambiarReapertura(e.target.value)}
+            disabled={!puedeEditar || guardandoReapertura}
+            className="w-full sm:w-96 h-10 px-3 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 disabled:opacity-60"
+          >
+            <option value="">Ninguna (queda para el equipo)</option>
+            {paraReabrir.map(p => <option key={p.id} value={p.id}>{p.nombre} · {p.idioma}</option>)}
+          </select>
+          <p className="text-xs text-ink-400 mt-2">Valen las plantillas aprobadas sin huecos o con uno solo ({'{{1}}'}), que se rellena con el nombre del cliente.</p>
+        </section>
+        {plantillas.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center">
           <p className="font-600 text-ink-900 mb-1">Aún no hay plantillas</p>
           <p className="text-sm text-ink-500 max-w-md mx-auto">Crea la primera con «Nueva plantilla». Si ya tienes plantillas en tu cuenta de Meta, pulsa «Actualizar desde Meta» para traerlas.</p>
@@ -230,6 +265,8 @@ export default function WhatsappPlantillasPage() {
             </li>
           ))}
         </ul>
+      )}
+        </>
       )}
 
       {formAbierto && (

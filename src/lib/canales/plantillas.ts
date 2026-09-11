@@ -126,3 +126,42 @@ export async function aplicarCambioDePlantilla(canal: CanalConCuenta, v: any) {
     updated_at: new Date().toISOString()
   }).eq('id', fila.id)
 }
+
+// La plantilla de reapertura de la sucursal, lista para enviar a un contacto:
+// aprobada, que Respondi sepa enviar y con como mucho un hueco, que es el
+// nombre del cliente. Si no hay o no vale, null.
+export async function plantillaDeReapertura(branchId: string, contactId: string) {
+  const { data: canal } = await supabaseAdmin
+    .from('channels')
+    .select('id, plantilla_reapertura_id')
+    .eq('branch_id', branchId)
+    .eq('tipo', 'whatsapp')
+    .eq('metodo', 'meta_oficial')
+    .neq('estado', 'desconectado')
+    .maybeSingle()
+  if (!canal?.plantilla_reapertura_id) return null
+
+  const { data: p } = await supabaseAdmin
+    .from('whatsapp_templates')
+    .select('nombre, idioma, estado, contenido, componentes')
+    .eq('id', canal.plantilla_reapertura_id)
+    .eq('channel_id', canal.id)
+    .maybeSingle()
+  if (!p || p.estado !== 'aprobada') return null
+
+  const { rellenar } = await import('@/lib/canales/plantillas-texto')
+  const info = analizarComponentes(p.componentes as any[], p.contenido)
+  if (!info.enviable || info.huecos.length > 1) return null
+
+  let parametros: string[] = []
+  if (info.huecos.length === 1) {
+    const { data: contacto } = await supabaseAdmin.from('contacts').select('nombre').eq('id', contactId).maybeSingle()
+    const nombre = (contacto?.nombre || '').trim()
+    const primero = nombre && nombre.toLowerCase() !== 'desconocido' ? nombre.split(/\s+/)[0] : ''
+    parametros = [primero || 'cliente']
+  }
+  return {
+    texto: [info.cabecera, rellenar(info.cuerpo, parametros), info.pie].filter(Boolean).join('\n\n'),
+    plantilla: { nombre: p.nombre, idioma: p.idioma, parametros }
+  }
+}

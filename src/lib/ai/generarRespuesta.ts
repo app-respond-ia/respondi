@@ -25,6 +25,15 @@ const PRECIO_POR_DEFECTO = { input: 0.20, output: 1.20 }
 const QUIEN_ATIENDE = /(equipo|persona|agente|humano|responsable|compañer|alguien|encargad|gerente|miembro|someone|agent|team|human|person|staff)/i
 const ACCION_DE_ATENDER = /(pas[aáeéoó]|deriv|escal|traslad|transfer|envi[aáeéoó]|avis|notific|comunic|contact|llam|atend|atiend|escrib|pondr|respond|connect|reach|call|get back)/i
 
+// El cliente pide expresamente hablar con una persona ("quiero hablar con una
+// persona de verdad", "pásame con alguien", "I want to talk to a human")
+const PIDE_PERSONA = /(habl|atiend|atend|p[aá]s[ae]me|pasa\s?me|p[aá]sen|contact|llam|comunic|pon(ga|me|edme))[^.?!]{0,40}(persona|humano|agente|alguien|encargad|responsable|gerente|emplead|operador|comercial)|\b(human|real person|someone real|an agent)\b/i
+function clientePidePersona(textos: string[]) {
+  // Sin excluir negaciones: "no quiero un bot, quiero un humano" es una
+  // petición. Si no lo era, la IA lo ve en la revisión y no escala.
+  return textos.some(t => PIDE_PERSONA.test(t || ''))
+}
+
 function parecePrometerPersona(texto: string) {
   return texto
     .split(/(?<=[.!?\n])/)
@@ -216,6 +225,11 @@ export async function generarRespuesta(conv: any) {
     systemPrompt += `- Responde SIEMPRE en ${idiomaBase}, aunque el cliente te escriba en otro idioma.\n`
   }
   systemPrompt += `- No inventes información. Si no lo sabes, indícalo${canEscalate ? ' o usa escalar_humano' : ''}.\n`
+  if (activeSkills.has('consultar_politicas')) {
+    // Los modelos pequeños contestaban de memoria ("puedes venir con tu perro,
+    // tenemos patio") en vez de mirar la norma del negocio
+    systemPrompt += `- Antes de responder sobre condiciones o sobre qué se permite (devoluciones, envíos, reservas, pagos, mascotas, normas del local...), consulta SIEMPRE las políticas con consultar_politicas. No supongas nada.\n`
+  }
   systemPrompt += `- Eres un asistente, responde de manera concisa y natural.\n`
   if (activeSkills.has('presupuestos')) {
     // Los totales los calcula la herramienta con los precios reales: el
@@ -447,7 +461,7 @@ export async function generarRespuesta(conv: any) {
       type: "function" as const,
       function: {
         name: "consultar_politicas",
-        description: "Consulta las políticas, normas o reglas del negocio. Úsala cuando el cliente pregunte por condiciones, devoluciones, garantías o políticas internas.",
+        description: "Consulta las políticas, normas o reglas del negocio. Úsala SIEMPRE antes de responder a cualquier pregunta sobre condiciones o sobre qué se permite: devoluciones, cambios, garantías, envíos, reservas, pagos, mascotas, accesos, horarios especiales o normas del local. No lo respondas de memoria.",
         parameters: {
           type: "object",
           properties: {
@@ -493,6 +507,16 @@ export async function generarRespuesta(conv: any) {
       }
     })
   }
+
+  // Recordatorio del idioma justo después de la conversación: los modelos
+  // pequeños hacen más caso a lo último que leen que al principio del todo
+  // (en las pruebas, gpt-4.1-mini contestaba en español a un cliente inglés)
+  openAiMessages.push({
+    role: 'system',
+    content: activeSkills.has('idioma_multi')
+      ? 'Responde en el mismo idioma en que está escrito el último mensaje del cliente.'
+      : `Responde en ${idiomaBase}.`
+  })
 
   let tokensInput = 0
   let tokensOutput = 0
@@ -573,6 +597,73 @@ export async function generarRespuesta(conv: any) {
     return 'Caso escalado a humano y respuestas automáticas pausadas.'
   }
 
+  // Poner una etiqueta a la conversación (la llama la herramienta y, si la IA
+  // se la salta, el etiquetado obligatorio de más abajo)
+  let etiquetadoEnEstaPasada = false
+  const aplicarEtiqueta = async (categoryId: string): Promise<string> => {
+    let toolResult = ''
+    const targetCategory = categories?.find(c => c.id === categoryId)
+    
+    if (!targetCategory) {
+      toolResult = 'Error: category_id no válido para esta sucursal.'
+    } else {
+      // 1. Obtener estado actual de las etiquetas en esta conversación
+      const { data: currentTags } = await supabaseAdmin
+        .from('conversation_tags')
+        .select('category_id, message_categories!inner(es_fallback)')
+        .eq('conversation_id', conversationId)
+
+      const hasRealTags = currentTags?.some((t: any) => !t.message_categories.es_fallback)
+      const fallbackTag = currentTags?.find((t: any) => t.message_categories.es_fallback)
+
+      let abortInsert = false
+
+      // 2. Lógica bidireccional
+      if (targetCategory.es_fallback) {
+        if (hasRealTags) {
+          toolResult = 'Ignorado: La conversación ya tiene una etiqueta específica, no es necesario aplicar la opción de respaldo.'
+          abortInsert = true
+        }
+      } else {
+        if (fallbackTag) {
+          // 3. Borrado con chequeo explícito de error
+          const { error: deleteError } = await supabaseAdmin
+            .from('conversation_tags')
+            .delete()
+            .match({ conversation_id: conversationId, category_id: fallbackTag.category_id })
+          
+          if (deleteError) {
+            console.error('Error al borrar la etiqueta de fallback:', deleteError)
+            toolResult = 'Error del sistema: no se pudo limpiar la etiqueta anterior.'
+            abortInsert = true
+          }
+        }
+      }
+
+      // 4. Inserción final si no se abortó
+      if (!abortInsert) {
+        const { error: insertError } = await supabaseAdmin.from('conversation_tags').insert({
+          conversation_id: conversationId,
+          category_id: categoryId,
+          aplicada_por: 'ia'
+        })
+        
+        if (insertError) {
+          if (insertError.code === '23505') {
+            toolResult = 'Ignorado: Esta etiqueta ya estaba aplicada a la conversación.'
+          } else {
+            console.error('Error etiquetando conversación:', insertError)
+            toolResult = 'Error del sistema: fallo al guardar la etiqueta.'
+          }
+        } else {
+          toolResult = 'Etiqueta aplicada correctamente.'
+        }
+      }
+    }
+    if (/^Etiqueta aplicada|^Ignorado/.test(toolResult)) etiquetadoEnEstaPasada = true
+    return toolResult
+  }
+
   // 8. Manejo de Tool Calls
   if (responseMsg.tool_calls) {
     for (const toolCall of responseMsg.tool_calls) {
@@ -619,65 +710,8 @@ export async function generarRespuesta(conv: any) {
         toolResult = formatted
       }
       else if (toolCall.function.name === 'etiquetar_conversacion') {
-        const targetCategory = categories?.find(c => c.id === args.category_id)
-        
-        if (!targetCategory) {
-          toolResult = 'Error: category_id no válido para esta sucursal.'
-        } else {
-          // 1. Obtener estado actual de las etiquetas en esta conversación
-          const { data: currentTags } = await supabaseAdmin
-            .from('conversation_tags')
-            .select('category_id, message_categories!inner(es_fallback)')
-            .eq('conversation_id', conversationId)
-
-          const hasRealTags = currentTags?.some((t: any) => !t.message_categories.es_fallback)
-          const fallbackTag = currentTags?.find((t: any) => t.message_categories.es_fallback)
-
-          let abortInsert = false
-
-          // 2. Lógica bidireccional
-          if (targetCategory.es_fallback) {
-            if (hasRealTags) {
-              toolResult = 'Ignorado: La conversación ya tiene una etiqueta específica, no es necesario aplicar la opción de respaldo.'
-              abortInsert = true
-            }
-          } else {
-            if (fallbackTag) {
-              // 3. Borrado con chequeo explícito de error
-              const { error: deleteError } = await supabaseAdmin
-                .from('conversation_tags')
-                .delete()
-                .match({ conversation_id: conversationId, category_id: fallbackTag.category_id })
-              
-              if (deleteError) {
-                console.error('Error al borrar la etiqueta de fallback:', deleteError)
-                toolResult = 'Error del sistema: no se pudo limpiar la etiqueta anterior.'
-                abortInsert = true
-              }
-            }
-          }
-
-          // 4. Inserción final si no se abortó
-          if (!abortInsert) {
-            const { error: insertError } = await supabaseAdmin.from('conversation_tags').insert({
-              conversation_id: conversationId,
-              category_id: args.category_id,
-              aplicada_por: 'ia'
-            })
-            
-            if (insertError) {
-              if (insertError.code === '23505') {
-                toolResult = 'Ignorado: Esta etiqueta ya estaba aplicada a la conversación.'
-              } else {
-                console.error('Error etiquetando conversación:', insertError)
-                toolResult = 'Error del sistema: fallo al guardar la etiqueta.'
-              }
-            } else {
-              toolResult = 'Etiqueta aplicada correctamente.'
-            }
-          }
-        }
-      } 
+        toolResult = await aplicarEtiqueta(args.category_id)
+      }
       else if (toolCall.function.name === 'escalar_humano') {
         toolResult = await ejecutarEscalado(args)
       }
@@ -834,10 +868,42 @@ export async function generarRespuesta(conv: any) {
     }
   }
 
+  // 9.5 Etiquetado obligatorio. Las instrucciones dicen que se etiquete SIEMPRE,
+  // pero los modelos más baratos (los de Trial, Starter y Pro) a veces
+  // contestan sin llamar a la herramienta y la conversación se queda sin
+  // etiqueta, que es justo lo que se usa para contar qué pregunta la gente.
+  // Si la conversación sigue sin ninguna, se le pide solo eso, obligando a
+  // usar la herramienta.
+  if (canTag && !etiquetadoEnEstaPasada) {
+    const { count } = await supabaseAdmin
+      .from('conversation_tags')
+      .select('category_id', { count: 'exact', head: true })
+      .eq('conversation_id', conversationId)
+    const herramienta = tools.find((t: any) => t.function?.name === 'etiquetar_conversacion')
+    if (!count && herramienta) {
+      try {
+        const forzado = await openai.chat.completions.create({
+          model: MODELO_IA,
+          messages: [...openAiMessages, { role: 'system', content: 'Ahora etiqueta la conversación con la categoría que mejor encaje con lo que pide el cliente.' }],
+          tools: [herramienta],
+          tool_choice: { type: 'function', function: { name: 'etiquetar_conversacion' } }
+        })
+        tokensInput += forzado.usage?.prompt_tokens || 0
+        tokensOutput += forzado.usage?.completion_tokens || 0
+        const llamada: any = forzado.choices[0].message.tool_calls?.[0]
+        if (llamada?.function?.arguments) {
+          await aplicarEtiqueta(JSON.parse(llamada.function.arguments).category_id)
+        }
+      } catch (e: any) {
+        console.error('Etiquetado obligatorio fallido:', e?.message)
+      }
+    }
+  }
+
   // 10. Guardar respuesta final en messages
   let insertId = null
   let isFallback = false
-  let finalContent = responseMsg?.content
+  let finalContent: string = responseMsg?.content || ''
   
   if (!finalContent) {
     finalContent = 'Dame un momento, estoy revisando tu consulta.'
@@ -852,6 +918,53 @@ export async function generarRespuesta(conv: any) {
   // lo revise: o escala de verdad, o reescribe la respuesta sin prometerlo.
   // (Buscar solo frases daría falsos avisos, como "nuestro equipo te atenderá
   // en la tienda"; por eso decide el modelo.)
+  // Red de seguridad hermana de la de abajo: el cliente PIDE una persona y la
+  // IA no ha escalado. Los modelos más baratos a veces contestan "entiendo tu
+  // frustración, ¿en qué puedo ayudarte?" y el equipo no se entera (visto en
+  // pruebas con gpt-4.1-mini). Se le pide que lo revise con las reglas de caso
+  // delante: o escala con la que encaje, o reescribe su respuesta.
+  const pendientesDelCliente = allMessages.filter((m: any) => m.remitente === 'cliente' && m.agrupado !== true).map((m: any) => m.contenido || '')
+  if (!isFallback && canEscalate && !escaladoEnEstaPasada && clientePidePersona(pendientesDelCliente)) {
+    openAiMessages.push({ role: 'assistant', content: finalContent })
+    openAiMessages.push({
+      role: 'system',
+      content: 'REVISIÓN: el cliente pide expresamente hablar con una persona y no has invocado escalar_humano, así que nadie del equipo se ha enterado. Si alguna de las Reglas de Caso encaja, invoca escalar_humano ahora con esa regla. Si ninguna encaja, escribe de nuevo tu respuesta completa.'
+    })
+    try {
+      const revision = await openai.chat.completions.create({
+        model: MODELO_IA,
+        messages: openAiMessages,
+        tools: tools.filter((t: any) => t.function?.name === 'escalar_humano')
+      })
+      tokensInput += revision.usage?.prompt_tokens || 0
+      tokensOutput += revision.usage?.completion_tokens || 0
+      const r: any = revision.choices[0].message
+      const llamada: any = r.tool_calls?.find((t: any) => t.type === 'function' && t.function?.name === 'escalar_humano')
+      if (llamada) {
+        const resultado = await ejecutarEscalado(JSON.parse(llamada.function.arguments))
+        // Y la respuesta al cliente, ya sabiendo que se ha pasado (o no) el caso
+        openAiMessages.push(r)
+        openAiMessages.push({ role: 'tool', tool_call_id: llamada.id, content: resultado })
+        const final = await openai.chat.completions.create({ model: MODELO_IA, messages: openAiMessages })
+        tokensInput += final.usage?.prompt_tokens || 0
+        tokensOutput += final.usage?.completion_tokens || 0
+        if (final.choices[0].message.content) finalContent = final.choices[0].message.content
+      } else if (r.content) {
+        finalContent = r.content
+      }
+    } catch (err: any) {
+      console.error('Revisión de petición de persona fallida:', err?.message)
+    }
+    await registrarError({
+      origen: 'llm',
+      descripcion: escaladoEnEstaPasada
+        ? 'El cliente pidió una persona y la IA no escaló; al revisarlo, se ha escalado'
+        : 'El cliente pidió una persona y la IA no escaló; al revisarlo, no ha visto regla que encaje',
+      stacktrace: JSON.stringify({ conversationId, cliente: pendientesDelCliente.join(' | ').slice(0, 300), respuesta: (finalContent || '').slice(0, 300) }),
+      tenant_id: tenantId
+    })
+  }
+
   if (!isFallback && !escaladoEnEstaPasada && parecePrometerPersona(finalContent)) {
     const original = finalContent
     openAiMessages.push({ role: 'assistant', content: original })

@@ -47,7 +47,7 @@ export async function POST(req: Request) {
   const { data: conv, error: fetchError } = await supabaseAdmin
     .from('conversations')
     .select(`
-      id, tenant_id, branch_id, contact_id, ia_pausada, ia_intentos_fallidos,
+      id, tenant_id, branch_id, contact_id, canal, ia_pausada, ia_intentos_fallidos,
       sucursales:branch_id (
         modo_pausa, timezone, trato_contactos_respuesta_auto, trato_contactos_modo,
         business_profiles (msg_fuera_horario, msg_cuota_agotada, msg_pausa_automatica, abrir_caso_fuera_horario, modo_horario_ia, tono, servicios, idioma_base),
@@ -160,6 +160,47 @@ export async function POST(req: Request) {
           await logRechazo('fuera_horario')
           return NextResponse.json({ status: 'Ignorado (Fuera de horario comercial)' })
         }
+      }
+    }
+
+    // ============================================================================
+    // 3.9 VENTANA DE 24 H DE WHATSAPP
+    // ============================================================================
+    // Pasadas 24 h desde el último mensaje del cliente, WhatsApp no deja
+    // mandarle texto: la respuesta de la IA no llegaría y se cobraría igual.
+    // Pasa sobre todo cuando escribió con el negocio cerrado y se abre al día
+    // siguiente o tras un fin de semana. Si la sucursal ha elegido una
+    // plantilla de reapertura, se le manda (sin gastar crédito) y, cuando
+    // conteste, la IA le atiende con normalidad. Si no, queda para el equipo,
+    // que en Chats verá el botón de enviar plantilla.
+    if (conv.canal === 'whatsapp') {
+      const { ultimoMensajeDelCliente, ventanaAbierta } = await import('@/lib/canales/ventana')
+      const ultimo = await ultimoMensajeDelCliente(conv.contact_id, conv.branch_id)
+      if (ultimo && !ventanaAbierta(ultimo)) {
+        const { plantillaDeReapertura } = await import('@/lib/canales/plantillas')
+        const reapertura = await plantillaDeReapertura(conv.branch_id, conv.contact_id)
+        if (reapertura) {
+          const { data: enviada } = await supabaseAdmin
+            .from('messages')
+            .insert({ tenant_id: conv.tenant_id, conversation_id: conversationId, remitente: 'ia', contenido: reapertura.texto, plantilla: reapertura.plantilla, agrupado: true })
+            .select('id')
+            .single()
+          // Lo que escribió queda contestado; su respuesta a la plantilla la
+          // atenderá la IA con todo el historial delante
+          await supabaseAdmin.from('messages').update({ agrupado: true }).eq('conversation_id', conversationId).eq('agrupado', false)
+          await supabaseAdmin.from('conversations').update({
+            motivo_bloqueo: null,
+            bloqueada_desde: null,
+            ia_procesando_desde: null,
+            fecha_ultimo_mensaje: new Date().toISOString()
+          }).eq('id', conversationId)
+          if (enviada) await enviarMensajeSaliente(enviada.id)
+          await logRechazo('plantilla_reapertura')
+          return NextResponse.json({ status: 'Ventana de 24 h cerrada: enviada la plantilla de reapertura' })
+        }
+        await bloquearConversacion('ventana_cerrada')
+        await logRechazo('ventana_cerrada')
+        return NextResponse.json({ status: 'Ignorado (ventana de 24 h cerrada y sin plantilla de reapertura)' })
       }
     }
 

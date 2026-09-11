@@ -721,6 +721,22 @@ con cada filtro), y la segunda miraba una sección que no existe
 (`audit_logs`): quien tenía permiso de registro sin ser administrador nunca
 veía la actividad. Ahora se piden una vez y con la sección buena.
 
+## Una columna nueva rompió en silencio el envío de plantillas (resuelto, 11-09-2026)
+Al añadir `channels.plantilla_reapertura_id` (que apunta a
+`whatsapp_templates`) quedaron dos relaciones entre las mismas tablas. Una
+consulta que unía plantillas y canales sin decir por cuál (`channels!inner`)
+dejó de funcionar sin error visible: devolvía vacío y enviar una plantilla
+decía "no encontrada". Lo cazó `probar-plantillas`. Regla: al añadir una
+clave foránea entre dos tablas que ya se relacionan, buscar las consultas que
+las unen y nombrar la relación (o quitar la unión si no hace falta).
+
+## Registrar un pago no quitaba la marca de prueba (resuelto, 11-09-2026)
+`registrarPagoYRenovar` ponía la organización en "activo" pero dejaba
+`trial_activo = true`: un cliente que ya pagaba seguía viendo "Tu prueba
+gratuita termina en X días". Además, los créditos que da la prueba no estaban
+en el formulario de planes, así que cambiar los "Créditos IA /mes" del plan
+Trial no hacía nada.
+
 ## La pantalla de Métricas nunca funcionó (resuelto)
 `src/app/actions/metricas.ts` estaba escrito contra un esquema que no existe.
 Las seis consultas del archivo pedían columnas inventadas:

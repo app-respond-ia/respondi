@@ -2,6 +2,9 @@ import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
   experimental: {},
+  // Librerías de correo (leer el buzón y enviar): se usan tal cual en el
+  // servidor, sin empaquetarlas
+  serverExternalPackages: ['imapflow', 'mailparser', 'nodemailer'],
   async redirects() {
     return [
       {

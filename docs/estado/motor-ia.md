@@ -135,3 +135,31 @@ respuesta y el bloque entero de multimedia.
   tildes ni plurales, también en categorías y características.
 - Pruebas: `probar-presupuestos` (5 comprobaciones con la IA real, estables
   en varias pasadas).
+
+## Modelos por plan y redes de seguridad (11-09-2026)
+Trial `gpt-4.1-nano` · Starter `gpt-4o-mini` · Pro `gpt-4.1-mini` · Business
+`gpt-4.1`. Los modelos baratos siguen peor las instrucciones de usar
+herramientas (en las pruebas: contestar de memoria sobre normas del local, no
+etiquetar, responder en español a un inglés, no pasar a una persona a quien la
+pedía). Para que valga con cualquier modelo:
+- **Etiquetado obligatorio**: si la IA contesta sin etiquetar y la
+  conversación no tiene ninguna etiqueta, se le pide solo eso, obligando a
+  usar la herramienta.
+- **El cliente pide una persona** y la IA no ha escalado: se le pide que lo
+  revise con las reglas de caso delante (escala con la que encaje o
+  reescribe). Hermana de la red de las promesas.
+- **Políticas**: instrucción de consultarlas SIEMPRE antes de responder sobre
+  condiciones o sobre qué se permite.
+- **Idioma**: recordatorio al final de la conversación, que es donde más caso
+  hacen los modelos pequeños.
+Con esto, en varias pasadas de `probar-motor-ia`: Business 100 %; Pro y
+Starter, la mayoría de pasadas perfectas y algún fallo suelto (una novedad
+del día sin mencionar, un inglés). Es el precio de los modelos baratos.
+
+## Ventana de 24 h al abrir (11-09-2026)
+Antes de gastar un crédito, si la conversación es de WhatsApp y han pasado
+más de 24 h desde el último mensaje del cliente, no se genera respuesta (no
+llegaría): se manda la plantilla de reapertura de la sucursal si la hay
+(`channels.plantilla_reapertura_id`, sin cobrar) o la conversación queda
+parada (`ventana_cerrada`) para el equipo, y se desbloquea sola en cuanto el
+cliente vuelve a escribir.

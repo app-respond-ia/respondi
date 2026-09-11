@@ -238,7 +238,7 @@ export async function enviarPlantillaConv(convId: string, plantillaId: string, v
 
   const { data: plantilla } = await supabase
     .from('whatsapp_templates')
-    .select('id, nombre, idioma, estado, contenido, componentes, channels!inner(branch_id, estado, tipo)')
+    .select('id, nombre, idioma, estado, contenido, componentes')
     .eq('id', plantillaId)
     .eq('tenant_id', auth.tenant_id)
     .eq('branch_id', auth.branch_id)

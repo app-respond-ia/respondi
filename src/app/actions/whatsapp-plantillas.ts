@@ -15,7 +15,7 @@ import { analizarComponentes, problemaDelCuerpo, huecosDe } from '@/lib/canales/
 async function canalDeLaSucursal(supabase: any, auth: any) {
   const { data } = await supabase
     .from('channels')
-    .select('id, tenant_id, branch_id, estado, metodo, meta_waba_id')
+    .select('id, tenant_id, branch_id, estado, metodo, meta_waba_id, plantilla_reapertura_id')
     .eq('tenant_id', auth.tenant_id)
     .eq('branch_id', auth.branch_id)
     .eq('tipo', 'whatsapp')
@@ -46,7 +46,7 @@ export async function getPlantillasWhatsApp() {
   if (error) return { success: false, error: error.message }
   return {
     success: true,
-    canal: { id: canal.id, tieneCuenta: !!canal.meta_waba_id },
+    canal: { id: canal.id, tieneCuenta: !!canal.meta_waba_id, plantillaReaperturaId: canal.plantilla_reapertura_id || null },
     plantillas: (plantillas || []).map(conAnalisis)
   }
 }
@@ -200,5 +200,49 @@ export async function borrarPlantillaWhatsApp(id: string) {
     valor_anterior: { nombre: plantilla.nombre, idioma: plantilla.idioma, contenido: plantilla.contenido }
   })
 
+  return { success: true }
+}
+
+// La plantilla que manda la IA cuando el negocio abre y han pasado más de
+// 24 h desde que el cliente escribió. Tiene que estar aprobada, poder
+// enviarse desde Respondi y tener como mucho un hueco ({{1}}), que se rellena
+// con el nombre del cliente. null: ninguna (esas conversaciones quedan para
+// el equipo).
+export async function guardarPlantillaReapertura(plantillaId: string | null) {
+  const denegado = await sinPermiso('canales')
+  if (denegado) return { success: false, error: denegado }
+
+  const supabase = await createClient()
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+
+  const canal = await canalDeLaSucursal(supabase, auth)
+  if (!canal) return { success: false, error: 'No hay un WhatsApp conectado con Meta en esta sucursal.' }
+
+  let nombre: string | null = null
+  if (plantillaId) {
+    const { data: p } = await supabase
+      .from('whatsapp_templates')
+      .select('id, nombre, estado, contenido, componentes')
+      .eq('id', plantillaId)
+      .eq('channel_id', canal.id)
+      .maybeSingle()
+    if (!p) return { success: false, error: 'Plantilla no encontrada.' }
+    const info = analizarComponentes(p.componentes as any[], p.contenido)
+    if (p.estado !== 'aprobada') return { success: false, error: 'Tiene que ser una plantilla aprobada por Meta.' }
+    if (!info.enviable || info.huecos.length > 1) return { success: false, error: 'Tiene que ser una plantilla sin huecos o con uno solo ({{1}}, que se rellena con el nombre del cliente).' }
+    nombre = p.nombre
+  }
+
+  const { error } = await supabase.from('channels').update({ plantilla_reapertura_id: plantillaId }).eq('id', canal.id)
+  if (error) return { success: false, error: error.message }
+
+  await registrarAuditoria({
+    tenant_id: auth.tenant_id,
+    user_id: auth.user_id,
+    accion: nombre ? `eligió la plantilla "${nombre}" para cuando se abre pasadas 24 h` : 'quitó la plantilla de reapertura',
+    tabla_afectada: 'canales',
+    registro_id: canal.id
+  })
   return { success: true }
 }

@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { registrarError } from '@/lib/errores'
 import { leerCredencialesMeta, enviarTexto, enviarPlantilla, ErrorMeta } from '@/lib/canales/meta'
+import { enviarCorreo, leerContrasenaCorreo, ErrorCorreo, type ConfigCorreo } from '@/lib/canales/correo'
 
 // Saca hacia el cliente un mensaje ya guardado (de la IA, de un agente o un
 // aviso automático) por el canal de su sucursal, y apunta cómo ha ido en el
@@ -49,7 +50,7 @@ export async function enviarMensajeSaliente(messageId: string): Promise<Resultad
 
   const { data: canal } = await supabaseAdmin
     .from('channels')
-    .select('id, metodo, estado, meta_phone_number_id')
+    .select('id, metodo, estado, meta_phone_number_id, configuracion')
     .eq('tenant_id', msg.tenant_id)
     .eq('branch_id', conv.branch_id)
     .eq('tipo', conv.canal)
@@ -57,6 +58,7 @@ export async function enviarMensajeSaliente(messageId: string): Promise<Resultad
     .maybeSingle()
 
   if (!canal) return fallar(`No hay ningún canal de ${conv.canal} conectado en esta sucursal.`)
+  if (canal.metodo === 'imap_smtp') return enviarPorCorreo(msg, conv, contacto, canal, intentos, fallar)
   if (canal.metodo !== 'meta_oficial') return fallar('Este canal todavía no puede enviar mensajes desde Respondi (solo está disponible la conexión oficial de Meta).')
   if (canal.estado !== 'activo' || !canal.meta_phone_number_id) return fallar('El canal de WhatsApp no está activo. Revisa la conexión en Canales.')
 
@@ -106,6 +108,65 @@ export async function enviarMensajeSaliente(messageId: string): Promise<Resultad
       origen: 'api_meta',
       descripcion: 'Fallo inesperado al enviar un mensaje por WhatsApp',
       stacktrace: JSON.stringify({ messageId, message: e?.message }),
+      tenant_id: msg.tenant_id
+    })
+    return fallar(e?.message || 'Error inesperado', true)
+  }
+}
+
+// Correo: la respuesta sale por el servidor del negocio, dentro del hilo del
+// último correo del cliente ("Re: su asunto"), para que su programa de correo
+// la agrupe con lo anterior
+async function enviarPorCorreo(
+  msg: any, conv: any, contacto: any, canal: any, intentos: number,
+  fallar: (error: string, reintentable?: boolean) => Promise<Resultado>
+): Promise<Resultado> {
+  const config = canal.configuracion as ConfigCorreo
+  if (canal.estado !== 'activo' || !config?.smtp) return fallar('El canal de correo no está activo. Revisa la conexión en Canales.')
+  const contrasena = await leerContrasenaCorreo(canal.id)
+  if (!contrasena) return fallar('El canal de correo no tiene la contraseña guardada. Vuelve a conectarlo en Canales.')
+
+  const { data: hilo } = await supabaseAdmin
+    .from('messages')
+    .select('identificador_externo, asunto, email_referencias')
+    .eq('conversation_id', msg.conversation_id)
+    .eq('remitente', 'cliente')
+    .order('timestamp', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  const base = (hilo?.asunto || '').trim()
+  const asunto = base ? (/^(re|aw|rv|res)\s*:/i.test(base) ? base : `Re: ${base}`) : `Mensaje de ${config.nombre_remitente || config.direccion}`
+  const referencias = (hilo?.email_referencias || '').split(/\s+/).filter(Boolean)
+  const enRespuestaA = hilo?.identificador_externo && /^<.+>$/.test(hilo.identificador_externo) ? hilo.identificador_externo : null
+
+  await apuntar(msg.id, { estado_envio: 'pendiente', intentos_envio: intentos, ultimo_intento_envio: new Date().toISOString() })
+  try {
+    const messageId = await enviarCorreo(config, contrasena, {
+      para: contacto.identificador_canal,
+      asunto,
+      texto: msg.contenido,
+      enRespuestaA,
+      referencias
+    })
+    await apuntar(msg.id, {
+      estado_envio: 'enviado',
+      error_envio: null,
+      identificador_externo: messageId,
+      asunto,
+      email_referencias: [...referencias, messageId].join(' ')
+    })
+    return { estado: 'enviado' }
+  } catch (e: any) {
+    if (e instanceof ErrorCorreo) {
+      if (e.tipo === 'credenciales') {
+        await supabaseAdmin.from('channels').update({ estado: 'error', ultimo_error: e.message }).eq('id', canal.id)
+      }
+      return fallar(e.message, e.reintentable)
+    }
+    await registrarError({
+      origen: 'app',
+      descripcion: 'Fallo inesperado al enviar un correo',
+      stacktrace: JSON.stringify({ messageId: msg.id, message: e?.message }),
       tenant_id: msg.tenant_id
     })
     return fallar(e?.message || 'Error inesperado', true)

@@ -314,7 +314,7 @@ export default function PlanesPage() {
                             ni eso: quedan fuera hasta tocar el motor. */}
                         <option value="gpt-4.1-nano">GPT-4.1 Nano — el más barato ($0,10 / $0,40)</option>
                         <option value="gpt-4o-mini">GPT-4o mini — barato ($0,15 / $0,60)</option>
-                        <option value="gpt-4.1-mini">GPT-4.1 mini — intermedio</option>
+                        <option value="gpt-4.1-mini">GPT-4.1 mini — intermedio ($0,40 / $1,60)</option>
                         <option value="gpt-4o">GPT-4o — capaz</option>
                         <option value="gpt-4.1">GPT-4.1 — el más capaz ($2,00 / $8,00)</option>
                       </select>

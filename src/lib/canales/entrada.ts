@@ -1,7 +1,7 @@
 import { supabaseAdmin } from '@/utils/supabase/admin'
 
-// Un mensaje que entra de un cliente, venga del proveedor que venga (hoy,
-// Meta). Aquí se hace lo mismo para todos: identificar al contacto y su
+// Un mensaje que entra de un cliente, venga del proveedor que venga (Meta
+// para WhatsApp, el buzón del negocio para el correo). Aquí se hace lo mismo para todos: identificar al contacto y su
 // conversación, guardar el archivo si lo hay y guardar el mensaje.
 export interface MensajeEntrante {
   canal: { id: string; tenant_id: string; branch_id: string; tipo: string }
@@ -12,6 +12,9 @@ export interface MensajeEntrante {
   mensajeExterno: string
   contenido: string
   archivo?: { datos: Buffer; tipo: string; nombre: string } | null
+  // Solo en correos: el asunto y el hilo (para contestar dentro del mismo hilo)
+  asunto?: string | null
+  referencias?: string[]
 }
 
 const TAMANO_MAXIMO = 50 * 1024 * 1024
@@ -58,7 +61,9 @@ export async function registrarMensajeEntrante(m: MensajeEntrante): Promise<{ ok
       contenido,
       media_url: mediaUrl,
       media_tipo: mediaTipo,
-      identificador_externo: m.mensajeExterno
+      identificador_externo: m.mensajeExterno,
+      ...(m.asunto !== undefined ? { asunto: m.asunto || null } : {}),
+      ...(m.referencias?.length ? { email_referencias: m.referencias.join(' ') } : {})
     })
     .select('id')
     .single()
@@ -68,6 +73,15 @@ export async function registrarMensajeEntrante(m: MensajeEntrante): Promise<{ ok
     if (errMensaje.code === '23505') return { ok: true, duplicado: true }
     return { ok: false, error: `No se pudo guardar el mensaje: ${errMensaje.message}` }
   }
+
+  // Si la conversación estaba parada porque habían pasado las 24 h de
+  // WhatsApp, el cliente acaba de escribir: la ventana se abre otra vez y la
+  // IA ya puede contestar
+  await supabaseAdmin
+    .from('conversations')
+    .update({ motivo_bloqueo: null, bloqueada_desde: null })
+    .eq('id', conversationId)
+    .eq('motivo_bloqueo', 'ventana_cerrada')
 
   await supabaseAdmin.from('channels').update({ ultima_actividad: new Date().toISOString() }).eq('id', m.canal.id)
   return { ok: true, messageId: nuevo.id }

@@ -62,6 +62,12 @@ solo la lista viva).
       solo las conversaciones de esa sucursal. Falta que lo vea Andreina
 - [x] Chats en tiempo real — hecho (11-09-2026): la hora del último mensaje
       ya no se pierde y un chat nuevo aparece sin recargar
+- [x] Lentitud general: las funciones de Vercel corrían en EE. UU. y la base
+      de datos está en Irlanda — resuelto (11-09-2026), ahora en Dublín. Chats
+      pasó de 13-18 s a unos 4 s en cargar
+- [ ] Chats aún tarda unos 4 s: al entrar hace 6 peticiones al servidor y
+      Next.js las atiende en fila (~0,5 s cada una). Juntar las del arranque
+      en una sola lo dejaría en 1-2 s
 
 ## Prioridad 2 — Fase 0 (antes de construir nada de la v2)
 - [x] Conseguir `OPENAI_API_KEY` — hecha: en `.env.local` y en las

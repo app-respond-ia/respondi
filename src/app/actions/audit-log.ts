@@ -9,6 +9,12 @@ export async function getAuditLog(filtros?: { userId?: string, tabla?: string, b
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
+  const permisos = await getMisPermisos()
+  const esAdmin = !!(permisos as any).esAdmin
+  if (!esAdmin && !((permisos as any).data || []).some((p: any) => p.seccion === 'audit_log' && p.nivel !== 'ninguno')) {
+    return { success: false, error: 'No tienes permiso para ver el registro de cambios.' }
+  }
+
   let query = supabase
     .from('audit_log')
     .select(`
@@ -20,6 +26,12 @@ export async function getAuditLog(filtros?: { userId?: string, tabla?: string, b
       )
     `)
     .eq('tenant_id', auth.tenant_id)
+
+  // Los cambios de la sucursal activa; los de toda la organización (usuarios,
+  // plan, facturación...), solo para el propietario o un administrador.
+  query = esAdmin
+    ? query.or(`branch_id.eq.${auth.branch_id},branch_id.is.null`)
+    : query.eq('branch_id', auth.branch_id)
 
   if (filtros?.userId) query = query.eq('user_id', filtros.userId)
   if (filtros?.tabla) query = query.eq('tabla_afectada', filtros.tabla)

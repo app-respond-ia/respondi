@@ -1,5 +1,6 @@
 'use server'
 
+import { sinPermiso } from '@/lib/permisos-servidor'
 import { createClient } from '@/utils/supabase/server'
 import { resolveBranchId } from '@/lib/active-branch'
 
@@ -27,6 +28,9 @@ export async function getCategorias() {
 }
 
 export async function crearCategoria(data: CategoriaData) {
+  const denegado = await sinPermiso('precios')
+  if (denegado) return { success: false, error: denegado }
+
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
@@ -52,6 +56,9 @@ export async function crearCategoria(data: CategoriaData) {
 }
 
 export async function actualizarCategoria(id: string, data: Partial<CategoriaData>) {
+  const denegado = await sinPermiso('precios')
+  if (denegado) return { success: false, error: denegado }
+
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
@@ -69,6 +76,9 @@ export async function actualizarCategoria(id: string, data: Partial<CategoriaDat
 }
 
 export async function eliminarCategoria(id: string) {
+  const denegado = await sinPermiso('precios')
+  if (denegado) return { success: false, error: denegado }
+
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }

@@ -1,5 +1,6 @@
 'use server'
 
+import { sinPermiso } from '@/lib/permisos-servidor'
 import { createClient } from '@/utils/supabase/server'
 import { resolveBranchId } from '@/lib/active-branch'
 import { registrarAuditoria } from '@/lib/auditoria'
@@ -39,6 +40,9 @@ export async function getHorarios(tipo: 'negocio' | 'ia' = 'negocio') {
 }
 
 export async function saveHorarios(horarios: HorarioDia[], tipo: 'negocio' | 'ia' = 'negocio') {
+  const denegado = await sinPermiso('perfil')
+  if (denegado) return { success: false, error: denegado }
+
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }

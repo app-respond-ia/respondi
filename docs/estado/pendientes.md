@@ -41,22 +41,16 @@ solo la lista viva).
       conversaciones dentro). Primero una maqueta para que la vea Andreina
 - [ ] Paso 3: las notas internas de una persona visibles en todas sus
       conversaciones (hoy solo se ven las de la conversación abierta)
-- [ ] Borrar código muerto: `src/app/actions/agente-casos.ts` y
-      `agente-caso-detalle.ts` (ninguna pantalla los usa; los agentes
-      trabajan desde Casos). También `src/components/layout/OperarioLayout.tsx`
-      parece sin uso
-- [x] Cada sucursal ve solo lo suyo — hecho (11-09-2026). Ver
-      `docs/arquitectura.md`, sección "Cada sucursal ve solo lo suyo"
-- [ ] **Antes de invitar agentes:** separar por sucursal en la base de datos
-      también la configuración (`price_list`, `categorias_precios`,
-      `message_categories`, `case_rules`, `skills`, `channels`,
-      `whatsapp_templates`, `daily_updates`, `tipos_novedad`,
-      `business_hours`, `business_profiles`, `policy_*`), y que solo el
-      propietario o quien tenga permiso pueda escribir en `sucursales`. Hoy
-      cualquier usuario de la organización podría cambiar la configuración
-      de otra sucursal por la API
-- [ ] El registro de cambios (`audit_log`) es por organización: quien tenga
-      permiso de verlo ve el de todas las sucursales
+- [x] Borrado el código muerto: `agente-casos.ts`, `agente-caso-detalle.ts`
+      y `OperarioLayout.tsx` (11-09-2026)
+- [x] Cada sucursal ve solo lo suyo — hecho (11-09-2026), también la
+      configuración, los permisos por sección en el servidor y el registro
+      de cambios. Ver `docs/arquitectura.md`, "Cada sucursal ve solo lo suyo"
+- [ ] Límite de canales del plan (`canales_max`): solo lo comprueba la
+      pantalla. Decidir con Jorge si es por sucursal o por organización
+      antes de ponerlo en el servidor
+- [ ] Alinear el enum `seccion_permiso` con las secciones que usa la app
+      (ver `docs/arquitectura.md`, "Permisos y roles")
 - [ ] Borrar las columnas obsoletas `contacts.trato/modo/respuesta_auto/nota`
       (ya no se usan; se borran con el OK de Jorge)
 - [ ] Hilo del cliente en Conversaciones — maqueta hecha

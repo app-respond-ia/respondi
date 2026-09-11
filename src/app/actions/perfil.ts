@@ -1,5 +1,6 @@
 'use server'
 
+import { sinPermiso } from '@/lib/permisos-servidor'
 import { createClient } from '@/utils/supabase/server'
 import { resolveBranchId } from '@/lib/active-branch'
 import { registrarAuditoria } from '@/lib/auditoria'
@@ -129,6 +130,9 @@ export async function savePerfilSucursal(data: {
   abrir_caso_fuera_horario: boolean,
   modo_horario_ia: string
 }) {
+  const denegado = await sinPermiso('perfil')
+  if (denegado) return { success: false, error: denegado }
+
   if (data.servicios && data.servicios.length > 500) {
     return { success: false, error: 'La información del negocio no puede superar los 500 caracteres.' }
   }

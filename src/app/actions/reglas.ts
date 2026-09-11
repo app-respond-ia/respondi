@@ -1,5 +1,6 @@
 'use server'
 
+import { sinPermiso } from '@/lib/permisos-servidor'
 import { createClient } from '@/utils/supabase/server'
 import { resolveBranchId } from '@/lib/active-branch'
 import { registrarAuditoria } from '@/lib/auditoria'
@@ -32,6 +33,9 @@ export async function getReglas() {
 }
 
 export async function crearRegla(data: ReglaData) {
+  const denegado = await sinPermiso('reglas')
+  if (denegado) return { success: false, error: denegado }
+
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
@@ -91,6 +95,9 @@ export async function crearRegla(data: ReglaData) {
 }
 
 export async function actualizarRegla(id: string, data: Partial<{ nombre: string, descripcion_intencion: string, tipo_caso: string, activa: boolean, prioridad_default: string }>) {
+  const denegado = await sinPermiso('reglas')
+  if (denegado) return { success: false, error: denegado }
+
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
@@ -137,6 +144,9 @@ export async function actualizarRegla(id: string, data: Partial<{ nombre: string
 }
 
 export async function eliminarRegla(id: string) {
+  const denegado = await sinPermiso('reglas')
+  if (denegado) return { success: false, error: denegado }
+
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
@@ -170,6 +180,9 @@ export async function eliminarRegla(id: string) {
 }
 
 export async function reordenarReglas(ids: string[]) {
+  const denegado = await sinPermiso('reglas')
+  if (denegado) return { success: false, error: denegado }
+
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
@@ -189,6 +202,9 @@ export async function reordenarReglas(ids: string[]) {
 }
 
 export async function crearReglasPlantilla() {
+  const denegado = await sinPermiso('reglas')
+  if (denegado) return { success: false, error: denegado }
+
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }

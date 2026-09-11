@@ -33,10 +33,26 @@ sucursal no se comparten con las demás.
 - **La app trabaja siempre sobre la sucursal activa**: aunque el
   propietario pueda entrar en todas, cada pantalla enseña solo la elegida
   en el selector.
-- Pendiente: la configuración de cada sucursal (catálogo, horarios,
-  políticas, etiquetas, reglas...) todavía está separada solo por
-  organización en la base de datos. No son datos de clientes, pero hay
-  que cerrarlo antes de invitar agentes (ver `pendientes.md`).
+- **La configuración de cada sucursal** (catálogo, categorías de
+  precios, etiquetas, reglas, skills, canales, plantillas, novedades,
+  horarios, perfil, políticas) se lee desde esa sucursal, y para
+  cambiarla hace falta además permiso de escritura en su sección para
+  esa sucursal (`auth_puede(sucursal, sección, nivel)`). Lo impone la
+  base de datos y, para dar un mensaje claro, también cada acción del
+  servidor (`sinPermiso()` en `src/lib/permisos-servidor.ts`).
+- **La ficha de la sucursal**: la ven quienes trabajan en ella; la editan
+  con permiso de Perfil o de Sucursales. Crear o borrar sucursales en la
+  base de datos, solo el propietario o un administrador; quien tiene
+  permiso de Sucursales las crea a través de la acción de la app, que
+  comprueba el permiso y el límite del plan y hace el alta completa como
+  sistema (si no, las reglas le frenarían a mitad) y le asigna la
+  sucursal nueva.
+- **El límite de sucursales del plan** se comprueba en el servidor y
+  contando las de toda la organización (no solo las que ve el usuario).
+- **Registro de cambios**: cada cambio guarda su sucursal. Los de una
+  sucursal los ve quien tenga permiso en ella; los de toda la
+  organización (usuarios, plan, facturación...) y los anteriores al
+  11-09-2026, solo el propietario o un administrador.
 
 ## Canales de mensajería
 - Modelo: **cada cliente trae su propia cuenta**, sin excepción. En
@@ -171,8 +187,16 @@ real. La columna legacy `rol` en `users` puede desincronizarse de
 `es_propietario` — origen repetido de bugs de permisos (revisar antes
 de tocar cualquier lógica de permisos). Por eso las reglas nuevas
 tratan como "administrador de la organización" a quien tenga
-`rol = 'admin'` **o** `es_propietario` (`auth_es_admin_org()`). A qué
-sucursales entra cada uno: ver "Cada sucursal ve solo lo suyo".
+`rol = 'admin'` **o** `es_propietario` (`auth_es_admin_org()`), y la
+app igual (`getMisPermisos().esAdmin`). A qué sucursales entra cada
+uno: ver "Cada sucursal ve solo lo suyo".
+
+Ojo: el enum `seccion_permiso` de la base de datos no coincide con las
+secciones que guarda la app en `roles_personalizados.permisos` (la app
+usa `contactos` y `facturacion`, que el enum no tiene; el enum tiene
+`blacklist`, `roles` y `soporte`, que la app no usa). Por eso las reglas
+nuevas usan `auth_puede()`, que recibe la sección como texto; la antigua
+`auth_has_permission()` no puede preguntar por `contactos`.
 
 ## Manejo de errores del sistema
 `registrarError()` (`src/lib/errores.ts`) es la función central —

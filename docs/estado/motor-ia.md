@@ -33,6 +33,15 @@ Resumen; el detalle y el porqué están en `docs/arquitectura.md`, sección
   mientras pensaba una persona la pausó o la cerró, la respuesta se descarta
   (queda en `ai_logs` como `pausa` con su coste) y no se cobra crédito.
 - Su respuesta cuenta como actividad para el cierre de 24 h.
+- **Nunca promete una persona sin avisar a nadie.** La instrucción se lo
+  prohíbe, pero el modelo a veces se la salta (visto en pruebas: "te pongo en
+  contacto con una persona" sin usar escalar_humano). Si la respuesta parece
+  prometerlo y no ha escalado, se le pide que la revise: o escala de verdad,
+  o la reescribe sin prometerlo. Cada vez que pasa queda en `error_logs`
+  ("La IA prometió una persona sin escalar…") para poder vigilarlo. Sin el
+  escalado activado, la instrucción le dice que no puede ofrecerlo.
+  Verificado con `probar-promesas` (13 escenarios, incluido quitar la regla
+  de "hablar con un humano" para forzar el fallo).
 
 ## Herramientas de la IA (Fase 2 del motor)
 - Etiquetar conversación → usa `message_categories` configuradas por

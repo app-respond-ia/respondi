@@ -1,14 +1,20 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
+import { supabaseAdmin } from '@/utils/supabase/admin'
+import { sinPermiso } from '@/lib/permisos-servidor'
 import { canManageRole } from './roles'
 import { registrarAuditoria } from '@/lib/auditoria'
 import { getAuthContext } from '@/lib/auth-context'
 import { registrarError } from '@/lib/errores'
 import { validarHorarios, horariosARegistros, registrosAHorarios, type HorarioDia } from '@/lib/horarios'
 
-async function vincularPropietariosASucursal(supabase: any, tenantId: string, sucursalId: string) {
-  const { data: propietarios, error } = await supabase
+async function vincularPropietariosASucursal(db: any, tenantId: string, sucursalId: string, creadorId?: string) {
+  // Entran en la sucursal nueva los propietarios y quien la ha creado (si no
+  // es propietario y no se le asignara, se quedaría fuera de lo que acaba de
+  // crear). Solo el propietario o un administrador puede asignar sucursales,
+  // así que esto lo hace el sistema.
+  const { data: propietarios, error } = await db
     .from('users')
     .select('id, roles_personalizados!inner(es_propietario)')
     .eq('tenant_id', tenantId)
@@ -27,12 +33,12 @@ async function vincularPropietariosASucursal(supabase: any, tenantId: string, su
     return
   }
 
-  if (propietarios && propietarios.length > 0) {
-    const { error: errVinculo } = await supabase.from('user_branches').insert(
-      propietarios.map((p: any) => ({
-        user_id: p.id,
-        branch_id: sucursalId
-      }))
+  const ids = new Set<string>((propietarios || []).map((p: any) => p.id))
+  if (creadorId) ids.add(creadorId)
+
+  if (ids.size > 0) {
+    const { error: errVinculo } = await db.from('user_branches').insert(
+      [...ids].map(id => ({ user_id: id, branch_id: sucursalId }))
     )
 
     if (errVinculo) {
@@ -51,6 +57,7 @@ export async function getSucursales() {
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
+  // La lista: las sucursales en las que trabaja el usuario (las demás no las ve)
   const { data: sucursales, error } = await supabase
     .from('sucursales')
     .select('id, nombre, direccion, activa, created_at')
@@ -59,33 +66,44 @@ export async function getSucursales() {
 
   if (error) return { success: false, error: error.message }
 
-  const { data: organizacion } = await supabase
-    .from('organizaciones')
-    .select('plan_id, plans!plan_id(sucursales_max)')
-    .eq('id', auth.tenant_id)
-    .single()
-  const plan = Array.isArray(organizacion?.plans) ? organizacion.plans[0] : organizacion?.plans
-  const sucursales_max = plan?.sucursales_max ?? null
-  const sucursales_activas_count = (sucursales || []).filter((s: any) => s.activa).length
-  return { success: true, data: { sucursales, sucursales_max, sucursales_activas_count } }
+  // El uso del plan: el de toda la organización
+  const { activas, max } = await usoDelPlan(auth.tenant_id)
+  return { success: true, data: { sucursales, sucursales_max: max, sucursales_activas_count: activas } }
+}
+
+// Cuántas sucursales activas tiene la organización y cuántas permite su plan.
+// Se cuentan todas con el cliente del sistema: el límite es de la
+// organización, y un usuario que no ve todas las sucursales contaría de menos
+// (podría pasarse del plan o desactivar la última que queda).
+async function usoDelPlan(tenantId: string, excepto?: string) {
+  let consulta = supabaseAdmin
+    .from('sucursales')
+    .select('id', { count: 'exact', head: true })
+    .eq('tenant_id', tenantId)
+    .eq('activa', true)
+  if (excepto) consulta = consulta.neq('id', excepto)
+
+  const [{ count }, { data: org }] = await Promise.all([
+    consulta,
+    supabaseAdmin.from('organizaciones').select('plans!plan_id(sucursales_max)').eq('id', tenantId).single()
+  ])
+  const plan: any = Array.isArray(org?.plans) ? org?.plans[0] : org?.plans
+  return { activas: count || 0, max: (plan?.sucursales_max ?? null) as number | null }
 }
 
 import { getMisPermisos } from './permisos'
 
 export async function desactivarSucursal(id: string) {
+  const denegado = await sinPermiso('sucursales')
+  if (denegado) return { success: false, error: denegado }
+
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
-  // Verificar que no es la única sucursal activa
-  const { count } = await supabase
-    .from('sucursales')
-    .select('*', { count: 'exact', head: true })
-    .eq('tenant_id', auth.tenant_id)
-    .eq('activa', true)
-    .neq('id', id)
-
-  if (!count || count === 0) {
+  // Verificar que no es la única sucursal activa (de toda la organización)
+  const { activas: otrasActivas } = await usoDelPlan(auth.tenant_id, id)
+  if (otrasActivas === 0) {
     return { success: false, error: 'No puedes desactivar la única sucursal activa de la organización.' }
   }
 
@@ -113,16 +131,16 @@ export async function desactivarSucursal(id: string) {
 }
 
 export async function reactivarSucursal(id: string) {
+  const denegado = await sinPermiso('sucursales')
+  if (denegado) return { success: false, error: denegado }
+
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
-  const sucRes = await getSucursales()
-  if (sucRes.success && sucRes.data) {
-    const { sucursales_max, sucursales_activas_count } = sucRes.data
-    if (sucursales_max !== null && sucursales_activas_count >= sucursales_max) {
-      return { success: false, error: 'Has alcanzado el límite de sucursales de tu plan' }
-    }
+  const { activas, max } = await usoDelPlan(auth.tenant_id)
+  if (max !== null && activas >= max) {
+    return { success: false, error: 'Has alcanzado el límite de sucursales de tu plan' }
   }
 
   const { data, error } = await supabase
@@ -238,6 +256,21 @@ export async function crearSucursalConDatos(data: {
     return { success: false, error: 'No tienes permisos para crear sucursales' }
   }
 
+  // El límite del plan se comprobaba solo en la pantalla (el botón se
+  // desactivaba), así que llamando a la acción se podían crear más.
+  const { activas, max } = await usoDelPlan(auth.tenant_id)
+  if (max !== null && activas >= max) {
+    return { success: false, error: 'Has alcanzado el límite de sucursales de tu plan' }
+  }
+
+  // Crear una sucursal es una operación completa (la sucursal, su perfil,
+  // horarios, catálogo, etiquetas, reglas y quién entra en ella) que el
+  // usuario tiene permiso para hacer entera; se acaba de comprobar. Con su
+  // propio cliente, las reglas de la base de datos le frenarían a mitad (aún
+  // no está asignado a la sucursal nueva, y puede no tener permiso de Precios
+  // o de Etiquetas) y la sucursal quedaría a medias. Por eso la hace el sistema.
+  const db = supabaseAdmin
+
   if (data.horarios && data.horarios.length > 0) {
     const errorValidacion = validarHorarios(data.horarios)
     if (errorValidacion) return { success: false, error: errorValidacion }
@@ -250,7 +283,7 @@ export async function crearSucursalConDatos(data: {
 
   // DEFENSA: Comprobar idempotencia por nombre en los últimos 10 segundos
   const hace10Segundos = new Date(Date.now() - 10000).toISOString()
-  const { data: sucursalReciente } = await supabase
+  const { data: sucursalReciente } = await db
     .from('sucursales')
     .select('*')
     .eq('tenant_id', userData!.tenant_id)
@@ -265,7 +298,7 @@ export async function crearSucursalConDatos(data: {
   }
 
   // Crear sucursal
-  const { data: newBranch, error: branchErr } = await supabase
+  const { data: newBranch, error: branchErr } = await db
     .from('sucursales')
     .insert({
       tenant_id: userData!.tenant_id,
@@ -287,7 +320,7 @@ export async function crearSucursalConDatos(data: {
   // Business profile
   if (data.servicios || data.politicas || data.msg_fuera_horario) {
     insertPromises.push(
-      supabase.from('business_profiles').insert({
+      db.from('business_profiles').insert({
         branch_id: newBranch.id,
         servicios: data.servicios || null,
         politicas: data.politicas || null,
@@ -305,7 +338,7 @@ export async function crearSucursalConDatos(data: {
   // Horarios
   if (data.horarios && data.horarios!.length > 0) {
     insertPromises.push(
-      supabase.from('business_hours').insert(
+      db.from('business_hours').insert(
         horariosARegistros(data.horarios!, newBranch.id, 'negocio')
       ).then(({ error }) => {
         if (error) return registrarError({ origen: 'app', descripcion: 'Fallo al crear business_hours durante alta de sucursal', stacktrace: error.message, tenant_id: userData!.tenant_id })
@@ -316,7 +349,7 @@ export async function crearSucursalConDatos(data: {
   // Horario personalizado de la IA (solo si el modo lo usa)
   if (data.modo_horario_ia === 'personalizado' && data.horarios_ia && data.horarios_ia.length > 0) {
     insertPromises.push(
-      supabase.from('business_hours').insert(
+      db.from('business_hours').insert(
         horariosARegistros(data.horarios_ia!, newBranch.id, 'ia')
       ).then(({ error }) => {
         if (error) return registrarError({ origen: 'app', descripcion: 'Fallo al crear business_hours (IA) durante alta de sucursal', stacktrace: error.message, tenant_id: userData!.tenant_id })
@@ -327,7 +360,7 @@ export async function crearSucursalConDatos(data: {
   // Skills
   if (data.skills && data.skills!.length > 0) {
     insertPromises.push(
-      supabase.from('skills').insert(
+      db.from('skills').insert(
         data.skills!.map((s, idx) => ({
           branch_id: newBranch.id,
           tenant_id: userData!.tenant_id,
@@ -345,7 +378,7 @@ export async function crearSucursalConDatos(data: {
   // Precios
   if (data.precios && data.precios!.length > 0) {
     insertPromises.push(
-      supabase.from('price_list').insert(
+      db.from('price_list').insert(
         data.precios!.map(p => ({
           branch_id: newBranch.id,
           tenant_id: userData!.tenant_id,
@@ -386,7 +419,7 @@ export async function crearSucursalConDatos(data: {
   }
 
   if (finalEtiquetas.length > 0) {
-    const { error } = await supabase.from('message_categories').insert(
+    const { error } = await db.from('message_categories').insert(
       finalEtiquetas.map((e, idx) => ({
         ...e,
         branch_id: newBranch.id,
@@ -434,7 +467,7 @@ export async function crearSucursalConDatos(data: {
   }
 
   if (finalReglas.length > 0) {
-    const { error } = await supabase.from('case_rules').insert(
+    const { error } = await db.from('case_rules').insert(
       finalReglas.map(r => ({
         ...r,
         branch_id: newBranch.id,
@@ -448,7 +481,7 @@ export async function crearSucursalConDatos(data: {
 
   // Tipos de novedad
   if (data.tipos_novedad && data.tipos_novedad!.length > 0) {
-    const { error } = await supabase.from('tipos_novedad').insert(
+    const { error } = await db.from('tipos_novedad').insert(
       data.tipos_novedad!.map(t => ({
         ...t,
         branch_id: newBranch.id,
@@ -469,7 +502,7 @@ export async function crearSucursalConDatos(data: {
     valor_nuevo: newBranch
   })
 
-  await vincularPropietariosASucursal(supabase, userData!.tenant_id, newBranch.id)
+  await vincularPropietariosASucursal(db, userData!.tenant_id, newBranch.id, user.id)
 
   return { success: true, sucursal: newBranch }
 }

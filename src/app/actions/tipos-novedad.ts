@@ -1,5 +1,6 @@
 'use server'
 
+import { sinPermiso } from '@/lib/permisos-servidor'
 import { createClient } from '@/utils/supabase/server'
 import { resolveBranchId } from '@/lib/active-branch'
 import { registrarAuditoria } from '@/lib/auditoria'
@@ -29,6 +30,9 @@ export async function getTiposNovedad() {
 }
 
 export async function crearTipoNovedad(data: TipoNovedadData) {
+  const denegado = await sinPermiso('novedades')
+  if (denegado) return { success: false, error: denegado }
+
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
@@ -60,6 +64,9 @@ export async function crearTipoNovedad(data: TipoNovedadData) {
 }
 
 export async function actualizarTipoNovedad(id: string, data: TipoNovedadData) {
+  const denegado = await sinPermiso('novedades')
+  if (denegado) return { success: false, error: denegado }
+
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
@@ -98,6 +105,9 @@ export async function actualizarTipoNovedad(id: string, data: TipoNovedadData) {
 }
 
 export async function eliminarTipoNovedad(id: string) {
+  const denegado = await sinPermiso('novedades')
+  if (denegado) return { success: false, error: denegado }
+
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }

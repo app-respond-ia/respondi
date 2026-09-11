@@ -32,8 +32,11 @@ export async function getMisPermisos() {
     : userData.roles_personalizados
 
   const esPropietario = roleData?.es_propietario || false
+  // Igual que en la base de datos (`auth_es_admin_org()`): el propietario o
+  // un usuario con rol de administrador de la organización lo puede todo.
+  const esAdminOrg = userData.rol === 'admin'
 
-  if (esSuperAdmin || esPropietario) {
+  if (esSuperAdmin || esPropietario || esAdminOrg) {
     return { 
       success: true, 
       esAdmin: true,

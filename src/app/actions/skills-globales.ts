@@ -1,7 +1,9 @@
 'use server'
 
+import { sinPermiso } from '@/lib/permisos-servidor'
 import { createClient } from '@/utils/supabase/server'
 import { traducirError } from '@/lib/traducirError'
+import { getAuthContext } from '@/lib/auth-context'
 
 // Para el superadmin — gestión de skills globales
 export async function getSkillsGlobales() {
@@ -140,9 +142,18 @@ export async function getSkillsParaCliente(branchId: string) {
 }
 
 export async function toggleSkillCliente(branchId: string, tenantId: string, skillGlobalId: string, activo: boolean) {
+  const denegado = await sinPermiso('skills')
+  if (denegado) return { success: false, error: denegado }
+
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: 'No autorizado' }
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+
+  // La sucursal y la organización son las del usuario, no las que mande la
+  // pantalla: antes se usaban tal cual llegaban.
+  if (branchId !== auth.branch_id || tenantId !== auth.tenant_id) {
+    return { success: false, error: 'Solo puedes cambiar las skills de la sucursal activa.' }
+  }
 
   // Verificar que el cliente puede togglear esta skill
   const { data: skillGlobal } = await supabase

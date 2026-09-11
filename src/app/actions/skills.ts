@@ -1,5 +1,6 @@
 'use server'
 
+import { sinPermiso } from '@/lib/permisos-servidor'
 // DEPRECATED: Este archivo es legacy. El sistema de skills ahora usa skills_globales.ts
 // Las funciones aquí solo se mantienen por compatibilidad con el onboarding.
 // No crear nuevas llamadas a estas funciones.
@@ -31,6 +32,9 @@ export async function getSkills() {
 }
 
 export async function crearSkill(data: SkillData) {
+  const denegado = await sinPermiso('skills')
+  if (denegado) return { success: false, error: denegado }
+
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
@@ -65,6 +69,9 @@ export async function crearSkill(data: SkillData) {
 }
 
 export async function actualizarSkill(id: string, data: Partial<{ nombre: string, descripcion: string, activo: boolean, orden: number }>) {
+  const denegado = await sinPermiso('skills')
+  if (denegado) return { success: false, error: denegado }
+
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
@@ -82,6 +89,9 @@ export async function actualizarSkill(id: string, data: Partial<{ nombre: string
 }
 
 export async function eliminarSkill(id: string) {
+  const denegado = await sinPermiso('skills')
+  if (denegado) return { success: false, error: denegado }
+
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
@@ -97,6 +107,9 @@ export async function eliminarSkill(id: string) {
 }
 
 export async function reordenarSkills(ids: string[]) {
+  const denegado = await sinPermiso('skills')
+  if (denegado) return { success: false, error: denegado }
+
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }

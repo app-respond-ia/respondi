@@ -654,6 +654,44 @@ la app le devuelve respuestas vacías. Varias comprobaciones "pasaron" así sin
 probar nada; ahora cada una exige su mensaje de error concreto y la prueba
 empieza comprobando que la app reconoce las dos sesiones.
 
+## La configuración y los permisos solo los protegía la pantalla (resuelto, 11-09-2026)
+- **Casi ninguna acción de configuración comprobaba el permiso en el
+  servidor** (unas 30: precios, categorías, etiquetas, reglas, skills,
+  horarios, novedades, tipos de novedad, perfil). Solo lo escondía la
+  pantalla: con "solo lectura" en Precios se podían cambiar precios
+  llamando a la acción.
+- **La configuración de cada sucursal estaba separada solo por
+  organización** en la base de datos: cualquier usuario podía leer y
+  cambiar por la API el catálogo, las etiquetas, los horarios... de
+  cualquier sucursal, e incluso crear sucursales.
+- **Activar una skill** usaba la sucursal y la organización que mandaba el
+  navegador, tal cual.
+- **El límite de sucursales del plan solo lo comprobaba la pantalla**:
+  llamando a la acción se podían crear más de las contratadas. Y
+  desactivar/reactivar contaban solo las sucursales que veía el usuario.
+- **El registro de cambios era de toda la organización.**
+
+Migración `20260911130000`: cada tabla de configuración se lee desde su
+sucursal y se cambia con permiso de su sección en esa sucursal
+(`auth_puede()`); `audit_log` guarda la sucursal. Cada acción comprueba
+además el permiso (`sinPermiso()`) para dar un mensaje claro. Crear una
+sucursal se hace como sistema tras comprobar permiso y plan, y quien la
+crea queda asignado. Verificado con `probar-configuracion` (20
+comprobaciones con un agente de permisos mezclados, por la app y atacando
+la base de datos, incluido llenar el plan hasta 5 sucursales).
+
+## La IA prometía una persona sin avisar a nadie (resuelto, 11-09-2026)
+En una ronda de pruebas, ante "quiero hablar con una persona de verdad", la
+IA contestó "te pongo en contacto con una persona de nuestro equipo" sin
+usar escalar_humano: ni caso ni pausa, y el cliente esperando. Ya había una
+instrucción que lo prohibía; el modelo se la saltó (en rondas anteriores el
+mismo escenario había salido bien cinco veces seguidas). No bastaba con la
+instrucción: ahora, si la respuesta parece prometer una persona y no se ha
+escalado, el modelo revisa su propia respuesta y o escala o la reescribe.
+Un primer intento con una lista de frases concretas se dejó escapar "voy a
+pasar tu solicitud al equipo para que puedan contactarte"; el filtro quedó
+amplio a propósito, porque solo decide si hace falta la revisión.
+
 ## La pantalla de Métricas nunca funcionó (resuelto)
 `src/app/actions/metricas.ts` estaba escrito contra un esquema que no existe.
 Las seis consultas del archivo pedían columnas inventadas:

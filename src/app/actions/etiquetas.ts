@@ -1,5 +1,6 @@
 'use server'
 
+import { sinPermiso } from '@/lib/permisos-servidor'
 import { createClient } from '@/utils/supabase/server'
 import { resolveBranchId } from '@/lib/active-branch'
 import { registrarAuditoria } from '@/lib/auditoria'
@@ -51,6 +52,9 @@ export async function getEtiquetas() {
 }
 
 export async function crearEtiqueta(data: EtiquetaData) {
+  const denegado = await sinPermiso('etiquetas')
+  if (denegado) return { success: false, error: denegado }
+
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
@@ -108,6 +112,9 @@ export async function crearEtiqueta(data: EtiquetaData) {
 }
 
 export async function actualizarEtiqueta(id: string, data: Partial<{ nombre: string, descripcion_intencion: string, color: string, activa: boolean, orden: number }>) {
+  const denegado = await sinPermiso('etiquetas')
+  if (denegado) return { success: false, error: denegado }
+
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
@@ -144,6 +151,9 @@ export async function actualizarEtiqueta(id: string, data: Partial<{ nombre: str
 }
 
 export async function eliminarEtiqueta(id: string) {
+  const denegado = await sinPermiso('etiquetas')
+  if (denegado) return { success: false, error: denegado }
+
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
@@ -177,6 +187,9 @@ export async function eliminarEtiqueta(id: string) {
 }
 
 export async function reordenarEtiquetas(ids: string[]) {
+  const denegado = await sinPermiso('etiquetas')
+  if (denegado) return { success: false, error: denegado }
+
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
@@ -196,6 +209,9 @@ export async function reordenarEtiquetas(ids: string[]) {
 }
 
 export async function crearEtiquetasPlantilla() {
+  const denegado = await sinPermiso('etiquetas')
+  if (denegado) return { success: false, error: denegado }
+
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }

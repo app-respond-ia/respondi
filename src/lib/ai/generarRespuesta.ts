@@ -14,6 +14,29 @@ const openai = new OpenAI({ apiKey: OPENAI_API_KEY })
 // de ahí sale el margen.
 const PRECIO_POR_DEFECTO = { input: 0.20, output: 1.20 }
 
+// Indicios de que una respuesta le dice al cliente que le va a atender una
+// persona. Es solo un primer filtro, amplio a propósito: si salta, el modelo
+// revisa su propia respuesta (paso 10) y decide si de verdad hay que escalar,
+// así que un falso aviso solo cuesta una revisión. Una lista de frases
+// concretas se quedaba corta (se escapó "voy a pasar tu solicitud al equipo
+// para que puedan contactarte"). Cuenta una frase afirmativa que habla de
+// alguien del equipo y de pasar, avisar, contactar o atender. Las preguntas
+// ("¿quieres que te pase con alguien?") no cuentan: ofrecer no es prometer.
+const QUIEN_ATIENDE = /(equipo|persona|agente|humano|responsable|compañer|alguien|encargad|gerente|miembro|someone|agent|team|human|person|staff)/i
+const ACCION_DE_ATENDER = /(pas[aáeéoó]|deriv|escal|traslad|transfer|envi[aáeéoó]|avis|notific|comunic|contact|llam|atend|atiend|escrib|pondr|respond|connect|reach|call|get back)/i
+
+function parecePrometerPersona(texto: string) {
+  return texto
+    .split(/(?<=[.!?\n])/)
+    .map(f => f.trim())
+    .filter(f => f && !f.endsWith('?') && !f.startsWith('¿'))
+    // "No puedo pasarte con otra persona" es justo lo contrario de prometerlo
+    .filter(f => !/\bno (puedo|podemos|es posible|me es posible|tengo forma)\b/i.test(f))
+    // "Solo puedo atenderte yo" tampoco: habla de la propia IA
+    .filter(f => !/\b(solo puedo|te atiendo yo|atenderte yo|ayudarte yo)\b/i.test(f))
+    .some(f => QUIEN_ATIENDE.test(f) && ACCION_DE_ATENDER.test(f))
+}
+
 export async function generarRespuesta(conv: any) {
   const conversationId = conv.id
   const tenantId = conv.tenant_id
@@ -208,6 +231,10 @@ export async function generarRespuesta(conv: any) {
     // Detectado probando el motor con un cliente pidiendo hablar con alguien.
     systemPrompt += `- Si el mensaje del cliente encaja con alguna de las Reglas de Caso listadas más abajo, DEBES invocar escalar_humano con el ID de esa regla.\n`
     systemPrompt += `- NUNCA digas que vas a avisar al equipo, pasar la conversación a una persona, derivar el caso o similar sin haber invocado antes escalar_humano. Si no invocas la herramienta, no se avisa a nadie y el cliente se queda esperando.\n`
+  } else {
+    // Sin escalado activado no hay forma de avisar a nadie: prometerlo es
+    // dejar al cliente esperando a alguien que no va a llegar.
+    systemPrompt += `- No puedes pasar la conversación a una persona del equipo: no lo ofrezcas ni lo prometas.\n`
   }
 
   if (canTag || canEscalate) {
@@ -468,6 +495,51 @@ export async function generarRespuesta(conv: any) {
   // impedir que salga su aviso de "te paso con una persona" (ver paso 10).
   let escaladoEnEstaPasada = false
 
+  // Escalar a una persona: abre (o reutiliza) el caso y pausa la IA. Lo usa la
+  // herramienta escalar_humano y también la revisión del paso 10.
+  const ejecutarEscalado = async (args: any): Promise<string> => {
+    const rule = rules?.find(r => r.id === args.rule_id)
+    if (!rule) return 'Error: rule_id no válido para esta sucursal.'
+
+    // OJO con los dos "tipo" que se llaman igual y NO son lo mismo:
+    //  - `case_rules.tipo_caso` es el motivo de negocio que configura el
+    //    cliente (derivacion_solicitada, queja, consulta...).
+    //  - `cases.tipo` es un enum del sistema con otros valores
+    //    (normal, fallo_llm, fallo_entrega, blacklist_sugerida).
+    // Aquí se pasaba el primero como si fuera el segundo, y Postgres
+    // rechazaba la inserción: NINGUNA regla de escalado llegó nunca a
+    // crear un caso. Un caso nacido de una regla de negocio es 'normal';
+    // el motivo concreto se guarda en la descripción, que es lo que lee
+    // la persona que lo atiende.
+    const idCaso = await crearCasoDesdeSistema(
+      conversationId,
+      tenantId,
+      branchId,
+      contactId,
+      `[${rule.nombre}] ${args.resumen_problema}`,
+      'normal',
+      rule.prioridad_default
+    )
+
+    if (!idCaso) {
+      // Si no hay caso, no se puede decir que lo hay: la IA no debe
+      // prometerle al cliente una atención que no va a llegar.
+      return 'No se ha podido derivar el caso a una persona. NO le digas al cliente que le vas a pasar con alguien; discúlpate y pídele que lo intente de nuevo más tarde.'
+    }
+
+    const { error } = await supabaseAdmin.from('conversations').update({ ia_pausada: true }).eq('id', conversationId)
+    if (error) {
+      await registrarError({
+        origen: 'app',
+        descripcion: 'Fallo al pausar la IA tras escalar a un humano (la IA seguirá contestando encima del agente)',
+        stacktrace: JSON.stringify({ conversationId, error }),
+        tenant_id: tenantId
+      })
+    }
+    escaladoEnEstaPasada = true
+    return 'Caso escalado a humano y respuestas automáticas pausadas.'
+  }
+
   // 8. Manejo de Tool Calls
   if (responseMsg.tool_calls) {
     for (const toolCall of responseMsg.tool_calls) {
@@ -574,48 +646,7 @@ export async function generarRespuesta(conv: any) {
         }
       } 
       else if (toolCall.function.name === 'escalar_humano') {
-        const rule = rules?.find(r => r.id === args.rule_id)
-        if (!rule) {
-          toolResult = 'Error: rule_id no válido para esta sucursal.'
-        } else {
-          // OJO con los dos "tipo" que se llaman igual y NO son lo mismo:
-          //  - `case_rules.tipo_caso` es el motivo de negocio que configura el
-          //    cliente (derivacion_solicitada, queja, consulta...).
-          //  - `cases.tipo` es un enum del sistema con otros valores
-          //    (normal, fallo_llm, fallo_entrega, blacklist_sugerida).
-          // Aquí se pasaba el primero como si fuera el segundo, y Postgres
-          // rechazaba la inserción: NINGUNA regla de escalado llegó nunca a
-          // crear un caso. Un caso nacido de una regla de negocio es 'normal';
-          // el motivo concreto se guarda en la descripción, que es lo que lee
-          // la persona que lo atiende.
-          const idCaso = await crearCasoDesdeSistema(
-            conversationId,
-            tenantId,
-            branchId,
-            contactId,
-            `[${rule.nombre}] ${args.resumen_problema}`,
-            'normal',
-            rule.prioridad_default
-          )
-
-          if (!idCaso) {
-            // Si no hay caso, no se puede decir que lo hay: la IA no debe
-            // prometerle al cliente una atención que no va a llegar.
-            toolResult = 'No se ha podido derivar el caso a una persona. NO le digas al cliente que le vas a pasar con alguien; discúlpate y pídele que lo intente de nuevo más tarde.'
-          } else {
-            const { error } = await supabaseAdmin.from('conversations').update({ ia_pausada: true }).eq('id', conversationId)
-            if (error) {
-              await registrarError({
-                origen: 'app',
-                descripcion: 'Fallo al pausar la IA tras escalar a un humano (la IA seguirá contestando encima del agente)',
-                stacktrace: JSON.stringify({ conversationId, error }),
-                tenant_id: tenantId
-              })
-            }
-            escaladoEnEstaPasada = true
-            toolResult = 'Caso escalado a humano y respuestas automáticas pausadas.'
-          }
-        }
+        toolResult = await ejecutarEscalado(args)
       }
       else if (toolCall.function.name === 'guardar_descripcion_imagen') {
         const msgExists = allMessages.some(m => m.id === args.message_id)
@@ -768,6 +799,59 @@ export async function generarRespuesta(conv: any) {
     isFallback = true
   }
 
+  // Red de seguridad: la IA no puede prometer una persona sin avisar a nadie.
+  // La instrucción se lo prohíbe, pero el modelo a veces se la salta (visto en
+  // pruebas: "te pongo en contacto con una persona de nuestro equipo" sin usar
+  // escalar_humano), y el cliente se queda esperando a alguien que no sabe
+  // nada. Si la respuesta PARECE prometerlo y no ha escalado, se le pide que
+  // lo revise: o escala de verdad, o reescribe la respuesta sin prometerlo.
+  // (Buscar solo frases daría falsos avisos, como "nuestro equipo te atenderá
+  // en la tienda"; por eso decide el modelo.)
+  if (!isFallback && !escaladoEnEstaPasada && parecePrometerPersona(finalContent)) {
+    const original = finalContent
+    openAiMessages.push({ role: 'assistant', content: original })
+    openAiMessages.push({
+      role: 'system',
+      content: canEscalate
+        ? 'REVISIÓN: en tu última respuesta le dices al cliente que una persona del equipo le va a atender, pero NO has invocado escalar_humano, así que nadie del equipo se ha enterado. Si de verdad hay que pasar la conversación a una persona, invoca escalar_humano ahora. Si no hace falta, escribe de nuevo tu respuesta completa sin decir que le va a atender una persona.'
+        : 'REVISIÓN: en tu última respuesta le dices al cliente que una persona del equipo le va a atender, pero aquí no puedes pasar la conversación a nadie. Escribe de nuevo tu respuesta completa sin prometerlo.'
+    })
+    try {
+      const revision = await openai.chat.completions.create({
+        model: MODELO_IA,
+        messages: openAiMessages,
+        ...(canEscalate ? { tools: tools.filter((t: any) => t.function?.name === 'escalar_humano') } : {})
+      })
+      tokensInput += revision.usage?.prompt_tokens || 0
+      tokensOutput += revision.usage?.completion_tokens || 0
+      const r = revision.choices[0].message
+      const llamada: any = r.tool_calls?.find((t: any) => t.type === 'function' && t.function?.name === 'escalar_humano')
+      if (llamada) {
+        await ejecutarEscalado(JSON.parse(llamada.function.arguments))
+        // Si el caso no se ha podido abrir, la promesa no puede salir
+        if (!escaladoEnEstaPasada) finalContent = 'Ahora mismo no puedo pasarte con una persona del equipo, pero dime en qué te puedo ayudar y lo intento yo.'
+      } else if (r.content) {
+        finalContent = r.content
+      }
+    } catch (err: any) {
+      // Sin revisión, se cumple la promesa por la vía segura: se escala con la
+      // regla de "quiere hablar con un humano" (o la primera que haya).
+      const regla = rules?.find(r => r.tipo_caso === 'derivacion_solicitada') || rules?.[0]
+      if (canEscalate && regla) {
+        await ejecutarEscalado({ rule_id: regla.id, resumen_problema: 'La IA le ha dicho al cliente que le atenderá una persona.' })
+      }
+    }
+    // Para poder vigilar cuántas veces pasa
+    await registrarError({
+      origen: 'llm',
+      descripcion: escaladoEnEstaPasada
+        ? 'La IA prometió una persona sin escalar; al revisarlo, se ha escalado'
+        : 'La IA prometió una persona sin escalar; al revisarlo, ha reescrito la respuesta',
+      stacktrace: JSON.stringify({ conversationId, antes: original.slice(0, 300), despues: finalContent.slice(0, 300) }),
+      tenant_id: tenantId
+    })
+  }
+
   // ¿Sigue siendo el turno de la IA? Entre leer los mensajes y tener la
   // respuesta pasan varios segundos, y en ese rato una persona puede haber
   // escrito al cliente, pausado la IA o cerrado la conversación. Mandar la
@@ -853,6 +937,7 @@ export async function generarRespuesta(conv: any) {
       accion: 'SIMULACION_N8N_WEBHOOK',
       tabla_afectada: 'messages',
       registro_id: insertId || conversationId,
+      branch_id: branchId,
       valor_nuevo: {
         event: 'message.sent',
         conversation_id: conversationId,

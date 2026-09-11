@@ -9,3 +9,8 @@ export const ESTADOS_CASO_ABIERTOS = ['pendiente', 'atendiendo'] as const
 export function casoTerminado(estatus: string | null | undefined) {
   return !!estatus && (ESTADOS_CASO_TERMINADOS as readonly string[]).includes(estatus)
 }
+
+// Descripción con la que nace un caso que abre una persona desde una
+// conversación. Las métricas la usan para separar los casos manuales de los
+// que abre el sistema, así que tiene que ser la misma en los dos sitios.
+export const DESCRIPCION_CASO_MANUAL = 'Caso creado manualmente desde la conversación'

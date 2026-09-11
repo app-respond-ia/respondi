@@ -617,6 +617,43 @@ a la vez con el código viejo. Las pruebas ahora ponen el candado
 que cada ejecución arrancaba con restos de la anterior; ahora se borran antes
 y se comprueba que no queda nada.
 
+## Las sucursales se veían entre sí y el selector no funcionaba (resuelto, 11-09-2026)
+Salió al decidir que cada sucursal ve solo lo suyo y comprobar si la app
+ya lo cumplía:
+- **El selector de sucursal no hacía nada desde el 27-07-2026.** Guardaba la
+  elegida en la cookie `respondi_active_branch` y la app la leía de
+  `active_branch_id`, que nadie escribía: todos trabajaban siempre en su
+  sucursal por defecto.
+- **Nadie comprobaba que la sucursal elegida fuera del usuario.** Al arreglar
+  el selector habría bastado con cambiar la cookie para entrar en otra.
+- **Conversaciones y Casos enseñaban las de todas las sucursales** (Chats sí
+  filtraba), y el detalle, las notas y el historial de cambios solo
+  comprobaban la organización.
+- **La memoria de la IA cruzaba sucursales**: en una podía "recordar" lo que
+  el cliente había hablado con otra.
+- **En la base de datos solo había separación por organización**, así que
+  cualquier usuario podía leer por la API los datos de todas las sucursales.
+  Y la lista de sucursales asignadas (`user_branches`) la podía cambiar
+  cualquiera: un agente podía asignarse otra sucursal.
+- **La lista de agentes para asignar casos** miraba la sucursal por defecto
+  de cada usuario, no las que tiene asignadas, y se podía dar un caso a
+  alguien de otra sucursal.
+- Por el camino: "restaurar a normal" un contacto le borraba la nota y ponía
+  "Restaurado a normal", que es lo que luego leía la IA; y la métrica "casos
+  de la IA / manuales" dejó de distinguir nada cuando la entrada de mensajes
+  dejó de abrir casos vacíos.
+
+Migración `20260911120000`. Verificado con `probar-tiendas` (26
+comprobaciones con una segunda sucursal y un agente temporales, por la app y
+atacando la base de datos directamente con la sesión del agente) y con todas
+las baterías anteriores.
+
+Lección sobre las pruebas: un usuario creado a mano sin
+`invitacion_aceptada` es desviado por el middleware a "aceptar invitación" y
+la app le devuelve respuestas vacías. Varias comprobaciones "pasaron" así sin
+probar nada; ahora cada una exige su mensaje de error concreto y la prueba
+empieza comprobando que la app reconoce las dos sesiones.
+
 ## La pantalla de Métricas nunca funcionó (resuelto)
 `src/app/actions/metricas.ts` estaba escrito contra un esquema que no existe.
 Las seis consultas del archivo pedían columnas inventadas:

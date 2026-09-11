@@ -5,10 +5,24 @@ import { getMisPermisos } from './permisos'
 
 import { getAuthContext } from '@/lib/auth-context'
 
+// Las notas de una conversación son de su tienda: solo se ven y se tocan
+// desde la tienda activa.
+async function esDeLaTiendaActiva(supabase: any, auth: any, conversationId: string) {
+  const { data } = await supabase
+    .from('conversations')
+    .select('id')
+    .eq('id', conversationId)
+    .eq('tenant_id', auth.tenant_id)
+    .eq('branch_id', auth.branch_id)
+    .maybeSingle()
+  return !!data
+}
+
 export async function getNotas(conversationId: string) {
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
+  if (!(await esDeLaTiendaActiva(supabase, auth, conversationId))) return { success: false, error: 'Conversación no encontrada' }
 
   const { data, error } = await supabase
     .from('internal_notes')
@@ -35,6 +49,7 @@ export async function crearNota(conversationId: string, contenido: string) {
   if (!contenido || contenido.trim() === '') {
     return { success: false, error: 'La nota no puede estar vacía' }
   }
+  if (!(await esDeLaTiendaActiva(supabase, auth, conversationId))) return { success: false, error: 'Conversación no encontrada' }
 
   const { data, error } = await supabase
     .from('internal_notes')
@@ -78,6 +93,9 @@ export async function eliminarNota(notaId: string) {
   if (!isOwner && level > 2) {
     return { success: false, error: 'No tienes permisos para eliminar notas' }
   }
+
+  const { data: nota } = await supabase.from('internal_notes').select('conversation_id').eq('id', notaId).eq('tenant_id', auth.tenant_id).maybeSingle()
+  if (!nota || !(await esDeLaTiendaActiva(supabase, auth, nota.conversation_id))) return { success: false, error: 'Nota no encontrada' }
 
   const { error } = await supabase
     .from('internal_notes')

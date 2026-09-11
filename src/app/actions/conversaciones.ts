@@ -27,6 +27,8 @@ export async function getConversaciones(filtros?: { estado?: string, canal?: str
       cases (id, estatus, agente:agente_id(nombre))
     `)
     .eq('tenant_id', tenantId)
+    // Cada tienda ve solo sus conversaciones (antes salían las de todas)
+    .eq('branch_id', auth.branch_id)
     .order('fecha_ultimo_mensaje', { ascending: filtros?.sort === 'asc', nullsFirst: false })
 
   if (filtros?.estado && filtros.estado !== 'Todas') {
@@ -96,6 +98,7 @@ export async function getConversacionDetalle(convId: string) {
     `)
     .eq('id', convId)
     .eq('tenant_id', tenantId)
+    .eq('branch_id', auth.branch_id)
     .single()
 
   if (error || !conv) return { success: false, error: error?.message || 'Conversación no encontrada' }
@@ -125,10 +128,15 @@ export async function pausarIA(convId: string) {
   const userData = { tenant_id: auth.tenant_id }
   const user = { id: auth.user_id }
 
-  const { error } = await supabase
+  const { data: cambiada, error } = await supabase
     .from('conversations')
     .update({ ia_pausada: true, atendida_por: user.id })
     .eq('id', convId)
+    .eq('tenant_id', auth.tenant_id)
+    .eq('branch_id', auth.branch_id)
+    .select('id')
+
+  if (!error && !cambiada?.length) return { success: false, error: 'Conversación no encontrada' }
 
   if (!error) {
     const { registrarAuditoria } = await import('@/lib/auditoria')
@@ -151,10 +159,15 @@ export async function reanudarIA(convId: string) {
   const userData = { tenant_id: auth.tenant_id }
   const user = { id: auth.user_id }
   
-  const { error } = await supabase
+  const { data: cambiada, error } = await supabase
     .from('conversations')
     .update({ ia_pausada: false, atendida_por: null })
     .eq('id', convId)
+    .eq('tenant_id', auth.tenant_id)
+    .eq('branch_id', auth.branch_id)
+    .select('id')
+
+  if (!error && !cambiada?.length) return { success: false, error: 'Conversación no encontrada' }
 
   if (!error) {
     const { registrarAuditoria } = await import('@/lib/auditoria')
@@ -187,6 +200,7 @@ export async function enviarMensajeAgenteConv(convId: string, contenido: string)
     .select('id, estado, ia_pausada')
     .eq('id', convId)
     .eq('tenant_id', auth.tenant_id)
+    .eq('branch_id', auth.branch_id)
     .maybeSingle()
 
   if (!conv) return { success: false, error: 'Conversación no encontrada' }

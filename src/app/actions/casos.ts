@@ -6,7 +6,50 @@ import { supabaseAdmin } from '@/utils/supabase/admin'
 import { crearNotificacion, notificarAAdminsDeOrganizacion } from '@/lib/notificaciones'
 import { after } from 'next/server'
 import { cerrarConversacionYCaso, resumirConversacionCerrada } from '@/lib/conversaciones/cierre'
-import { casoTerminado } from '@/lib/casos/estados'
+import { casoTerminado, DESCRIPCION_CASO_MANUAL } from '@/lib/casos/estados'
+
+// Un caso solo se ve y se toca desde la tienda a la que pertenece.
+async function casoDeLaTienda(supabase: any, auth: any, casoId: string, campos: string): Promise<any> {
+  const { data } = await supabase
+    .from('cases')
+    .select(campos)
+    .eq('id', casoId)
+    .eq('tenant_id', auth.tenant_id)
+    .eq('branch_id', auth.branch_id)
+    .maybeSingle()
+  return data
+}
+
+// Quién puede llevar casos en la tienda activa: el propietario o un
+// administrador, y quien tenga asignada esta tienda y permiso de Casos. Antes
+// se miraba la "tienda por defecto" de cada usuario, que no sirve para quien
+// trabaja en varias.
+async function agentesDeLaTienda(supabase: any, auth: any) {
+  const [{ data: usuarios, error }, { data: asignados }] = await Promise.all([
+    supabase
+      .from('users')
+      .select('id, nombre, email, rol, roles_personalizados(es_propietario, permisos)')
+      .eq('tenant_id', auth.tenant_id)
+      .eq('activo', true),
+    supabase
+      .from('user_branches')
+      .select('user_id')
+      .eq('branch_id', auth.branch_id)
+  ])
+
+  if (error) return { error: error.message, agentes: [] as any[] }
+
+  const enLaTienda = new Set((asignados || []).map((a: any) => a.user_id))
+  const agentes = (usuarios || []).filter((u: any) => {
+    const rol = Array.isArray(u.roles_personalizados) ? u.roles_personalizados[0] : u.roles_personalizados
+    if (u.rol === 'admin' || rol?.es_propietario) return true
+    if (!rol || !enLaTienda.has(u.id)) return false
+    const pCasos = (rol.permisos || []).find((p: any) => p.seccion === 'casos')
+    return !!pCasos && pCasos.nivel !== 'ninguno'
+  }).map((u: any) => ({ id: u.id, nombre: u.nombre, email: u.email, roles_personalizados: u.roles_personalizados }))
+
+  return { error: null, agentes }
+}
 
 export async function getCasos(filtros?: { estado?: string, canal?: string, search?: string, agentesIds?: string[], dateRange?: { from: string, to: string }, sort?: 'asc' | 'desc' }) {
   const supabase = await createClient()
@@ -36,6 +79,8 @@ export async function getCasos(filtros?: { estado?: string, canal?: string, sear
       )
     `)
     .eq('tenant_id', tenantId)
+    // Cada tienda ve solo sus casos
+    .eq('branch_id', auth.branch_id)
     .order('fecha_apertura', { ascending: filtros?.sort === 'asc' })
 
   if (filtros?.estado && filtros.estado !== 'Todos') {
@@ -127,6 +172,7 @@ export async function getCasoDetalle(casoId: string) {
     `)
     .eq('id', casoId)
     .eq('tenant_id', userData?.tenant_id)
+    .eq('branch_id', auth.branch_id)
     .single()
 
   if (error || !caso) return { success: false, error: error?.message || 'Caso no encontrado' }
@@ -171,7 +217,7 @@ export async function tomarCaso(casoId: string) {
   if (auth.error) return { success: false, error: auth.error }
   const userData = { tenant_id: auth.tenant_id }
   const user = { id: auth.user_id }
-  const { data: caso } = await supabase.from('cases').select('conversation_id, estatus').eq('id', casoId).eq('tenant_id', auth.tenant_id).maybeSingle()
+  const caso = await casoDeLaTienda(supabase, auth, casoId, 'conversation_id, estatus')
 
   if (!caso) return { success: false, error: 'Caso no encontrado' }
   // Tomar un caso resuelto lo dejaría "atendiendo" colgado de una conversación
@@ -214,7 +260,8 @@ export async function cerrarCaso(casoId: string) {
   const userData = { tenant_id: auth.tenant_id }
   const user = { id: auth.user_id }
   
-  const { data: caso } = await supabase.from('cases').select('conversation_id').eq('id', casoId).single()
+  const caso = await casoDeLaTienda(supabase, auth, casoId, 'conversation_id')
+  if (!caso) return { success: false, error: 'Caso no encontrado' }
 
   const { error } = await supabase
     .from('cases')
@@ -259,12 +306,7 @@ export async function reabrirCaso(casoId: string) {
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
-  const { data: caso } = await supabase
-    .from('cases')
-    .select('id, estatus, agente_id, conversation_id, contact_id, branch_id, conversations ( canal, estado )')
-    .eq('id', casoId)
-    .eq('tenant_id', auth.tenant_id)
-    .maybeSingle()
+  const caso = await casoDeLaTienda(supabase, auth, casoId, 'id, estatus, agente_id, conversation_id, contact_id, branch_id, conversations ( canal, estado )')
 
   if (!caso) return { success: false, error: 'Caso no encontrado' }
   if (!casoTerminado(caso.estatus)) return { success: true }
@@ -382,9 +424,17 @@ export async function crearCasoDesdeConversacion(conversationId: string, agenteI
     .select('contact_id, branch_id, estado')
     .eq('id', conversationId)
     .eq('tenant_id', userData.tenant_id)
+    .eq('branch_id', auth.branch_id)
     .single()
 
   if (convError || !conv) return { success: false, error: 'Conversación no encontrada' }
+
+  if (agenteId) {
+    const { agentes } = await agentesDeLaTienda(supabase, auth)
+    if (!agentes.some((a: any) => a.id === agenteId)) {
+      return { success: false, error: 'Ese agente no trabaja en esta sucursal.' }
+    }
+  }
   if (conv.estado !== 'activa') {
     return { success: false, error: 'La conversación está cerrada. Reábrela para poder atender al cliente.' }
   }
@@ -417,7 +467,7 @@ export async function crearCasoDesdeConversacion(conversationId: string, agenteI
       contact_id: conv.contact_id,
       conversation_id: conversationId,
       tipo: 'normal',
-      descripcion: 'Caso creado manualmente desde la conversación',
+      descripcion: DESCRIPCION_CASO_MANUAL,
       estatus: agenteId ? 'atendiendo' : 'pendiente',
       agente_id: agenteId,
       fecha_apertura: new Date().toISOString()
@@ -472,6 +522,15 @@ export async function asignarCaso(casoId: string, agenteId: string) {
   const userData = { tenant_id: auth.tenant_id }
   const user = { id: auth.user_id }
 
+  const caso = await casoDeLaTienda(supabase, auth, casoId, 'id')
+  if (!caso) return { success: false, error: 'Caso no encontrado' }
+
+  // No se puede dar un caso a alguien que no trabaja en esta tienda
+  const { agentes } = await agentesDeLaTienda(supabase, auth)
+  if (!agentes.some((a: any) => a.id === agenteId)) {
+    return { success: false, error: 'Ese agente no trabaja en esta sucursal.' }
+  }
+
   const { error } = await supabase
     .from('cases')
     .update({ agente_id: agenteId })
@@ -516,7 +575,7 @@ export async function soltarCaso(casoId: string) {
   const userData = { tenant_id: auth.tenant_id }
   const user = { id: auth.user_id }
 
-  const { data: caso } = await supabase.from('cases').select('estatus, conversation_id').eq('id', casoId).eq('tenant_id', auth.tenant_id).maybeSingle()
+  const caso = await casoDeLaTienda(supabase, auth, casoId, 'estatus, conversation_id')
   if (!caso) return { success: false, error: 'Caso no encontrado' }
   if (casoTerminado(caso.estatus)) return { success: false, error: 'Este caso ya está resuelto.' }
 
@@ -556,31 +615,9 @@ export async function getAgentesParaCasos() {
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
-  const userData = { tenant_id: auth.tenant_id, branch_id: auth.branch_id }
-  const user = { id: auth.user_id }
-
-  const { data: users, error } = await supabase
-    .from('users')
-    .select('id, nombre, email, roles_personalizados(es_propietario, permisos)')
-    .eq('tenant_id', userData.tenant_id)
-    .eq('branch_id', userData.branch_id)
-    .eq('activo', true)
-
-  if (error) return { success: false, error: error.message }
-
-  // Filtrar los que tengan acceso a la sección de casos
-  const agentesValidos = (users || []).filter((u: any) => {
-    const rol = Array.isArray(u.roles_personalizados) ? u.roles_personalizados[0] : u.roles_personalizados
-    if (!rol) return false
-    if (rol.es_propietario) return true
-    
-    // Verificar permisos
-    const permisos = rol.permisos || []
-    const pCasos = permisos.find((p: any) => p.seccion === 'casos')
-    return pCasos && pCasos.nivel !== 'ninguno'
-  })
-
-  return { success: true, data: agentesValidos }
+  const { error, agentes } = await agentesDeLaTienda(supabase, auth)
+  if (error) return { success: false, error }
+  return { success: true, data: agentes }
 }
 
 export async function actualizarPrioridadCaso(casoId: string, prioridad: string) {
@@ -590,7 +627,8 @@ export async function actualizarPrioridadCaso(casoId: string, prioridad: string)
   const userData = { tenant_id: auth.tenant_id }
   const user = { id: auth.user_id }
   
-  const { data: anterior } = await supabase.from('cases').select('prioridad').eq('id', casoId).single()
+  const anterior = await casoDeLaTienda(supabase, auth, casoId, 'prioridad')
+  if (!anterior) return { success: false, error: 'Caso no encontrado' }
 
   const { error } = await supabase
     .from('cases')
@@ -619,7 +657,8 @@ export async function actualizarSLACaso(casoId: string, sla_horas: number | null
   const userData = { tenant_id: auth.tenant_id }
   const user = { id: auth.user_id }
 
-  const { data: anterior } = await supabase.from('cases').select('sla_horas').eq('id', casoId).single()
+  const anterior = await casoDeLaTienda(supabase, auth, casoId, 'sla_horas')
+  if (!anterior) return { success: false, error: 'Caso no encontrado' }
 
   const { error } = await supabase
     .from('cases')

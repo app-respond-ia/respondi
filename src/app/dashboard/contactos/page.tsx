@@ -229,8 +229,9 @@ export default function ContactosPage() {
       canal: contactoADesbloquear.canal,
       identificador_canal: contactoADesbloquear.identificador_canal,
       nombre: contactoADesbloquear.nombre || null,
-      trato: 'normal',
-      nota: 'Restaurado a normal'
+      // Sin nota: se conserva la que tenía (antes se sustituía por
+      // "Restaurado a normal", y eso es lo que acababa leyendo la IA)
+      trato: 'normal'
     })
     
     if (res.success && res.data) {
@@ -269,7 +270,7 @@ export default function ContactosPage() {
       <div className="flex items-start justify-between gap-4 flex-wrap mb-8">
         <div>
           <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Contactos</h1>
-          <p className="text-ink-500 mt-1 max-w-xl">Gestiona el trato especial para contactos (bloqueados o sin IA).</p>
+          <p className="text-ink-500 mt-1 max-w-xl">Gestiona el trato especial para contactos (bloqueados o sin IA). Lo que decidas aquí vale solo para esta sucursal.</p>
         </div>
         <div className="flex items-center gap-3">
           <button onClick={openAñadir} disabled={nivelPermiso !== 'escritura'} className="inline-flex items-center gap-2 px-4 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition disabled:opacity-50 disabled:cursor-not-allowed">

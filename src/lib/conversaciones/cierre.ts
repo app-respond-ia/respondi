@@ -16,7 +16,11 @@ import { ESTADOS_CASO_ABIERTOS } from '@/lib/casos/estados'
 // Todas pasan ahora por aquí, para que terminen igual.
 
 // Cierra la conversación y, si le queda un caso abierto, lo da por resuelto.
-// Usa el cliente que le pasen: la acción ya ha comprobado quién es el usuario.
+// La conversación se cierra con el cliente del usuario (la acción ya ha
+// comprobado que es de su tienda). El caso lo resuelve el sistema: es una
+// consecuencia del cierre, y quien cierra desde Chats puede no tener permiso
+// de Casos; con su cliente ese paso fallaba en silencio y el caso se quedaba
+// abierto colgado de una conversación cerrada.
 export async function cerrarConversacionYCaso(
   supabase: any,
   conversationId: string,
@@ -25,15 +29,17 @@ export async function cerrarConversacionYCaso(
 ) {
   const ahora = new Date().toISOString()
 
-  const { error: errConv } = await supabase
+  const { data: cerrada, error: errConv } = await supabase
     .from('conversations')
     .update({ estado: 'cerrada', fecha_cierre: ahora, ia_procesando_desde: null })
     .eq('id', conversationId)
     .eq('tenant_id', tenantId)
+    .select('id')
 
   if (errConv) return { success: false, error: errConv.message }
+  if (!cerrada?.length) return { success: false, error: 'Conversación no encontrada' }
 
-  const { data: casosAbiertos } = await supabase
+  const { data: casosAbiertos } = await supabaseAdmin
     .from('cases')
     .select('id')
     .eq('conversation_id', conversationId)
@@ -41,16 +47,23 @@ export async function cerrarConversacionYCaso(
     .in('estatus', ESTADOS_CASO_ABIERTOS as unknown as string[])
 
   for (const caso of casosAbiertos || []) {
-    const { error: errCaso } = await supabase
+    const { error: errCaso } = await supabaseAdmin
       .from('cases')
       .update({ estatus: 'resuelto', fecha_cierre: ahora })
       .eq('id', caso.id)
 
-    if (!errCaso) {
-      await supabase.from('case_notes').insert({
-        tenant_id: tenantId, case_id: caso.id, user_id: null, nota: notaCaso
+    if (errCaso) {
+      await registrarError({
+        origen: 'app',
+        descripcion: 'Fallo al resolver el caso de una conversación cerrada (queda abierto sobre una conversación cerrada)',
+        stacktrace: JSON.stringify({ conversationId, casoId: caso.id, error: errCaso }),
+        tenant_id: tenantId
       })
+      continue
     }
+    await supabaseAdmin.from('case_notes').insert({
+      tenant_id: tenantId, case_id: caso.id, user_id: null, nota: notaCaso
+    })
   }
 
   return { success: true }

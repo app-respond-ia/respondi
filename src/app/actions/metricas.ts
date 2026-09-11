@@ -3,7 +3,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { resolveBranchId } from '@/lib/active-branch'
 import { getAuthContext } from '@/lib/auth-context'
-import { ESTADOS_CASO_TERMINADOS } from '@/lib/casos/estados'
+import { ESTADOS_CASO_TERMINADOS, DESCRIPCION_CASO_MANUAL } from '@/lib/casos/estados'
 
 export async function getMetricas(periodo: 'hoy' | 'semana' | 'mes' | 'total' = 'mes') {
   const supabase = await createClient()
@@ -117,44 +117,47 @@ export async function getMetricas(periodo: 'hoy' | 'semana' | 'mes' | 'total' = 
       }, 0) / casosCerradosData.length / 60000)
     : 0
 
-  // No hay ninguna columna que diga de dónde salió el caso. Hoy solo los crea
-  // el sistema (al escalar, fuera de horario, sin cuota...) y siempre con una
-  // descripción; los que abre la entrada de mensajes nacen sin ella. Se usa
-  // eso como distinción hasta que exista un campo de origen de verdad.
-  const casosEscaladosIA = casosData?.filter(c => !!c.descripcion).length || 0
-  const casosEscaladosManuales = totalCasos - casosEscaladosIA
+  // No hay ninguna columna que diga de dónde salió el caso. Los que abre una
+  // persona desde una conversación llevan siempre la misma descripción; el
+  // resto los abre el sistema (escalado de la IA, fuera de horario, sin
+  // créditos...). Antes se distinguían por tener descripción o no, pero desde
+  // que la entrada de mensajes ya no abre casos vacíos, todos la tienen.
+  const casosEscaladosManuales = casosData?.filter(c => c.descripcion === DESCRIPCION_CASO_MANUAL).length || 0
+  const casosEscaladosIA = totalCasos - casosEscaladosManuales
 
   // Tasa de escalado (% convs que generaron un caso)
   const tasaEscalado = totalConvs > 0 ? Math.round((totalCasos / totalConvs) * 100) : 0
 
   // ── CONTACTOS ────────────────────────────────────────────────
-  // `contacts` es por organización, no por sucursal: no tiene `branch_id`.
-  // Y el canal es una columna suya (`canal`), no una relación con `channels`.
-  const { data: contactosData } = await supabase
-    .from('contacts')
-    .select('id, created_at, canal')
-    .eq('tenant_id', auth.tenant_id)
+  // Los de ESTA tienda: quienes le han escrito alguna vez. `contacts` es de
+  // toda la organización, así que se cuentan a partir de sus conversaciones
+  // (antes salían los contactos de todas las tiendas). Un contacto es "nuevo"
+  // si su primera conversación con esta tienda cae dentro del periodo.
+  const convsAllTime = await supabase
+    .from('conversations')
+    .select('contact_id, canal, fecha_inicio')
+    .eq('branch_id', branchId)
+    .order('fecha_inicio', { ascending: true })
 
-  const totalContactos = contactosData?.length || 0
-  const nuevosContactos = contactosData?.filter(c => c.created_at >= desde).length || 0
+  const primeraConv: Record<string, { canal: string, fecha_inicio: string }> = {}
+  const convsPerContact: Record<string, number> = {}
+  convsAllTime.data?.forEach(c => {
+    if (!c.contact_id) return
+    convsPerContact[c.contact_id] = (convsPerContact[c.contact_id] || 0) + 1
+    if (!primeraConv[c.contact_id]) primeraConv[c.contact_id] = { canal: c.canal, fecha_inicio: c.fecha_inicio }
+  })
 
-  // Contactos por canal
+  const totalContactos = Object.keys(primeraConv).length
+  const nuevosContactos = Object.values(primeraConv).filter(p => p.fecha_inicio >= desde).length
+
+  // Contactos por canal (el de su primera conversación con esta tienda)
   const contactosPorCanal: Record<string, number> = {}
-  contactosData?.forEach(c => {
-    const tipo = c.canal || 'desconocido'
+  Object.values(primeraConv).forEach(p => {
+    const tipo = p.canal || 'desconocido'
     contactosPorCanal[tipo] = (contactosPorCanal[tipo] || 0) + 1
   })
 
-  // Contactos recurrentes (más de 1 conversación)
-  const convsAllTime = await supabase
-    .from('conversations')
-    .select('contact_id')
-    .eq('branch_id', branchId)
-
-  const convsPerContact: Record<string, number> = {}
-  convsAllTime.data?.forEach(c => {
-    if (c.contact_id) convsPerContact[c.contact_id] = (convsPerContact[c.contact_id] || 0) + 1
-  })
+  // Contactos recurrentes (más de 1 conversación con esta tienda)
   const contactosRecurrentes = Object.values(convsPerContact).filter(v => v > 1).length
 
   // ── CRÉDITOS ─────────────────────────────────────────────────

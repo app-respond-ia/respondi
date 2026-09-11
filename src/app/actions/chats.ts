@@ -130,10 +130,12 @@ export async function getEtiquetasTenant() {
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
+  // Las etiquetas son de cada tienda: el filtro de Chats solo ofrece las suyas
   const { data, error } = await supabase
     .from('message_categories')
     .select('id, nombre, color')
     .eq('tenant_id', auth.tenant_id)
+    .eq('branch_id', auth.branch_id)
     .order('nombre')
 
   if (error) return { success: false, error: error.message }
@@ -145,12 +147,13 @@ export async function getMensajes(conversationId: string) {
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
-  // Check tenant
+  // La conversación tiene que ser de la tienda activa
   const { data: conv } = await supabase
     .from('conversations')
     .select('id')
     .eq('id', conversationId)
     .eq('tenant_id', auth.tenant_id)
+    .eq('branch_id', auth.branch_id)
     .single()
     
   if (!conv) return { success: false, error: 'Conversación no encontrada' }
@@ -402,10 +405,11 @@ export async function getContextoChat(conversationId: string) {
     `)
     .eq('id', conversationId)
     .eq('tenant_id', auth.tenant_id)
+    .eq('branch_id', auth.branch_id)
     .single()
 
   if (error) return { success: false, error: error.message }
-  
+
   // Format the output specifically for the frontend
   const contexto = {
     ...data,

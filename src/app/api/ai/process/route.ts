@@ -47,7 +47,6 @@ export async function POST(req: Request) {
     .from('conversations')
     .select(`
       id, tenant_id, branch_id, contact_id, ia_pausada, ia_intentos_fallidos,
-      contacts:contact_id (trato, modo, respuesta_auto, nota),
       sucursales:branch_id (
         modo_pausa, timezone, trato_contactos_respuesta_auto, trato_contactos_modo,
         business_profiles (msg_fuera_horario, msg_cuota_agotada, msg_pausa_automatica, abrir_caso_fuera_horario, modo_horario_ia, tono, servicios, idioma_base),
@@ -61,6 +60,18 @@ export async function POST(req: Request) {
     console.error('Fetch error:', fetchError)
     return NextResponse.json({ error: 'Conversación no encontrada', details: fetchError }, { status: 404 })
   }
+
+  // Cómo trata ESTA tienda a este contacto (normal, sin IA, bloqueado) y su
+  // nota. Cada tienda tiene la suya: bloquear en una no bloquea en otra. Si no
+  // tiene ficha, es un contacto normal.
+  const { data: ficha } = await supabaseAdmin
+    .from('contactos_sucursal')
+    .select('trato, modo, respuesta_auto, nota')
+    .eq('contact_id', conv.contact_id)
+    .eq('branch_id', conv.branch_id)
+    .maybeSingle()
+  const fichaContacto = ficha || { trato: 'normal', modo: null, respuesta_auto: null, nota: null }
+  ;(conv as any).ficha_contacto = fichaContacto
 
   const liberarCandado = async () => {
     await supabaseAdmin.from('conversations').update({ ia_procesando_desde: null }).eq('id', conversationId)
@@ -92,7 +103,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ status: 'Ignorado (IA pausada por agente)' })
     }
 
-    const contact = Array.isArray(conv.contacts) ? conv.contacts[0] : conv.contacts
+    const contact = fichaContacto
     const branch = Array.isArray(conv.sucursales) ? conv.sucursales[0] : conv.sucursales
     const profile = Array.isArray(branch?.business_profiles) ? branch?.business_profiles[0] : branch?.business_profiles
     const hours = branch?.business_hours || []

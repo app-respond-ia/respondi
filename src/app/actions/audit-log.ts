@@ -66,6 +66,16 @@ export async function getLogsAuditoria(tablaAfectada: 'cases' | 'conversations',
 
   if (!hasLogsPerm) return { success: true, data: [], hasPermission: false }
 
+  // El historial de una conversación o de un caso solo se ve desde su tienda
+  const { data: registro } = await supabase
+    .from(tablaAfectada)
+    .select('id')
+    .eq('id', registroId)
+    .eq('tenant_id', auth.tenant_id)
+    .eq('branch_id', auth.branch_id)
+    .maybeSingle()
+  if (!registro) return { success: true, data: [], hasPermission: true }
+
   let query = supabase
     .from('audit_log')
     .select(`

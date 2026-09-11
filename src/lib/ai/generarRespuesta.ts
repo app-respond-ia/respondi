@@ -101,10 +101,13 @@ export async function generarRespuesta(conv: any) {
   const canUseNovedades = activeSkills.has('novedades_dia')
 
   // 3.6. Contexto CRM (Historial y Novedades)
+  // Solo lo hablado con ESTA tienda: lo que el cliente habló con otra no se
+  // comparte (antes la IA de una tienda "recordaba" conversaciones de otra).
   const { data: pastConvs } = await supabaseAdmin
     .from('conversations')
     .select('id, fecha_cierre, resumen')
     .eq('contact_id', contactId)
+    .eq('branch_id', branchId)
     .eq('estado', 'cerrada')
     .neq('id', conversationId)
     .not('resumen', 'is', null)
@@ -141,9 +144,11 @@ export async function generarRespuesta(conv: any) {
   // --- CONTEXTO ESPECÍFICO DEL CLIENTE ---
   let contextAdded = false;
   
-  if (conv.contacts?.nota) {
+  // La nota es la que ha puesto ESTA tienda (`contactos_sucursal`); la de otra
+  // tienda no se comparte. La trae /api/ai/process en `ficha_contacto`.
+  if (conv.ficha_contacto?.nota) {
     if (!contextAdded) { systemPrompt += `\n--- CONTEXTO ESPECÍFICO DEL CLIENTE ---\n`; contextAdded = true; }
-    let notaLimpia = conv.contacts.nota;
+    let notaLimpia = conv.ficha_contacto.nota;
     if (notaLimpia.length > 300) {
       const cutPoint = notaLimpia.substring(0, 300).lastIndexOf(' ');
       notaLimpia = notaLimpia.substring(0, cutPoint > 0 ? cutPoint : 300) + '...';

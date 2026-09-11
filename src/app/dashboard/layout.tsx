@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import AdminLayout from '@/components/layout/AdminLayout'
 import { getMisPermisos } from '@/app/actions/permisos'
-import { resolveBranchId } from '@/lib/active-branch'
+import { resolveBranchId, sucursalesPermitidas } from '@/lib/active-branch'
 import { getImpersonatedTenantId } from '@/lib/impersonate'
 import ImpersonationBanner from '@/components/ImpersonationBanner'
 import { ToastProvider } from '@/components/ui/Toast'
@@ -66,36 +66,10 @@ export default async function DashboardLayout({
   const esAdmin = (permisosRes.success && (permisosRes as any).esAdmin) || false
   const permisos = (permisosRes.success && permisosRes.data) ? permisosRes.data : []
 
-  const { data: ubData } = await supabase
-    .from('user_branches')
-    .select('branch_id, sucursales(id, nombre)')
-    .eq('user_id', user.id)
-    .order('branch_id', { ascending: true })
-
-  let branches = ((ubData || [])
-    .map((ub: any) => {
-      const s = Array.isArray(ub.sucursales) ? ub.sucursales[0] : ub.sucursales
-      return s ? { id: s.id, nombre: s.nombre } : null
-    })
-    .filter(Boolean) as { id: string, nombre: string }[])
-
-  let activeBranchId = await resolveBranchId(supabase, user.id) || ''
-
-  // Si estamos impersonando, ignoramos las sucursales del usuario real (super_admin no tiene ninguna)
-  // y traemos las sucursales de la organización impersonada
-  if (isImpersonating) {
-    const { data: sucursalesOrg } = await supabase
-      .from('sucursales')
-      .select('id, nombre')
-      .eq('tenant_id', userData.tenant_id)
-      .eq('activa', true)
-      .order('created_at', { ascending: true })
-
-    branches = sucursalesOrg || []
-    if (!activeBranchId && branches.length > 0) {
-      activeBranchId = branches[0].id
-    }
-  }
+  // La lista del selector sale de la misma regla que decide a qué tiendas se
+  // puede entrar (también al impersonar: las de la organización impersonada).
+  const branches = await sucursalesPermitidas(supabase, user.id)
+  const activeBranchId = await resolveBranchId(supabase, user.id) || ''
 
   let creditos = null
   if (userData?.tenant_id) {

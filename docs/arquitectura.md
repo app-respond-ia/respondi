@@ -10,6 +10,34 @@ identificado igual en todas las sucursales), pero las conversaciones
 activas se aíslan por sucursal — un mismo contacto puede tener una
 conversación activa distinta por cada sucursal a la que escriba.
 
+## Cada sucursal ve solo lo suyo
+Decidido con Jorge el 11-09-2026: los datos de los clientes de una
+sucursal no se comparten con las demás.
+- **Quién entra en qué sucursal:** el propietario o un administrador de
+  la organización, en todas; el resto, en las que tiene asignadas
+  (`user_branches`). La regla vive en la base de datos
+  (`auth_sucursales()`) y en la app (`sucursalesPermitidas()` en
+  `src/lib/active-branch.ts`), y el selector de la cabecera solo ofrece
+  y solo acepta esas. Solo el propietario o un administrador puede
+  cambiar las sucursales asignadas.
+- **Qué se separa:** conversaciones, mensajes, notas internas, etiquetas
+  de conversación, casos y sus notas, y la ficha del contacto. Lo impone
+  la base de datos (RLS), no solo las pantallas: un usuario no puede
+  leerlos de otra sucursal ni atacando la API directamente.
+- **La ficha del contacto es de cada sucursal** (`contactos_sucursal`):
+  trato (normal / sin IA / bloqueado), modo, respuesta automática y nota.
+  Bloquear un número en una sucursal no lo bloquea en otra. El nombre sí
+  es de la persona y se comparte. Las columnas `trato`, `modo`,
+  `respuesta_auto` y `nota` de `contacts` quedan obsoletas.
+- **La memoria de la IA** solo usa lo hablado con esa sucursal.
+- **La app trabaja siempre sobre la sucursal activa**: aunque el
+  propietario pueda entrar en todas, cada pantalla enseña solo la elegida
+  en el selector.
+- Pendiente: la configuración de cada sucursal (catálogo, horarios,
+  políticas, etiquetas, reglas...) todavía está separada solo por
+  organización en la base de datos. No son datos de clientes, pero hay
+  que cerrarlo antes de invitar agentes (ver `pendientes.md`).
+
 ## Canales de mensajería
 - Modelo: **cada cliente trae su propia cuenta**, sin excepción. En
   Whaticket, cada cliente paga y gestiona su propia suscripción (Respondi
@@ -141,9 +169,10 @@ desincronización entre la base de datos y la suscripción real.
 `roles_personalizados` (nivel 1-5, `es_propietario`) es el sistema
 real. La columna legacy `rol` en `users` puede desincronizarse de
 `es_propietario` — origen repetido de bugs de permisos (revisar antes
-de tocar cualquier lógica de permisos). Bug abierto: un admin/dueño
-de organización no podía hacer ciertas acciones en su propio panel —
-ver `docs/estado/pendientes.md`.
+de tocar cualquier lógica de permisos). Por eso las reglas nuevas
+tratan como "administrador de la organización" a quien tenga
+`rol = 'admin'` **o** `es_propietario` (`auth_es_admin_org()`). A qué
+sucursales entra cada uno: ver "Cada sucursal ve solo lo suyo".
 
 ## Manejo de errores del sistema
 `registrarError()` (`src/lib/errores.ts`) es la función central —

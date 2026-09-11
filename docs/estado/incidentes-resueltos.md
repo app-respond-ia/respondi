@@ -593,6 +593,17 @@ Salieron al probar el modelo nuevo con choques entre caminos, no uno a uno:
   estado sin nadie detrás. **Tomar un caso resuelto** lo dejaba "atendiendo"
   sobre una conversación cerrada.
 - En Chats, si cerrar o reabrir fallaba, la ventana no decía nada.
+- **Conversaciones que no se cerraban nunca**: las que creó la versión
+  anterior de la entrada de mensajes no tienen fecha de último mensaje, y el
+  cierre de 24 h no las veía. Ahora, si falta, cuenta desde el inicio. Al
+  aplicarlo se cerraron 3 de demostración en "Mi organización" (del 08-09);
+  otras 2 siguen abiertas porque tienen un caso pendiente, que es lo correcto.
+
+Verificado también en producción con el cron de verdad: el primer mensaje de
+un cliente nuevo se contesta una sola vez (~51 s) y sin caso; pedir una
+persona abre un caso y pausa la IA; un agente que escribe pausa la IA; y un
+mensaje que se quedó detrás de la respuesta de la IA lo recoge el cron y lo
+contesta (~21 s).
 
 Verificado con `contrato-conversaciones` (36 comprobaciones: los mensajes
 entran por la misma puerta que un WhatsApp real y las acciones de las

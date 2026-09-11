@@ -2,100 +2,203 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { getAuthContext } from '@/lib/auth-context'
-import { getMisPermisos } from '@/app/actions/permisos'
 import { registrarAuditoria } from '@/lib/auditoria'
+import { sinPermiso } from '@/lib/permisos-servidor'
+import { leerCredencialesMeta, crearPlantillaMeta, borrarPlantillaMeta, ErrorMeta } from '@/lib/canales/meta'
+import { sincronizarPlantillas, estadoDesdeMeta } from '@/lib/canales/plantillas'
+import { analizarComponentes, problemaDelCuerpo, huecosDe } from '@/lib/canales/plantillas-texto'
+
+// Las plantillas de WhatsApp de la sucursal activa. Se crean en Meta (que las
+// revisa y las aprueba o rechaza) y Respondi guarda una copia al día. Antes se
+// guardaban aquí con el aviso "enviada a revisión", pero nunca llegaban a Meta.
+
+async function canalDeLaSucursal(supabase: any, auth: any) {
+  const { data } = await supabase
+    .from('channels')
+    .select('id, tenant_id, branch_id, estado, metodo, meta_waba_id')
+    .eq('tenant_id', auth.tenant_id)
+    .eq('branch_id', auth.branch_id)
+    .eq('tipo', 'whatsapp')
+    .eq('metodo', 'meta_oficial')
+    .neq('estado', 'desconectado')
+    .maybeSingle()
+  return data
+}
+
+function conAnalisis(p: any) {
+  return { ...p, ...analizarComponentes(p.componentes, p.contenido) }
+}
 
 export async function getPlantillasWhatsApp() {
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
-  // First we need the whatsapp channel id for the active branch
-  const { data: channel, error: channelError } = await supabase
-    .from('channels')
-    .select('id')
-    .eq('branch_id', auth.branch_id)
-    .eq('tipo', 'whatsapp')
-    .eq('estado', 'activo')
-    .maybeSingle()
-
-  if (channelError || !channel) {
-    return { success: false, error: 'No hay un canal de WhatsApp activo en esta sucursal.' }
-  }
+  const canal = await canalDeLaSucursal(supabase, auth)
+  if (!canal) return { success: true, canal: null, plantillas: [] }
 
   const { data: plantillas, error } = await supabase
     .from('whatsapp_templates')
-    .select('*')
-    .eq('channel_id', channel.id)
-    .order('created_at', { ascending: false })
+    .select('id, nombre, contenido, idioma, categoria, estado, motivo_rechazo, componentes, meta_template_id, created_at, updated_at')
+    .eq('channel_id', canal.id)
+    .order('nombre', { ascending: true })
 
   if (error) return { success: false, error: error.message }
-
-  return { success: true, plantillas, channelId: channel.id }
+  return {
+    success: true,
+    canal: { id: canal.id, tieneCuenta: !!canal.meta_waba_id },
+    plantillas: (plantillas || []).map(conAnalisis)
+  }
 }
 
-export async function crearPlantillaWhatsApp(data: { nombre: string, contenido: string, idioma: string, categoria: string, channel_id: string }) {
+// Las que se pueden enviar desde Chats: aprobadas y sin datos que Respondi
+// todavía no sepa pedir
+export async function getPlantillasParaEnviar() {
+  const res = await getPlantillasWhatsApp()
+  if (!res.success) return res
+  return {
+    success: true,
+    plantillas: (res.plantillas || []).filter((p: any) => p.estado === 'aprobada' && p.enviable)
+  }
+}
+
+export async function sincronizarPlantillasWhatsApp() {
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
-  // 1. Verificamos permisos (solo escritura puede crear plantillas)
-  const misPermisos = await getMisPermisos()
-  if (!misPermisos.success) return { success: false, error: 'Error verificando permisos.' }
-  
-  const tienePermiso = (misPermisos as any).esAdmin || 
-                       (misPermisos.data || []).some((p: any) => p.seccion === 'canales' && p.nivel === 'escritura')
+  const canal = await canalDeLaSucursal(supabase, auth)
+  if (!canal) return { success: false, error: 'No hay un WhatsApp conectado con Meta en esta sucursal.' }
 
-  if (!tienePermiso) {
-    return { success: false, error: 'No tienes permiso de escritura en canales.' }
+  try {
+    const r = await sincronizarPlantillas(canal)
+    if (!r.ok) return { success: false, error: r.error }
+    return { success: true, total: r.total }
+  } catch (e: any) {
+    return { success: false, error: `Meta no ha dado la lista de plantillas: ${e?.message}` }
+  }
+}
+
+const IDIOMAS_VALIDOS = /^[a-z]{2,3}(_[A-Z]{2})?$/
+
+export async function crearPlantillaWhatsApp(data: { nombre: string; contenido: string; idioma: string; categoria: 'utilidad' | 'marketing'; ejemplos: string[] }) {
+  const denegado = await sinPermiso('canales')
+  if (denegado) return { success: false, error: denegado }
+
+  const supabase = await createClient()
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+
+  const canal = await canalDeLaSucursal(supabase, auth)
+  if (!canal) return { success: false, error: 'No hay un WhatsApp conectado con Meta en esta sucursal.' }
+  if (!canal.meta_waba_id) return { success: false, error: 'Falta el identificador de tu cuenta de WhatsApp Business. Añádelo en Canales → WhatsApp → Cambiar claves.' }
+
+  const nombre = (data.nombre || '').trim()
+  const contenido = (data.contenido || '').trim()
+  if (!/^[a-z0-9_]{1,512}$/.test(nombre)) return { success: false, error: 'El nombre solo puede llevar letras minúsculas sin tildes, números y guiones bajos (_), por ejemplo: pedido_listo.' }
+  if (!IDIOMAS_VALIDOS.test(data.idioma || '')) return { success: false, error: 'Elige el idioma de la plantilla.' }
+  if (!['utilidad', 'marketing'].includes(data.categoria)) return { success: false, error: 'Elige si es de Utilidad o de Marketing.' }
+  const problema = problemaDelCuerpo(contenido)
+  if (problema) return { success: false, error: problema }
+  const huecos = huecosDe(contenido)
+  const ejemplos = (data.ejemplos || []).slice(0, huecos.length).map(e => (e || '').trim())
+  if (ejemplos.length < huecos.length || ejemplos.some(e => !e)) {
+    return { success: false, error: 'Pon un ejemplo para cada hueco: Meta los necesita para revisar la plantilla.' }
   }
 
-  // Prevención IDOR: Confirmamos que el channel_id existe y pertenece a este tenant y branch
-  const { data: channel, error: channelError } = await supabase
-    .from('channels')
-    .select('id')
-    .eq('id', data.channel_id)
-    .eq('tenant_id', auth.tenant_id)
-    .eq('branch_id', auth.branch_id)
-    .single()
+  const credenciales = await leerCredencialesMeta(canal.id)
+  if (!credenciales) return { success: false, error: 'El canal de WhatsApp no tiene las claves de Meta guardadas. Revisa la conexión en Canales.' }
 
-  if (channelError || !channel) {
-    return { success: false, error: 'Canal no encontrado o no autorizado.' }
+  let enMeta
+  try {
+    enMeta = await crearPlantillaMeta(canal.meta_waba_id, credenciales.access_token, {
+      nombre,
+      idioma: data.idioma,
+      categoria: data.categoria === 'marketing' ? 'MARKETING' : 'UTILITY',
+      cuerpo: contenido,
+      ejemplos
+    })
+  } catch (e: any) {
+    const detalle = e instanceof ErrorMeta && e.clavesInvalidas ? 'las claves del canal ya no valen (puede que el token haya caducado)' : e?.message
+    return { success: false, error: `Meta no ha aceptado la plantilla: ${detalle}` }
   }
 
-  // Force nombre to lowercase and replace spaces with underscores (basic cleanup if UI missed it)
-  const nombreLimpio = data.nombre.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_')
-
-  const { data: nuevaPlantilla, error } = await supabase
+  // Meta puede cambiar la categoría si no encaja con el texto
+  const categoria = enMeta.category.toUpperCase() === 'MARKETING' ? 'marketing' : enMeta.category.toUpperCase() === 'AUTHENTICATION' ? 'autenticacion' : 'utilidad'
+  const { data: nueva, error } = await supabase
     .from('whatsapp_templates')
-    .insert({
+    .upsert({
       tenant_id: auth.tenant_id,
       branch_id: auth.branch_id,
-      channel_id: data.channel_id,
-      nombre: nombreLimpio,
-      contenido: data.contenido.trim(),
+      channel_id: canal.id,
+      nombre,
+      contenido,
       idioma: data.idioma,
-      categoria: data.categoria,
-      estado: 'pendiente'
-    })
-    .select()
+      categoria,
+      estado: estadoDesdeMeta(enMeta.status),
+      componentes: [{ type: 'BODY', text: contenido }],
+      meta_template_id: enMeta.id,
+      motivo_rechazo: null,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'channel_id,nombre,idioma' })
+    .select('id, nombre, estado, categoria')
     .single()
 
-  if (error) {
-    if (error.code === '23505') { // unique violation
-      return { success: false, error: 'Ya existe una plantilla con ese nombre e idioma.' }
-    }
-    return { success: false, error: error.message }
-  }
+  if (error) return { success: false, error: error.message }
 
   await registrarAuditoria({
     tenant_id: auth.tenant_id,
     user_id: auth.user_id,
-    accion: `creó una plantilla de WhatsApp "${nombreLimpio}"`,
+    accion: `creó la plantilla de WhatsApp "${nombre}" y la envió a Meta para revisión`,
     tabla_afectada: 'whatsapp_templates',
-    registro_id: nuevaPlantilla.id,
-    valor_nuevo: nuevaPlantilla
+    registro_id: nueva.id,
+    valor_nuevo: { nombre, idioma: data.idioma, categoria, contenido }
   })
 
-  return { success: true, plantilla: nuevaPlantilla }
+  return { success: true, plantilla: nueva, categoriaCambiada: categoria !== data.categoria }
+}
+
+export async function borrarPlantillaWhatsApp(id: string) {
+  const denegado = await sinPermiso('canales')
+  if (denegado) return { success: false, error: denegado }
+
+  const supabase = await createClient()
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+
+  const canal = await canalDeLaSucursal(supabase, auth)
+  if (!canal) return { success: false, error: 'No hay un WhatsApp conectado con Meta en esta sucursal.' }
+
+  const { data: plantilla } = await supabase
+    .from('whatsapp_templates')
+    .select('id, nombre, idioma, meta_template_id, contenido')
+    .eq('id', id)
+    .eq('channel_id', canal.id)
+    .maybeSingle()
+  if (!plantilla) return { success: false, error: 'Plantilla no encontrada.' }
+
+  // Primero en Meta: si allí sigue, volvería a aparecer al actualizar
+  if (plantilla.meta_template_id && canal.meta_waba_id) {
+    const credenciales = await leerCredencialesMeta(canal.id)
+    if (!credenciales) return { success: false, error: 'El canal de WhatsApp no tiene las claves de Meta guardadas. Revisa la conexión en Canales.' }
+    try {
+      await borrarPlantillaMeta(canal.meta_waba_id, credenciales.access_token, plantilla.nombre, plantilla.meta_template_id)
+    } catch (e: any) {
+      return { success: false, error: `Meta no ha dejado borrarla: ${e?.message}` }
+    }
+  }
+
+  const { error } = await supabase.from('whatsapp_templates').delete().eq('id', plantilla.id)
+  if (error) return { success: false, error: error.message }
+
+  await registrarAuditoria({
+    tenant_id: auth.tenant_id,
+    user_id: auth.user_id,
+    accion: `borró la plantilla de WhatsApp "${plantilla.nombre}"`,
+    tabla_afectada: 'whatsapp_templates',
+    registro_id: plantilla.id,
+    valor_anterior: { nombre: plantilla.nombre, idioma: plantilla.idioma, contenido: plantilla.contenido }
+  })
+
+  return { success: true }
 }

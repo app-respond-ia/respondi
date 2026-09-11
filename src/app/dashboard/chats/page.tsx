@@ -19,6 +19,7 @@ import { useToast } from '@/components/ui/Toast'
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/client'
 import { EtiquetaPill } from '@/components/ui/EtiquetaPill'
+import { EnviarPlantillaModal } from '@/components/chats/EnviarPlantillaModal'
 import { colorEtiqueta } from '@/lib/etiquetas/colores'
 import { nombreCanal } from '@/lib/canales/nombres'
 
@@ -76,6 +77,7 @@ function ChatsContent() {
   
   const [mensajeText, setMensajeText] = useState('')
   const [enviando, setEnviando] = useState(false)
+  const [plantillaAbierta, setPlantillaAbierta] = useState(false)
   
   const [procesando, setProcesando] = useState(false)
   const [modalState, setModalState] = useState<{
@@ -318,6 +320,13 @@ function ChatsContent() {
                 if (prev.some(m => m.id === newMsg.id)) return prev
                 return [...prev, newMsg]
               })
+              // Si escribe el cliente, WhatsApp vuelve a dejar escribirle
+              // libremente otras 24 h
+              if (newMsg.remitente === 'cliente') {
+                setContexto((prev: any) => prev && prev.id === currentSelected && prev.ventana
+                  ? { ...prev, ventana: { abierta: true, cierra: new Date(new Date(newMsg.timestamp || Date.now()).getTime() + 24 * 3600 * 1000).toISOString() } }
+                  : prev)
+              }
             }
 
             // 2. Un chat nuevo, o una persona de la lista que ha empezado otra
@@ -521,6 +530,7 @@ function ChatsContent() {
       }
       if (res.envio === 'fallido') {
         showToast(`El mensaje se ha guardado pero no ha llegado al cliente: ${res.errorEnvio}`, 'error')
+        if (/24 h/.test(res.errorEnvio || '')) cargarContexto(selectedConvId)
       } else if (res.envio === 'reintentar') {
         showToast('No se ha podido enviar ahora mismo; se volverá a intentar solo en un minuto.', 'info')
       }
@@ -529,6 +539,37 @@ function ChatsContent() {
     }
     setEnviando(false)
   }
+
+  // Una plantilla enviada desde la ventana de plantillas
+  const handlePlantillaEnviada = (res: Awaited<ReturnType<typeof enviarMensajeAgenteConv>>) => {
+    if (!selectedConvId) return
+    if (!res.success) {
+      showToast(res.error || 'No se ha podido enviar la plantilla', 'error')
+      return
+    }
+    cargarMensajes(selectedConvId)
+    if (res.iaPausadaAhora) {
+      setConversaciones(prev => prev.map(c => c.id === selectedConvId ? { ...c, ia_pausada: true } : c))
+      cargarContexto(selectedConvId)
+    }
+    if (res.envio === 'fallido') {
+      showToast(`La plantilla se ha guardado pero no ha llegado al cliente: ${res.errorEnvio}`, 'error')
+    } else if (res.envio === 'reintentar') {
+      showToast('No se ha podido enviar ahora mismo; se volverá a intentar solo en un minuto.', 'info')
+    } else {
+      showToast('Plantilla enviada', 'success')
+    }
+  }
+
+  // La ventana de 24 h de WhatsApp de este cliente, y que se cierre sola en
+  // pantalla cuando pase la hora
+  const ventanaCerrada = !!contexto && contexto.id === selectedConvId && !!contexto.ventana && !contexto.ventana.abierta
+  useEffect(() => {
+    const cierra = contexto?.ventana?.abierta && contexto.ventana.cierra ? new Date(contexto.ventana.cierra).getTime() - Date.now() : null
+    if (cierra === null || cierra <= 0 || cierra > 24 * 3600 * 1000) return
+    const t = setTimeout(() => setContexto((prev: any) => prev?.ventana ? { ...prev, ventana: { ...prev.ventana, abierta: false } } : prev), cierra + 1000)
+    return () => clearTimeout(t)
+  }, [contexto?.ventana?.abierta, contexto?.ventana?.cierra])
 
   // Formatting helpers
   const getInitials = (name?: string) => name ? name.substring(0, 2).toUpperCase() : '??'
@@ -1096,6 +1137,21 @@ function ChatsContent() {
 
             {selectedConv?.estado === 'activa' && (
               <div className="p-3 sm:p-4 bg-white border-t border-slate-200 shrink-0">
+                {ventanaCerrada && (
+                  <div className="mb-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2.5">
+                    <p className="text-xs text-amber-800 flex-1">
+                      Han pasado más de 24 h desde el último mensaje del cliente: WhatsApp solo deja escribirle con una plantilla aprobada.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setPlantillaAbierta(true)}
+                      disabled={nivelPermiso !== 'escritura'}
+                      className="shrink-0 px-3 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-xs font-600 transition disabled:opacity-50"
+                    >
+                      Enviar plantilla
+                    </button>
+                  </div>
+                )}
                 <form onSubmit={handleEnviar} className="flex items-end gap-2">
                   <div className="flex-1 relative">
                     <textarea 
@@ -1108,14 +1164,14 @@ function ChatsContent() {
                           handleEnviar(e as unknown as React.FormEvent)
                         }
                       }}
-                      placeholder="Escribe un mensaje..." 
-                      disabled={nivelPermiso !== 'escritura' || enviando}
+                      placeholder={ventanaCerrada ? 'Usa una plantilla para escribir a este cliente' : 'Escribe un mensaje...'}
+                      disabled={nivelPermiso !== 'escritura' || enviando || ventanaCerrada}
                       className="w-full px-4 py-2.5 rounded-2xl border border-slate-300 bg-white resize-none text-sm placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition max-h-32 disabled:opacity-50 disabled:bg-slate-50"
                     ></textarea>
                   </div>
                   <button 
                     type="submit"
-                    disabled={nivelPermiso !== 'escritura' || enviando || !mensajeText.trim()} 
+                    disabled={nivelPermiso !== 'escritura' || enviando || !mensajeText.trim() || ventanaCerrada} 
                     className="p-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white transition shrink-0 disabled:opacity-50 disabled:cursor-not-allowed" 
                     aria-label="Enviar"
                   >
@@ -1142,6 +1198,16 @@ function ChatsContent() {
           ) : null}
         </section>
       )}
+
+        {selectedConvId && (
+          <EnviarPlantillaModal
+            isOpen={plantillaAbierta}
+            onClose={() => setPlantillaAbierta(false)}
+            convId={selectedConvId}
+            nombreCliente={selectedConv?.contacts?.nombre}
+            onEnviada={handlePlantillaEnviada}
+          />
+        )}
 
         <ConfirmModal
           isOpen={modalState.isOpen}

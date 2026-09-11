@@ -11,10 +11,19 @@ function getInitials(name: string) {
   return name.substring(0, 2).toUpperCase()
 }
 
+// La hora, y el día si no es de hoy: un mensaje de ayer con solo "14:14"
+// parecía de hoy (y en WhatsApp importa, por las 24 h)
 function formatTime(dateStr: string) {
   if (!dateStr) return ''
   const d = new Date(dateStr)
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  const hora = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  const hoy = new Date()
+  const ayer = new Date()
+  ayer.setDate(hoy.getDate() - 1)
+  if (d.toDateString() === hoy.toDateString()) return hora
+  if (d.toDateString() === ayer.toDateString()) return `Ayer, ${hora}`
+  const fecha = d.toLocaleDateString([], { day: 'numeric', month: 'short', ...(d.getFullYear() !== hoy.getFullYear() ? { year: 'numeric' } : {}) })
+  return `${fecha}, ${hora}`
 }
 
 // Cómo va el envío de un mensaje hacia el cliente (IA o agente)
@@ -59,6 +68,11 @@ export function MessageBubble({ msg, contactName, channelId }: MessageBubbleProp
             <span className={`inline-flex items-center gap-1 text-[10px] font-600 ${labelColor}`}>
               {isIA ? 'IA' : (msg.users?.nombre || 'Agente')}
             </span>
+            {msg.plantilla?.nombre && (
+              <span className="text-[10px] font-600 text-ink-500 bg-slate-100 px-1.5 py-0.5 rounded" title={`Plantilla de WhatsApp "${msg.plantilla.nombre}"`}>
+                Plantilla
+              </span>
+            )}
             <span className="text-[11px] text-ink-400">{formatTime(msg.timestamp)}</span>
             {msg.estado_envio && ESTADO_ENVIO[msg.estado_envio] && (
               <span className={`text-[11px] font-600 ${ESTADO_ENVIO[msg.estado_envio].clase}`} title={msg.error_envio || ESTADO_ENVIO[msg.estado_envio].titulo}>

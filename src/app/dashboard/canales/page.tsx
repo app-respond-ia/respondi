@@ -23,6 +23,7 @@ interface Canal {
   calidad_actualizada_en?: string | null
   fecha_conexion?: string
   meta_phone_number_id?: string | null
+  meta_waba_id?: string | null
   numero_visible?: string | null
   nombre_verificado?: string | null
   ultimo_error?: string | null
@@ -62,6 +63,7 @@ export default function CanalesPage() {
   // Conexión de WhatsApp con Meta: elegir método → pegar claves → datos del aviso
   const [pasoMeta, setPasoMeta] = useState<'metodo' | 'claves' | 'aviso'>('metodo')
   const [phoneNumberId, setPhoneNumberId] = useState('')
+  const [wabaId, setWabaId] = useState('')
   const [accessToken, setAccessToken] = useState('')
   const [appSecret, setAppSecret] = useState('')
   const [datosAviso, setDatosAviso] = useState<DatosAviso | null>(null)
@@ -105,6 +107,7 @@ export default function CanalesPage() {
     setConexionConfirmada(false)
     setPasoMeta('metodo')
     setPhoneNumberId('')
+    setWabaId('')
     setAccessToken('')
     setAppSecret('')
     setDatosAviso(null)
@@ -139,7 +142,7 @@ export default function CanalesPage() {
 
   const handleGuardarClavesMeta = async () => {
     setModalLoading(true)
-    const res = await conectarWhatsAppMeta({ phoneNumberId, accessToken, appSecret })
+    const res = await conectarWhatsAppMeta({ phoneNumberId, accessToken, appSecret, wabaId })
     setModalLoading(false)
     if (!res.success || !res.data) {
       showToast(res.error || 'No se ha podido conectar', 'error')
@@ -167,6 +170,7 @@ export default function CanalesPage() {
     setModalTipo('whatsapp')
     setModalMetodo('oficial')
     setPhoneNumberId(canal.meta_phone_number_id || '')
+    setWabaId(canal.meta_waba_id || '')
     setAccessToken('')
     setAppSecret('')
     setPasoMeta('claves')
@@ -480,12 +484,17 @@ export default function CanalesPage() {
                 <>
                   <div className="px-6 py-5 space-y-4">
                     <p className="text-sm text-ink-600">
-                      Copia estos tres datos de tu app de Meta (<a href="https://developers.facebook.com/apps" target="_blank" rel="noopener noreferrer" className="text-brand-600 font-600 hover:underline">developers.facebook.com</a>). Los comprobamos con Meta antes de guardarlos y quedan cifrados: nadie los vuelve a ver.
+                      Copia estos cuatro datos de tu app de Meta (<a href="https://developers.facebook.com/apps" target="_blank" rel="noopener noreferrer" className="text-brand-600 font-600 hover:underline">developers.facebook.com</a>). Los comprobamos con Meta antes de guardarlos y quedan cifrados: nadie los vuelve a ver.
                     </p>
                     <div>
                       <label htmlFor="meta-phone-id" className="block text-sm font-600 text-ink-900 mb-1">Identificador del número de teléfono</label>
                       <input id="meta-phone-id" value={phoneNumberId} onChange={e => setPhoneNumberId(e.target.value)} inputMode="numeric" autoComplete="off" placeholder="Ej. 123456789012345" className="w-full h-11 px-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500" />
                       <p className="text-xs text-ink-500 mt-1">En tu app → WhatsApp → Configuración de la API. Son solo cifras (no es tu número de teléfono).</p>
+                    </div>
+                    <div>
+                      <label htmlFor="meta-waba-id" className="block text-sm font-600 text-ink-900 mb-1">Identificador de la cuenta de WhatsApp Business</label>
+                      <input id="meta-waba-id" value={wabaId} onChange={e => setWabaId(e.target.value)} inputMode="numeric" autoComplete="off" placeholder="Ej. 102290129340398" className="w-full h-11 px-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500" />
+                      <p className="text-xs text-ink-500 mt-1">En la misma pantalla, justo debajo. Hace falta para las plantillas (los mensajes que se pueden enviar pasadas 24 h).</p>
                     </div>
                     <div>
                       <label htmlFor="meta-token" className="block text-sm font-600 text-ink-900 mb-1">Token de acceso</label>
@@ -500,7 +509,7 @@ export default function CanalesPage() {
                   </div>
                   <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100">
                     <button onClick={() => setIsModalOpen(false)} disabled={modalLoading} className="px-5 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition disabled:opacity-50">Cancelar</button>
-                    <button onClick={handleGuardarClavesMeta} disabled={modalLoading || !phoneNumberId || !accessToken || !appSecret} className="px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition disabled:opacity-50">
+                    <button onClick={handleGuardarClavesMeta} disabled={modalLoading || !phoneNumberId || !wabaId || !accessToken || !appSecret} className="px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition disabled:opacity-50">
                       {modalLoading ? 'Comprobando con Meta…' : 'Comprobar y guardar'}
                     </button>
                   </div>
@@ -510,7 +519,7 @@ export default function CanalesPage() {
                   <div className="px-6 py-5 space-y-4">
                     <p className="text-sm text-ink-600">
                       {datosAviso.numero_visible ? <><strong className="text-ink-900">{datosAviso.numero_visible}</strong> está listo. </> : null}
-                      Último paso: en tu app de Meta → WhatsApp → Configuración → <strong>Webhook</strong> → Editar, pega estos dos datos, pulsa «Verificar y guardar» y, en «Campos del webhook», activa <strong>messages</strong>.
+                      Último paso: en tu app de Meta → WhatsApp → Configuración → <strong>Webhook</strong> → Editar, pega estos dos datos, pulsa «Verificar y guardar» y, en «Campos del webhook», activa <strong>messages</strong> y <strong>message_template_status_update</strong> (este último avisa cuando Meta aprueba o rechaza una plantilla).
                     </p>
                     <div>
                       <p className="text-sm font-600 text-ink-900 mb-1">URL de devolución de llamada</p>

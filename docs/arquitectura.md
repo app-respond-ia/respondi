@@ -82,9 +82,11 @@ sucursal no se comparten con las demás.
   conversación distinta — sin ventana de 24h, hilos con asunto en vez
   de mensajes en tiempo real, proveedor de correo entrante que avise a la
   app. `channels.tipo` ya está preparado como enum para añadir este valor.
-- Pendiente: fuera de la ventana de 24 h de WhatsApp, un mensaje de un
-  agente falla y el agente ve el motivo; falta poder elegir y enviar una
-  plantilla aprobada desde Chats.
+- **Ventana de 24 h de WhatsApp**: pasadas 24 h desde el último mensaje del
+  cliente, Chats solo deja escribirle con una plantilla aprobada por Meta.
+  Las plantillas se crean en Respondi y se mandan a Meta a revisar, o se
+  traen de Meta; Meta es quien manda sobre su estado y Respondi guarda una
+  copia al día. Detalle en `docs/estado/canales-mensajeria.md`.
 
 ## Multimedia entrante
 - Imágenes: se pasan directo a la IA la primera vez; después se

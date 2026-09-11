@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { registrarError } from '@/lib/errores'
-import { leerCredencialesMeta, enviarTexto, ErrorMeta } from '@/lib/canales/meta'
+import { leerCredencialesMeta, enviarTexto, enviarPlantilla, ErrorMeta } from '@/lib/canales/meta'
 
 // Saca hacia el cliente un mensaje ya guardado (de la IA, de un agente o un
 // aviso automático) por el canal de su sucursal, y apunta cómo ha ido en el
@@ -20,7 +20,7 @@ async function apuntar(messageId: string, cambios: Record<string, any>) {
 export async function enviarMensajeSaliente(messageId: string): Promise<Resultado> {
   const { data: msg } = await supabaseAdmin
     .from('messages')
-    .select('id, tenant_id, conversation_id, remitente, contenido, estado_envio, intentos_envio, conversations(branch_id, canal, contacts(identificador_canal))')
+    .select('id, tenant_id, conversation_id, remitente, contenido, plantilla, estado_envio, intentos_envio, conversations(branch_id, canal, contacts(identificador_canal))')
     .eq('id', messageId)
     .maybeSingle()
 
@@ -68,11 +68,31 @@ export async function enviarMensajeSaliente(messageId: string): Promise<Resultad
   await apuntar(messageId, { estado_envio: 'pendiente', intentos_envio: intentos, ultimo_intento_envio: new Date().toISOString() })
 
   try {
-    const idExterno = await enviarTexto(canal.meta_phone_number_id, credenciales.access_token, contacto.identificador_canal, msg.contenido)
+    // Una plantilla sale como plantilla (con sus huecos rellenos); lo demás,
+    // como texto. `contenido` de una plantilla es solo para enseñarla en Chats.
+    const plantilla: any = msg.plantilla
+    const idExterno = plantilla?.nombre
+      ? await enviarPlantilla(canal.meta_phone_number_id, credenciales.access_token, contacto.identificador_canal, {
+          nombre: plantilla.nombre,
+          idioma: plantilla.idioma,
+          parametros: Array.isArray(plantilla.parametros) ? plantilla.parametros : []
+        })
+      : await enviarTexto(canal.meta_phone_number_id, credenciales.access_token, contacto.identificador_canal, msg.contenido)
     await apuntar(messageId, { estado_envio: 'enviado', error_envio: null, identificador_externo: idExterno })
     return { estado: 'enviado' }
   } catch (e: any) {
     if (e instanceof ErrorMeta) {
+      // Fallos propios de las plantillas (códigos 132xxx de Meta)
+      if ((msg.plantilla as any)?.nombre && e.codigo && e.codigo >= 132000 && e.codigo < 133000) {
+        const textos: Record<number, string> = {
+          132000: 'El número de huecos rellenados no coincide con la plantilla.',
+          132001: 'La plantilla no existe en Meta (o no en ese idioma). Actualiza la lista en Canales → Plantillas.',
+          132007: 'Meta ha rechazado el texto por sus normas.',
+          132015: 'Meta ha pausado esta plantilla por su calidad.',
+          132016: 'Meta ha desactivado esta plantilla.'
+        }
+        return fallar(textos[e.codigo] || `Meta no ha aceptado la plantilla: ${e.message}`)
+      }
       if (e.fueraDeVentana) {
         return fallar('Han pasado más de 24 h desde el último mensaje del cliente: WhatsApp solo deja escribirle con una plantilla aprobada.')
       }

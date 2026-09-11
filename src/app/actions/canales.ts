@@ -8,7 +8,9 @@ import { getAuthContext } from '@/lib/auth-context'
 import crypto from 'crypto'
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { sinPermiso } from '@/lib/permisos-servidor'
-import { comprobarNumero, guardarCredencialesMeta, ErrorMeta } from '@/lib/canales/meta'
+import { comprobarNumero, numeroEsDeLaCuenta, guardarCredencialesMeta, ErrorMeta } from '@/lib/canales/meta'
+import { sincronizarPlantillas } from '@/lib/canales/plantillas'
+import { after } from 'next/server'
 
 // Dirección a la que Meta avisa de los mensajes de un canal
 function urlDelAviso(channelId: string) {
@@ -49,7 +51,7 @@ export async function getCanales() {
 
   const { data: filas, error } = await supabase
     .from('channels')
-    .select('id, tipo, metodo, estado, identificador_externo, calidad_mensajeria, calidad_actualizada_en, fecha_conexion, ultima_actividad, verify_token, meta_phone_number_id, numero_visible, nombre_verificado, ultimo_error')
+    .select('id, tipo, metodo, estado, identificador_externo, calidad_mensajeria, calidad_actualizada_en, fecha_conexion, ultima_actividad, verify_token, meta_phone_number_id, meta_waba_id, numero_visible, nombre_verificado, ultimo_error')
     .eq('branch_id', auth.branch_id)
     .order('created_at', { ascending: true })
 
@@ -194,7 +196,7 @@ export async function desconectarCanal(id: string) {
 // tiene que pegar en Meta para que avise a Respondi de los mensajes. El canal
 // se queda "pendiente" hasta que Meta verifica esa dirección; entonces pasa a
 // "activo" solo.
-export async function conectarWhatsAppMeta(datos: { phoneNumberId: string; accessToken: string; appSecret: string }) {
+export async function conectarWhatsAppMeta(datos: { phoneNumberId: string; accessToken: string; appSecret: string; wabaId: string }) {
   const denegado = await sinPermiso('canales')
   if (denegado) return { success: false, error: denegado }
 
@@ -205,6 +207,7 @@ export async function conectarWhatsAppMeta(datos: { phoneNumberId: string; acces
   const phoneNumberId = (datos.phoneNumberId || '').trim()
   const accessToken = (datos.accessToken || '').trim()
   const appSecret = (datos.appSecret || '').trim()
+  const wabaId = (datos.wabaId || '').trim()
 
   if (!/^\d{6,25}$/.test(phoneNumberId)) {
     return { success: false, error: 'El "Identificador del número de teléfono" son solo cifras (lo encuentras en tu app de Meta → WhatsApp → Configuración de la API).' }
@@ -212,6 +215,9 @@ export async function conectarWhatsAppMeta(datos: { phoneNumberId: string; acces
   if (accessToken.length < 30) return { success: false, error: 'El token de acceso no parece completo. Cópialo entero desde tu app de Meta.' }
   if (!/^[0-9a-f]{32}$/i.test(appSecret)) {
     return { success: false, error: 'La clave secreta de la app tiene 32 caracteres (en tu app de Meta → Configuración de la app → Básica → Clave secreta de la app).' }
+  }
+  if (!/^\d{6,25}$/.test(wabaId)) {
+    return { success: false, error: 'El "Identificador de la cuenta de WhatsApp Business" son solo cifras (está en la misma página que el identificador del número: WhatsApp → Configuración de la API).' }
   }
 
   // Cambiar las claves del WhatsApp que ya tiene esta sucursal no ocupa otro
@@ -226,6 +232,16 @@ export async function conectarWhatsAppMeta(datos: { phoneNumberId: string; acces
   } catch (e: any) {
     const detalle = e instanceof ErrorMeta && e.clavesInvalidas ? 'el token no es válido o ha caducado' : e?.message
     return { success: false, error: `Meta no ha aceptado estos datos: ${detalle}.` }
+  }
+
+  // La cuenta de WhatsApp Business (hace falta para las plantillas): que el
+  // token llega a ella y que el número es suyo
+  try {
+    if (!(await numeroEsDeLaCuenta(wabaId, accessToken, phoneNumberId))) {
+      return { success: false, error: 'Ese número no pertenece a esa cuenta de WhatsApp Business. Revisa los dos identificadores en tu app de Meta.' }
+    }
+  } catch (e: any) {
+    return { success: false, error: `Meta no ha aceptado el identificador de la cuenta de WhatsApp Business: ${e?.message}.` }
   }
 
   // 2. Un número solo puede estar conectado a un canal (en toda Respondi)
@@ -257,6 +273,7 @@ export async function conectarWhatsAppMeta(datos: { phoneNumberId: string; acces
     estado: sigueActivo ? 'activo' : 'pendiente',
     identificador_externo: phoneNumberId,
     meta_phone_number_id: phoneNumberId,
+    meta_waba_id: wabaId,
     numero_visible: numero.numeroVisible || null,
     nombre_verificado: numero.nombreVerificado || null,
     calidad_mensajeria: numero.calidad || null,
@@ -279,6 +296,9 @@ export async function conectarWhatsAppMeta(datos: { phoneNumberId: string; acces
   } catch (e: any) {
     return { success: false, error: `No se han podido guardar las claves: ${e?.message}` }
   }
+
+  // Las plantillas que la cuenta ya tenga en Meta aparecen en Respondi
+  after(() => sincronizarPlantillas({ id: canal.id, tenant_id: auth.tenant_id!, branch_id: auth.branch_id!, meta_waba_id: wabaId }).catch(() => {}))
 
   await registrarAuditoria({
     tenant_id: auth.tenant_id,

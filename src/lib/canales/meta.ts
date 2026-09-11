@@ -74,7 +74,11 @@ async function graph(ruta: string, token: string, init: RequestInit = {}) {
   }
   const cuerpo: any = await r.json().catch(() => ({}))
   if (!r.ok) {
-    throw new ErrorMeta(cuerpo?.error?.message || `Meta ha respondido con un error ${r.status}`, cuerpo?.error?.code ?? null, r.status)
+    // Cuando Meta trae una explicación pensada para el usuario (por ejemplo, por
+    // qué no acepta una plantilla), se usa esa
+    const e = cuerpo?.error || {}
+    const texto = e.error_user_msg ? `${e.error_user_title ? `${e.error_user_title}: ` : ''}${e.error_user_msg}` : e.message
+    throw new ErrorMeta(texto || `Meta ha respondido con un error ${r.status}`, e.code ?? null, r.status)
   }
   return cuerpo
 }
@@ -114,4 +118,88 @@ export async function descargarArchivo(mediaId: string, token: string): Promise<
   }
   if (!r.ok) throw new ErrorMeta(`Meta no ha dejado descargar el archivo (${r.status})`, null, r.status)
   return { datos: Buffer.from(await r.arrayBuffer()), tipo: (info.mime_type || r.headers.get('content-type') || 'application/octet-stream').split(';')[0].trim() }
+}
+
+// ---------- Plantillas ----------
+// WhatsApp solo deja escribir libremente al cliente durante las 24 h
+// siguientes a su último mensaje; después, solo con una plantilla que Meta
+// haya aprobado. Las plantillas son de la cuenta de WhatsApp Business (WABA),
+// no del número.
+
+// Que la cuenta existe, que el token llega a ella y que el número es suyo
+export async function numeroEsDeLaCuenta(wabaId: string, token: string, phoneNumberId: string) {
+  const d = await graph(`${encodeURIComponent(wabaId)}/phone_numbers?fields=id,display_phone_number&limit=100`, token)
+  return (d?.data || []).some((n: any) => String(n.id) === String(phoneNumberId))
+}
+
+export interface PlantillaMeta {
+  id: string
+  name: string
+  language: string
+  status: string
+  category: string
+  components?: any[]
+  rejected_reason?: string
+  parameter_format?: string
+}
+
+const CAMPOS_PLANTILLA = 'id,name,language,status,category,components,rejected_reason,parameter_format'
+
+export async function listarPlantillasMeta(wabaId: string, token: string): Promise<PlantillaMeta[]> {
+  const todas: PlantillaMeta[] = []
+  let despues: string | null = null
+  // Hasta 20 páginas de 100 (una cuenta tiene como mucho unos cientos)
+  for (let i = 0; i < 20; i++) {
+    const d: any = await graph(`${encodeURIComponent(wabaId)}/message_templates?fields=${CAMPOS_PLANTILLA}&limit=100${despues ? `&after=${encodeURIComponent(despues)}` : ''}`, token)
+    todas.push(...(d?.data || []))
+    despues = d?.paging?.next && d?.paging?.cursors?.after ? d.paging.cursors.after : null
+    if (!despues) break
+  }
+  return todas
+}
+
+// Solo cuerpo de texto con huecos numerados ({{1}}, {{2}}...). Meta pide un
+// ejemplo de cada hueco para revisarla.
+export async function crearPlantillaMeta(wabaId: string, token: string, p: { nombre: string; idioma: string; categoria: 'MARKETING' | 'UTILITY'; cuerpo: string; ejemplos: string[] }) {
+  const d = await graph(`${encodeURIComponent(wabaId)}/message_templates`, token, {
+    method: 'POST',
+    body: JSON.stringify({
+      name: p.nombre,
+      language: p.idioma,
+      category: p.categoria,
+      components: [{
+        type: 'BODY',
+        text: p.cuerpo,
+        ...(p.ejemplos.length ? { example: { body_text: [p.ejemplos] } } : {})
+      }]
+    })
+  })
+  if (!d?.id) throw new ErrorMeta('Meta no ha devuelto el identificador de la plantilla', null, 200)
+  return { id: String(d.id), status: String(d.status || 'PENDING'), category: String(d.category || p.categoria) }
+}
+
+export async function borrarPlantillaMeta(wabaId: string, token: string, nombre: string, id: string) {
+  await graph(`${encodeURIComponent(wabaId)}/message_templates?name=${encodeURIComponent(nombre)}&hsm_id=${encodeURIComponent(id)}`, token, { method: 'DELETE' })
+}
+
+export async function enviarPlantilla(phoneNumberId: string, token: string, destino: string, p: { nombre: string; idioma: string; parametros: string[] }): Promise<string> {
+  const d = await graph(`${encodeURIComponent(phoneNumberId)}/messages`, token, {
+    method: 'POST',
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: destino.replace(/\D/g, ''),
+      type: 'template',
+      template: {
+        name: p.nombre,
+        language: { code: p.idioma },
+        ...(p.parametros.length
+          ? { components: [{ type: 'body', parameters: p.parametros.map(text => ({ type: 'text', text })) }] }
+          : {})
+      }
+    })
+  })
+  const id = d?.messages?.[0]?.id
+  if (!id) throw new ErrorMeta('Meta no ha devuelto el identificador del mensaje enviado', null, 200)
+  return id
 }

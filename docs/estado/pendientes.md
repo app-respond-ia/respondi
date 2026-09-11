@@ -32,8 +32,17 @@ solo la lista viva).
       (número de prueba gratis, hasta 5 móviles) y conectarla en Canales
 - [ ] Whaticket: preguntar a su soporte si pueden avisar a Respondi de los
       mensajes que entran (su API documentada solo envía)
-- [ ] Plantillas de WhatsApp desde Chats para escribir fuera de la ventana
-      de 24 h
+- [x] Plantillas de WhatsApp — hecho (11-09-2026): se crean y se mandan a
+      Meta, se traen de Meta con su estado, y se envían desde Chats pasadas
+      las 24 h. Ver `canales-mensajeria.md`
+- [ ] Plantillas con foto/vídeo/documento en la cabecera o con botones que
+      cambian: hoy se ven pero no se pueden enviar desde Respondi
+- [ ] Si un cliente escribe con el negocio cerrado y abre más de 24 h
+      después (por ejemplo, el fin de semana), la IA no puede contestarle
+      con texto: el mensaje queda "no enviado" (y el crédito se cobra igual)
+      y un agente tiene que usar una plantilla. Decidir si la IA debería
+      mirar la ventana antes de contestar y usar una plantilla de "ya
+      estamos abiertos" elegida por la sucursal
 - [ ] Token permanente de Meta: el de prueba caduca en 24 h; explicar en
       Canales cómo crear el de "usuario del sistema"
 - [x] Modelo de chats, conversaciones y casos — paso 1 hecho (11-09-2026):

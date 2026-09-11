@@ -409,6 +409,7 @@ export async function getContextoChat(conversationId: string) {
       estado,
       canal,
       ia_pausada,
+      contact_id,
       contacts (
         id,
         nombre,
@@ -441,9 +442,28 @@ export async function getContextoChat(conversationId: string) {
 
   if (error) return { success: false, error: error.message }
 
+  // La ventana de 24 h de WhatsApp: desde el último mensaje del cliente, en
+  // cualquiera de sus conversaciones con esta sucursal. Cerrada, solo se le
+  // puede escribir con una plantilla aprobada.
+  let ventana: { abierta: boolean; cierra: string | null } | null = null
+  if (data.canal === 'whatsapp') {
+    const { data: ultimo } = await supabase
+      .from('messages')
+      .select('timestamp, conversations!inner(contact_id, branch_id)')
+      .eq('remitente', 'cliente')
+      .eq('conversations.contact_id', data.contact_id)
+      .eq('conversations.branch_id', auth.branch_id)
+      .order('timestamp', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    const cierra = ultimo ? new Date(new Date(ultimo.timestamp).getTime() + 24 * 3600 * 1000) : null
+    ventana = { abierta: !!cierra && cierra.getTime() > Date.now(), cierra: cierra ? cierra.toISOString() : null }
+  }
+
   // Format the output specifically for the frontend
   const contexto = {
     ...data,
+    ventana,
     etiquetas: data.conversation_tags?.map((t: any) => t.message_categories) || [],
     caso_asociado: data.cases && data.cases.length > 0 ? {
       ...data.cases[0],

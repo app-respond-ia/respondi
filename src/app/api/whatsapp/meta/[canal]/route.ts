@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/utils/supabase/admin'
 import { registrarError } from '@/lib/errores'
 import { registrarMensajeEntrante } from '@/lib/canales/entrada'
 import { leerCredencialesMeta, firmaValida, descargarArchivo } from '@/lib/canales/meta'
+import { aplicarCambioDePlantilla } from '@/lib/canales/plantillas'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -19,7 +20,7 @@ async function cargarCanal(id: string) {
   if (!/^[0-9a-f-]{36}$/i.test(id)) return null
   const { data } = await supabaseAdmin
     .from('channels')
-    .select('id, tenant_id, branch_id, tipo, metodo, estado, verify_token, meta_phone_number_id')
+    .select('id, tenant_id, branch_id, tipo, metodo, estado, verify_token, meta_phone_number_id, meta_waba_id')
     .eq('id', id)
     .maybeSingle()
   return data
@@ -74,7 +75,8 @@ function textoDelMensaje(m: any): string {
 const ORDEN: Record<string, number> = { pendiente: 0, reintentar: 0, enviado: 1, entregado: 2, leido: 3 }
 const ESTADO_META: Record<string, string> = { sent: 'enviado', delivered: 'entregado', read: 'leido', failed: 'fallido' }
 
-// 2. Avisos: mensajes que entran y estados de los que enviamos
+// 2. Avisos: mensajes que entran, estados de los que enviamos y cambios en
+//    las plantillas (aprobada, rechazada, pausada...)
 export async function POST(req: Request, { params }: Ctx) {
   const { canal: id } = await params
   const cuerpo = Buffer.from(await req.arrayBuffer())
@@ -101,6 +103,10 @@ export async function POST(req: Request, { params }: Ctx) {
   try {
     for (const entrada of datos.entry || []) {
       for (const cambio of entrada.changes || []) {
+        if (cambio.field === 'message_template_status_update') {
+          await aplicarCambioDePlantilla(canal, cambio.value)
+          continue
+        }
         if (cambio.field !== 'messages') continue
         const v = cambio.value || {}
         // Por si la misma app de Meta tiene varios números: solo los de este canal

@@ -139,14 +139,16 @@ export async function reanudarIA(convId: string) {
 // Cuando una persona escribe al cliente, la IA se aparta: se pausa en esa
 // conversación y da por contestado todo lo que el cliente había escrito hasta
 // ahora. Antes la IA seguía activa y el cliente podía recibir a la vez la
-// respuesta del agente y la de la IA.
-export async function enviarMensajeAgenteConv(convId: string, contenido: string) {
-  const texto = contenido?.trim()
-  if (!texto) return { success: false, error: 'El mensaje no puede estar vacío.' }
+// respuesta del agente y la de la IA. Vale igual para un texto que para una
+// plantilla de WhatsApp.
+type ResultadoEscribir =
+  | { success: true; iaPausadaAhora: boolean; envio: string; errorEnvio: string | null; error?: undefined }
+  | { success: false; error: string; iaPausadaAhora?: undefined; envio?: undefined; errorEnvio?: undefined }
 
+async function escribirComoAgente(convId: string, mensaje: { contenido: string; plantilla?: { nombre: string; idioma: string; parametros: string[] } }): Promise<ResultadoEscribir> {
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
-  if (auth.error) return { success: false, error: auth.error }
+  if (auth.error) return { success: false, error: String(auth.error) }
 
   const { data: conv } = await supabase
     .from('conversations')
@@ -167,9 +169,10 @@ export async function enviarMensajeAgenteConv(convId: string, contenido: string)
       tenant_id: auth.tenant_id,
       conversation_id: convId,
       remitente: 'agente',
-      contenido: texto,
+      contenido: mensaje.contenido,
       agente_id: auth.user_id,
-      agrupado: true
+      agrupado: true,
+      ...(mensaje.plantilla ? { plantilla: mensaje.plantilla } : {})
     })
     .select('id')
     .single()
@@ -193,12 +196,21 @@ export async function enviarMensajeAgenteConv(convId: string, contenido: string)
     })
     .eq('id', convId)
 
+  const { registrarAuditoria } = await import('@/lib/auditoria')
   if (iaPausadaAhora) {
-    const { registrarAuditoria } = await import('@/lib/auditoria')
     await registrarAuditoria({
       tenant_id: auth.tenant_id,
       user_id: auth.user_id,
       accion: 'pausó la IA al escribir al cliente',
+      tabla_afectada: 'conversations',
+      registro_id: convId
+    })
+  }
+  if (mensaje.plantilla) {
+    await registrarAuditoria({
+      tenant_id: auth.tenant_id,
+      user_id: auth.user_id,
+      accion: `envió la plantilla de WhatsApp "${mensaje.plantilla.nombre}" al cliente`,
       tabla_afectada: 'conversations',
       registro_id: convId
     })
@@ -208,6 +220,48 @@ export async function enviarMensajeAgenteConv(convId: string, contenido: string)
   const envio = await enviarMensajeSaliente(nuevo.id)
 
   return { success: true, iaPausadaAhora, envio: envio.estado, errorEnvio: envio.error || null }
+}
+
+export async function enviarMensajeAgenteConv(convId: string, contenido: string): Promise<ResultadoEscribir> {
+  const texto = contenido?.trim()
+  if (!texto) return { success: false, error: 'El mensaje no puede estar vacío.' }
+  return escribirComoAgente(convId, { contenido: texto })
+}
+
+// Pasadas 24 h desde el último mensaje del cliente, WhatsApp solo deja
+// escribirle con una plantilla aprobada. Se guarda con el texto ya rellenado
+// (es lo que se ve en Chats) y sale hacia Meta como plantilla.
+export async function enviarPlantillaConv(convId: string, plantillaId: string, valores: string[]): Promise<ResultadoEscribir> {
+  const supabase = await createClient()
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: String(auth.error) }
+
+  const { data: plantilla } = await supabase
+    .from('whatsapp_templates')
+    .select('id, nombre, idioma, estado, contenido, componentes, channels!inner(branch_id, estado, tipo)')
+    .eq('id', plantillaId)
+    .eq('tenant_id', auth.tenant_id)
+    .eq('branch_id', auth.branch_id)
+    .maybeSingle()
+
+  if (!plantilla) return { success: false, error: 'Plantilla no encontrada en esta sucursal.' }
+  if (plantilla.estado !== 'aprobada') return { success: false, error: 'Esa plantilla no está aprobada por Meta, así que no se puede enviar.' }
+
+  const { analizarComponentes, rellenar } = await import('@/lib/canales/plantillas-texto')
+  const info = analizarComponentes(plantilla.componentes as any[], plantilla.contenido)
+  if (!info.enviable) return { success: false, error: `Esta plantilla no se puede enviar desde Respondi: ${info.motivoNoEnviable?.toLowerCase()}.` }
+
+  const parametros = info.huecos.map((_, i) => (valores?.[i] || '').trim())
+  if (parametros.some(v => !v)) return { success: false, error: 'Rellena todos los huecos de la plantilla.' }
+  if (parametros.some(v => v.length > 1000 || /\n|\t|\s{5,}/.test(v))) {
+    return { success: false, error: 'Los huecos no pueden llevar saltos de línea, tabuladores ni muchos espacios seguidos (WhatsApp no lo permite).' }
+  }
+
+  const texto = [info.cabecera, rellenar(info.cuerpo, parametros), info.pie].filter(Boolean).join('\n\n')
+  return escribirComoAgente(convId, {
+    contenido: texto,
+    plantilla: { nombre: plantilla.nombre, idioma: plantilla.idioma, parametros }
+  })
 }
 
 // La ficha de un cliente: todas sus conversaciones con esta sucursal, de la

@@ -15,6 +15,33 @@ function urlDelAviso(channelId: string) {
   return `${process.env.NEXT_PUBLIC_SITE_URL || 'https://respondi.vercel.app'}/api/whatsapp/meta/${channelId}`
 }
 
+// Los canales que permite el plan son para toda la organización, repartidos
+// entre sus sucursales como quiera (igual que el límite de sucursales y el de
+// usuarios): el plan Pro trae 3 canales y 2 sucursales, y como cada sucursal
+// puede tener como mucho uno de cada tipo, "3 por sucursal" no limitaría nada.
+// Cuenta todo canal que no esté desconectado (activo, pendiente de que Meta lo
+// verifique, o con error), de todas las sucursales. Se cuenta con el cliente
+// del sistema porque cada usuario solo ve los canales de sus sucursales y
+// contaría de menos. `excepto`: el canal que se está cambiando (reconectar el
+// mismo no ocupa un hueco más).
+const ESTADOS_EN_USO = ['activo', 'pendiente', 'error']
+
+async function usoDeCanales(tenantId: string, excepto?: { branchId: string; tipo: string }) {
+  const [{ data: filas }, { data: org }] = await Promise.all([
+    supabaseAdmin.from('channels').select('branch_id, tipo').eq('tenant_id', tenantId).in('estado', ESTADOS_EN_USO),
+    supabaseAdmin.from('organizaciones').select('plans!plan_id(canales_max)').eq('id', tenantId).single()
+  ])
+  const plan: any = Array.isArray(org?.plans) ? org?.plans[0] : org?.plans
+  const enUso = (filas || []).filter((f: any) => !(excepto && f.branch_id === excepto.branchId && f.tipo === excepto.tipo)).length
+  return { enUso, max: (plan?.canales_max ?? null) as number | null }
+}
+
+async function fueraDelPlan(tenantId: string, branchId: string, tipo: string) {
+  const { enUso, max } = await usoDeCanales(tenantId, { branchId, tipo })
+  if (max === null || enUso < max) return null
+  return `Tu plan incluye ${max} ${max === 1 ? 'canal' : 'canales'} entre todas tus sucursales y ya ${max === 1 ? 'está en uso' : 'están en uso'}. Desconecta uno o cambia de plan para conectar otro.`
+}
+
 export async function getCanales() {
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
@@ -42,9 +69,11 @@ export async function getCanales() {
     .single()
   const plan = Array.isArray(organizacion?.plans) ? organizacion.plans[0] : organizacion?.plans
   const canales_max = plan?.canales_max ?? null
-  const canales_activos_count = (canales || []).filter((c: any) => c.estado === 'activo').length
+  // Los que ocupan hueco en el plan: los de toda la organización, no solo los
+  // de esta sucursal (antes contaba solo los activos de la sucursal abierta)
+  const { enUso: canales_en_uso } = await usoDeCanales(auth.tenant_id!)
 
-  return { success: true, data: { canales, canales_max, canales_activos_count } }
+  return { success: true, data: { canales, canales_max, canales_en_uso } }
 }
 
 import { getMisPermisos } from '@/app/actions/permisos'
@@ -68,6 +97,9 @@ export async function conectarCanal(dataOrTipo: any, argMetodo?: any) {
   const data = typeof dataOrTipo === 'string'
     ? { tipo: dataOrTipo, metodo: argMetodo }
     : dataOrTipo
+
+  const sinHueco = await fueraDelPlan(auth.tenant_id!, auth.branch_id!, data.tipo)
+  if (sinHueco) return { success: false, error: sinHueco }
 
   const { data: newCanal, error: canalError } = await supabase
     .from('channels')
@@ -181,6 +213,11 @@ export async function conectarWhatsAppMeta(datos: { phoneNumberId: string; acces
   if (!/^[0-9a-f]{32}$/i.test(appSecret)) {
     return { success: false, error: 'La clave secreta de la app tiene 32 caracteres (en tu app de Meta → Configuración de la app → Básica → Clave secreta de la app).' }
   }
+
+  // Cambiar las claves del WhatsApp que ya tiene esta sucursal no ocupa otro
+  // canal; conectar uno nuevo, sí
+  const sinHueco = await fueraDelPlan(auth.tenant_id!, auth.branch_id!, 'whatsapp')
+  if (sinHueco) return { success: false, error: sinHueco }
 
   // 1. ¿Son buenos? Se pregunta a Meta por el número con ese token
   let numero

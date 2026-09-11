@@ -179,7 +179,7 @@ export default function PlanesPage() {
                     </li>
                     <li className="flex items-center gap-3">
                       <svg className={`w-5 h-5 shrink-0 ${isPro ? 'text-brand-500' : 'text-ink-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
-                      <span className="text-ink-700"><strong className="font-600 text-ink-900">{p.canales_max}</strong> canales de conexión</span>
+                      <span className="text-ink-700"><strong className="font-600 text-ink-900">{p.canales_max}</strong> canales en total</span>
                     </li>
                     <li className="flex items-center gap-3">
                       <svg className={`w-5 h-5 shrink-0 ${isPro ? 'text-brand-500' : 'text-ink-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
@@ -273,7 +273,7 @@ export default function PlanesPage() {
                       <input type="number" value={formData.creditos_mensuales} onChange={e => setFormData({...formData, creditos_mensuales: parseInt(e.target.value)})} className="w-full h-10 px-3 rounded-lg border border-slate-300 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-100" />
                     </div>
                     <div>
-                      <label className="block text-xs font-500 text-ink-600 mb-1.5">Canales máximos</label>
+                      <label className="block text-xs font-500 text-ink-600 mb-1.5">Canales máximos (en total)</label>
                       <input type="number" value={formData.canales_max} onChange={e => setFormData({...formData, canales_max: parseInt(e.target.value)})} className="w-full h-10 px-3 rounded-lg border border-slate-300 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-100" />
                     </div>
                     <div>

@@ -43,7 +43,8 @@ export default function CanalesPage() {
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
   const [errorCarga, setErrorCarga] = useState(false)
   const [canalesMax, setCanalesMax] = useState<number | null>(null)
-  const [canalesActivosCount, setCanalesActivosCount] = useState<number>(0)
+  // Canales en uso en toda la organización: el límite del plan es del total
+  const [canalesEnUso, setCanalesEnUso] = useState<number>(0)
   const { showToast } = useToast()
   
   // Modal confirmación desconectar
@@ -71,7 +72,7 @@ export default function CanalesPage() {
     if (res.success && res.data) {
       setCanales(res.data.canales)
       setCanalesMax(res.data.canales_max)
-      setCanalesActivosCount(res.data.canales_activos_count || 0)
+      setCanalesEnUso(res.data.canales_en_uso || 0)
     } else {
       showToast(res.error || 'Error al cargar canales', 'error')
     }
@@ -94,7 +95,7 @@ export default function CanalesPage() {
     cargar().catch(() => setErrorCarga(true))
   }, [])
 
-  const limitReached = canalesMax !== null && canalesActivosCount >= canalesMax
+  const limitReached = canalesMax !== null && canalesEnUso >= canalesMax
 
   const handleOpenModal = (tipo: TipoCanal) => {
     if (limitReached || nivelPermiso !== 'escritura') return
@@ -407,7 +408,7 @@ export default function CanalesPage() {
               </button>
               {limitReached && (
                 <div className="absolute top-full right-0 mt-2 px-2 py-1 bg-ink-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition whitespace-nowrap pointer-events-none z-10">
-                  Has alcanzado el límite de canales de tu plan
+                  Ya usas los {canalesMax} canales de tu plan (contando todas tus sucursales)
                 </div>
               )}
             </div>
@@ -445,7 +446,9 @@ export default function CanalesPage() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-600 text-ink-900">
-              Plan activo · {canalesMax === null ? 'Canales ilimitados' : `${canalesMax} canales disponibles`}
+              {canalesMax === null
+                ? 'Tu plan incluye canales ilimitados'
+                : `Tu plan incluye ${canalesMax} ${canalesMax === 1 ? 'canal' : 'canales'} entre todas tus sucursales · ${canalesEnUso} en uso`}
             </p>
             <p className="text-sm text-ink-600">WhatsApp se conecta con la API oficial de Meta, con tu propia cuenta: tus claves se guardan cifradas y solo las usa Respondi para enviar y recibir tus mensajes.</p>
           </div>

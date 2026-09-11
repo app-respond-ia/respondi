@@ -50,16 +50,19 @@ solo la lista viva).
 - [x] Cada sucursal ve solo lo suyo — hecho (11-09-2026), también la
       configuración, los permisos por sección en el servidor y el registro
       de cambios. Ver `docs/arquitectura.md`, "Cada sucursal ve solo lo suyo"
-- [ ] Límite de canales del plan (`canales_max`): solo lo comprueba la
-      pantalla. Decidir con Jorge si es por sucursal o por organización
-      antes de ponerlo en el servidor
+- [x] Límite de canales del plan (`canales_max`) — hecho (11-09-2026): es de
+      toda la organización (el que se pone en cada plan en el panel de
+      superadmin), cuenta los canales no desconectados de todas sus
+      sucursales y lo comprueba el servidor al conectar
 - [ ] Alinear el enum `seccion_permiso` con las secciones que usa la app
       (ver `docs/arquitectura.md`, "Permisos y roles")
 - [ ] Borrar las columnas obsoletas `contacts.trato/modo/respuesta_auto/nota`
-      (ya no se usan; se borran con el OK de Jorge)
+      — Jorge dio el OK (11-09-2026). Migración escrita
+      (`20260911150000_borrar_columnas_viejas_contacts.sql`), comprobado que
+      nada las usa y que no se pierde ningún dato; falta aplicarla
 - [x] Historial del cliente en Conversaciones — hecho (11-09-2026) según la
       maqueta (https://claude.ai/code/artifact/2339cc2a-07c6-4b98-98e8-b70feb6962db):
-      solo las conversaciones de esa sucursal. Falta que lo vea Andreina
+      solo las conversaciones de esa sucursal
 - [x] Chats en tiempo real — hecho (11-09-2026): la hora del último mensaje
       ya no se pierde y un chat nuevo aparece sin recargar
 - [x] Lentitud general: las funciones de Vercel corrían en EE. UU. y la base

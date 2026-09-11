@@ -49,6 +49,14 @@ sucursal no se comparten con las demás.
   sucursal nueva.
 - **El límite de sucursales del plan** se comprueba en el servidor y
   contando las de toda la organización (no solo las que ve el usuario).
+- **El límite de canales del plan** también es de toda la organización:
+  el número que se pone en cada plan en el panel de superadmin son los
+  canales en total, repartidos entre sus sucursales como quiera (el plan
+  Pro trae 3 canales y 2 sucursales; como cada sucursal tiene como mucho
+  uno de cada tipo, "3 por sucursal" no limitaría nada). Cuentan los que
+  no están desconectados (activos, pendientes o con error) y lo comprueba
+  el servidor al conectar; cambiar las claves de un canal ya conectado no
+  ocupa otro hueco.
 - **Registro de cambios**: cada cambio guarda su sucursal. Los de una
   sucursal los ve quien tenga permiso en ella; los de toda la
   organización (usuarios, plan, facturación...) y los anteriores al

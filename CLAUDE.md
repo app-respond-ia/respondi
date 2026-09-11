@@ -11,7 +11,9 @@ Socios al 50/50: Atsura (Andreina — diseño/comercial) y Propulse System LLC
 ## Stack
 - Next.js + TypeScript + Tailwind CSS
 - Supabase (PostgreSQL + RLS + Realtime + Storage + pg_cron)
-- Vercel (Hobby plan) — producción en respondi.vercel.app
+- Vercel (Hobby plan) — producción en respondi.vercel.app. Las funciones
+  corren en Dublín (`dub1`, en `vercel.json`), junto a la base de datos
+  (Supabase `eu-west-1`, Irlanda): no cambiar una sin la otra
 - Sin n8n (decidido el 11-09-2026): la app recibe y envía los mensajes
   directamente con cada proveedor (Meta Cloud API y Whaticket)
 - Repo: `app-respond-ia/respondi`

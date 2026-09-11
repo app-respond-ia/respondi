@@ -91,16 +91,34 @@ function ChatsContent() {
   const [showMobileContext, setShowMobileContext] = useState(false)
   const agentDropdownRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    const checkLogs = async () => {
-      const perms = await getMisPermisos()
-      if (perms.success && perms.data) {
-        const isAdmin = perms.esAdmin
-        const hasAudit = Array.isArray(perms.data) ? perms.data.some((p: any) => p.seccion === 'audit_log' && p.nivel !== 'ninguno') : false
-        setHasLogPerm(isAdmin || hasAudit)
-      }
+  const [miUsuario, setMiUsuario] = useState<string | null>(null)
+
+  // Los permisos se piden una sola vez al entrar. Antes se pedían dos veces
+  // (y otra más con cada filtro), y la segunda miraba una sección que no
+  // existe ('audit_logs'): quien tenía permiso de registro sin ser
+  // administrador nunca veía la actividad en Chats.
+  const cargarPermisos = async () => {
+    const permisosRes = await getMisPermisos()
+    if (!permisosRes.success) {
+      setErrorCarga(true)
+      return
     }
-    checkLogs()
+    setMiUsuario((permisosRes as any).userId || null)
+    if ((permisosRes as any).esAdmin) {
+      setNivelPermiso('escritura')
+      setHasLogPerm(true)
+      setCanDeleteNotes(true)
+    } else {
+      const lista: any[] = (permisosRes as any).data || []
+      const p = lista.find(p => p.seccion === 'chats')
+      setNivelPermiso(p?.nivel || 'ninguno')
+      setHasLogPerm(lista.some(p => p.seccion === 'audit_log' && p.nivel !== 'ninguno'))
+      setCanDeleteNotes(((permisosRes as any).userLevel || 5) <= 2)
+    }
+  }
+
+  useEffect(() => {
+    cargarPermisos().catch(() => setErrorCarga(true))
     
     getEtiquetasTenant().then(res => {
       if (res.success && res.data) setEtiquetasTenant(res.data)
@@ -146,21 +164,18 @@ function ChatsContent() {
     if (isFirstMount.current) setLoadingChats(true)
     setIsFetching(true)
     
-    const [res, permisosRes] = await Promise.all([
-      getConversaciones({
-        estado: filtroActivo,
-        search: debouncedSearch,
-        canal: canalFilter,
-        iaPausada: iaFilter,
-        tieneCaso: casoFilter,
-        asignadosAMi: asignadosAMi,
-        agentesIds: agentesIds,
-        etiquetasIds: etiquetasIds,
-        dateRange: dateRange.from || dateRange.to ? dateRange : undefined,
-        sort: sortOrder
-      }),
-      getMisPermisos()
-    ])
+    const res = await getConversaciones({
+      estado: filtroActivo,
+      search: debouncedSearch,
+      canal: canalFilter,
+      iaPausada: iaFilter,
+      tieneCaso: casoFilter,
+      asignadosAMi: asignadosAMi,
+      agentesIds: agentesIds,
+      etiquetasIds: etiquetasIds,
+      dateRange: dateRange.from || dateRange.to ? dateRange : undefined,
+      sort: sortOrder
+    })
 
     if (res.success && res.data) {
       let nuevas: any[] = res.data.conversaciones || []
@@ -187,20 +202,6 @@ function ChatsContent() {
       showToast(res.error || 'Error al cargar chats', 'error')
     }
 
-    if (!permisosRes.success) setErrorCarga(true)
-    if (permisosRes.success) {
-      if ((permisosRes as any).esAdmin) {
-        setNivelPermiso('escritura')
-        setHasLogPerm(true)
-        setCanDeleteNotes(true)
-      } else {
-        const p = (permisosRes.data || []).find((p: any) => p.seccion === 'chats')
-        setNivelPermiso(p?.nivel || 'ninguno')
-        setHasLogPerm((permisosRes.data || []).some((p: any) => p.seccion === 'audit_logs'))
-        setCanDeleteNotes(((permisosRes as any).userLevel || 5) <= 2)
-      }
-    }
-    
     if (initialChatId && res.success && res.data && isFirstMount.current) {
       // Se puede llegar con cualquier conversación de la persona (por ejemplo,
       // desde un caso antiguo): se abre su chat.
@@ -435,8 +436,12 @@ function ChatsContent() {
     } else if (modalState.action === 'asignar_mi' || modalState.action === 'asignar_otro' || modalState.action === 'cola') {
       let targetAgenteId = null
       if (modalState.action === 'asignar_mi') {
-        const perms = await getMisPermisos()
-        targetAgenteId = (perms as any).userId
+        targetAgenteId = miUsuario
+        if (!targetAgenteId) {
+          showToast('No se ha podido saber quién eres. Recarga la página e inténtalo de nuevo.', 'error')
+          setProcesando(false)
+          return
+        }
       }
       if (modalState.action === 'asignar_otro' && modalState.targetAgenteId) {
         targetAgenteId = modalState.targetAgenteId
@@ -457,8 +462,7 @@ function ChatsContent() {
         } else {
           let targetAgenteId = null
           if (modalState.action === 'asignar_mi_existente') {
-            const perms = await getMisPermisos()
-            targetAgenteId = (perms as any).userId
+            targetAgenteId = miUsuario
           } else if (modalState.action === 'asignar_otro_existente') {
             targetAgenteId = modalState.targetAgenteId
           }

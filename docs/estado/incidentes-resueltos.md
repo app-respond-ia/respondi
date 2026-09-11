@@ -710,6 +710,17 @@ es la lista de permisos y no tiene `userId`: salía vacío. Crear un caso con
 `getMisPermisos()` devuelve `userId` arriba, y Chats y el historial lo leen
 de ahí.
 
+## Cada acción tardaba un segundo: servidor en EE. UU., base de datos en Irlanda (resuelto, 11-09-2026)
+Vercel pone las funciones por defecto en Washington (`iad1`) y la base de
+datos está en Irlanda (`eu-west-1`): cada consulta cruzaba el Atlántico ida y
+vuelta, y cada acción del servidor, que hace varias, tardaba 1-2 s. Como
+Next.js ejecuta las acciones de una pantalla una detrás de otra, Chats
+tardaba 13-18 s en estar listo. Ahora `vercel.json` fija las funciones en
+Dublín (`dub1`). Además Chats pedía los permisos dos veces al entrar (y otra
+con cada filtro), y la segunda miraba una sección que no existe
+(`audit_logs`): quien tenía permiso de registro sin ser administrador nunca
+veía la actividad. Ahora se piden una vez y con la sección buena.
+
 ## La pantalla de Métricas nunca funcionó (resuelto)
 `src/app/actions/metricas.ts` estaba escrito contra un esquema que no existe.
 Las seis consultas del archivo pedían columnas inventadas:

@@ -9,9 +9,10 @@ import { getMisPermisos } from '@/app/actions/permisos'
 import { useToast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { nombreCanal } from '@/lib/canales/nombres'
+import { ConectarCorreo } from './ConectarCorreo'
 
-type TipoCanal = 'instagram' | 'whatsapp' | 'facebook'
-type MetodoCanal = 'whaticket' | 'meta_oficial'
+type TipoCanal = 'instagram' | 'whatsapp' | 'facebook' | 'email'
+type MetodoCanal = 'whaticket' | 'meta_oficial' | 'imap_smtp'
 type EstadoCanal = 'activo' | 'pendiente' | 'desconectado' | 'error'
 
 interface Canal {
@@ -31,6 +32,13 @@ interface Canal {
   ultimo_error?: string | null
   webhook_url?: string | null
   verify_token?: string | null
+  configuracion?: any
+}
+
+const NOMBRE_METODO: Record<MetodoCanal, string> = {
+  meta_oficial: 'Meta oficial',
+  whaticket: 'Whaticket',
+  imap_smtp: 'tu servidor de correo'
 }
 
 // Lo que el cliente pega en su app de Meta para que avise a Respondi
@@ -70,6 +78,9 @@ export default function CanalesPage() {
   const [appSecret, setAppSecret] = useState('')
   const [datosAviso, setDatosAviso] = useState<DatosAviso | null>(null)
 
+  // Conexión del correo (tiene su propia ventana)
+  const [correoAbierto, setCorreoAbierto] = useState<{ canal: Canal | null } | null>(null)
+
   const cargar = async () => {
     setLoading(true)
     const res = await getCanales()
@@ -100,9 +111,14 @@ export default function CanalesPage() {
   }, [])
 
   const limitReached = canalesMax !== null && canalesEnUso >= canalesMax
+  const getCanal = (tipo: TipoCanal) => [...canales].reverse().find(c => c.tipo === tipo)
 
   const handleOpenModal = (tipo: TipoCanal) => {
     if (limitReached || nivelPermiso !== 'escritura') return
+    if (tipo === 'email') {
+      setCorreoAbierto({ canal: getCanal('email') || null })
+      return
+    }
     setModalTipo(tipo)
     setModalMetodo('oficial')
     setAceptaRiesgo(false)
@@ -231,8 +247,6 @@ export default function CanalesPage() {
     )
   }
 
-  const getCanal = (tipo: TipoCanal) => [...canales].reverse().find(c => c.tipo === tipo)
-
   const renderCard = (tipo: TipoCanal, titulo: string, Icono: any, descSinConectar: string, bgClass: string) => {
     const canal = getCanal(tipo)
     const isActivo = canal?.estado === 'activo'
@@ -267,6 +281,8 @@ export default function CanalesPage() {
             <button onClick={() => handleDesconectar(canal.id)} disabled={nivelPermiso !== 'escritura'} className="text-sm font-600 text-red-700 hover:text-red-800 hover:underline underline-offset-2 transition disabled:opacity-50 disabled:cursor-not-allowed">Eliminar conexión</button>
             {canal.metodo === 'meta_oficial' ? (
               <button onClick={() => abrirCambiarClaves(canal)} disabled={nivelPermiso !== 'escritura'} className="px-4 py-1.5 rounded-lg bg-red-600 text-white text-sm font-600 transition hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed">Cambiar claves</button>
+            ) : canal.metodo === 'imap_smtp' ? (
+              <button onClick={() => setCorreoAbierto({ canal })} disabled={nivelPermiso !== 'escritura'} className="px-4 py-1.5 rounded-lg bg-red-600 text-white text-sm font-600 transition hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed">Cambiar datos</button>
             ) : (
               <button onClick={() => handleOpenModal(tipo)} disabled={limitReached || nivelPermiso !== 'escritura'} className={`px-4 py-1.5 rounded-lg bg-red-600 text-white text-sm font-600 transition ${limitReached || nivelPermiso !== 'escritura' ? 'opacity-50 cursor-not-allowed' : 'hover:bg-red-700'}`}>Reconectar</button>
             )}
@@ -300,7 +316,7 @@ export default function CanalesPage() {
                 </div>
                 {isActivo && (
                   <>
-                    <p className="text-sm text-ink-600">{canal.numero_visible || canal.identificador_externo || 'Sin identificador'}{canal.nombre_verificado ? ` (${canal.nombre_verificado})` : ''} · Conectado vía {canal.metodo === 'meta_oficial' ? 'Meta oficial' : 'Whaticket'}</p>
+                    <p className="text-sm text-ink-600">{canal.numero_visible || canal.identificador_externo || 'Sin identificador'}{canal.nombre_verificado ? ` (${canal.nombre_verificado})` : ''} · Conectado vía {NOMBRE_METODO[canal.metodo] || canal.metodo}</p>
                     <p className="text-xs text-ink-400 mt-1">Desde el {canal.fecha_conexion ? new Date(canal.fecha_conexion).toLocaleDateString() : 'Desconocido'}</p>
                   </>
                 )}
@@ -318,6 +334,16 @@ export default function CanalesPage() {
               <div className="mt-4 flex items-center gap-2 p-3 rounded-xl bg-emerald-50 border border-emerald-200">
                 <svg className="w-5 h-5 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                 <p className="text-xs text-ink-700"><strong>Conexión oficial con Meta.</strong> Sin riesgo de baneo. Recomendado para uso profesional.</p>
+              </div>
+            )}
+            {isActivo && canal.metodo === 'imap_smtp' && (
+              <div className={`mt-4 flex items-start gap-2 p-3 rounded-xl border ${canal.ultimo_error ? 'bg-amber-50 border-amber-200' : 'bg-sky-50 border-sky-200'}`}>
+                <svg className={`w-5 h-5 shrink-0 mt-0.5 ${canal.ultimo_error ? 'text-amber-600' : 'text-sky-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <p className="text-xs text-ink-700">
+                  {canal.ultimo_error
+                    ? <><strong>La última vez no se pudo revisar el buzón:</strong> {canal.ultimo_error} Se vuelve a intentar cada minuto.</>
+                    : <>Revisamos la bandeja de entrada cada minuto y la IA contesta desde esta dirección, dentro del mismo hilo del correo.</>}
+                </p>
               </div>
             )}
             {isActivo && canal.metodo === 'whaticket' && (
@@ -372,6 +398,9 @@ export default function CanalesPage() {
                 <Link href="/dashboard/canales/whatsapp-plantillas" className="text-sm font-600 text-brand-600 hover:text-brand-700 hover:underline underline-offset-2 transition mr-auto">
                   Gestionar plantillas
                 </Link>
+              )}
+              {canal.metodo === 'imap_smtp' && (
+                <button onClick={() => setCorreoAbierto({ canal })} disabled={nivelPermiso !== 'escritura'} className="text-sm font-600 text-ink-700 hover:text-ink-900 hover:underline underline-offset-2 transition disabled:opacity-50 disabled:cursor-not-allowed">Cambiar datos</button>
               )}
               {canal.metodo === 'meta_oficial' && (
                 <>
@@ -463,7 +492,7 @@ export default function CanalesPage() {
       {/* Encabezado */}
       <div className="mb-6">
         <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Canales</h1>
-        <p className="text-ink-500 mt-1">Las redes sociales por donde tu IA atiende a tus clientes.</p>
+        <p className="text-ink-500 mt-1">Por dónde atiende tu IA a tus clientes: redes sociales y correo.</p>
       </div>
 
       {/* Banner del plan */}
@@ -478,7 +507,7 @@ export default function CanalesPage() {
                 ? 'Tu plan incluye canales ilimitados'
                 : `Tu plan incluye ${canalesMax} ${canalesMax === 1 ? 'canal' : 'canales'} entre todas tus sucursales · ${canalesEnUso} en uso`}
             </p>
-            <p className="text-sm text-ink-600">WhatsApp se conecta con la API oficial de Meta, con tu propia cuenta: tus claves se guardan cifradas y solo las usa Respondi para enviar y recibir tus mensajes.</p>
+            <p className="text-sm text-ink-600">WhatsApp se conecta con la API oficial de Meta, con tu propia cuenta, y el correo con tu propio buzón: tus claves se guardan cifradas y solo las usa Respondi para enviar y recibir tus mensajes.</p>
           </div>
         </div>
       </div>
@@ -488,6 +517,16 @@ export default function CanalesPage() {
       {renderCard('whatsapp', 'WhatsApp', <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.946C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 018.413 3.488 11.824 11.824 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413z"/></svg>, 'Conecta tu número de WhatsApp para atender a tus clientes.', 'bg-emerald-500 shadow-emerald-200')}
       
       {renderCard('facebook', 'Facebook', <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>, 'Conecta tu página de Facebook para recibir Messenger.', 'bg-[#1877F2] shadow-blue-200')}
+
+      {renderCard('email', 'Email', <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>, 'Conecta el buzón de tu negocio para que la IA conteste los correos.', 'bg-sky-600 shadow-sky-200')}
+
+      {correoAbierto && (
+        <ConectarCorreo
+          canal={correoAbierto.canal}
+          onCerrar={() => setCorreoAbierto(null)}
+          onConectado={() => { setCorreoAbierto(null); cargar() }}
+        />
+      )}
 
       {/* POPUP conectar canal */}
       {isModalOpen && (

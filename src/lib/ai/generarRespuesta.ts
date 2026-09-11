@@ -157,7 +157,11 @@ export async function generarRespuesta(conv: any) {
     : { data: null }
 
   // 4. Preparar Prompt del Sistema
+  // Un correo se escribe distinto que un chat (ver estilo-email.ts)
+  const esCorreo = conv.canal === 'email'
+  const { instruccionesEmail, correoParaIA, limpiarRespuestaEmail } = await import('@/lib/ai/estilo-email')
   let systemPrompt = `Eres el asistente virtual del negocio.\n`
+  if (esCorreo) systemPrompt += instruccionesEmail()
   if (profile) {
     if (profile.tono) {
       systemPrompt += `Tono: ${profile.tono}\n`
@@ -230,7 +234,7 @@ export async function generarRespuesta(conv: any) {
     // tenemos patio") en vez de mirar la norma del negocio
     systemPrompt += `- Antes de responder sobre condiciones o sobre qué se permite (devoluciones, envíos, reservas, pagos, mascotas, normas del local...), consulta SIEMPRE las políticas con consultar_politicas. No supongas nada.\n`
   }
-  systemPrompt += `- Eres un asistente, responde de manera concisa y natural.\n`
+  if (!esCorreo) systemPrompt += `- Eres un asistente, responde de manera concisa y natural.\n`
   if (activeSkills.has('presupuestos')) {
     // Los totales los calcula la herramienta con los precios reales: el
     // modelo se equivoca haciendo cuentas
@@ -371,7 +375,7 @@ export async function generarRespuesta(conv: any) {
         content: `[El cliente ha enviado un archivo adjunto de tipo ${m.media_tipo} que no puedes abrir ni leer. Dile que lo has recibido pero que no puedes procesarlo, y deriva el caso a una persona.]${m.contenido ? ` Texto que lo acompaña: ${m.contenido}` : ''}`
       })
     } else {
-      openAiMessages.push({ role, content: m.contenido || '' })
+      openAiMessages.push({ role, content: esCorreo && role === 'user' ? correoParaIA(m.asunto, m.contenido || '') : (m.contenido || '') })
     }
   }
 
@@ -1034,6 +1038,8 @@ export async function generarRespuesta(conv: any) {
     })
     return { success: true, reason: 'Humano_Tomo_El_Control' }
   }
+
+  if (esCorreo) finalContent = limpiarRespuestaEmail(finalContent) || finalContent
 
   const { data: newMsg, error: errorMsg } = await supabaseAdmin.from('messages').insert({
     tenant_id: tenantId,

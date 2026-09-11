@@ -110,19 +110,54 @@ Meta.
 - **Pruebas**: `probar-plantillas` (30 comprobaciones) contra el Meta
   simulado, más un recorrido en navegador (`captura-plantillas`).
 
-## Canal de email (pendiente de construir, antes de Shopify)
-Mismo motor de IA y mismas herramientas que WhatsApp/Instagram, pero
-lógica de conversación distinta:
-- Sin ventana de 24h
-- Hilos con asunto, no mensajes en tiempo real — pueden tardar
-  horas/días
-- Necesita proveedor de correo entrante (Resend, ya usado para
-  transaccionales, o Postmark/SendGrid) que convierta el email en
-  webhook — jugando el mismo papel que n8n hace para WhatsApp
-- `channels.tipo` ya es un enum preparado para añadir este valor sin
-  cambios grandes de esquema
-- `conversations`/`messages` ya son genéricos por canal, no atados a
-  WhatsApp
+## Canal de email (hecho el 11-09-2026)
+Decidido con Jorge: **opción A**, el negocio conecta **su propio buzón**
+(IMAP para leer, SMTP para enviar) y la IA contesta desde su dirección. Se
+eligió frente a un proveedor de correo entrante (reenvío a una dirección de
+Respondi) porque no hay que tocar DNS ni reenvíos: pone su correo y una
+contraseña y listo. Leer y enviar son piezas separadas en
+`src/lib/canales/correo.ts`, así que otra forma de recibir o enviar se añade
+sin tocar el resto.
+- **Conectar** (Canales → tarjeta Email → `ConectarCorreo.tsx`, acción
+  `conectarCorreo`): dirección, proveedor y contraseña. El proveedor se
+  detecta solo por la dirección (`detectarProveedorCorreo`: dominios
+  conocidos y, si no, a qué servidores le llega el correo a ese dominio) y
+  rellena los servidores (`src/lib/canales/proveedores-correo.ts`: Gmail/
+  Workspace, IONOS, Hostinger, OVHcloud, Zoho —con su región—, Yahoo,
+  iCloud u "Otro" a mano). Antes de guardar se entra en el buzón y en el
+  servidor de salida; la contraseña va a la caja fuerte (Vault) y la
+  pantalla nunca la recibe. Nombre del remitente y firma, opcionales.
+  "Cambiar datos" sin escribir la contraseña mantiene la guardada.
+- **Gmail, Yahoo e iCloud** piden una *contraseña de aplicación* (no la
+  normal); la ventana lo explica con el enlace.
+- **Outlook / Hotmail / Microsoft 365 no se pueden conectar todavía**:
+  Microsoft ya no deja entrar en el buzón con contraseña (exige su inicio de
+  sesión OAuth). Se detecta y se explica; queda en pendientes.
+- **Leer**: cron `revisar-correos` cada minuto (pg_cron →
+  `/api/cron/revisar-correos`, solo si hay algún buzón activo). Lee la
+  bandeja de entrada desde el momento de conectar (nunca lo antiguo), hasta
+  20 correos por pasada. Se saltan respuestas automáticas, rebotes,
+  boletines y listas, y lo que manda el propio buzón. Del texto se quita lo
+  citado del correo anterior. Lo leído se apunta con
+  `guardar_lectura_correo`, que solo toca eso (antes se guardaba la
+  configuración entera y podía pisar una firma recién cambiada).
+- **Contestar**: la IA usa el mismo motor y herramientas, con otra forma de
+  escribir (`src/lib/ai/estilo-email.ts`): saludo con el nombre, párrafos,
+  despedida, sin formato de chat y sin firmar (la firma se añade sola). La
+  respuesta —de la IA o de un agente desde Chats— sale "Re: asunto" dentro
+  del mismo hilo (In-Reply-To/References) y se deja copia en Enviados
+  (Gmail lo hace solo). En Chats se ve el asunto de cada correo.
+- **Sin ventana de 24 h**: en correo se puede contestar cuando sea.
+- **Errores**: si el proveedor rechaza la contraseña, el canal pasa a
+  "error" con el motivo en su tarjeta; un fallo pasajero solo se apunta y se
+  reintenta al minuto. Al conectar, el canal no pasa a activo hasta tener la
+  contraseña guardada (si no, la revisión de ese minuto lo marcaba con
+  error: pasó en las pruebas).
+- **Recomendación a los clientes**: un buzón de atención al cliente
+  (info@, hola@…), no uno personal, porque la IA contesta todo lo que llega.
+- **Pruebas**: `probar-correo` (29 comprobaciones) con un buzón de pruebas
+  real de Ethereal (IMAP/SMTP que no entregan a nadie), y `captura-correo`
+  en navegador (ventana, detección de Gmail, aviso de Hotmail, Chats, móvil).
 
 ## Investigación de competidores (v2)
 Analizados Neople.io, Aurora Inbox y Chatwoot (sugerido por Andreina)

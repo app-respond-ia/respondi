@@ -12,6 +12,7 @@ const CANAL_COLORS: Record<string, string> = {
   whatsapp: 'bg-emerald-500',
   instagram: 'bg-purple-500',
   facebook: 'bg-blue-500',
+  email: 'bg-sky-500',
   desconocido: 'bg-slate-400'
 }
 

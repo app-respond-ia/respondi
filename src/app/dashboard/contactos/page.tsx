@@ -31,6 +31,15 @@ const CANAL_CONFIG = {
       </svg>
     ),
   },
+  email: {
+    label: 'Email',
+    iconBg: 'bg-sky-500',
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+      </svg>
+    ),
+  },
   facebook: {
     label: 'Facebook',
     iconBg: 'bg-blue-600',
@@ -445,6 +454,7 @@ export default function ContactosPage() {
                       <option value="whatsapp">WhatsApp</option>
                       <option value="instagram">Instagram</option>
                       <option value="facebook">Facebook</option>
+                      <option value="email">Email</option>
                     </select>
                   </div>
 
@@ -484,10 +494,10 @@ export default function ContactosPage() {
                           className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm disabled:bg-slate-50 disabled:opacity-75" />
                       </div>
                     ) : (
-                      <input type="text" placeholder="Ej. @usuario" required
+                      <input type={modalFormData.canal === 'email' ? 'email' : 'text'} placeholder={modalFormData.canal === 'email' ? 'Ej. cliente@correo.com' : 'Ej. @usuario'} required
                         disabled={!!modalFormData.id}
                         value={modalFormData.identificador_canal}
-                        onChange={e => setModalFormData({...modalFormData, identificador_canal: e.target.value.replace(/[^a-zA-Z0-9._@]/g, '')})}
+                        onChange={e => setModalFormData({...modalFormData, identificador_canal: e.target.value.replace(modalFormData.canal === 'email' ? /[^a-zA-Z0-9._@+\-]/g : /[^a-zA-Z0-9._@]/g, '')})}
                         className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm disabled:bg-slate-50 disabled:opacity-75" />
                     )}
                     {!modalFormData.id && (

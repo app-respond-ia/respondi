@@ -151,7 +151,8 @@ export default function CasoDetallePage() {
   const esCerrado = caso.estatus === 'resuelto' || caso.estatus === 'cerrado'
 
   const canalIcon = caso.contacts?.canal === 'whatsapp' ? 'text-[#25D366]' : 
-                    caso.contacts?.canal === 'instagram' ? 'text-purple-500' : 'text-[#1877F2]'
+                    caso.contacts?.canal === 'instagram' ? 'text-purple-500' :
+                    caso.contacts?.canal === 'email' ? 'text-sky-600' : 'text-[#1877F2]'
 
   return (
     // En el móvil baja la página entera: si no, el lateral (notas, actividad)

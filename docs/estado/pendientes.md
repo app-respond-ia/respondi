@@ -128,9 +128,14 @@ solo la lista viva).
       que su coste real por respuesta es peor que su precio por token
 
 ## Prioridad 3 — Cimientos antes de Shopify
-- [ ] Canal de email: mismo motor de IA, lógica de conversación
-      distinta (ver `docs/arquitectura.md`) — proveedor de correo
-      entrante, nuevo valor en `channels.tipo`, ajustes de UI en Chats
+- [x] Canal de email (11-09-2026): el negocio conecta su propio buzón
+      (IMAP/SMTP) y la IA contesta con forma de correo, en el mismo hilo.
+      Detalle en `docs/estado/canales-mensajeria.md`
+- [ ] Email con Outlook / Microsoft 365: necesita el inicio de sesión de
+      Microsoft (OAuth, registrar una app en Azure). Hoy se avisa de que no
+      se puede
+- [ ] Email: leer los adjuntos más allá del primero (hoy se guarda el
+      primero y se avisa de cuántos más hay)
 
 ## Prioridad 4 — Shopify Fase 1
 - [ ] Conexión real con la API de Shopify (catálogo/stock/pedidos)

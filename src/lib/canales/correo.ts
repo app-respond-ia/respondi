@@ -150,7 +150,8 @@ function esAutomatico(p: any, propia: string) {
   if (/mailer-daemon|postmaster|no-?reply|donotreply|do-not-reply|bounce/i.test(de)) return true
   const auto = cab('auto-submitted')
   if (auto && auto !== 'no') return true
-  if (h?.has('x-autoreply') || h?.has('x-autorespond') || h?.has('list-unsubscribe') || h?.has('list-id')) return true
+  // Las cabeceras List-* (boletines y listas) las junta la librería en "list"
+  if (h?.has('x-autoreply') || h?.has('x-autorespond') || h?.has('list') || h?.has('list-unsubscribe') || h?.has('list-id')) return true
   if (/^(bulk|junk|list|auto_reply)$/.test(cab('precedence'))) return true
   return false
 }

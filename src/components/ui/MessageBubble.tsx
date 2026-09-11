@@ -48,6 +48,7 @@ export function MessageBubble({ msg, contactName, channelId }: MessageBubbleProp
         </div>
         <div className="max-w-[75%]">
           <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-sm px-4 py-2.5">
+            {msg.asunto && <p className="text-xs font-600 text-ink-700 mb-1 break-words">Asunto: {msg.asunto}</p>}
             <p className="text-sm text-ink-900 whitespace-pre-wrap break-words">{msg.contenido}</p>
           </div>
           <p className="text-[11px] text-ink-400 mt-1 ml-1">{formatTime(msg.timestamp)}</p>
@@ -62,6 +63,7 @@ export function MessageBubble({ msg, contactName, channelId }: MessageBubbleProp
       <div className="flex gap-2.5 justify-end">
         <div className="max-w-[75%]">
           <div className={`${bgClass} rounded-2xl rounded-tr-sm px-4 py-2.5`}>
+            {msg.asunto && <p className="text-xs font-600 opacity-80 mb-1 break-words">Asunto: {msg.asunto}</p>}
             <p className="text-sm whitespace-pre-wrap break-words">{msg.contenido}</p>
           </div>
           <div className="flex items-center justify-end gap-1.5 mt-1 mr-1">

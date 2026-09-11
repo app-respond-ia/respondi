@@ -2,7 +2,7 @@
 
 ## Qué es Respondi
 SaaS multi-tenant de atención al cliente y ventas por IA (WhatsApp, Instagram,
-Facebook). El público son equipos comerciales/de atención al cliente de
+Facebook y email). El público son equipos comerciales/de atención al cliente de
 cualquier tipo de negocio, no solo negocios pequeños tipo restaurantes.
 
 Socios al 50/50: Atsura (Andreina — diseño/comercial) y Propulse System LLC
@@ -15,7 +15,8 @@ Socios al 50/50: Atsura (Andreina — diseño/comercial) y Propulse System LLC
   corren en Dublín (`dub1`, en `vercel.json`), junto a la base de datos
   (Supabase `eu-west-1`, Irlanda): no cambiar una sin la otra
 - Sin n8n (decidido el 11-09-2026): la app recibe y envía los mensajes
-  directamente con cada proveedor (Meta Cloud API y Whaticket)
+  directamente con cada proveedor (Meta Cloud API y Whaticket; el correo,
+  con el propio buzón del negocio por IMAP/SMTP)
 - Repo: `app-respond-ia/respondi`
 
 ## Reglas de oro (nunca las rompas sin preguntar primero)

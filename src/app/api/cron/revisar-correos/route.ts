@@ -5,6 +5,11 @@ import { registrarError } from '@/lib/errores'
 import { registrarMensajeEntrante } from '@/lib/canales/entrada'
 import { leerCorreosNuevos, leerContrasenaCorreo, ErrorCorreo, type ConfigCorreo } from '@/lib/canales/correo'
 
+async function guardarLectura(channelId: string, direccion: string, lectura: { uidvalidity: string; ultimo_uid: number }) {
+  const { error } = await supabaseAdmin.rpc('guardar_lectura_correo', { p_channel_id: channelId, p_direccion: direccion, p_lectura: lectura })
+  if (error) throw new Error(`No se pudo apuntar lo leído: ${error.message}`)
+}
+
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
@@ -46,7 +51,8 @@ export async function POST(req: Request) {
           const r = await registrarMensajeEntrante({
             canal: { id: canal.id, tenant_id: canal.tenant_id, branch_id: canal.branch_id, tipo: 'email' },
             contactoExterno: c.de.direccion,
-            nombreContacto: c.de.nombre,
+            // Sin nombre en el correo, la dirección (mejor que "Desconocido")
+            nombreContacto: c.de.nombre || c.de.direccion,
             mensajeExterno: c.messageId || `uid-${lectura.uidvalidity}-${c.uid}@${canal.id}`,
             contenido: [c.texto, otros.length ? `[El cliente ha adjuntado ${otros.length} archivo(s) más]` : ''].filter(Boolean).join('\n\n') || '(correo sin texto)',
             archivo: adjunto ? { datos: adjunto.datos, tipo: adjunto.tipo, nombre: adjunto.nombre } : null,
@@ -57,10 +63,12 @@ export async function POST(req: Request) {
           if (!r.duplicado) metidos++
         }
         // Hasta aquí leído: si algo falla después, este no se vuelve a meter
-        await supabaseAdmin.from('channels').update({ configuracion: { ...config, lectura: { uidvalidity: lectura.uidvalidity, ultimo_uid: c.uid } } }).eq('id', canal.id)
+        await guardarLectura(canal.id, config.direccion, { uidvalidity: lectura.uidvalidity, ultimo_uid: c.uid })
       }
+      // Solo lo leído: si el cliente ha cambiado su firma o sus servidores
+      // mientras tanto, no se pisa
+      await guardarLectura(canal.id, config.direccion, lectura)
       await supabaseAdmin.from('channels').update({
-        configuracion: { ...config, lectura },
         ultima_actividad: new Date().toISOString(),
         ultimo_error: null
       }).eq('id', canal.id)

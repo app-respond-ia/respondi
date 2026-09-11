@@ -106,6 +106,7 @@ export default function DashboardPage() {
             <option value="instagram">Instagram</option>
             <option value="whatsapp">WhatsApp</option>
             <option value="facebook">Facebook</option>
+            <option value="email">Email</option>
           </select>
           <div className="inline-flex p-1 rounded-xl bg-white border border-slate-200">
             {(['hoy', 'semana', 'mes'] as const).map(p => (

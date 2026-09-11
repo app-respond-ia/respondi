@@ -77,11 +77,14 @@ sucursal no se comparten con las demás.
   canal para los avisos, firma comprobada, estados de envío y reintentos.
   **Whaticket queda en espera**: su API documentada solo envía, no avisa
   de los mensajes que entran.
-- Canal de **email** (pendiente de construir, antes de Shopify): mismo
-  motor de IA y mismas herramientas que WhatsApp, pero lógica de
-  conversación distinta — sin ventana de 24h, hilos con asunto en vez
-  de mensajes en tiempo real, proveedor de correo entrante que avise a la
-  app. `channels.tipo` ya está preparado como enum para añadir este valor.
+- Canal de **email** (hecho el 11-09-2026, opción A elegida por Jorge): el
+  negocio conecta su propio buzón (IMAP para leer cada minuto, SMTP para
+  enviar) y la IA contesta desde su dirección. Mismo motor y herramientas
+  que WhatsApp; cambia la forma de escribir (saludo, párrafos, despedida) y
+  la respuesta va dentro del hilo del cliente. Sin ventana de 24 h. Leer y
+  enviar están separados para poder cambiar a otra forma (reenvío a
+  Respondi, proveedor de envío) sin rehacerlo. Outlook/Microsoft 365, más
+  adelante (exigen OAuth). Detalle en `docs/estado/canales-mensajeria.md`.
 - **Ventana de 24 h de WhatsApp**: pasadas 24 h desde el último mensaje del
   cliente, Chats solo deja escribirle con una plantilla aprobada por Meta.
   Las plantillas se crean en Respondi y se mandan a Meta a revisar, o se

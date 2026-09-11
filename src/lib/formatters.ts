@@ -1,6 +1,10 @@
 export function formatChannelId(canal: string, identificador: string): string {
   let cleaned = identificador.trim()
   
+  if (canal === 'email') {
+    // Las direcciones de correo, siempre en minúsculas y sin espacios
+    return cleaned.replace(/\s+/g, '').toLowerCase()
+  }
   if (canal === 'whatsapp') {
     // Remove all non-digit and non-plus characters
     cleaned = cleaned.replace(/[^\d+]/g, '')

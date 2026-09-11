@@ -10,6 +10,9 @@ import { supabaseAdmin } from '@/utils/supabase/admin'
 import { sinPermiso } from '@/lib/permisos-servidor'
 import { comprobarNumero, numeroEsDeLaCuenta, guardarCredencialesMeta, caducidadDelToken, ErrorMeta } from '@/lib/canales/meta'
 import { sincronizarPlantillas } from '@/lib/canales/plantillas'
+import { comprobarCorreo, guardarContrasenaCorreo, leerContrasenaCorreo, ErrorCorreo, type ConfigCorreo } from '@/lib/canales/correo'
+import { proveedorCorreo, esServidorMicrosoft, esDireccionMicrosoft, AVISO_MICROSOFT } from '@/lib/canales/proveedores-correo'
+import { promises as dns } from 'dns'
 import { after } from 'next/server'
 
 // Dirección a la que Meta avisa de los mensajes de un canal
@@ -51,7 +54,7 @@ export async function getCanales() {
 
   const { data: filas, error } = await supabase
     .from('channels')
-    .select('id, tipo, metodo, estado, identificador_externo, calidad_mensajeria, calidad_actualizada_en, fecha_conexion, ultima_actividad, verify_token, meta_phone_number_id, meta_waba_id, token_caduca_en, numero_visible, nombre_verificado, ultimo_error')
+    .select('id, tipo, metodo, estado, identificador_externo, calidad_mensajeria, calidad_actualizada_en, fecha_conexion, ultima_actividad, verify_token, meta_phone_number_id, meta_waba_id, token_caduca_en, numero_visible, nombre_verificado, ultimo_error, configuracion')
     .eq('branch_id', auth.branch_id)
     .order('created_at', { ascending: true })
 
@@ -59,10 +62,16 @@ export async function getCanales() {
 
   // Los datos que el cliente tiene que pegar en su app de Meta para que avise
   // a Respondi de los mensajes (las claves nunca salen de la caja fuerte)
-  const canales = (filas || []).map((c: any) => ({
-    ...c,
-    webhook_url: c.metodo === 'meta_oficial' ? urlDelAviso(c.id) : null
-  }))
+  const canales = (filas || []).map((c: any) => {
+    // Del correo, solo los ajustes que se pueden cambiar (servidores, nombre,
+    // firma): hasta dónde se ha leído el buzón no le importa a la pantalla
+    const { lectura, ...configuracion } = c.configuracion || {}
+    return {
+      ...c,
+      configuracion: c.configuracion ? configuracion : null,
+      webhook_url: c.metodo === 'meta_oficial' ? urlDelAviso(c.id) : null
+    }
+  })
 
   const { data: organizacion } = await supabase
     .from('organizaciones')
@@ -325,4 +334,183 @@ export async function conectarWhatsAppMeta(datos: { phoneNumberId: string; acces
       verify_token: canal.verify_token
     }
   }
+}
+
+// ---------- Correo ----------
+
+// Adivina el proveedor por la dirección (a qué servidores le llega el correo
+// a ese dominio), para que el cliente no tenga que saberlo
+export async function detectarProveedorCorreo(direccion: string): Promise<{ proveedor: string | null; microsoft?: boolean; imap?: any; smtp?: any }> {
+  const dominio = (direccion || '').trim().toLowerCase().split('@')[1]
+  if (!dominio || !/^[a-z0-9.-]+\.[a-z]{2,}$/.test(dominio)) return { proveedor: null }
+  if (esDireccionMicrosoft(direccion)) return { proveedor: null, microsoft: true }
+  if (['gmail.com', 'googlemail.com'].includes(dominio)) return { proveedor: 'gmail' }
+  if (/^(yahoo|ymail)\./.test(dominio)) return { proveedor: 'yahoo' }
+  if (['icloud.com', 'me.com', 'mac.com'].includes(dominio)) return { proveedor: 'icloud' }
+  let mx: string[] = []
+  try {
+    mx = (await Promise.race([
+      dns.resolveMx(dominio),
+      new Promise<never>((_, no) => setTimeout(() => no(new Error('tiempo')), 4000))
+    ])).map(r => r.exchange.toLowerCase())
+  } catch {
+    return { proveedor: null }
+  }
+  const hay = (re: RegExp) => mx.some(m => re.test(m))
+  if (hay(/(google|googlemail)\.com$/)) return { proveedor: 'gmail' }
+  if (hay(/outlook\.com$/)) return { proveedor: null, microsoft: true }
+  if (hay(/(ionos\.[a-z]+|kundenserver\.de|1and1\.[a-z]+)$/)) return { proveedor: 'ionos' }
+  if (hay(/hostinger\.[a-z]+$/)) return { proveedor: 'hostinger' }
+  if (hay(/ovh\.net$/)) return { proveedor: 'ovh' }
+  if (hay(/zoho\.[a-z]+$/)) {
+    // Zoho tiene servidores por región (el de Europa es el que viene puesto)
+    const region = mx.find(m => /zoho\.[a-z]+$/.test(m))!.split('.').pop()
+    return region === 'eu' ? { proveedor: 'zoho' } : {
+      proveedor: 'zoho',
+      imap: { host: `imappro.zoho.${region}`, puerto: 993, seguro: true },
+      smtp: { host: `smtppro.zoho.${region}`, puerto: 465, seguro: true }
+    }
+  }
+  if (hay(/yahoodns\.net$/)) return { proveedor: 'yahoo' }
+  if (hay(/icloud\.com$/)) return { proveedor: 'icloud' }
+  return { proveedor: null }
+}
+
+const DIRECCION_VALIDA = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
+const SERVIDOR_VALIDO = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i
+
+function servidorDe(s: any): { host: string; puerto: number; seguro: boolean } | null {
+  const host = String(s?.host || '').trim().toLowerCase()
+  const puerto = Number(s?.puerto)
+  if (!SERVIDOR_VALIDO.test(host) || !Number.isInteger(puerto) || puerto < 1 || puerto > 65535) return null
+  return { host, puerto, seguro: !!s?.seguro }
+}
+
+// Conectar el buzón de correo del negocio (opción A: su propio buzón). Se
+// entra en él con esos datos ANTES de guardarlos; la contraseña va a la caja
+// fuerte. Desde ese momento, la IA contesta los correos que lleguen (no los
+// antiguos). Sirve también para cambiar los datos de uno ya conectado: si la
+// contraseña se deja vacía, se mantiene la que había.
+export async function conectarCorreo(datos: {
+  direccion: string
+  contrasena?: string
+  proveedor?: string
+  usuario?: string
+  imap?: { host: string; puerto: number; seguro: boolean }
+  smtp?: { host: string; puerto: number; seguro: boolean }
+  nombreRemitente?: string
+  firma?: string
+}) {
+  const denegado = await sinPermiso('canales')
+  if (denegado) return { success: false, error: denegado }
+
+  const supabase = await createClient()
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+
+  const direccion = (datos.direccion || '').trim().toLowerCase()
+  if (!DIRECCION_VALIDA.test(direccion)) return { success: false, error: 'Escribe la dirección de correo completa (por ejemplo, hola@tunegocio.com).' }
+
+  // Los servidores: los del proveedor elegido, o los que haya escrito
+  const base = datos.proveedor && datos.proveedor !== 'otro' ? proveedorCorreo(datos.proveedor) : null
+  const imap = servidorDe(datos.imap || base?.imap)
+  const smtp = servidorDe(datos.smtp || base?.smtp)
+  if (!imap) return { success: false, error: 'Falta el servidor de entrada (IMAP) o su puerto no es válido.' }
+  if (!smtp) return { success: false, error: 'Falta el servidor de salida (SMTP) o su puerto no es válido.' }
+  if (esDireccionMicrosoft(direccion) || esServidorMicrosoft(imap.host) || esServidorMicrosoft(smtp.host)) {
+    return { success: false, error: AVISO_MICROSOFT }
+  }
+  const usuario = (datos.usuario || '').trim() || direccion
+  const nombreRemitente = (datos.nombreRemitente || '').trim().slice(0, 80) || null
+  const firma = (datos.firma || '').trim().slice(0, 1000) || null
+
+  const sinHueco = await fueraDelPlan(auth.tenant_id!, auth.branch_id!, 'email')
+  if (sinHueco) return { success: false, error: sinHueco }
+
+  // Un buzón solo puede estar conectado a un canal (en toda Respondi): si no,
+  // dos sucursales contestarían el mismo correo
+  const { data: usados } = await supabaseAdmin
+    .from('channels')
+    .select('tenant_id, branch_id')
+    .eq('tipo', 'email')
+    .eq('identificador_externo', direccion)
+    .neq('estado', 'desconectado')
+  if ((usados || []).some((u: any) => u.tenant_id !== auth.tenant_id || u.branch_id !== auth.branch_id)) {
+    return { success: false, error: 'Este correo ya está conectado en otra sucursal u organización.' }
+  }
+
+  const { data: existente } = await supabase
+    .from('channels')
+    .select('id, estado, configuracion, fecha_conexion')
+    .eq('tenant_id', auth.tenant_id)
+    .eq('branch_id', auth.branch_id)
+    .eq('tipo', 'email')
+    .maybeSingle()
+
+  // Sin contraseña nueva, la guardada (solo si es el mismo buzón)
+  const anterior = (existente?.configuracion || null) as ConfigCorreo | null
+  const mismoBuzon = !!anterior && existente?.estado !== 'desconectado' && anterior.direccion === direccion && anterior.imap?.host === imap.host
+  let contrasena = datos.contrasena || ''
+  if (!contrasena && mismoBuzon && existente) contrasena = (await leerContrasenaCorreo(existente.id)) || ''
+  if (!contrasena) return { success: false, error: 'Escribe la contraseña del buzón.' }
+
+  const config: ConfigCorreo = { imap, smtp, usuario, direccion, nombre_remitente: nombreRemitente, firma, lectura: null }
+
+  // 1. ¿Funcionan? Se entra en el buzón y en el servidor de salida
+  let lectura
+  try {
+    lectura = await comprobarCorreo(config, contrasena)
+  } catch (e: any) {
+    return { success: false, error: e instanceof ErrorCorreo ? e.message : 'No se ha podido comprobar el buzón. Revisa los datos.' }
+  }
+  // Si es el mismo buzón que ya se leía, se sigue por donde iba (así no se
+  // pierde ningún correo que haya llegado mientras se cambiaban los datos)
+  if (mismoBuzon && anterior?.lectura && anterior.lectura.uidvalidity === lectura.uidvalidity) lectura = anterior.lectura
+
+  // 2. El canal de correo de esta sucursal (se crea o se actualiza). Si no
+  //    estaba funcionando, se queda "pendiente" hasta tener la contraseña
+  //    guardada: si no, la revisión de cada minuto podría encontrarlo activo y
+  //    sin contraseña y marcarlo con error nada más conectarlo
+  const yaFuncionaba = existente?.estado === 'activo' && mismoBuzon
+  const { data: canal, error } = await supabase
+    .from('channels')
+    .upsert({
+      tenant_id: auth.tenant_id,
+      branch_id: auth.branch_id,
+      tipo: 'email',
+      metodo: 'imap_smtp',
+      estado: yaFuncionaba ? 'activo' : 'pendiente',
+      identificador_externo: direccion,
+      configuracion: { ...config, lectura },
+      fecha_conexion: existente?.estado === 'activo' && existente.fecha_conexion ? existente.fecha_conexion : new Date().toISOString(),
+      ultimo_error: null
+    }, { onConflict: 'tenant_id, branch_id, tipo' })
+    .select('id, estado, identificador_externo')
+    .single()
+  if (error || !canal) return { success: false, error: error?.message || 'No se ha podido guardar el canal.' }
+
+  // 3. La contraseña, a la caja fuerte, y entonces sí: activo
+  try {
+    await guardarContrasenaCorreo(canal.id, contrasena)
+  } catch (e: any) {
+    await supabaseAdmin.from('channels').update({ estado: 'error', ultimo_error: 'No se ha podido guardar la contraseña. Vuelve a conectar el correo.' }).eq('id', canal.id)
+    return { success: false, error: `No se ha podido guardar la contraseña: ${e?.message}` }
+  }
+  if (!yaFuncionaba) {
+    const { error: errActivar } = await supabase.from('channels').update({ estado: 'activo' }).eq('id', canal.id)
+    if (errActivar) return { success: false, error: errActivar.message }
+  }
+
+  await registrarAuditoria({
+    tenant_id: auth.tenant_id,
+    user_id: auth.user_id,
+    accion: existente && existente.estado !== 'desconectado' ? `cambió los datos del correo ${direccion}` : `conectó el correo ${direccion}`,
+    tabla_afectada: 'canales',
+    registro_id: canal.id,
+    // Nunca la contraseña
+    valor_anterior: anterior ? { direccion: anterior.direccion, imap: anterior.imap?.host, smtp: anterior.smtp?.host } : null,
+    valor_nuevo: { direccion, imap: imap.host, smtp: smtp.host, nombre_remitente: nombreRemitente }
+  })
+
+  return { success: true, data: { id: canal.id, direccion } }
 }

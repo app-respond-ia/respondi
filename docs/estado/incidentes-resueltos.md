@@ -4,6 +4,35 @@ Bugs reales que ya ocurrieron en producción, con su causa raíz.
 Antes de tocar algo parecido, lee esto — muchos son "familia de bug
 repetible" si no se tiene cuidado.
 
+## Registrarse no funcionaba desde el 10-09-2026 (12-09-2026)
+Al poner los créditos de la prueba en 500 se probó crear una cuenta nueva y
+saltó: `column "estado" is of type estado_organizacion but expression is of
+type text`. La función `crear_cuenta_completa` ponía el estado con
+`CASE WHEN v_es_trial THEN 'trial' ELSE 'activo' END`: cuando las dos ramas de
+un CASE son literales sin tipo, Postgres decide que el resultado es **texto**,
+y esa columna es un enum. Estaba así desde la migración `20260910240000`, y la
+última organización creada es de ese mismo día: **nadie podía registrarse
+desde entonces** y no lo sabíamos, porque las pruebas de invitación no pasan
+por esa función (un invitado entra en una organización que ya existe).
+
+Arreglado con el tipo explícito (`'trial'::estado_organizacion`) y verificado
+en producción con un navegador de verdad: alta → asistente → cuenta con sus
+500 créditos (`probar-alta-web`, 4 comprobaciones; `probar-alta-creditos`
+para los créditos de cada plan).
+
+De paso, otro fallo de la misma función: una cuenta creada directamente en un
+plan de pago se quedaba con 100 créditos, porque leía siempre
+`creditos_diarios_trial` (solo tiene valor en el plan de prueba). Ahora cada
+plan da los suyos.
+
+**Reglas que deja**:
+- En un `CASE` que devuelve literales para una columna con tipo propio (enum),
+  hay que decir el tipo: `'valor'::mi_enum`.
+- Las pruebas de alta tienen que crear una cuenta **de cero** por la web; las
+  de invitación no cubren ese camino.
+- Supabase limita las altas por hora desde la misma IP: dos altas seguidas en
+  una prueba pueden fallar sin que haya nada roto.
+
 ## Supabase devuelve 504 de vez en cuando (12-09-2026)
 Probando el correo en producción, un buzón recién conectado quedó marcado con
 error: "no tiene la contraseña guardada". La contraseña sí estaba. En los logs

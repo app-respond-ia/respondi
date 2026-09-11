@@ -38,6 +38,17 @@ recarga manual (cantidad libre, positiva o negativa, motivo
 obligatorio). **Verificado end-to-end en producción** (abono +5000,
 débito -200, incluyendo `audit_log` correcto).
 
+## Créditos de la prueba (12-09-2026)
+500 al abrir la cuenta, **una sola vez** (no es una recarga diaria, aunque la
+columna se llame `plans.creditos_diarios_trial`; decisión de Jorge). Coste
+real medido: una respuesta con `gpt-4.1-nano` gasta ~1.500 tokens de entrada y
+~50 de salida, es decir 0,0002 $; una cuenta de prueba que gaste los 500
+créditos cuesta unos 8 céntimos. Se cambia en Superadmin → Planes →
+«Créditos de la prueba».
+
+Cada plan da los suyos al crear la cuenta: la prueba, los de la prueba; los de
+pago, sus `creditos_mensuales`.
+
 ## Pieza B — Stripe, suscripción mensual (en curso)
 Avanzado lo que no depende de las claves: migraciones
 `organizaciones.stripe_customer_id`, `organizaciones.stripe_subscription_id`,

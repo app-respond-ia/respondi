@@ -127,11 +127,11 @@ solo la lista viva).
       consumieron el doble de tokens de entrada para la misma pregunta, así
       que su coste real por respuesta es peor que su precio por token
 
-## Preguntas para Jorge
-- [ ] Créditos de la prueba: hoy se dan **una sola vez** al abrir la cuenta,
-      aunque la columna se llame `creditos_diarios_trial`. ¿Se quedan así o
-      pasan a recargarse cada día durante la prueba? (Ya se pueden cambiar
-      desde Superadmin → Planes → «Créditos de la prueba».)
+## Decidido
+- [x] Créditos de la prueba (12-09-2026): **500, una sola vez** al abrir la
+      cuenta, no recarga diaria (Jorge). Cuestan unos 8 céntimos por cuenta.
+      Por el camino salió que registrarse estaba roto desde el 10-09, ver
+      `incidentes-resueltos.md`
 
 ## Prioridad 3 — Cimientos antes de Shopify
 - [x] Canal de email (11-09-2026): el negocio conecta su propio buzón

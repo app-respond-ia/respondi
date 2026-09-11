@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { getAuthContext } from '@/lib/auth-context'
 import { enviarMensajeSaliente } from '@/lib/canales/salida'
+import { supabaseAdmin } from '@/utils/supabase/admin'
 
 export async function getConversaciones(filtros?: { estado?: string, canal?: string, search?: string, iaPausada?: boolean, dateRange?: { from: string, to: string }, sort?: 'asc' | 'desc' }) {
   const supabase = await createClient()
@@ -145,7 +146,7 @@ type ResultadoEscribir =
   | { success: true; iaPausadaAhora: boolean; envio: string; errorEnvio: string | null; error?: undefined }
   | { success: false; error: string; iaPausadaAhora?: undefined; envio?: undefined; errorEnvio?: undefined }
 
-async function escribirComoAgente(convId: string, mensaje: { contenido: string; plantilla?: { nombre: string; idioma: string; parametros: string[] } }): Promise<ResultadoEscribir> {
+async function escribirComoAgente(convId: string, mensaje: { contenido: string; plantilla?: any; archivo?: { ruta: string; tipo: string } | null }): Promise<ResultadoEscribir> {
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: String(auth.error) }
@@ -172,7 +173,10 @@ async function escribirComoAgente(convId: string, mensaje: { contenido: string; 
       contenido: mensaje.contenido,
       agente_id: auth.user_id,
       agrupado: true,
-      ...(mensaje.plantilla ? { plantilla: mensaje.plantilla } : {})
+      ...(mensaje.plantilla ? { plantilla: mensaje.plantilla } : {}),
+      // La foto, el vídeo o el documento que lleva la plantilla, para poder
+      // verlo también en Chats
+      ...(mensaje.archivo ? { media_url: mensaje.archivo.ruta, media_tipo: mensaje.archivo.tipo } : {})
     })
     .select('id')
     .single()
@@ -231,7 +235,40 @@ export async function enviarMensajeAgenteConv(convId: string, contenido: string)
 // Pasadas 24 h desde el último mensaje del cliente, WhatsApp solo deja
 // escribirle con una plantilla aprobada. Se guarda con el texto ya rellenado
 // (es lo que se ve en Chats) y sale hacia Meta como plantilla.
-export async function enviarPlantillaConv(convId: string, plantillaId: string, valores: string[]): Promise<ResultadoEscribir> {
+export interface ExtrasPlantilla {
+  // Hueco de la cabecera de texto
+  cabecera?: string[]
+  // Archivo ya subido con `subirArchivoDePlantilla`
+  archivo?: { ruta: string; tipo: string; nombre: string } | null
+  // Valor de cada botón que lo pide, por su posición
+  botones?: { indice: number; tipo: 'url' | 'copy_code'; valor: string }[]
+}
+
+// Sube la foto, el vídeo o el documento que lleva la cabecera de una plantilla
+// al almacén privado. Se manda a Meta en el momento de enviar el mensaje.
+export async function subirArchivoDePlantilla(datos: FormData) {
+  const supabase = await createClient()
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false as const, error: String(auth.error) }
+
+  const archivo = datos.get('archivo')
+  if (!(archivo instanceof File) || !archivo.size) return { success: false as const, error: 'Elige un archivo.' }
+  // Los límites de WhatsApp: 5 MB en fotos, 16 MB en vídeos, 100 MB en documentos
+  const maximo = archivo.type.startsWith('image/') ? 5 : archivo.type.startsWith('video/') ? 16 : 100
+  if (archivo.size > maximo * 1024 * 1024) {
+    return { success: false as const, error: `WhatsApp no admite ${archivo.type.startsWith('image/') ? 'fotos' : archivo.type.startsWith('video/') ? 'vídeos' : 'documentos'} de más de ${maximo} MB.` }
+  }
+
+  const extension = (archivo.name.includes('.') ? archivo.name.split('.').pop() : archivo.type.split('/').pop()) || 'bin'
+  const ruta = `${auth.tenant_id}/plantillas/${Date.now()}-${Math.random().toString(36).slice(2, 9)}.${extension}`
+  const { error } = await supabaseAdmin.storage
+    .from('whatsapp_media')
+    .upload(ruta, Buffer.from(await archivo.arrayBuffer()), { contentType: archivo.type || 'application/octet-stream', upsert: false })
+  if (error) return { success: false as const, error: `No se ha podido guardar el archivo: ${error.message}` }
+  return { success: true as const, archivo: { ruta, tipo: archivo.type || 'application/octet-stream', nombre: archivo.name } }
+}
+
+export async function enviarPlantillaConv(convId: string, plantillaId: string, valores: string[], extras?: ExtrasPlantilla): Promise<ResultadoEscribir> {
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: String(auth.error) }
@@ -247,7 +284,7 @@ export async function enviarPlantillaConv(convId: string, plantillaId: string, v
   if (!plantilla) return { success: false, error: 'Plantilla no encontrada en esta sucursal.' }
   if (plantilla.estado !== 'aprobada') return { success: false, error: 'Esa plantilla no está aprobada por Meta, así que no se puede enviar.' }
 
-  const { analizarComponentes, rellenar } = await import('@/lib/canales/plantillas-texto')
+  const { analizarComponentes, rellenar, NOMBRE_ARCHIVO_CABECERA } = await import('@/lib/canales/plantillas-texto')
   const info = analizarComponentes(plantilla.componentes as any[], plantilla.contenido)
   if (!info.enviable) return { success: false, error: `Esta plantilla no se puede enviar desde Respondi: ${info.motivoNoEnviable?.toLowerCase()}.` }
 
@@ -257,10 +294,42 @@ export async function enviarPlantillaConv(convId: string, plantillaId: string, v
     return { success: false, error: 'Los huecos no pueden llevar saltos de línea, tabuladores ni muchos espacios seguidos (WhatsApp no lo permite).' }
   }
 
-  const texto = [info.cabecera, rellenar(info.cuerpo, parametros), info.pie].filter(Boolean).join('\n\n')
+  // Cabecera: o un archivo (foto, vídeo, documento) o el hueco de su texto
+  const limpio = (v: string) => (v || '').trim()
+  let cabeceraArchivo: any = null
+  if (info.archivoCabecera) {
+    const a = extras?.archivo
+    if (!a?.ruta) return { success: false, error: `Esta plantilla lleva ${NOMBRE_ARCHIVO_CABECERA[info.archivoCabecera]} en la cabecera: adjúntalo para poder enviarla.` }
+    cabeceraArchivo = { formato: info.archivoCabecera, ruta: a.ruta, tipo: a.tipo, nombre: a.nombre }
+  }
+  const parametrosCabecera = info.huecosCabecera.map((_, i) => limpio(extras?.cabecera?.[i] || ''))
+  if (parametrosCabecera.some(v => !v)) return { success: false, error: 'Rellena el hueco de la cabecera de la plantilla.' }
+  if (parametrosCabecera.some(v => v.length > 60 || /\n|\t/.test(v))) return { success: false, error: 'El hueco de la cabecera es corto y de una sola línea (máximo 60 caracteres).' }
+
+  // Botones que piden un valor (final del enlace o código)
+  const pendientes = info.botones.filter(b => b.necesitaValor)
+  const botones = pendientes.map(b => ({
+    indice: b.indice,
+    tipo: b.necesitaValor as 'url' | 'copy_code',
+    valor: limpio((extras?.botones || []).find(x => x.indice === b.indice)?.valor || '')
+  }))
+  if (botones.some(b => !b.valor)) return { success: false, error: 'Rellena lo que piden los botones de la plantilla.' }
+  if (botones.some(b => b.valor.length > 200 || /\s/.test(b.valor))) return { success: false, error: 'Lo que va en un botón no puede llevar espacios y como mucho son 200 caracteres.' }
+
+  const cabeceraTexto = info.cabeceraTexto ? rellenar(info.cabeceraTexto, parametrosCabecera) : null
+  const adjunto = cabeceraArchivo ? `[${NOMBRE_ARCHIVO_CABECERA[info.archivoCabecera!]}: ${cabeceraArchivo.nombre}]` : null
+  const texto = [adjunto, cabeceraTexto, rellenar(info.cuerpo, parametros), info.pie].filter(Boolean).join('\n\n')
   return escribirComoAgente(convId, {
     contenido: texto,
-    plantilla: { nombre: plantilla.nombre, idioma: plantilla.idioma, parametros }
+    plantilla: {
+      nombre: plantilla.nombre,
+      idioma: plantilla.idioma,
+      parametros,
+      ...(parametrosCabecera.length ? { parametrosCabecera } : {}),
+      ...(cabeceraArchivo ? { cabeceraArchivo } : {}),
+      ...(botones.length ? { botones } : {})
+    },
+    archivo: cabeceraArchivo ? { ruta: cabeceraArchivo.ruta, tipo: cabeceraArchivo.tipo } : null
   })
 }
 
@@ -309,11 +378,13 @@ export async function getHiloCliente(convId: string) {
         .order('created_at', { ascending: true })
     : { data: [] as any[] }
 
-  const { data: mensajesActuales } = await supabase
+  const { data: mensajesDeLaConv } = await supabase
     .from('messages')
     .select('*, users(nombre)')
     .eq('conversation_id', convId)
     .order('timestamp', { ascending: true })
+  const { conEnlacesDeArchivos } = await import('@/lib/canales/archivos')
+  const mensajesActuales = await conEnlacesDeArchivos(mensajesDeLaConv)
 
   const conversaciones = (convs || []).map((c: any) => ({
     ...c,

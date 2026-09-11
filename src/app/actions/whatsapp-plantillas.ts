@@ -232,7 +232,7 @@ export async function guardarPlantillaReapertura(plantillaId: string | null) {
     if (!p) return { success: false, error: 'Plantilla no encontrada.' }
     const info = analizarComponentes(p.componentes as any[], p.contenido)
     if (p.estado !== 'aprobada') return { success: false, error: 'Tiene que ser una plantilla aprobada por Meta.' }
-    if (!info.enviable || info.huecos.length > 1) return { success: false, error: 'Tiene que ser una plantilla sin huecos o con uno solo ({{1}}, que se rellena con el nombre del cliente).' }
+    if (!info.automatica || info.huecos.length > 1) return { success: false, error: 'Tiene que ser una plantilla que se pueda enviar sola: sin huecos o con uno solo ({{1}}, que se rellena con el nombre del cliente), y sin archivos ni botones que haya que rellenar.' }
     nombre = p.nombre
   }
 

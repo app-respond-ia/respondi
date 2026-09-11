@@ -107,8 +107,22 @@ Meta.
   huecos con nombre ({{nombre}}), aparecen en la lista pero marcadas como que
   aún no se pueden enviar desde Respondi. Desde Respondi solo se crean de tipo
   Utilidad o Marketing, con cuerpo de texto.
-- **Pruebas**: `probar-plantillas` (30 comprobaciones) contra el Meta
-  simulado, más un recorrido en navegador (`captura-plantillas`).
+- **Plantillas con foto, vídeo o documento en la cabecera y con botones**
+  (12-09-2026): se envían desde Chats. La ventana pide lo que falte —el
+  archivo, el hueco del título, el final del enlace de un botón o el código
+  de un botón «copiar»— y el archivo se sube a Meta en el momento del envío
+  (su identificador dura 30 días, así que en un reintento se vuelve a subir).
+  El archivo se guarda además en el almacén privado, así que el mensaje
+  enviado se ve con su foto en Chats. Lo que sigue sin poder enviarse:
+  cabecera de UBICACIÓN y botones de catálogo, formulario o código de un solo
+  uso. Desde Respondi solo se **crean** plantillas de texto; las de foto se
+  crean en Meta y se traen con «Actualizar desde Meta».
+- **La plantilla de reapertura** (la que manda la IA sola pasadas 24 h) solo
+  admite plantillas que no piden nada: sin archivo, sin huecos en la cabecera
+  y sin botones que haya que rellenar.
+- **Pruebas**: `probar-plantillas` (44 comprobaciones) contra el Meta
+  simulado, más un recorrido en navegador (`captura-plantillas`) que adjunta
+  una foto de verdad.
 
 ## Canal de email (hecho el 11-09-2026)
 Decidido con Jorge: **opción A**, el negocio conecta **su propio buzón**

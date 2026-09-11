@@ -196,7 +196,9 @@ export async function getMensajes(conversationId: string) {
     .order('timestamp', { ascending: true })
 
   if (error) return { success: false, error: error.message }
-  return { success: true, data: { mensajes } }
+  // Con enlace temporal para poder ver las fotos y los archivos en Chats
+  const { conEnlacesDeArchivos } = await import('@/lib/canales/archivos')
+  return { success: true, data: { mensajes: await conEnlacesDeArchivos(mensajes) } }
 }
 
 export async function toggleIAPausa(conversationId: string, pausada: boolean) {

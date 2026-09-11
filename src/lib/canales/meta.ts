@@ -185,7 +185,71 @@ export async function borrarPlantillaMeta(wabaId: string, token: string, nombre:
   await graph(`${encodeURIComponent(wabaId)}/message_templates?name=${encodeURIComponent(nombre)}&hsm_id=${encodeURIComponent(id)}`, token, { method: 'DELETE' })
 }
 
-export async function enviarPlantilla(phoneNumberId: string, token: string, destino: string, p: { nombre: string; idioma: string; parametros: string[] }): Promise<string> {
+// Sube un archivo a Meta y devuelve su identificador, que dura 30 días. Es la
+// forma de mandar la foto, el vídeo o el documento de la cabecera de una
+// plantilla sin tener que publicarlo en una dirección pública.
+export async function subirArchivoAMeta(phoneNumberId: string, token: string, archivo: { datos: Buffer; tipo: string; nombre: string }): Promise<string> {
+  const formulario = new FormData()
+  formulario.append('messaging_product', 'whatsapp')
+  formulario.append('type', archivo.tipo)
+  formulario.append('file', new Blob([new Uint8Array(archivo.datos)], { type: archivo.tipo }), archivo.nombre)
+  let r: Response
+  try {
+    r = await fetch(`${GRAPH}/${encodeURIComponent(phoneNumberId)}/media`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formulario,
+      signal: AbortSignal.timeout(60000)
+    })
+  } catch (e: any) {
+    throw new ErrorMeta(`No se ha podido subir el archivo a Meta (${e?.message || 'sin respuesta'})`, null, null)
+  }
+  const cuerpo: any = await r.json().catch(() => ({}))
+  if (!r.ok) {
+    const e = cuerpo?.error || {}
+    throw new ErrorMeta(e.error_user_msg || e.message || `Meta ha rechazado el archivo (error ${r.status})`, e.code ?? null, r.status)
+  }
+  if (!cuerpo?.id) throw new ErrorMeta('Meta no ha devuelto el identificador del archivo subido', null, 200)
+  return String(cuerpo.id)
+}
+
+export interface EnvioPlantilla {
+  nombre: string
+  idioma: string
+  // Huecos del cuerpo, en orden
+  parametros: string[]
+  // Hueco de la cabecera de texto, si lo tiene
+  parametrosCabecera?: string[]
+  // Archivo de la cabecera, ya subido a Meta (o un enlace público)
+  cabeceraArchivo?: { formato: 'IMAGE' | 'VIDEO' | 'DOCUMENT'; id?: string; enlace?: string; nombre?: string } | null
+  // Valores de los botones que los piden: el final del enlace o el código
+  botones?: { indice: number; tipo: 'url' | 'copy_code'; valor: string }[]
+}
+
+// Los "components" que Meta espera al enviar una plantilla
+export function componentesDeEnvio(p: EnvioPlantilla) {
+  const components: any[] = []
+  if (p.cabeceraArchivo) {
+    const clave = p.cabeceraArchivo.formato.toLowerCase() // image | video | document
+    const medio: any = p.cabeceraArchivo.id ? { id: p.cabeceraArchivo.id } : { link: p.cabeceraArchivo.enlace }
+    if (clave === 'document' && p.cabeceraArchivo.nombre) medio.filename = p.cabeceraArchivo.nombre
+    components.push({ type: 'header', parameters: [{ type: clave, [clave]: medio }] })
+  } else if (p.parametrosCabecera?.length) {
+    components.push({ type: 'header', parameters: p.parametrosCabecera.map(text => ({ type: 'text', text })) })
+  }
+  if (p.parametros.length) {
+    components.push({ type: 'body', parameters: p.parametros.map(text => ({ type: 'text', text })) })
+  }
+  for (const b of p.botones || []) {
+    components.push(b.tipo === 'copy_code'
+      ? { type: 'button', sub_type: 'copy_code', index: String(b.indice), parameters: [{ type: 'coupon_code', coupon_code: b.valor }] }
+      : { type: 'button', sub_type: 'url', index: String(b.indice), parameters: [{ type: 'text', text: b.valor }] })
+  }
+  return components
+}
+
+export async function enviarPlantilla(phoneNumberId: string, token: string, destino: string, p: EnvioPlantilla): Promise<string> {
+  const components = componentesDeEnvio(p)
   const d = await graph(`${encodeURIComponent(phoneNumberId)}/messages`, token, {
     method: 'POST',
     body: JSON.stringify({
@@ -196,9 +260,7 @@ export async function enviarPlantilla(phoneNumberId: string, token: string, dest
       template: {
         name: p.nombre,
         language: { code: p.idioma },
-        ...(p.parametros.length
-          ? { components: [{ type: 'body', parameters: p.parametros.map(text => ({ type: 'text', text })) }] }
-          : {})
+        ...(components.length ? { components } : {})
       }
     })
   })

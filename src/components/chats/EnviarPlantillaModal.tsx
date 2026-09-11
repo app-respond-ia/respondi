@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { getPlantillasParaEnviar } from '@/app/actions/whatsapp-plantillas'
-import { enviarPlantillaConv } from '@/app/actions/conversaciones'
-import { rellenar } from '@/lib/canales/plantillas-texto'
+import { enviarPlantillaConv, subirArchivoDePlantilla } from '@/app/actions/conversaciones'
+import { rellenar, NOMBRE_ARCHIVO_CABECERA, TIPOS_ARCHIVO_CABECERA } from '@/lib/canales/plantillas-texto'
 
 // Elegir una plantilla aprobada, rellenar sus huecos y enviarla. Es la única
 // forma de escribir por WhatsApp a un cliente pasadas 24 h desde su último
@@ -24,6 +24,12 @@ export function EnviarPlantillaModal({ isOpen, onClose, convId, nombreCliente, o
   const [plantillas, setPlantillas] = useState<any[]>([])
   const [elegida, setElegida] = useState<string | null>(null)
   const [valores, setValores] = useState<string[]>([])
+  // Lo que piden algunas plantillas además del cuerpo: el hueco de la
+  // cabecera, su foto/vídeo/documento y lo que llevan los botones
+  const [cabecera, setCabecera] = useState<string[]>([])
+  const [botones, setBotones] = useState<Record<number, string>>({})
+  const [archivo, setArchivo] = useState<{ ruta: string; tipo: string; nombre: string } | null>(null)
+  const [subiendo, setSubiendo] = useState(false)
   const [enviando, setEnviando] = useState(false)
 
   useEffect(() => {
@@ -32,6 +38,9 @@ export function EnviarPlantillaModal({ isOpen, onClose, convId, nombreCliente, o
     setError(null)
     setElegida(null)
     setValores([])
+    setCabecera([])
+    setBotones({})
+    setArchivo(null)
     getPlantillasParaEnviar()
       .then(res => {
         if (res.success) setPlantillas((res as any).plantillas || [])
@@ -47,14 +56,36 @@ export function EnviarPlantillaModal({ isOpen, onClose, convId, nombreCliente, o
     setElegida(id)
     const p = plantillas.find(x => x.id === id)
     setValores((p?.huecos || []).map(() => ''))
+    setCabecera((p?.huecosCabecera || []).map(() => ''))
+    setBotones({})
+    setArchivo(null)
   }
 
-  const completos = !!plantilla && valores.every(v => v.trim())
+  const botonesConValor = (plantilla?.botones || []).filter((b: any) => b.necesitaValor)
+  const completos = !!plantilla
+    && valores.every(v => v.trim())
+    && cabecera.every(v => v.trim())
+    && botonesConValor.every((b: any) => (botones[b.indice] || '').trim())
+    && (!plantilla.archivoCabecera || !!archivo)
+
+  const subirArchivo = async (fichero: File | null) => {
+    if (!fichero) return
+    setSubiendo(true)
+    const datos = new FormData()
+    datos.append('archivo', fichero)
+    const res = await subirArchivoDePlantilla(datos).catch(() => ({ success: false as const, error: 'No se ha podido subir el archivo.' }))
+    setSubiendo(false)
+    if (res.success) { setArchivo(res.archivo); setError(null) } else { setError(res.error || 'No se ha podido subir el archivo.') }
+  }
 
   const enviar = async () => {
     if (!plantilla || !completos) return
     setEnviando(true)
-    const res = await enviarPlantillaConv(convId, plantilla.id, valores)
+    const res = await enviarPlantillaConv(convId, plantilla.id, valores, {
+      cabecera,
+      archivo,
+      botones: botonesConValor.map((b: any) => ({ indice: b.indice, tipo: b.necesitaValor, valor: (botones[b.indice] || '').trim() }))
+    })
       .catch(() => ({ success: false as const, error: 'No se ha podido enviar. Revisa la conexión.' }))
     setEnviando(false)
     if (res.success) onClose()
@@ -106,6 +137,61 @@ export function EnviarPlantillaModal({ isOpen, onClose, convId, nombreCliente, o
                 ))}
               </fieldset>
 
+              {plantilla?.archivoCabecera && (
+                <div>
+                  <p className="text-sm font-600 text-ink-900 mb-1">La {NOMBRE_ARCHIVO_CABECERA[plantilla.archivoCabecera]} que va arriba del mensaje</p>
+                  <input
+                    id="archivo-plantilla"
+                    type="file"
+                    accept={TIPOS_ARCHIVO_CABECERA[plantilla.archivoCabecera]}
+                    onChange={e => subirArchivo(e.target.files?.[0] || null)}
+                    className="w-full text-sm file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-slate-100 file:text-ink-700 file:font-600 file:text-sm hover:file:bg-slate-200"
+                  />
+                  <p className="text-xs text-ink-500 mt-1">
+                    {subiendo ? 'Subiendo…' : archivo ? `Listo: ${archivo.nombre}` : plantilla.archivoCabecera === 'IMAGE' ? 'JPG o PNG, hasta 5 MB.' : plantilla.archivoCabecera === 'VIDEO' ? 'MP4, hasta 16 MB.' : 'PDF, Word, Excel o texto, hasta 100 MB.'}
+                  </p>
+                </div>
+              )}
+
+              {plantilla && plantilla.huecosCabecera?.length > 0 && (
+                <div className="space-y-3">
+                  <p className="text-sm font-600 text-ink-900">Título del mensaje</p>
+                  {plantilla.huecosCabecera.map((n: number, i: number) => (
+                    <div key={`cab-${n}`}>
+                      <label htmlFor={`hueco-cabecera-${n}`} className="block text-xs font-600 text-ink-600 mb-1">{`Cabecera {{${n}}}`}</label>
+                      <input
+                        id={`hueco-cabecera-${n}`}
+                        value={cabecera[i] || ''}
+                        onChange={e => setCabecera(v => v.map((x, j) => (j === i ? e.target.value.replace(/[\n\t]/g, ' ') : x)))}
+                        maxLength={60}
+                        className="w-full h-10 px-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {botonesConValor.length > 0 && (
+                <div className="space-y-3">
+                  <p className="text-sm font-600 text-ink-900">Botones</p>
+                  {botonesConValor.map((b: any) => (
+                    <div key={`bot-${b.indice}`}>
+                      <label htmlFor={`boton-${b.indice}`} className="block text-xs font-600 text-ink-600 mb-1">
+                        {b.necesitaValor === 'copy_code' ? `Código del botón «${b.texto}»` : `Final del enlace del botón «${b.texto}»`}
+                      </label>
+                      <input
+                        id={`boton-${b.indice}`}
+                        value={botones[b.indice] || ''}
+                        onChange={e => setBotones(v => ({ ...v, [b.indice]: e.target.value.trim() }))}
+                        maxLength={200}
+                        placeholder={b.necesitaValor === 'copy_code' ? 'VERANO20' : 'pedido/12345'}
+                        className="w-full h-10 px-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {plantilla && plantilla.huecos.length > 0 && (
                 <div className="space-y-3">
                   <p className="text-sm font-600 text-ink-900">Rellena los huecos</p>
@@ -128,12 +214,17 @@ export function EnviarPlantillaModal({ isOpen, onClose, convId, nombreCliente, o
                 <div>
                   <p className="text-xs font-600 text-ink-500 mb-1.5">Así lo verá el cliente</p>
                   <div className="rounded-2xl rounded-tr-sm bg-emerald-50 border border-emerald-100 px-4 py-3 text-sm text-emerald-900 whitespace-pre-wrap break-words">
-                    {plantilla.cabecera && <p className="font-600 mb-1">{plantilla.cabecera}</p>}
+                    {plantilla.archivoCabecera && (
+                      <p className="text-xs text-emerald-800/80 mb-1">
+                        {archivo ? `📎 ${archivo.nombre}` : `📎 Aquí irá la ${NOMBRE_ARCHIVO_CABECERA[plantilla.archivoCabecera]}`}
+                      </p>
+                    )}
+                    {plantilla.cabeceraTexto && <p className="font-600 mb-1">{rellenar(plantilla.cabeceraTexto, cabecera)}</p>}
                     <p>{rellenar(plantilla.cuerpo, valores)}</p>
                     {plantilla.pie && <p className="text-xs text-emerald-800/70 mt-2">{plantilla.pie}</p>}
-                    {plantilla.botones?.length > 0 && (
+                    {plantilla.botonesTexto?.length > 0 && (
                       <div className="mt-2 pt-2 border-t border-emerald-200 flex flex-wrap gap-2">
-                        {plantilla.botones.map((b: string) => <span key={b} className="text-xs font-600 text-emerald-700">{b}</span>)}
+                        {plantilla.botonesTexto.map((b: string) => <span key={b} className="text-xs font-600 text-emerald-700">{b}</span>)}
                       </div>
                     )}
                   </div>
@@ -145,7 +236,7 @@ export function EnviarPlantillaModal({ isOpen, onClose, convId, nombreCliente, o
 
         <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100">
           <button onClick={onClose} disabled={enviando} className="px-5 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition disabled:opacity-50">Cancelar</button>
-          <button onClick={enviar} disabled={!completos || enviando} className="px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition disabled:opacity-50">
+          <button onClick={enviar} disabled={!completos || enviando || subiendo} className="px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition disabled:opacity-50">
             {enviando ? 'Enviando…' : 'Enviar plantilla'}
           </button>
         </div>

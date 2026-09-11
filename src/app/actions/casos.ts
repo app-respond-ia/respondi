@@ -183,12 +183,13 @@ export async function getCasoDetalle(casoId: string) {
   if (caso.conversation_id) {
     const { data: msgs } = await supabase
       .from('messages')
-      .select('id, remitente, contenido, timestamp')
+      .select('id, remitente, contenido, timestamp, media_url, media_tipo, asunto')
       .eq('conversation_id', caso.conversation_id)
       .eq('tenant_id', userData?.tenant_id)
       .order('timestamp', { ascending: true })
-    
-    mensajes = msgs || []
+
+    const { conEnlacesDeArchivos } = await import('@/lib/canales/archivos')
+    mensajes = await conEnlacesDeArchivos(msgs)
 
     const { data: tags } = await supabase
       .from('conversation_tags')

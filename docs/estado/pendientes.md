@@ -35,8 +35,13 @@ solo la lista viva).
 - [x] Plantillas de WhatsApp — hecho (11-09-2026): se crean y se mandan a
       Meta, se traen de Meta con su estado, y se envían desde Chats pasadas
       las 24 h. Ver `canales-mensajeria.md`
-- [ ] Plantillas con foto/vídeo/documento en la cabecera o con botones que
-      cambian: hoy se ven pero no se pueden enviar desde Respondi
+- [x] Plantillas con foto/vídeo/documento en la cabecera o con botones que
+      cambian — hecho (12-09-2026): se envían desde Chats adjuntando lo que
+      pidan. Quedan fuera la cabecera de ubicación y los botones de catálogo,
+      formulario o código de un solo uso
+- [x] Ver las fotos y los archivos en Chats (12-09-2026): antes solo los veía
+      la IA; ahora el mensaje enseña la foto, el vídeo o el archivo con un
+      enlace temporal
 - [x] Cliente que escribió con el negocio cerrado y se abre pasadas 24 h —
       hecho (11-09-2026, decidido con Jorge): antes de gastar un crédito se
       mira la ventana de WhatsApp; si está cerrada, la IA manda la plantilla

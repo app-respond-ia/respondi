@@ -6,6 +6,39 @@ interface MessageBubbleProps {
   channelId?: string
 }
 
+// La foto, el vídeo o el archivo que lleva el mensaje. El enlace es temporal
+// (lo crea el servidor al cargar los mensajes): el almacén es privado.
+function Archivo({ msg }: { msg: any }) {
+  if (!msg.media_url) return null
+  const tipo = String(msg.media_tipo || '')
+  const enlace = msg.media_enlace as string | undefined
+  const nombre = String(msg.media_url).split('/').pop() || 'archivo'
+
+  if (!enlace) {
+    return <p className="text-xs text-ink-400 mb-1">📎 Archivo adjunto (no se ha podido abrir)</p>
+  }
+  if (tipo.startsWith('image/')) {
+    return (
+      <a href={enlace} target="_blank" rel="noopener noreferrer" className="block mb-1.5">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={enlace} alt="Archivo enviado en el chat" className="rounded-xl max-h-64 w-auto max-w-full object-cover" />
+      </a>
+    )
+  }
+  if (tipo.startsWith('video/')) {
+    return <video src={enlace} controls className="rounded-xl max-h-64 w-full mb-1.5" />
+  }
+  if (tipo.startsWith('audio/')) {
+    return <audio src={enlace} controls className="w-full mb-1.5" />
+  }
+  return (
+    <a href={enlace} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 mb-1.5 px-3 py-2 rounded-xl bg-white/70 border border-slate-200 text-xs font-600 text-ink-700 hover:bg-white transition">
+      <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
+      <span className="truncate">{nombre}</span>
+    </a>
+  )
+}
+
 function getInitials(name: string) {
   if (!name) return '?'
   return name.substring(0, 2).toUpperCase()
@@ -49,6 +82,7 @@ export function MessageBubble({ msg, contactName, channelId }: MessageBubbleProp
         <div className="max-w-[75%]">
           <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-sm px-4 py-2.5">
             {msg.asunto && <p className="text-xs font-600 text-ink-700 mb-1 break-words">Asunto: {msg.asunto}</p>}
+            <Archivo msg={msg} />
             <p className="text-sm text-ink-900 whitespace-pre-wrap break-words">{msg.contenido}</p>
           </div>
           <p className="text-[11px] text-ink-400 mt-1 ml-1">{formatTime(msg.timestamp)}</p>
@@ -64,6 +98,7 @@ export function MessageBubble({ msg, contactName, channelId }: MessageBubbleProp
         <div className="max-w-[75%]">
           <div className={`${bgClass} rounded-2xl rounded-tr-sm px-4 py-2.5`}>
             {msg.asunto && <p className="text-xs font-600 opacity-80 mb-1 break-words">Asunto: {msg.asunto}</p>}
+            <Archivo msg={msg} />
             <p className="text-sm whitespace-pre-wrap break-words">{msg.contenido}</p>
           </div>
           <div className="flex items-center justify-end gap-1.5 mt-1 mr-1">

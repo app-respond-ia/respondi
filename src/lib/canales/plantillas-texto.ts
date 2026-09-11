@@ -51,31 +51,85 @@ export function problemaDelCuerpo(texto: string): string | null {
   return null
 }
 
-// El texto del cuerpo y si Respondi la puede enviar tal cual. Se envían las
-// que solo tienen huecos en el cuerpo; una cabecera con foto, vídeo o
-// documento, o botones con partes que cambian, necesitan datos que Respondi
-// todavía no pide.
+// Qué lleva una plantilla y qué hace falta para enviarla. Meta permite:
+//  - cabecera de TEXTO (con como mucho un hueco), o de FOTO, VÍDEO o
+//    DOCUMENTO (hay que mandar el archivo en cada envío)
+//  - cuerpo con huecos numerados
+//  - pie sin huecos
+//  - botones: de respuesta rápida y de teléfono no piden nada; los de enlace
+//    con un hueco en la dirección y los de "copiar código" piden un valor
+// Lo que Respondi todavía no sabe enviar: cabecera de UBICACIÓN y botones de
+// catálogo, formularios o códigos de un solo uso.
+export type FormatoCabecera = 'TEXT' | 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'LOCATION'
+
+export const NOMBRE_ARCHIVO_CABECERA: Record<string, string> = {
+  IMAGE: 'foto',
+  VIDEO: 'vídeo',
+  DOCUMENT: 'documento'
+}
+
+export const TIPOS_ARCHIVO_CABECERA: Record<string, string> = {
+  IMAGE: 'image/jpeg,image/png',
+  VIDEO: 'video/mp4,video/3gpp',
+  DOCUMENT: 'application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain'
+}
+
+export interface BotonPlantilla {
+  indice: number
+  tipo: string
+  texto: string
+  // 'url' → falta el final del enlace; 'copy_code' → falta el código
+  necesitaValor: 'url' | 'copy_code' | null
+}
+
 export function analizarComponentes(componentes: any[] | null | undefined, cuerpoGuardado?: string) {
   const lista = Array.isArray(componentes) ? componentes : []
   const tipo = (c: any) => String(c?.type || '').toUpperCase()
   const cuerpo = lista.find(c => tipo(c) === 'BODY')?.text ?? cuerpoGuardado ?? ''
-  const cabecera = lista.find(c => tipo(c) === 'HEADER')
+  const cab = lista.find(c => tipo(c) === 'HEADER')
+  const formatoCabecera = (cab ? String(cab.format || 'TEXT').toUpperCase() : null) as FormatoCabecera | null
+  const cabeceraTexto = formatoCabecera === 'TEXT' ? (cab.text || null) : null
+  const huecosCabecera = huecosDe(cab?.text || '')
   const pie = lista.find(c => tipo(c) === 'FOOTER')?.text || null
-  const botones: any[] = lista.find(c => tipo(c) === 'BUTTONS')?.buttons || []
+  const crudos: any[] = lista.find(c => tipo(c) === 'BUTTONS')?.buttons || []
 
+  const botones: BotonPlantilla[] = crudos.map((b, indice) => {
+    const t = String(b?.type || '').toUpperCase()
+    return {
+      indice,
+      tipo: t,
+      texto: String(b?.text || ''),
+      necesitaValor: t === 'URL' && /\{\{/.test(String(b?.url || '')) ? 'url' : t === 'COPY_CODE' ? 'copy_code' : null
+    }
+  })
+
+  // Lo que ni a mano se puede enviar todavía
   let motivo: string | null = null
-  if (tieneHuecosConNombre(cuerpo)) motivo = 'Usa huecos con nombre en vez de números'
-  else if (cabecera && String(cabecera.format || 'TEXT').toUpperCase() !== 'TEXT') motivo = 'Lleva foto, vídeo o documento en la cabecera'
-  else if (cabecera && huecosDe(cabecera.text || '').length) motivo = 'Tiene huecos en la cabecera'
-  else if (botones.some(b => /\{\{/.test(b?.url || '') || ['OTP', 'COPY_CODE', 'FLOW', 'CATALOG', 'MPM'].includes(String(b?.type || '').toUpperCase()))) motivo = 'Tiene botones que cambian en cada envío'
+  if (tieneHuecosConNombre(cuerpo) || tieneHuecosConNombre(cab?.text || '')) motivo = 'Usa huecos con nombre en vez de números'
+  else if (formatoCabecera === 'LOCATION') motivo = 'Lleva una ubicación en la cabecera'
+  else if (botones.some(b => ['OTP', 'FLOW', 'CATALOG', 'MPM'].includes(b.tipo))) motivo = 'Tiene botones de catálogo, formulario o código de un solo uso'
+  else if (huecosCabecera.length > 1) motivo = 'Tiene más de un hueco en la cabecera'
+
+  const archivoCabecera = formatoCabecera && ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(formatoCabecera) ? formatoCabecera : null
 
   return {
     cuerpo,
-    cabecera: cabecera && String(cabecera.format || 'TEXT').toUpperCase() === 'TEXT' ? (cabecera.text || null) : null,
+    // El texto de la cabecera, solo si es de texto
+    cabecera: cabeceraTexto,
+    cabeceraTexto,
+    formatoCabecera,
+    // Un archivo que hay que adjuntar en cada envío (foto, vídeo o documento)
+    archivoCabecera,
+    huecosCabecera,
     pie,
-    botones: botones.map(b => String(b?.text || '')).filter(Boolean),
+    botones,
+    // Solo los nombres, para las vistas previas de siempre
+    botonesTexto: botones.map(b => b.texto).filter(Boolean),
     huecos: huecosDe(cuerpo),
+    // Se puede enviar a mano desde Chats, pidiendo lo que falte
     enviable: !motivo,
+    // Se puede enviar sola (la IA, la reapertura): no pide archivo ni botones
+    automatica: !motivo && !archivoCabecera && huecosCabecera.length === 0 && !botones.some(b => b.necesitaValor),
     motivoNoEnviable: motivo
   }
 }

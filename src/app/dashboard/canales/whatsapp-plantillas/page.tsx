@@ -7,7 +7,7 @@ import { getPlantillasWhatsApp, crearPlantillaWhatsApp, sincronizarPlantillasWha
 import { getMisPermisos } from '@/app/actions/permisos'
 import { useToast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
-import { ETIQUETA_ESTADO_PLANTILLA, ETIQUETA_CATEGORIA_PLANTILLA, huecosDe, problemaDelCuerpo, rellenar } from '@/lib/canales/plantillas-texto'
+import { ETIQUETA_ESTADO_PLANTILLA, ETIQUETA_CATEGORIA_PLANTILLA, NOMBRE_ARCHIVO_CABECERA, huecosDe, problemaDelCuerpo, rellenar } from '@/lib/canales/plantillas-texto'
 
 // Las plantillas son los mensajes que Meta aprueba de antemano: la única forma
 // de escribir por WhatsApp a un cliente cuando han pasado más de 24 h desde su
@@ -168,7 +168,7 @@ export default function WhatsappPlantillasPage() {
   }
 
   // Las que valen para reabrir: aprobadas, enviables y con como mucho un hueco
-  const paraReabrir = plantillas.filter(p => p.estado === 'aprobada' && p.enviable && (p.huecos?.length || 0) <= 1)
+  const paraReabrir = plantillas.filter(p => p.estado === 'aprobada' && p.automatica && (p.huecos?.length || 0) <= 1)
 
   if (errorCarga) return <ErrorCarga />
   if (loading || nivelPermiso === null) return <Loading />
@@ -254,7 +254,15 @@ export default function WhatsappPlantillasPage() {
                 {p.cabecera && <p className="font-600 mb-1">{p.cabecera}</p>}
                 <p>{p.cuerpo}</p>
                 {p.pie && <p className="text-xs text-ink-500 mt-2">{p.pie}</p>}
-                {p.botones?.length > 0 && <p className="text-xs font-600 text-brand-700 mt-2">{p.botones.join(' · ')}</p>}
+                {p.botonesTexto?.length > 0 && <p className="text-xs font-600 text-brand-700 mt-2">{p.botonesTexto.join(' · ')}</p>}
+                {p.estado === 'aprobada' && p.enviable && (p.archivoCabecera || p.huecosCabecera?.length || p.botones?.some((b: any) => b.necesitaValor)) && (
+                  <p className="text-xs text-ink-500 mt-2">
+                    Al enviarla desde Chats se te pedirá{' '}
+                    {[p.archivoCabecera ? `la ${NOMBRE_ARCHIVO_CABECERA[p.archivoCabecera]} de la cabecera` : null,
+                      p.huecosCabecera?.length ? 'el hueco de la cabecera' : null,
+                      p.botones?.some((b: any) => b.necesitaValor) ? 'lo que llevan los botones' : null].filter(Boolean).join(', ')}.
+                  </p>
+                )}
               </div>
               {p.estado === 'rechazada' && p.motivo_rechazo && (
                 <p className="text-xs text-rose-600 mt-2">{p.motivo_rechazo}</p>

@@ -152,7 +152,8 @@ export async function plantillaDeReapertura(branchId: string, contactId: string)
 
   const { rellenar } = await import('@/lib/canales/plantillas-texto')
   const info = analizarComponentes(p.componentes as any[], p.contenido)
-  if (!info.enviable || info.huecos.length > 1) return null
+  // La manda la IA sola: no puede pedir archivo ni valores de botones
+  if (!info.automatica || info.huecos.length > 1) return null
 
   let parametros: string[] = []
   if (info.huecos.length === 1) {

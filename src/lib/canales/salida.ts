@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { registrarError } from '@/lib/errores'
-import { leerCredencialesMeta, enviarTexto, enviarPlantilla, ErrorMeta } from '@/lib/canales/meta'
+import { leerCredencialesMeta, enviarTexto, enviarPlantilla, subirArchivoAMeta, ErrorMeta } from '@/lib/canales/meta'
 import { enviarCorreo, leerContrasenaCorreo, ErrorCorreo, type ConfigCorreo } from '@/lib/canales/correo'
 
 // Saca hacia el cliente un mensaje ya guardado (de la IA, de un agente o un
@@ -78,13 +78,34 @@ export async function enviarMensajeSaliente(messageId: string): Promise<Resultad
     // Una plantilla sale como plantilla (con sus huecos rellenos); lo demás,
     // como texto. `contenido` de una plantilla es solo para enseñarla en Chats.
     const plantilla: any = msg.plantilla
-    const idExterno = plantilla?.nombre
-      ? await enviarPlantilla(canal.meta_phone_number_id, credenciales.access_token, contacto.identificador_canal, {
-          nombre: plantilla.nombre,
-          idioma: plantilla.idioma,
-          parametros: Array.isArray(plantilla.parametros) ? plantilla.parametros : []
+    let idExterno: string
+    if (plantilla?.nombre) {
+      // La foto, el vídeo o el documento de la cabecera se sube a Meta en el
+      // momento de enviar (su identificador dura 30 días, y en un reintento
+      // podría haber caducado)
+      let cabeceraArchivo = null
+      if (plantilla.cabeceraArchivo?.ruta) {
+        const a = plantilla.cabeceraArchivo
+        const { data: archivo, error: errArchivo } = await supabaseAdmin.storage.from('whatsapp_media').download(a.ruta)
+        if (errArchivo || !archivo) return fallar('No se ha encontrado el archivo de la plantilla. Vuelve a enviarla adjuntándolo de nuevo.')
+        const idEnMeta = await subirArchivoAMeta(canal.meta_phone_number_id, credenciales.access_token, {
+          datos: Buffer.from(await archivo.arrayBuffer()),
+          tipo: a.tipo || 'application/octet-stream',
+          nombre: a.nombre || 'archivo'
         })
-      : await enviarTexto(canal.meta_phone_number_id, credenciales.access_token, contacto.identificador_canal, msg.contenido)
+        cabeceraArchivo = { formato: a.formato, id: idEnMeta, nombre: a.nombre }
+      }
+      idExterno = await enviarPlantilla(canal.meta_phone_number_id, credenciales.access_token, contacto.identificador_canal, {
+        nombre: plantilla.nombre,
+        idioma: plantilla.idioma,
+        parametros: Array.isArray(plantilla.parametros) ? plantilla.parametros : [],
+        parametrosCabecera: Array.isArray(plantilla.parametrosCabecera) ? plantilla.parametrosCabecera : [],
+        cabeceraArchivo,
+        botones: Array.isArray(plantilla.botones) ? plantilla.botones : []
+      })
+    } else {
+      idExterno = await enviarTexto(canal.meta_phone_number_id, credenciales.access_token, contacto.identificador_canal, msg.contenido)
+    }
     await apuntar(messageId, { estado_envio: 'enviado', error_envio: null, identificador_externo: idExterno })
     return { estado: 'enviado' }
   } catch (e: any) {

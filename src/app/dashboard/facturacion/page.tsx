@@ -4,6 +4,10 @@ import { ErrorCarga } from '@/components/ui/ErrorCarga'
 import { useState, useEffect } from 'react'
 import { getMisPermisos } from '@/app/actions/permisos'
 import { getMetricas, getMovimientosCreditosCliente } from '@/app/actions/metricas'
+import { getPlanesDisponibles, solicitarCambioPlan } from '@/app/actions/planes'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
+import { useToast } from '@/components/ui/Toast'
+import Link from 'next/link'
 
 function StatCard({ label, value, sub }: { label: string, value: string | number, sub?: string }) {
   return (
@@ -30,6 +34,25 @@ export default function FacturacionPage() {
   const [movimientos, setMovimientos] = useState<any[]>([])
   
   const [filtros, setFiltros] = useState<{ tipo?: 'abono' | 'debito', origen?: string }>({})
+  const [planes, setPlanes] = useState<any>(null)
+  const [planPedido, setPlanPedido] = useState<any>(null)
+  const [pidiendo, setPidiendo] = useState(false)
+  const { showToast } = useToast()
+
+  const pedirPlan = async () => {
+    if (!planPedido) return
+    setPidiendo(true)
+    const r = await solicitarCambioPlan(planPedido.id).catch(() => ({ success: false, error: 'No se ha podido enviar. Revisa la conexión.' }))
+    setPidiendo(false)
+    if (r.success) {
+      showToast('Petición enviada. El equipo de Respondi te contestará en Soporte para completar el cambio.', 'success')
+      setPlanPedido(null)
+      const p = await getPlanesDisponibles().catch(() => null)
+      if (p?.success) setPlanes(p.data)
+    } else {
+      showToast((r as any).error || 'No se ha podido enviar la petición', 'error')
+    }
+  }
 
   useEffect(() => { cargar().catch(() => setErrorCarga(true)) }, [filtros])
 
@@ -54,6 +77,7 @@ export default function FacturacionPage() {
 
     // 2. Si tiene permiso (cualquier nivel), cargamos los datos
     if (pNivel !== 'ninguno') {
+      getPlanesDisponibles().then(r => { if (r.success) setPlanes(r.data) }).catch(() => {})
       const [resMetricas, resMov] = await Promise.all([
         getMetricas('mes'), // Reusado de Metricas, nos interesan solo los créditos
         getMovimientosCreditosCliente(filtros as any)
@@ -90,13 +114,57 @@ export default function FacturacionPage() {
         <p className="text-ink-500 mt-1">Gestiona tu suscripción, método de pago e historial de consumo de IA.</p>
       </div>
 
-      {/* PLAN ACTUAL PLACEHOLDER */}
-      <section className="mb-10 bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8">
-        <h2 className="text-xl font-bold text-ink-900 mb-2">Gestión de tu plan</h2>
-        <p className="text-sm text-ink-500 mb-5">Gestión de suscripción y compra de créditos disponible próximamente.</p>
-        <button disabled className="px-5 h-10 rounded-xl bg-slate-100 text-slate-400 text-sm font-600 cursor-not-allowed">
-          Gestionar suscripción en Stripe
-        </button>
+      {/* PLANES: hasta que Stripe esté conectado, el cambio lo hace el equipo
+          de Respondi a partir de la petición del cliente */}
+      <section id="planes" className="mb-10 scroll-mt-6">
+        <SectionTitle>Tu plan</SectionTitle>
+        {!planes ? (
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 text-sm text-ink-500">Cargando planes…</div>
+        ) : (
+          <>
+            {planes.peticionAbierta && (
+              <div className="mb-4 rounded-xl bg-brand-50 border border-brand-100 px-4 py-3 text-sm text-brand-900">
+                Has pedido un cambio de plan («{planes.peticionAbierta.asunto}»). El equipo de Respondi te contestará en{' '}
+                <Link href={`/dashboard/soporte/${planes.peticionAbierta.id}`} className="font-600 underline underline-offset-2">Soporte</Link>.
+              </div>
+            )}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {planes.planes.map((p: any) => {
+                const esActual = p.id === planes.planActualId && !planes.enPrueba
+                const esPendiente = p.id === planes.planPendienteId
+                return (
+                  <div key={p.id} className={`rounded-2xl border p-5 flex flex-col ${esActual ? 'border-brand-400 bg-brand-50/40' : 'border-slate-200 bg-white'}`}>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <p className="font-display font-700 text-lg text-ink-900">{p.nombre}</p>
+                      {esActual && <span className="text-[11px] font-600 px-2 py-0.5 rounded-full bg-brand-600 text-white">Tu plan</span>}
+                      {esPendiente && <span className="text-[11px] font-600 px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">En la próxima renovación</span>}
+                    </div>
+                    <p className="text-ink-900 mb-3"><span className="font-display font-700 text-2xl">{Number(p.precio_usd).toLocaleString('es-ES')} $</span><span className="text-ink-500"> /mes</span></p>
+                    <ul className="text-sm text-ink-600 space-y-1 mb-5 flex-1">
+                      <li>{Number(p.creditos_mensuales || 0).toLocaleString('es-ES')} respuestas de IA al mes</li>
+                      {/* 999 (o vacío) es la forma de decir "sin límite" en los planes */}
+                      <li>{p.canales_max === null || p.canales_max >= 999 ? 'Canales ilimitados' : `${p.canales_max} ${p.canales_max === 1 ? 'canal' : 'canales'} en total`}</li>
+                      <li>{p.sucursales_max === null || p.sucursales_max >= 999 ? 'Sucursales ilimitadas' : `${p.sucursales_max} ${p.sucursales_max === 1 ? 'sucursal' : 'sucursales'}`}</li>
+                      <li>{p.usuarios_max === null || p.usuarios_max >= 999 ? 'Usuarios ilimitados' : `${p.usuarios_max} ${p.usuarios_max === 1 ? 'usuario' : 'usuarios'}`}</li>
+                    </ul>
+                    {!esActual && (
+                      <button
+                        onClick={() => setPlanPedido(p)}
+                        disabled={nivelPermiso !== 'escritura' || !!planes.peticionAbierta}
+                        className="h-10 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {planes.enPrueba ? 'Elegir este plan' : 'Cambiar a este plan'}
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            <p className="text-xs text-ink-500 mt-3">
+              {planes.enPrueba ? 'Estás en la prueba gratuita. ' : ''}El pago con tarjeta estará disponible pronto; mientras tanto, al elegir un plan el equipo de Respondi te escribe por Soporte para completar el cambio.
+            </p>
+          </>
+        )}
       </section>
 
       {/* RESUMEN DE CRÉDITOS */}
@@ -231,6 +299,17 @@ export default function FacturacionPage() {
           )}
         </div>
       </section>
+      <ConfirmModal
+        isOpen={!!planPedido}
+        onClose={() => !pidiendo && setPlanPedido(null)}
+        onConfirm={pedirPlan}
+        title={`Plan ${planPedido?.nombre || ''}`}
+        message="Enviaremos tu petición al equipo de Respondi, que te escribirá por Soporte para completar el cambio."
+        confirmText="Enviar petición"
+        cancelText="Cancelar"
+        type="info"
+        isLoading={pidiendo}
+      />
     </div>
   )
 }

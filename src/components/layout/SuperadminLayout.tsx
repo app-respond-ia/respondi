@@ -131,7 +131,7 @@ export default function SuperadminLayout({
       <aside
         className={`fixed inset-y-0 left-0 z-40 ${collapsed ? 'w-20' : 'w-72'} bg-ink-900 text-white transform transition-all duration-300 ease-out flex flex-col h-full ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static lg:z-auto`}
       >
-        <div className={`flex items-center gap-3 h-20 border-b border-white/10 shrink-0 overflow-hidden transition-all ${collapsed ? 'justify-center px-2' : 'px-6'}`}>
+        <div className={`flex items-center gap-3 h-16 border-b border-white/10 shrink-0 overflow-hidden transition-all ${collapsed ? 'justify-center px-2' : 'px-6'}`}>
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center shadow-lg shadow-brand-600/30 shrink-0">
             <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h8M8 14h5M21 12c0 4.418-4.03 8-9 8a9.7 9.7 0 01-4-.85L3 20l1.1-3.3A7.6 7.6 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
@@ -173,7 +173,7 @@ export default function SuperadminLayout({
                 <div key={link.label} className="space-y-1">
                   <button
                     onClick={() => setExpandedGroup(isExpanded ? null : link.label)}
-                    className={`w-full flex items-center justify-between py-2.5 rounded-xl transition ${isGroupActive ? 'bg-brand-600/10 text-brand-500 font-600' : 'text-ink-400 hover:bg-white/5 hover:text-white'} ${collapsed ? 'px-0 justify-center' : 'px-3'}`}
+                    className={`w-full flex items-center justify-between py-2 rounded-lg transition ${isGroupActive ? 'bg-brand-600/10 text-brand-500 font-600' : 'text-ink-400 hover:bg-white/5 hover:text-white'} ${collapsed ? 'px-0 justify-center' : 'px-3'}`}
                     title={collapsed ? link.label : undefined}
                   >
                     <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'}`}>
@@ -219,7 +219,7 @@ export default function SuperadminLayout({
                 key={link.href}
                 href={link.href}
                 onClick={closeSidebar}
-                className={`flex items-center justify-between py-2.5 rounded-xl transition ${isActive ? `bg-brand-600 text-white font-500 shadow-lg shadow-brand-900/40 ${collapsed ? 'px-0 justify-center' : 'px-3'}` : `text-ink-400 hover:bg-white/5 hover:text-white ${collapsed ? 'px-0 justify-center' : 'px-3'}`}`}
+                className={`flex items-center justify-between py-2 rounded-lg transition ${isActive ? `bg-brand-600 text-white font-500 shadow-lg shadow-brand-900/40 ${collapsed ? 'px-0 justify-center' : 'px-3'}` : `text-ink-400 hover:bg-white/5 hover:text-white ${collapsed ? 'px-0 justify-center' : 'px-3'}`}`}
                 title={collapsed ? link.label : undefined}
               >
                 <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'}`}>
@@ -252,7 +252,7 @@ export default function SuperadminLayout({
       {/* CONTENIDO PRINCIPAL */}
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
         <header className="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-slate-200">
-          <div className="flex items-center gap-3 px-4 sm:px-6 lg:px-8 h-20">
+          <div className="flex items-center gap-3 px-4 sm:px-6 lg:px-8 h-16">
             <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 -ml-2 rounded-lg hover:bg-slate-100 transition" aria-label="Abrir menú">
               <svg className="w-6 h-6 text-ink-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
             </button>

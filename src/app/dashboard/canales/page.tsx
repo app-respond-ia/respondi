@@ -474,7 +474,7 @@ export default function CanalesPage() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-600 text-ink-900">
-              {canalesMax === null
+              {canalesMax === null || canalesMax >= 999
                 ? 'Tu plan incluye canales ilimitados'
                 : `Tu plan incluye ${canalesMax} ${canalesMax === 1 ? 'canal' : 'canales'} entre todas tus sucursales · ${canalesEnUso} en uso`}
             </p>

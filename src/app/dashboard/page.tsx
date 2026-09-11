@@ -1,5 +1,6 @@
 'use client'
 import Loading from '@/components/Loading'
+import Link from 'next/link'
 
 import { useState, useEffect } from 'react'
 import { getDashboardData } from '@/app/actions/dashboard'
@@ -88,7 +89,7 @@ export default function DashboardPage() {
             <p className="font-600 text-amber-900 text-sm">
               {trial.dias_restantes > 1 ? `Tu prueba gratuita termina en ${trial.dias_restantes} días` : trial.dias_restantes === 1 ? 'Tu prueba gratuita termina mañana' : 'Tu prueba gratuita termina hoy'}
             </p>
-            <p className="text-sm text-amber-700">Activa un plan para que tu agente siga atendiendo sin interrupciones.</p>
+            <p className="text-sm text-amber-700">Activa un plan para que tu agente siga atendiendo sin interrupciones. <Link href="/dashboard/facturacion#planes" className="font-600 underline underline-offset-2">Ver planes</Link></p>
           </div>
         </div>
       )}
@@ -279,9 +280,9 @@ export default function DashboardPage() {
           </div>
           <div className="text-right">
             <p className="text-xs text-slate-500 mb-1">¿Necesitas más?</p>
-            <button className="px-4 h-9 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 transition">
+            <Link href="/dashboard/facturacion#planes" className="inline-flex items-center px-4 h-9 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 transition">
               Ampliar plan
-            </button>
+            </Link>
           </div>
         </div>
       </div>

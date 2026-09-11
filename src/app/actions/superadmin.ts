@@ -415,9 +415,13 @@ export async function registrarPagoYRenovar(organizacionId: string, importe: num
   baseDate.setMonth(baseDate.getMonth() + 1)
   const nuevaFecha = baseDate.toISOString().split('T')[0]
 
+  // Quien paga ya no está de prueba. Antes solo se ponía "activo" y la marca
+  // de prueba seguía: el cliente veía "Tu prueba gratuita termina en X días"
+  // después de haber pagado.
   let updates: any = { 
     fecha_vencimiento: nuevaFecha, 
-    estado: 'activo'
+    estado: 'activo',
+    trial_activo: false
   }
 
   if (org.plan_pendiente_id) {

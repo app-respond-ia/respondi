@@ -27,7 +27,9 @@ export default function Header({ branches, activeBranchId, onOpenMobile, userIni
   let creditosClasses = ''
   let dotClasses = ''
   if (creditos) {
-    const pct = creditos.max > 0 ? (creditos.saldo / creditos.max) * 100 : 0
+    // Sin tope conocido (el plan no dice cuántos da), el color depende solo de
+    // si queda saldo; antes salía en rojo con saldo de sobra
+    const pct = creditos.max > 0 ? (creditos.saldo / creditos.max) * 100 : (creditos.saldo > 0 ? 100 : 0)
     if (pct > 20) {
       creditosClasses = 'bg-slate-100 text-ink-700'
       dotClasses = 'bg-emerald-500'
@@ -62,7 +64,7 @@ export default function Header({ branches, activeBranchId, onOpenMobile, userIni
 
   return (
     <header className="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-slate-200">
-      <div className="flex items-center gap-3 px-4 sm:px-6 lg:px-8 h-20">
+      <div className="flex items-center gap-3 px-4 sm:px-6 lg:px-8 h-16">
         <button onClick={onOpenMobile} className="lg:hidden p-2 -ml-2 rounded-lg hover:bg-slate-100 transition" aria-label="Abrir menú">
           <svg className="w-6 h-6 text-ink-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
         </button>
@@ -103,7 +105,9 @@ export default function Header({ branches, activeBranchId, onOpenMobile, userIni
         {creditos && (
           <div className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-500 ml-1 ${creditosClasses}`}>
             <span className={`w-2 h-2 rounded-full ${dotClasses}`}></span>
-            {creditos.saldo.toLocaleString()} / {creditos.max.toLocaleString()} créditos
+            {creditos.max > 0
+              ? `${creditos.saldo.toLocaleString()} / ${creditos.max.toLocaleString()} créditos`
+              : `${creditos.saldo.toLocaleString()} créditos`}
           </div>
         )}
 

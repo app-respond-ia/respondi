@@ -19,11 +19,24 @@
   --color-ink-500: #6b6486;
   --color-ink-700: #3b3155;
   --color-ink-900: #1c1530;
+
+  /* Títulos más contenidos, al estilo del panel de Shopify (antes 24 y 30 px) */
+  --text-2xl: 1.375rem;
+  --text-2xl--line-height: 1.3;
+  --text-3xl: 1.625rem;
+  --text-3xl--line-height: 1.25;
+}
+
+/* Letra más pequeña y panel más compacto, al estilo de Shopify: el tamaño base
+   pasa de 16 a 15 px (todo lo que se mide en rem se reduce igual) y el texto
+   normal, sin tamaño propio, queda en unos 13 px. */
+html {
+  font-size: 15px;
 }
 
 @layer base {
   body {
-    @apply font-body bg-slate-50 text-ink-900 antialiased;
+    @apply font-body bg-slate-50 text-ink-900 antialiased text-sm;
   }
   h1, h2, h3, .font-display {
     @apply font-display;

@@ -32,8 +32,8 @@ export default function Sidebar({ user, onCloseMobile, permisos, esAdmin, collap
 
   const navItemClass = (path: string) =>
     isActive(path)
-      ? `flex items-center gap-3 py-2.5 rounded-xl bg-brand-500/10 border-l-2 border-brand-500 text-white font-500 transition ${collapsed ? 'justify-center px-0 border-l-0' : 'px-3'}`
-      : `flex items-center gap-3 py-2.5 rounded-xl text-ink-400 hover:bg-white/5 hover:text-white transition border-l-2 border-transparent ${collapsed ? 'justify-center px-0' : 'px-3'}`
+      ? `flex items-center gap-3 py-2 rounded-lg bg-brand-500/10 border-l-2 border-brand-500 text-white font-500 transition ${collapsed ? 'justify-center px-0 border-l-0' : 'px-3'}`
+      : `flex items-center gap-3 py-2 rounded-lg text-ink-400 hover:bg-white/5 hover:text-white transition border-l-2 border-transparent ${collapsed ? 'justify-center px-0' : 'px-3'}`
 
   const getNivel = (seccion: string): 'ninguno' | 'lectura' | 'escritura' => {
     if (esAdmin) return 'escritura'
@@ -44,14 +44,14 @@ export default function Sidebar({ user, onCloseMobile, permisos, esAdmin, collap
   const navItemWithPermClass = (path: string, seccion: string) => {
     const nivel = getNivel(seccion)
     if (nivel === 'ninguno') {
-      return `flex items-center gap-3 py-2.5 rounded-xl text-ink-600/40 cursor-not-allowed border-l-2 border-transparent ${collapsed ? 'justify-center px-0' : 'px-3'}`
+      return `flex items-center gap-3 py-2 rounded-lg text-ink-600/40 cursor-not-allowed border-l-2 border-transparent ${collapsed ? 'justify-center px-0' : 'px-3'}`
     }
     return navItemClass(path)
   }
 
   return (
     <aside className={`relative ${collapsed ? 'w-20' : 'w-72'} bg-ink-900 text-white flex flex-col h-full transition-all duration-300 ease-out`}>
-      <div className={`relative flex items-center gap-3 h-20 border-b border-white/10 shrink-0 overflow-hidden ${collapsed ? 'justify-center px-2' : 'px-6'}`}>
+      <div className={`relative flex items-center gap-3 h-16 border-b border-white/10 shrink-0 overflow-hidden ${collapsed ? 'justify-center px-2' : 'px-6'}`}>
         <div className="absolute -top-8 -left-8 w-24 h-24 rounded-full bg-brand-600/20 blur-2xl pointer-events-none"></div>
         <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center shadow-lg shadow-brand-600/40 shrink-0 ring-1 ring-white/10">
           <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">

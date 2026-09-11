@@ -73,6 +73,8 @@ export default async function DashboardLayout({
     ])
     if (!org) return null
     const plan = Array.isArray(org.plans) ? org.plans[0] : org.plans
+    // En la prueba, lo que se dio al empezar; si no, lo que da el plan al mes.
+    // Si el plan no lo dice, se enseña solo el saldo (antes salía "7 / 0")
     const max = org.trial_activo ? plan?.creditos_diarios_trial : plan?.creditos_mensuales
     return { saldo: quotas?.saldo || 0, max: max || 0 }
   }

@@ -22,7 +22,7 @@ export default function PlanesPage() {
   const defaultFormData = {
     nombre: '', precio_usd: 0, creditos_mensuales: 1000, canales_max: 1, sucursales_max: 1, 
     usuarios_max: 1, precio_credito_adicional: 0.005, precio_sucursal_extra: 15, 
-    dias_retencion_mensajes: 30, dias_trial: 14, modelo_ia: 'gpt-4o-mini',
+    dias_retencion_mensajes: 30, dias_trial: 14, creditos_diarios_trial: 0, modelo_ia: 'gpt-4o-mini',
     precio_input_usd_millon: 0.20, precio_output_usd_millon: 1.20,
     activo: false, acumula_creditos: false, stripe_price_id: ''
   }
@@ -53,6 +53,7 @@ export default function PlanesPage() {
         precio_sucursal_extra: plan.precio_sucursal_extra || 0,
         dias_retencion_mensajes: plan.dias_retencion_mensajes || 30,
         dias_trial: plan.dias_trial ?? 14,
+        creditos_diarios_trial: plan.creditos_diarios_trial ?? 0,
         modelo_ia: plan.modelo_ia || 'gpt-4o-mini',
         precio_input_usd_millon: plan.precio_input_usd_millon ?? 0.20,
         precio_output_usd_millon: plan.precio_output_usd_millon ?? 1.20,
@@ -288,6 +289,15 @@ export default function PlanesPage() {
                       <label className="block text-xs font-500 text-ink-600 mb-1.5">Días de prueba</label>
                       <input type="number" min="0" value={formData.dias_trial} onChange={e => setFormData({...formData, dias_trial: parseInt(e.target.value) || 0})} className="w-full h-10 px-3 rounded-lg border border-slate-300 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-100" />
                       <p className="text-[11px] text-ink-400 mt-1">Duración del periodo de prueba al dar de alta con este plan.</p>
+                    </div>
+                    {/* Los créditos que recibe una cuenta al empezar la prueba.
+                        No estaba en el formulario: se cambiaban los "Créditos
+                        IA /mes" del plan Trial y no pasaba nada, porque una
+                        cuenta de prueba recibe estos. */}
+                    <div>
+                      <label className="block text-xs font-500 text-ink-600 mb-1.5">Créditos de la prueba</label>
+                      <input type="number" min="0" value={formData.creditos_diarios_trial} onChange={e => setFormData({...formData, creditos_diarios_trial: parseInt(e.target.value) || 0})} disabled={!formData.dias_trial} className="w-full h-10 px-3 rounded-lg border border-slate-300 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-100 disabled:bg-slate-50 disabled:text-ink-400" />
+                      <p className="text-[11px] text-ink-400 mt-1">{formData.dias_trial ? 'Los recibe la cuenta al darse de alta, una sola vez, para toda la prueba. Los «Créditos IA /mes» se dan al pagar y en cada renovación.' : 'Solo para planes con días de prueba.'}</p>
                     </div>
                     <div>
                       <label className="block text-xs font-500 text-ink-600 mb-1.5">Modelo IA asignado</label>

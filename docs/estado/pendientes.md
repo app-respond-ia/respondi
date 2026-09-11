@@ -192,8 +192,12 @@ se traga en silencio.
 - [ ] Auditoría completa del esquema de Supabase (FKs faltantes) —
       hacer después de terminar el diseño de contexto/herramientas de
       la IA
-- [ ] Herramienta de presupuestos real para la IA (hoy la skill existe
-      en el panel pero sin herramienta real detrás)
+- [x] Herramienta de presupuestos de la IA — hecho (11-09-2026): con la
+      skill "Hacer presupuestos" activada, la IA pasa productos y cantidades
+      y `hacer_presupuesto` calcula el total con los precios del catálogo
+      (avisa de los "desde", no inventa los "a consultar" ni lo que no
+      existe). De paso, el buscador del catálogo ya encuentra los productos
+      aunque el cliente escriba sin tildes o en plural
 - [ ] Bloque 2.1 (traducir errores crudos de Postgres a mensajes
       entendibles) — pausado a propósito hasta cerrar la auditoría de
       esquema y la estrategia de errores/seguridad, para diseñar el

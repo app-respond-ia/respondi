@@ -119,3 +119,19 @@ respuesta y el bloque entero de multimedia.
   skills/skills_globales)
 - Ronda de pruebas rigurosa escenario-por-escenario de toda la
   jerarquía de pausa/horario, antes de tener clientes reales
+
+## Presupuestos y búsqueda en el catálogo (11-09-2026)
+- **`hacer_presupuesto`** (skill "Hacer presupuestos", apagada por defecto):
+  la IA le pasa los productos y las cantidades y la herramienta calcula
+  partidas y total con los precios reales del catálogo
+  (`src/lib/ai/presupuesto.ts`). El modelo no hace cuentas: se equivocaba
+  multiplicando y sumando. Lo que tiene precio "desde" sale como mínimo
+  orientativo; lo "a consultar" no se suma; lo que no existe o es ambiguo
+  se le devuelve aparte para que lo diga o pregunte.
+- **Búsqueda sin tildes ni plurales** (`src/lib/ai/comparar-texto.ts`): el
+  buscador del catálogo comparaba el texto tal cual y "tartas de limon" no
+  encontraba "Tarta de limón", así que al cliente se le decía que no
+  existía. Ahora buscador y presupuestos comparan igual: sin mayúsculas,
+  tildes ni plurales, también en categorías y características.
+- Pruebas: `probar-presupuestos` (5 comprobaciones con la IA real, estables
+  en varias pasadas).

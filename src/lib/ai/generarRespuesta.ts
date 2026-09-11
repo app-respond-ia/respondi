@@ -217,6 +217,11 @@ export async function generarRespuesta(conv: any) {
   }
   systemPrompt += `- No inventes información. Si no lo sabes, indícalo${canEscalate ? ' o usa escalar_humano' : ''}.\n`
   systemPrompt += `- Eres un asistente, responde de manera concisa y natural.\n`
+  if (activeSkills.has('presupuestos')) {
+    // Los totales los calcula la herramienta con los precios reales: el
+    // modelo se equivoca haciendo cuentas
+    systemPrompt += `- Si el cliente pide un presupuesto o el total de varios productos o cantidades, llama a hacer_presupuesto en ese mismo momento (sin preguntar antes detalles que no cambian el precio) y da exactamente las cifras que devuelve. NUNCA calcules tú precios ni totales.\n`
+  }
   // Cuando el negocio estaba cerrado se le manda al cliente un aviso
   // automático y la conversación queda en espera. Al abrir, esa respuesta
   // pendiente se contesta, pero el aviso sigue en el historial y el modelo lo
@@ -404,6 +409,34 @@ export async function generarRespuesta(conv: any) {
             etiquetas: { type: "array", items: { type: "string" }, description: "Características mencionadas (ej. 'vegano', 'frio', 'madera')." },
             precio_maximo: { type: "number", description: "Precio máximo en caso de que el cliente especifique un presupuesto." }
           }
+        }
+      }
+    })
+  }
+
+  if (activeSkills.has('presupuestos')) {
+    tools.push({
+      type: "function" as const,
+      function: {
+        name: "hacer_presupuesto",
+        description: "Calcula un presupuesto exacto con los precios reales del catálogo. Úsala SIEMPRE, en cuanto el cliente diga qué productos y cuántos, cuando pida un presupuesto o el precio total de varios productos o de una cantidad. Pasa cada producto con el nombre que ha dicho el cliente (o el del catálogo) y su cantidad; la herramienta los encuentra aunque no estén escritos igual. No pidas detalles que no cambian el precio y no hagas tú las cuentas.",
+        parameters: {
+          type: "object",
+          properties: {
+            lineas: {
+              type: "array",
+              description: "Los productos del presupuesto.",
+              items: {
+                type: "object",
+                properties: {
+                  producto: { type: "string", description: "Nombre del producto o servicio." },
+                  cantidad: { type: "number", description: "Cuántas unidades quiere el cliente." }
+                },
+                required: ["producto", "cantidad"]
+              }
+            }
+          },
+          required: ["lineas"]
         }
       }
     })
@@ -661,32 +694,28 @@ export async function generarRespuesta(conv: any) {
         }
       }
       else if (toolCall.function.name === 'consultar_catalogo') {
+        // Lo que escribe el cliente se compara sin mayúsculas, tildes ni
+        // plurales. Antes se buscaba el texto tal cual y "tartas de limon" no
+        // encontraba "Tarta de limón": al cliente se le decía que no existía.
+        const { normalizar, contienePalabras } = await import('@/lib/ai/comparar-texto')
+        const conTexto = !!args.busqueda || (Array.isArray(args.etiquetas) && args.etiquetas.length > 0)
         let query = supabaseAdmin.from('price_list').select(`
-          id, nombre, tipo, precio, precio_tipo, moneda, descripcion,
+          id, nombre, tipo, precio, precio_tipo, moneda, descripcion, etiquetas,
           categorias_precios (id, nombre, parent_id)
         `).eq('branch_id', branchId).eq('visible_ia', true).eq('disponible', true)
-        
-        if (args.busqueda) {
-          query = query.or(`nombre.ilike.%${args.busqueda}%,descripcion.ilike.%${args.busqueda}%`)
-        }
-        
+
         if (args.categoria) {
-          const { data: cats } = await supabaseAdmin.from('categorias_precios')
-            .select('id, parent_id')
+          const { data: todasCats } = await supabaseAdmin.from('categorias_precios')
+            .select('id, nombre, parent_id')
             .eq('branch_id', branchId)
-            .ilike('nombre', `%${args.categoria}%`)
-            
-          if (cats && cats.length > 0) {
-            const catIds = new Set<string>()
+          const buscadaCat = normalizar(args.categoria)
+          const cats = (todasCats || []).filter((c: any) => normalizar(c.nombre).includes(buscadaCat) || contienePalabras(c.nombre, args.categoria))
+
+          if (cats.length > 0) {
+            const catIds = new Set<string>(cats.map((c: any) => c.id))
             for (const c of cats) {
-              catIds.add(c.id)
-              if (!c.parent_id) {
-                const { data: subs } = await supabaseAdmin.from('categorias_precios')
-                  .select('id')
-                  .eq('branch_id', branchId)
-                  .eq('parent_id', c.id)
-                if (subs) subs.forEach(s => catIds.add(s.id))
-              }
+              // Una categoría principal incluye sus subcategorías
+              if (!c.parent_id) (todasCats || []).filter((x: any) => x.parent_id === c.id).forEach((x: any) => catIds.add(x.id))
             }
             query = query.in('categoria_id', Array.from(catIds))
           } else {
@@ -694,17 +723,29 @@ export async function generarRespuesta(conv: any) {
           }
         }
         
-        if (args.etiquetas && args.etiquetas.length > 0) {
-          query = query.overlaps('etiquetas', args.etiquetas)
-        }
-        
         if (args.precio_maximo !== undefined) {
           query = query.lte('precio', args.precio_maximo)
         }
         
-        query = query.limit(15)
+        // Con texto o características se filtra aquí mismo, sobre el catálogo
+        // de la sucursal; sin ellos basta con los 15 primeros
+        query = query.limit(conTexto ? 2000 : 15)
         
-        const { data: productos, error } = await query
+        const { data: encontrados, error } = await query
+        let productos: any[] = encontrados || []
+
+        if (!error && args.busqueda) {
+          const b = normalizar(args.busqueda)
+          const enNombre = (p: any) => normalizar(p.nombre).includes(b) || contienePalabras(p.nombre, args.busqueda)
+          productos = productos
+            .filter(p => enNombre(p) || normalizar(p.descripcion || '').includes(b) || contienePalabras(`${p.nombre} ${p.descripcion || ''}`, args.busqueda))
+            .sort((a, z) => Number(enNombre(z)) - Number(enNombre(a)))
+        }
+        if (!error && Array.isArray(args.etiquetas) && args.etiquetas.length > 0) {
+          const pedidas = args.etiquetas.map((e: string) => normalizar(e)).filter(Boolean)
+          productos = productos.filter(p => (p.etiquetas || []).some((e: string) => pedidas.includes(normalizar(e))))
+        }
+        productos = productos.slice(0, 15)
         
         if (error) {
           console.error("Error consultando catálogo:", error)
@@ -726,6 +767,10 @@ export async function generarRespuesta(conv: any) {
             toolResult += '\n'
           }
         }
+      }
+      else if (toolCall.function.name === 'hacer_presupuesto') {
+        const { calcularPresupuesto } = await import('@/lib/ai/presupuesto')
+        toolResult = await calcularPresupuesto(branchId, Array.isArray(args.lineas) ? args.lineas : [])
       }
       else if (toolCall.function.name === 'consultar_politicas') {
         try {

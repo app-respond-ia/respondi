@@ -50,15 +50,14 @@ export async function POST(req: Request) {
       let metidos = 0
       for (const c of correos) {
         if (!c.automatico && c.de.direccion) {
-          const [adjunto, ...otros] = c.adjuntos
           const r = await registrarMensajeEntrante({
             canal: { id: canal.id, tenant_id: canal.tenant_id, branch_id: canal.branch_id, tipo: 'email' },
             contactoExterno: c.de.direccion,
             // Sin nombre en el correo, la dirección (mejor que "Desconocido")
             nombreContacto: c.de.nombre || c.de.direccion,
             mensajeExterno: c.messageId || `uid-${lectura.uidvalidity}-${c.uid}@${canal.id}`,
-            contenido: [c.texto, otros.length ? `[El cliente ha adjuntado ${otros.length} archivo(s) más]` : ''].filter(Boolean).join('\n\n') || '(correo sin texto)',
-            archivo: adjunto ? { datos: adjunto.datos, tipo: adjunto.tipo, nombre: adjunto.nombre } : null,
+            contenido: c.texto || (c.adjuntos.length ? `(correo sin texto, con ${c.adjuntos.length === 1 ? 'un archivo adjunto' : c.adjuntos.length + ' archivos adjuntos'})` : '(correo sin texto)'),
+            archivos: c.adjuntos.map(a => ({ datos: a.datos, tipo: a.tipo, nombre: a.nombre })),
             asunto: c.asunto || null,
             referencias: c.messageId ? [...c.referencias, c.messageId] : c.referencias
           })

@@ -11,7 +11,9 @@ export interface MensajeEntrante {
   // Identificador del mensaje en el proveedor: si llega dos veces, se ignora
   mensajeExterno: string
   contenido: string
+  // Un mensaje de WhatsApp trae como mucho un archivo; un correo, varios
   archivo?: { datos: Buffer; tipo: string; nombre: string } | null
+  archivos?: { datos: Buffer; tipo: string; nombre: string }[]
   // Solo en correos: el asunto y el hilo (para contestar dentro del mismo hilo)
   asunto?: string | null
   referencias?: string[]
@@ -34,22 +36,25 @@ export async function registrarMensajeEntrante(m: MensajeEntrante): Promise<{ ok
   // 2. El archivo, si lo hay, al almacenamiento privado. Se guarda la ruta, no
   //    un enlace firmado: el enlace caduca y rompería el historial del chat.
   let contenido = m.contenido
-  let mediaUrl: string | null = null
-  let mediaTipo: string | null = null
-  if (m.archivo) {
-    if (m.archivo.datos.length > TAMANO_MAXIMO) {
-      contenido = `${contenido ? contenido + ' ' : ''}[El cliente ha enviado un archivo de más de 50 MB que no se ha podido guardar]`
-    } else {
-      const extension = (m.archivo.nombre.includes('.') ? m.archivo.nombre.split('.').pop() : m.archivo.tipo.split('/').pop()?.split(';')[0]) || 'bin'
-      const ruta = `${m.canal.tenant_id}/${conversationId}/${Date.now()}-${Math.random().toString(36).slice(2, 9)}.${extension}`
-      const { error: errSubida } = await supabaseAdmin.storage
-        .from('whatsapp_media')
-        .upload(ruta, m.archivo.datos, { contentType: m.archivo.tipo, upsert: false })
-      if (errSubida) return { ok: false, error: `No se pudo guardar el archivo: ${errSubida.message}` }
-      mediaUrl = ruta
-      mediaTipo = m.archivo.tipo
-    }
+  const entrantes = [...(m.archivo ? [m.archivo] : []), ...(m.archivos || [])]
+  const adjuntos: { ruta: string; tipo: string; nombre: string }[] = []
+  let grandes = 0
+  for (const archivo of entrantes) {
+    if (archivo.datos.length > TAMANO_MAXIMO) { grandes++; continue }
+    const extension = (archivo.nombre.includes('.') ? archivo.nombre.split('.').pop() : archivo.tipo.split('/').pop()?.split(';')[0]) || 'bin'
+    const ruta = `${m.canal.tenant_id}/${conversationId}/${Date.now()}-${Math.random().toString(36).slice(2, 9)}.${extension}`
+    const { error: errSubida } = await supabaseAdmin.storage
+      .from('whatsapp_media')
+      .upload(ruta, archivo.datos, { contentType: archivo.tipo, upsert: false })
+    if (errSubida) return { ok: false, error: `No se pudo guardar el archivo: ${errSubida.message}` }
+    adjuntos.push({ ruta, tipo: archivo.tipo, nombre: archivo.nombre })
   }
+  if (grandes) {
+    contenido = `${contenido ? contenido + ' ' : ''}[El cliente ha enviado ${grandes === 1 ? 'un archivo' : `${grandes} archivos`} de más de 50 MB que no se ${grandes === 1 ? 'ha' : 'han'} podido guardar]`
+  }
+  // El primero va también en media_url/media_tipo: es lo que mira la IA
+  const mediaUrl = adjuntos[0]?.ruta || null
+  const mediaTipo = adjuntos[0]?.tipo || null
 
   // 3. El mensaje
   const { data: nuevo, error: errMensaje } = await supabaseAdmin
@@ -61,6 +66,7 @@ export async function registrarMensajeEntrante(m: MensajeEntrante): Promise<{ ok
       contenido,
       media_url: mediaUrl,
       media_tipo: mediaTipo,
+      ...(adjuntos.length ? { adjuntos } : {}),
       identificador_externo: m.mensajeExterno,
       ...(m.asunto !== undefined ? { asunto: m.asunto || null } : {}),
       ...(m.referencias?.length ? { email_referencias: m.referencias.join(' ') } : {})

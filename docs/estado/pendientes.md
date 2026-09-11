@@ -145,8 +145,9 @@ solo la lista viva).
 - [ ] Email con Outlook / Microsoft 365: necesita el inicio de sesión de
       Microsoft (OAuth, registrar una app en Azure). Hoy se avisa de que no
       se puede
-- [ ] Email: leer los adjuntos más allá del primero (hoy se guarda el
-      primero y se avisa de cuántos más hay)
+- [x] Email: todos los adjuntos (12-09-2026). Se guardan todos en
+      `messages.adjuntos` y se ven en Chats; el primero sigue en
+      `media_url`, que es lo que mira la IA
 
 ## Prioridad 4 — Shopify Fase 1
 - [ ] Conexión real con la API de Shopify (catálogo/stock/pedidos)

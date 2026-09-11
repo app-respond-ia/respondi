@@ -161,6 +161,9 @@ sin tocar el resto.
   respuesta —de la IA o de un agente desde Chats— sale "Re: asunto" dentro
   del mismo hilo (In-Reply-To/References) y se deja copia en Enviados
   (Gmail lo hace solo). En Chats se ve el asunto de cada correo.
+- **Adjuntos**: entran todos los archivos del correo (`messages.adjuntos`), y
+  se ven en Chats con un enlace temporal. El primero va también en `media_url`,
+  que es lo que mira la IA para las fotos.
 - **Sin ventana de 24 h**: en correo se puede contestar cuando sea.
 - **Errores**: si el proveedor rechaza la contraseña, el canal pasa a
   "error" con el motivo en su tarjeta; un fallo pasajero solo se apunta y se

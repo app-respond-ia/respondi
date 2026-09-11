@@ -8,11 +8,19 @@ interface MessageBubbleProps {
 
 // La foto, el vídeo o el archivo que lleva el mensaje. El enlace es temporal
 // (lo crea el servidor al cargar los mensajes): el almacén es privado.
-function Archivo({ msg }: { msg: any }) {
-  if (!msg.media_url) return null
-  const tipo = String(msg.media_tipo || '')
-  const enlace = msg.media_enlace as string | undefined
-  const nombre = String(msg.media_url).split('/').pop() || 'archivo'
+function Archivos({ msg }: { msg: any }) {
+  // Un correo puede traer varios; WhatsApp, uno
+  const lista = Array.isArray(msg.adjuntos) && msg.adjuntos.length
+    ? msg.adjuntos.map((a: any) => ({ tipo: a.tipo, enlace: a.enlace, nombre: a.nombre }))
+    : msg.media_url ? [{ tipo: msg.media_tipo, enlace: msg.media_enlace, nombre: String(msg.media_url).split('/').pop() }] : []
+  if (!lista.length) return null
+  return <>{lista.map((a: any, i: number) => <Archivo key={i} archivo={a} />)}</>
+}
+
+function Archivo({ archivo }: { archivo: { tipo?: string | null; enlace?: string | null; nombre?: string | null } }) {
+  const tipo = String(archivo.tipo || '')
+  const enlace = archivo.enlace || undefined
+  const nombre = archivo.nombre || 'archivo'
 
   if (!enlace) {
     return <p className="text-xs text-ink-400 mb-1">📎 Archivo adjunto (no se ha podido abrir)</p>
@@ -82,7 +90,7 @@ export function MessageBubble({ msg, contactName, channelId }: MessageBubbleProp
         <div className="max-w-[75%]">
           <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-sm px-4 py-2.5">
             {msg.asunto && <p className="text-xs font-600 text-ink-700 mb-1 break-words">Asunto: {msg.asunto}</p>}
-            <Archivo msg={msg} />
+            <Archivos msg={msg} />
             <p className="text-sm text-ink-900 whitespace-pre-wrap break-words">{msg.contenido}</p>
           </div>
           <p className="text-[11px] text-ink-400 mt-1 ml-1">{formatTime(msg.timestamp)}</p>
@@ -98,7 +106,7 @@ export function MessageBubble({ msg, contactName, channelId }: MessageBubbleProp
         <div className="max-w-[75%]">
           <div className={`${bgClass} rounded-2xl rounded-tr-sm px-4 py-2.5`}>
             {msg.asunto && <p className="text-xs font-600 opacity-80 mb-1 break-words">Asunto: {msg.asunto}</p>}
-            <Archivo msg={msg} />
+            <Archivos msg={msg} />
             <p className="text-sm whitespace-pre-wrap break-words">{msg.contenido}</p>
           </div>
           <div className="flex items-center justify-end gap-1.5 mt-1 mr-1">

@@ -193,7 +193,7 @@ export async function actualizarTratoContacto(data: ActualizarTratoContactoData)
 
       if (!unlockErr) {
         after(() => {
-          fetch(`https://respondi.vercel.app/api/ai/process`, {
+          fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'https://respondi.vercel.app'}/api/ai/process`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

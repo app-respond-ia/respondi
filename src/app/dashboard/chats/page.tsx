@@ -244,20 +244,27 @@ function ChatsContent() {
     }
   }, [selectedConvId])
 
+  // Los agentes de la sucursal no cambian de un chat a otro: se piden la
+  // primera vez y no con cada chat que se abre (cada petición al servidor va
+  // en fila detrás de la anterior y hacía más lento cambiar de chat). Al
+  // cambiar de sucursal la página se recarga entera.
+  const agentesCargados = useRef(false)
   const cargarContexto = async (id: string) => {
     setLoadingContext(true)
     try {
+      const pedirAgentes = !agentesCargados.current
       const [ctxRes, agRes, logRes] = await Promise.all([
         getContextoChat(id),
-        getAgentesParaCasos(),
+        pedirAgentes ? getAgentesParaCasos() : Promise.resolve(null),
         hasLogPerm ? getLogsAuditoria('conversations', id) : Promise.resolve({ success: true, data: [] })
       ])
       
       if (ctxRes.success && ctxRes.data) {
         setContexto(ctxRes.data)
       }
-      if (agRes.success && agRes.data) {
+      if (agRes?.success && agRes.data) {
         setAgentes(agRes.data)
+        agentesCargados.current = true
       }
       if (logRes.success && logRes.data) {
         setLogs(logRes.data)

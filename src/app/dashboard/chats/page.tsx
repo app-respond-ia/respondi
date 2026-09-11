@@ -4,9 +4,8 @@ import { ErrorCarga } from '@/components/ui/ErrorCarga'
 
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { getConversaciones, getMensajes, toggleIAPausa, cerrarConversacion, reabrirConversacion, getContextoChat, getEtiquetasTenant } from '@/app/actions/chats'
+import { getConversaciones, getMensajes, toggleIAPausa, cerrarConversacion, reabrirConversacion, getContextoChat, inicioChats, abrirChat } from '@/app/actions/chats'
 import { enviarMensajeAgenteConv } from '@/app/actions/conversaciones'
-import { getMisPermisos } from '@/app/actions/permisos'
 import { reabrirCaso, getAgentesParaCasos, crearCasoDesdeConversacion, asignarCaso, soltarCaso } from '@/app/actions/casos'
 import { getLogsAuditoria } from '@/app/actions/audit-log'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
@@ -99,9 +98,8 @@ function ChatsContent() {
   // (y otra más con cada filtro), y la segunda miraba una sección que no
   // existe ('audit_logs'): quien tenía permiso de registro sin ser
   // administrador nunca veía la actividad en Chats.
-  const cargarPermisos = async () => {
-    const permisosRes = await getMisPermisos()
-    if (!permisosRes.success) {
+  const aplicarPermisos = (permisosRes: any) => {
+    if (!permisosRes?.success) {
       setErrorCarga(true)
       return
     }
@@ -120,12 +118,7 @@ function ChatsContent() {
   }
 
   useEffect(() => {
-    cargarPermisos().catch(() => setErrorCarga(true))
-    
-    getEtiquetasTenant().then(res => {
-      if (res.success && res.data) setEtiquetasTenant(res.data)
-    })
-    
+
     function handleClickOutside(event: MouseEvent) {
       if (filtersRef.current && !filtersRef.current.contains(event.target as Node)) {
         setShowFilters(false)
@@ -166,7 +159,7 @@ function ChatsContent() {
     if (isFirstMount.current) setLoadingChats(true)
     setIsFetching(true)
     
-    const res = await getConversaciones({
+    const filtros = {
       estado: filtroActivo,
       search: debouncedSearch,
       canal: canalFilter,
@@ -177,7 +170,17 @@ function ChatsContent() {
       etiquetasIds: etiquetasIds,
       dateRange: dateRange.from || dateRange.to ? dateRange : undefined,
       sort: sortOrder
-    })
+    }
+    // Al entrar, permisos, etiquetas y lista llegan juntos; después, solo la lista
+    let res: any
+    if (isFirstMount.current) {
+      const inicio = await inicioChats(filtros)
+      aplicarPermisos(inicio.permisos)
+      if (inicio.etiquetas.success && inicio.etiquetas.data) setEtiquetasTenant(inicio.etiquetas.data)
+      res = inicio.lista
+    } else {
+      res = await getConversaciones(filtros)
+    }
 
     if (res.success && res.data) {
       let nuevas: any[] = res.data.conversaciones || []
@@ -238,8 +241,7 @@ function ChatsContent() {
 
   useEffect(() => {
     if (selectedConvId) {
-      cargarMensajes(selectedConvId)
-      cargarContexto(selectedConvId)
+      abrirChatEntero(selectedConvId)
     } else {
       setContexto(null)
       setLogs([])
@@ -274,6 +276,30 @@ function ChatsContent() {
     } catch (error) {
       console.error(error)
     }
+    setLoadingContext(false)
+  }
+
+  // Abrir un chat: mensajes, ficha, actividad y (la primera vez) los agentes,
+  // en una sola petición al servidor
+  const abrirChatEntero = async (id: string) => {
+    setLoadingMsgs(true)
+    setLoadingContext(true)
+    setMensajes([])
+    try {
+      const r = await abrirChat(id, { actividad: hasLogPerm, agentes: !agentesCargados.current })
+      if (selectedConvIdRef.current !== id) return // ya se ha abierto otro
+      if (r.mensajes.success && r.mensajes.data) setMensajes(r.mensajes.data.mensajes || [])
+      else showToast(r.mensajes.error || 'Error al cargar mensajes', 'error')
+      if (r.contexto.success && r.contexto.data) setContexto(r.contexto.data)
+      if (r.logs?.success && r.logs.data) setLogs(r.logs.data)
+      if (r.agentes?.success && r.agentes.data) {
+        setAgentes(r.agentes.data)
+        agentesCargados.current = true
+      }
+    } catch {
+      showToast('No se ha podido abrir el chat. Revisa la conexión.', 'error')
+    }
+    setLoadingMsgs(false)
     setLoadingContext(false)
   }
 

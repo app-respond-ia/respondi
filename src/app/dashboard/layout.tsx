@@ -62,27 +62,32 @@ export default async function DashboardLayout({
     if (!primeraSucursal?.onboarding_completado) redirect('/onboarding')
   }
 
-  const permisosRes = await getMisPermisos()
-  const esAdmin = (permisosRes.success && (permisosRes as any).esAdmin) || false
-  const permisos = (permisosRes.success && permisosRes.data) ? permisosRes.data : []
-
-  // La lista del selector sale de la misma regla que decide a qué tiendas se
-  // puede entrar (también al impersonar: las de la organización impersonada).
-  const branches = await sucursalesPermitidas(supabase, user.id)
-  const activeBranchId = await resolveBranchId(supabase, user.id) || ''
-
-  let creditos = null
-  if (userData?.tenant_id) {
+  // Permisos, tiendas del selector, tienda activa y créditos no dependen unos
+  // de otros: se piden a la vez (antes iban uno detrás de otro y cada página
+  // del panel tardaba más en empezar a pintarse).
+  const creditosDeLaOrganizacion = async () => {
+    if (!userData?.tenant_id) return null
     const [{ data: org }, { data: quotas }] = await Promise.all([
       supabase.from('organizaciones').select('trial_activo, plans!plan_id(creditos_diarios_trial, creditos_mensuales)').eq('id', userData.tenant_id).single(),
       supabase.from('message_quotas').select('saldo').eq('tenant_id', userData.tenant_id).order('timestamp', { ascending: false }).limit(1).maybeSingle()
     ])
-    if (org) {
-      const plan = Array.isArray(org.plans) ? org.plans[0] : org.plans
-      const max = org.trial_activo ? plan?.creditos_diarios_trial : plan?.creditos_mensuales
-      creditos = { saldo: quotas?.saldo || 0, max: max || 0 }
-    }
+    if (!org) return null
+    const plan = Array.isArray(org.plans) ? org.plans[0] : org.plans
+    const max = org.trial_activo ? plan?.creditos_diarios_trial : plan?.creditos_mensuales
+    return { saldo: quotas?.saldo || 0, max: max || 0 }
   }
+
+  // La lista del selector sale de la misma regla que decide a qué tiendas se
+  // puede entrar (también al impersonar: las de la organización impersonada).
+  const [permisosRes, branches, sucursalActiva, creditos] = await Promise.all([
+    getMisPermisos(),
+    sucursalesPermitidas(supabase, user.id),
+    resolveBranchId(supabase, user.id),
+    creditosDeLaOrganizacion()
+  ])
+  const esAdmin = (permisosRes.success && (permisosRes as any).esAdmin) || false
+  const permisos = (permisosRes.success && permisosRes.data) ? permisosRes.data : []
+  const activeBranchId = sucursalActiva || ''
 
   return (
     <>

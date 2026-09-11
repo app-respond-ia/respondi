@@ -473,3 +473,25 @@ export async function getContextoChat(conversationId: string) {
   
   return { success: true, data: contexto }
 }
+
+// Chats al entrar: permisos, etiquetas del filtro y la lista, en una sola
+// petición. Next.js atiende las peticiones de una pantalla una detrás de
+// otra, así que cada una que se ahorra es tiempo que el usuario no espera.
+export async function inicioChats(filtros?: Parameters<typeof getConversaciones>[0]) {
+  const { getMisPermisos } = await import('./permisos')
+  const [permisos, etiquetas, lista] = await Promise.all([getMisPermisos(), getEtiquetasTenant(), getConversaciones(filtros)])
+  return { permisos, etiquetas, lista }
+}
+
+// Un chat al abrirlo: mensajes, ficha, actividad y (la primera vez) los
+// agentes de la sucursal, también en una sola petición
+export async function abrirChat(conversationId: string, opciones: { actividad: boolean; agentes: boolean }) {
+  const [{ getLogsAuditoria }, { getAgentesParaCasos }] = await Promise.all([import('./audit-log'), import('./casos')])
+  const [mensajes, contexto, logs, agentes] = await Promise.all([
+    getMensajes(conversationId),
+    getContextoChat(conversationId),
+    opciones.actividad ? getLogsAuditoria('conversations', conversationId) : Promise.resolve(null),
+    opciones.agentes ? getAgentesParaCasos() : Promise.resolve(null)
+  ])
+  return { mensajes, contexto, logs, agentes }
+}

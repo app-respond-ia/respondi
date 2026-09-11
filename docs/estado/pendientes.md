@@ -78,9 +78,10 @@ solo la lista viva).
 - [x] Lentitud general: las funciones de Vercel corrían en EE. UU. y la base
       de datos está en Irlanda — resuelto (11-09-2026), ahora en Dublín. Chats
       pasó de 13-18 s a unos 4 s en cargar
-- [ ] Chats aún tarda unos 4 s: al entrar hace 6 peticiones al servidor y
-      Next.js las atiende en fila (~0,5 s cada una). Juntar las del arranque
-      en una sola lo dejaría en 1-2 s
+- [x] Chats más rápido (11-09-2026): al entrar hace una sola petición
+      (permisos, etiquetas y lista) y al abrir un chat otra (mensajes, ficha,
+      actividad); antes eran 6 en fila. El marco del panel pide a la vez lo
+      que no depende entre sí
 
 ## Prioridad 2 — Fase 0 (antes de construir nada de la v2)
 - [x] Conseguir `OPENAI_API_KEY` — hecha: en `.env.local` y en las

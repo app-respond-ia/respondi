@@ -1,5 +1,5 @@
 import { supabaseAdmin } from '@/utils/supabase/admin'
-import { cargarAgenda, huecosDelDia, huecosEntreDias, recursosCandidatos, type Agenda } from './disponibilidad'
+import { cargarAgenda, esRestaurante, huecosDelDia, huecosEntreDias, recursosCandidatos, servicioMesa, servicioPorId, type Agenda } from './disponibilidad'
 import { crearCita, moverCita, cancelarCita, citasDelContacto, normalizarTelefono } from './citas'
 import { diaEnZona, instanteLocal, leerFecha, partesEnZona, sumarDias, textoFecha, textoFechaHora, textoHora } from './tiempo'
 import type { Cita, Recurso, Servicio } from './tipos'
@@ -35,7 +35,9 @@ export async function cargarHerramientasDeAgenda(branchId: string, contactId: st
   const agenda = await cargarAgenda(branchId)
   if (!agenda || !agenda.ajustes.activa) return { contexto: null, definiciones: [], instrucciones: '' }
   const servicios = agenda.servicios.filter(s => s.reservable && s.disponible && s.visible_ia)
-  if (!servicios.length) return { contexto: null, definiciones: [], instrucciones: '' }
+  const restaurante = esRestaurante(agenda)
+  const mesas = agenda.recursos.filter(r => r.activo && r.tipo === 'mesa')
+  if (!servicios.length && !(restaurante && mesas.length)) return { contexto: null, definiciones: [], instrucciones: '' }
 
   let contacto: ContextoAgenda['contacto'] = { id: contactId, canal: null, identificador: null, nombre: null }
   if (contactId) {
@@ -51,9 +53,14 @@ export async function cargarHerramientasDeAgenda(branchId: string, contactId: st
   const a = agenda.ajustes
   const antelacion = a.antelacion_minima_minutos >= 60 ? `${Math.round(a.antelacion_minima_minutos / 60)} h` : `${a.antelacion_minima_minutos} min`
 
+  const zonas = [...new Set(mesas.map(m => (m.zona || '').trim()).filter(Boolean))]
+  const turnos = agenda.ajustes.turnos.map(t => `${t.nombre} de ${t.inicio} a ${t.fin}${t.ultima_entrada ? ` (última entrada ${t.ultima_entrada})` : ''}`).join('; ')
   const notas = [
     `AGENDA DE RESERVAS. Hoy es ${textoFechaHora(ahora, agenda.zona, { conAnio: true })} (${hoy}); mañana es ${sumarDias(hoy, 1)}. Las fechas se pasan siempre como AAAA-MM-DD y las horas como HH:MM.`,
-    `Servicios que se reservan:\n${listaServicios}`,
+    restaurante
+      ? `RESTAURANTE: lo que se reserva es una MESA (pasa servicio "mesa"). ${turnos ? `Turnos: ${turnos}.` : 'Sin turnos definidos: vale cualquier hora de apertura.'} ${zonas.length ? `Zonas: ${zonas.join(', ')} (si el cliente pide una, pásala en zona).` : ''} Pregunta SIEMPRE cuántas personas antes de buscar mesa. Las peticiones (alergias, trona, cumpleaños, silla de ruedas) van en "peticiones". Nunca prometas una mesa concreta ni la terraza si la herramienta no la ha dado.`
+      : '',
+    servicios.length ? `${restaurante ? 'Además se reservan estos servicios' : 'Servicios que se reservan'}:\n${listaServicios}` : '',
     profesionales.length ? `Profesionales que se pueden elegir: ${profesionales.join(', ')}. Si el cliente no dice con quién, no preguntes: se asigna solo.` : '',
     `Reglas: reservar con al menos ${antelacion} de antelación y como mucho ${a.antelacion_maxima_dias} días antes; cambiar o cancelar hasta ${a.cancelacion_horas} h antes; a partir de ${a.grupo_grande_desde} personas la reserva la gestiona una persona del equipo.`,
     a.confirmacion === 'manual' ? 'Las reservas quedan PENDIENTES hasta que alguien del equipo las confirme: dilo así, no digas que está confirmada.' : 'Las reservas quedan confirmadas al momento.',
@@ -71,12 +78,13 @@ export async function cargarHerramientasDeAgenda(branchId: string, contactId: st
         parameters: {
           type: 'object',
           properties: {
-            servicio: { type: 'string', description: 'El servicio, con las palabras del cliente o el nombre de la lista.' },
+            servicio: { type: 'string', description: 'El servicio, con las palabras del cliente o el nombre de la lista. En un restaurante, "mesa".' },
             fecha: { type: 'string', description: 'Día que quiere, AAAA-MM-DD.' },
             hora_preferida: { type: 'string', description: 'Hora aproximada que prefiere, HH:MM, si la ha dicho.' },
             franja: { type: 'string', enum: ['manana', 'tarde', 'cualquiera'], description: 'Parte del día que prefiere.' },
-            personas: { type: 'number', description: 'Cuántas personas (mesas, clases). Si no lo dice, 1.' },
-            profesional: { type: 'string', description: 'Con quién quiere, si lo ha dicho.' }
+            personas: { type: 'number', description: 'Cuántas personas (mesas, clases). En un restaurante es obligatorio.' },
+            profesional: { type: 'string', description: 'Con quién quiere, si lo ha dicho.' },
+            zona: { type: 'string', description: 'Restaurante: zona que pide (terraza, interior...), si la dice.' }
           },
           required: ['servicio', 'fecha']
         }
@@ -90,11 +98,12 @@ export async function cargarHerramientasDeAgenda(branchId: string, contactId: st
         parameters: {
           type: 'object',
           properties: {
-            servicio: { type: 'string' },
+            servicio: { type: 'string', description: 'El servicio; en un restaurante, "mesa".' },
             fecha: { type: 'string', description: 'AAAA-MM-DD' },
             hora: { type: 'string', description: 'HH:MM, una de las que dio ver_huecos.' },
             personas: { type: 'number' },
             profesional: { type: 'string', description: 'Si el cliente eligió con quién.' },
+            zona: { type: 'string', description: 'Restaurante: zona que pidió, si ver_huecos la dio.' },
             nombre: { type: 'string', description: 'Nombre del cliente si lo ha dicho y no lo teníamos.' },
             extras: { type: 'array', items: { type: 'string' }, description: 'Extras que ha pedido, con el nombre de la lista.' },
             peticiones: { type: 'string', description: 'Peticiones especiales (alergias, trona, aparcamiento...).' }
@@ -107,16 +116,17 @@ export async function cargarHerramientasDeAgenda(branchId: string, contactId: st
       type: 'function',
       function: {
         name: 'cambiar_cita',
-        description: 'Mueve una cita del cliente a otro día u hora (que ver_huecos haya dado). Si tiene varias, pasa cita_id de la que toque (las da mis_citas).',
+        description: 'Mueve una cita del cliente a otro día u hora (que ver_huecos haya dado), o cambia cuántas personas son. Si tiene varias, pasa cita_id de la que toque (las da mis_citas).',
         parameters: {
           type: 'object',
           properties: {
             cita_id: { type: 'string' },
-            fecha: { type: 'string', description: 'AAAA-MM-DD' },
-            hora: { type: 'string', description: 'HH:MM' },
+            fecha: { type: 'string', description: 'AAAA-MM-DD (si no cambia, la misma).' },
+            hora: { type: 'string', description: 'HH:MM (si no cambia, la misma).' },
+            personas: { type: 'number', description: 'Solo si cambia el número de personas.' },
             profesional: { type: 'string' }
           },
-          required: ['fecha', 'hora']
+          required: ['hora']
         }
       }
     },
@@ -186,11 +196,16 @@ export async function ejecutarHerramientaDeAgenda(nombre: string, args: any, ctx
 }
 
 // --- Buscar servicio y profesional por lo que dice el cliente --------------
-async function buscarServicio(ctx: ContextoAgenda, texto: string): Promise<Servicio | null> {
+const HABLA_DE_MESA = /\bmesa|reserv|comer|cenar|almorz|comida|cena|desayun|brunch|men[uú]/i
+
+async function buscarServicio(ctx: ContextoAgenda, texto: string, personas = 1): Promise<Servicio | null> {
   const { normalizar, contienePalabras } = await import('@/lib/ai/comparar-texto')
   const servicios = ctx.agenda.servicios.filter(s => s.reservable && s.disponible)
+  const restaurante = esRestaurante(ctx.agenda)
   const buscado = normalizar(String(texto || ''))
-  if (!buscado) return servicios.length === 1 ? servicios[0] : null
+  // En un restaurante, salvo que nombre un servicio de la lista, es una mesa
+  if (restaurante && (!buscado || buscado === 'mesa' || HABLA_DE_MESA.test(texto || '')) && !servicios.some(s => buscado && normalizar(s.nombre) === buscado)) return servicioMesa(ctx.agenda, personas)
+  if (!buscado) return servicios.length === 1 ? servicios[0] : (restaurante ? servicioMesa(ctx.agenda, personas) : null)
   const exacto = servicios.find(s => normalizar(s.nombre) === buscado)
   if (exacto) return exacto
   const contiene = servicios.filter(s => contienePalabras(s.nombre, buscado) || contienePalabras(buscado, s.nombre))
@@ -200,6 +215,7 @@ async function buscarServicio(ctx: ContextoAgenda, texto: string): Promise<Servi
   const palabras = buscado.split(/\s+/).filter(p => p.length > 2)
   const puntuados = servicios.map(s => ({ s, n: palabras.filter(p => normalizar(s.nombre).includes(p) || normalizar(s.descripcion || '').includes(p)).length })).filter(x => x.n > 0).sort((a, b) => b.n - a.n)
   if (puntuados.length && (puntuados.length === 1 || puntuados[0].n > puntuados[1].n)) return puntuados[0].s
+  if (restaurante) return servicioMesa(ctx.agenda, personas)
   return servicios.length === 1 ? servicios[0] : null
 }
 
@@ -218,6 +234,7 @@ function nombresDe(ctx: ContextoAgenda, ids: string[]) {
 
 function noHayServicio(ctx: ContextoAgenda) {
   const lista = ctx.agenda.servicios.filter(s => s.reservable && s.disponible).map(s => s.nombre).slice(0, 15).join(', ')
+  if (esRestaurante(ctx.agenda)) return `No sé si quiere una mesa o uno de estos servicios: ${lista || 'ninguno'}. Si es una mesa, pasa servicio "mesa" y las personas.`
   return `No sé a qué servicio se refiere. Pregúntale cuál quiere de estos: ${lista}.`
 }
 
@@ -245,11 +262,13 @@ function elegirOpciones(huecos: { inicio: string; recursos: string[]; plazas?: n
 }
 
 async function verHuecos(args: any, ctx: ContextoAgenda) {
-  const servicio = await buscarServicio(ctx, args?.servicio)
+  const personasDichas = Number(args?.personas) || 0
+  const servicio = await buscarServicio(ctx, args?.servicio, personasDichas || 1)
   if (!servicio) return noHayServicio(ctx)
   const fecha = leerFecha(args?.fecha) ? String(args.fecha) : null
   if (!fecha) return 'La fecha tiene que ir como AAAA-MM-DD. Pregunta al cliente qué día quiere.'
-  const personas = Math.max(1, Math.round(Number(args?.personas) || 1))
+  if (servicio.id === 'mesa' && !personasDichas) return 'Antes de buscar mesa pregunta cuántas personas son.'
+  const personas = Math.max(1, Math.round(personasDichas || 1))
   if (personas >= ctx.agenda.ajustes.grupo_grande_desde) {
     // Grupo grande: no se busca hueco, se abre el caso ya con lo que se sabe
     const cuando = `${fecha}${args?.hora_preferida ? ` hacia las ${args.hora_preferida}` : args?.franja && args.franja !== 'cualquiera' ? ` por la ${args.franja === 'manana' ? 'mañana' : 'tarde'}` : ''}`
@@ -263,14 +282,16 @@ async function verHuecos(args: any, ctx: ContextoAgenda) {
 
   const zona = ctx.agenda.zona
   const preferida = horaEnMinutos(args?.hora_preferida)
-  const { huecos, motivo } = await huecosDelDia({ agenda: ctx.agenda, servicio, fecha, personas, recursoId: recurso?.id || null })
+  const zonaPedida = args?.zona ? String(args.zona) : null
+  const { huecos, motivo } = await huecosDelDia({ agenda: ctx.agenda, servicio, fecha, personas, recursoId: recurso?.id || null, zona: zonaPedida })
   if (huecos.length) {
     const opciones = elegirOpciones(huecos, zona, preferida, args?.franja)
-    const lineas = opciones.map(h => `- ${textoHora(h.inicio, zona)}${h.recursos.length && ctx.agenda.recursos.find(r => r.id === h.recursos[0])?.tipo === 'persona' ? ` con ${nombresDe(ctx, h.recursos)}` : ''}${h.plazas !== undefined ? ` (${h.plazas} plazas libres)` : ''}`)
-    return `Huecos para ${servicio.nombre} el ${textoFecha(instanteLocal(zona, ...fechaPartes(fecha), 12, 0), zona)} (${fecha})${personas > 1 ? ` para ${personas} personas` : ''}:\n${lineas.join('\n')}\n${huecos.length > opciones.length ? `Hay ${huecos.length} huecos en total ese día; si el cliente quiere otra hora, vuelve a llamar con hora_preferida.` : ''} Ofrécele estas horas y, cuando elija, llama a reservar_cita con fecha ${fecha} y la hora exacta.`
+    const zonaDe = (h: { recursos: string[] }) => { const z = [...new Set(h.recursos.map(id => ctx.agenda.recursos.find(r => r.id === id)?.zona).filter(Boolean))]; return z.length ? ` (${z.join(' + ')})` : '' }
+    const lineas = opciones.map(h => `- ${textoHora(h.inicio, zona)}${(h as any).turno ? ` [${(h as any).turno}]` : ''}${servicio.id === 'mesa' ? zonaDe(h) : ''}${h.recursos.length && ctx.agenda.recursos.find(r => r.id === h.recursos[0])?.tipo === 'persona' ? ` con ${nombresDe(ctx, h.recursos)}` : ''}${h.plazas !== undefined ? ` (${h.plazas} plazas libres)` : ''}`)
+    return `Huecos para ${servicio.nombre} el ${textoFecha(instanteLocal(zona, ...fechaPartes(fecha), 12, 0), zona)} (${fecha})${personas > 1 && servicio.id !== 'mesa' ? ` para ${personas} personas` : ''}${zonaPedida ? ` en ${zonaPedida}` : ''}:\n${lineas.join('\n')}\n${huecos.length > opciones.length ? `Hay ${huecos.length} huecos en total ese día; si el cliente quiere otra hora, vuelve a llamar con hora_preferida.` : ''} Ofrécele estas horas y, cuando elija, llama a reservar_cita con fecha ${fecha}${servicio.id === 'mesa' ? `, servicio "mesa", ${personas} personas${zonaPedida ? `, zona "${zonaPedida}"` : ''}` : ''} y la hora exacta.`
   }
   // Ese día no: los siguientes 7
-  const siguiente = await huecosEntreDias({ agenda: ctx.agenda, servicio, desde: sumarDias(fecha, 1), dias: 7, personas, recursoId: recurso?.id || null, maximoPorDia: 3 })
+  const siguiente = await huecosEntreDias({ agenda: ctx.agenda, servicio, desde: sumarDias(fecha, 1), dias: 7, personas, recursoId: recurso?.id || null, maximoPorDia: 3, zona: zonaPedida })
   if (!siguiente.porDia.length) return `El ${fecha} no hay hueco para ${servicio.nombre}${motivo ? ` (${motivo.toLowerCase()})` : ''} y tampoco en la semana siguiente. Ofrece apuntarle en la lista de espera (apuntar_espera_agenda) o pregunta por otra fecha más adelante.`
   const lineas = siguiente.porDia.slice(0, 3).map(d => `- ${textoFecha(instanteLocal(zona, ...fechaPartes(d.fecha), 12, 0), zona)} (${d.fecha}): ${d.huecos.map(h => textoHora(h.inicio, zona)).join(', ')}`)
   return `El ${fecha} no hay hueco para ${servicio.nombre}${motivo ? ` (${motivo.toLowerCase()})` : ''}. Lo más cercano:\n${lineas.join('\n')}\nOfrece estas opciones o la lista de espera para el día que quería (apuntar_espera_agenda).`
@@ -283,12 +304,13 @@ function fechaPartes(fecha: string): [number, number, number] {
 
 async function reservar(args: any, ctx: ContextoAgenda) {
   if (!ctx.contacto.id) return 'No se puede reservar: el cliente no está identificado en esta conversación. Pide que escriba desde su WhatsApp o correo.'
-  const servicio = await buscarServicio(ctx, args?.servicio)
+  const personas = Math.max(1, Math.round(Number(args?.personas) || 1))
+  const servicio = await buscarServicio(ctx, args?.servicio, personas)
   if (!servicio) return noHayServicio(ctx)
   const fecha = leerFecha(args?.fecha) ? String(args.fecha) : null
   const minutos = horaEnMinutos(args?.hora)
   if (!fecha || minutos === null) return 'Faltan la fecha (AAAA-MM-DD) o la hora (HH:MM). Pídeselas al cliente.'
-  const personas = Math.max(1, Math.round(Number(args?.personas) || 1))
+  if (servicio.id === 'mesa' && !Number(args?.personas)) return 'Falta cuántas personas son. Pregúntalo antes de reservar la mesa.'
   const recurso = await buscarRecurso(ctx, args?.profesional, servicio)
   if (recurso === 'no_existe') return `No hay nadie que se llame "${args.profesional}". Pregunta con quién quiere de: ${recursosCandidatos(ctx.agenda, servicio).filter(r => r.elegible).map(r => r.nombre).join(', ')}.`
   const zona = ctx.agenda.zona
@@ -304,6 +326,7 @@ async function reservar(args: any, ctx: ContextoAgenda) {
     inicio: inicio.toISOString(),
     personas,
     recurso_id: recurso?.id || null,
+    zona: args?.zona ? String(args.zona) : null,
     extras: Array.isArray(args?.extras) ? args.extras.map(String) : [],
     contact_id: ctx.contacto.id,
     conversation_id: ctx.conversation_id,
@@ -324,7 +347,8 @@ async function reservar(args: any, ctx: ContextoAgenda) {
   }
   const c = r.cita
   const quien = (c.recursos || []).filter(x => x.tipo === 'persona').map(x => x.nombre).join(' y ')
-  return `RESERVA GUARDADA (${c.estado === 'pendiente' ? 'PENDIENTE de que el equipo la confirme' : 'confirmada'}): ${c.servicio_nombre}, ${textoFechaHora(c.inicio, zona)}${quien ? ` con ${quien}` : ''}${c.personas > 1 ? `, ${c.personas} personas` : ''}${c.precio_estimado !== null ? `, ${c.precio_estimado} ${c.moneda || ''}` : ''}. Confírmaselo al cliente con estos datos exactos${c.estado === 'pendiente' ? ' y dile que le avisarán cuando esté confirmada' : ''}. Cancelar o cambiar: hasta ${servicio.cancelacion_horas ?? ctx.agenda.ajustes.cancelacion_horas} h antes.`
+  const zonaMesa = [...new Set((c.recursos || []).filter(x => x.tipo === 'mesa').map(x => ctx.agenda.recursos.find(rr => rr.id === x.id)?.zona).filter(Boolean))].join(' + ')
+  return `RESERVA GUARDADA (${c.estado === 'pendiente' ? 'PENDIENTE de que el equipo la confirme' : 'confirmada'}): ${c.servicio_nombre}, ${textoFechaHora(c.inicio, zona)}${quien ? ` con ${quien}` : ''}${zonaMesa ? ` en ${zonaMesa}` : ''}${c.personas > 1 && servicio.id !== 'mesa' ? `, ${c.personas} personas` : ''}${c.precio_estimado !== null ? `, ${c.precio_estimado} ${c.moneda || ''}` : ''}. Confírmaselo al cliente con estos datos exactos${c.estado === 'pendiente' ? ' y dile que le avisarán cuando esté confirmada' : ''}. Cancelar o cambiar: hasta ${servicio.cancelacion_horas ?? ctx.agenda.ajustes.cancelacion_horas} h antes.`
 }
 
 async function citaDelCliente(ctx: ContextoAgenda, citaId?: string): Promise<Cita | string> {
@@ -346,7 +370,7 @@ async function cambiar(args: any, ctx: ContextoAgenda) {
   const fecha = leerFecha(args?.fecha) ? String(args.fecha) : diaEnZona(new Date(cita.inicio), ctx.agenda.zona)
   const minutos = horaEnMinutos(args?.hora)
   if (minutos === null) return 'Falta la hora nueva (HH:MM). Pregúntasela al cliente o usa ver_huecos.'
-  const servicio = ctx.agenda.servicios.find(s => s.id === cita.servicio_id)
+  const servicio = servicioPorId(ctx.agenda, cita.servicio_id, cita.personas)
   let recursoId: string | null | undefined = undefined
   if (args?.profesional && servicio) {
     const r = await buscarRecurso(ctx, args.profesional, servicio)
@@ -356,7 +380,7 @@ async function cambiar(args: any, ctx: ContextoAgenda) {
   const zona = ctx.agenda.zona
   const [anio, mes, dia] = fechaPartes(fecha)
   const inicio = instanteLocal(zona, anio, mes, dia, Math.floor(minutos / 60), minutos % 60)
-  const r = await moverCita(cita.id, { inicio: inicio.toISOString(), recurso_id: recursoId, por: 'cliente', origen: 'ia' })
+  const r = await moverCita(cita.id, { inicio: inicio.toISOString(), recurso_id: recursoId, por: 'cliente', origen: 'ia', personas: Number(args?.personas) || null })
   if (!r.ok) {
     if (r.codigo === 'plazo_cancelacion') {
       await abrirCasoAgenda(ctx, `Cambio de cita fuera de plazo: ${cita.servicio_nombre} del ${textoFechaHora(cita.inicio, zona)} → pide ${textoFechaHora(inicio, zona)}.`)
@@ -365,7 +389,7 @@ async function cambiar(args: any, ctx: ContextoAgenda) {
     if (r.codigo === 'sin_hueco' || r.codigo === 'ocupado' || r.codigo === 'aforo') return `${r.error} Llama a ver_huecos y ofrece otra hora; la cita original sigue como estaba.`
     return `${r.error} La cita original sigue como estaba.`
   }
-  return `CITA CAMBIADA: ${r.cita.servicio_nombre} ahora es el ${textoFechaHora(r.cita.inicio, zona)}${(r.cita.recursos || []).filter(x => x.tipo === 'persona').length ? ` con ${(r.cita.recursos || []).filter(x => x.tipo === 'persona').map(x => x.nombre).join(' y ')}` : ''}. Confírmaselo así al cliente.`
+  return `CITA CAMBIADA: ${r.cita.servicio_nombre}${r.cita.personas !== cita.personas ? ` (${r.cita.personas} personas)` : ''} ahora es el ${textoFechaHora(r.cita.inicio, zona)}${(r.cita.recursos || []).filter(x => x.tipo === 'persona').length ? ` con ${(r.cita.recursos || []).filter(x => x.tipo === 'persona').map(x => x.nombre).join(' y ')}` : ''}. Confírmaselo así al cliente.`
 }
 
 async function cancelar(args: any, ctx: ContextoAgenda) {

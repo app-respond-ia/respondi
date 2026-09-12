@@ -1,7 +1,7 @@
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { registrarError } from '@/lib/errores'
 import { cargarAgenda, type Agenda } from './disponibilidad'
-import { apuntarHistorial, contextoDeCita } from './citas'
+import { apuntarHistorial, cambiarEstadoCita, contextoDeCita } from './citas'
 import { diaEnZona } from './tiempo'
 import type { Cita } from './tipos'
 
@@ -194,4 +194,39 @@ export async function avisarListaEspera(cancelada: Cita, agenda: Agenda) {
     await registrarError({ origen: 'app', descripcion: 'Fallo al avisar a la lista de espera de la agenda', stacktrace: JSON.stringify({ error: err?.message, cita: cancelada.id }), tenant_id: cancelada.tenant_id })
     return 0
   }
+}
+
+// Restaurante: pasada la cortesía sin que llegue nadie, la mesa se libera
+// (la reserva queda como "no se presentó" y, si está encendida, sale la
+// automatización de plantón)
+export async function repasarCortesia(tenantId: string, branchId: string) {
+  const agenda = await cargarAgenda(branchId)
+  if (!agenda || agenda.ajustes.modo !== 'restaurante' || !agenda.ajustes.tiempo_cortesia_minutos) return 0
+  const limite = new Date(Date.now() - agenda.ajustes.tiempo_cortesia_minutos * 60000)
+  const { data: citas } = await supabaseAdmin
+    .from('citas')
+    .select('id')
+    .eq('branch_id', branchId)
+    .eq('estado', 'confirmada')
+    .is('llegada_en', null)
+    .lte('inicio', limite.toISOString())
+    .gte('inicio', new Date(Date.now() - 12 * 3600 * 1000).toISOString())
+    .limit(100)
+  let liberadas = 0
+  for (const c of citas || []) {
+    const r = await cambiarEstadoCita(c.id, 'no_presentado', { origen: 'sistema', detalle: { motivo: `pasados ${agenda.ajustes.tiempo_cortesia_minutos} min de cortesía sin llegar` } })
+    if (r.ok) liberadas++
+  }
+  return liberadas
+}
+
+// Las sucursales con agenda de restaurante activa (para el reloj)
+export async function restaurantesActivos(): Promise<{ tenant_id: string; branch_id: string }[]> {
+  const { data } = await supabaseAdmin
+    .from('agenda_ajustes')
+    .select('tenant_id, branch_id')
+    .eq('activa', true)
+    .eq('modo', 'restaurante')
+    .gt('tiempo_cortesia_minutos', 0)
+  return (data || []) as any
 }

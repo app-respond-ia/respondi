@@ -5,9 +5,10 @@ que valga para cualquier negocio (peluquería, clínica, taller, academia y
 también un restaurante con mesas y turnos), en tres tramos seguidos:
 
 1. **Servicios, recursos, citas, herramientas de la IA, calendario y
-   automatizaciones** (este documento, hecho).
+   automatizaciones** (hecho el 12-09-2026).
 2. **Modo restaurante**: mesas con capacidad, combinaciones, turnos,
-   duración por comensales, aforo por turno, cortesía, sin reserva.
+   duración por comensales, aforo por turno, cortesía, sin reserva (hecho
+   el 13-09-2026).
 3. **Enlace público de reserva** (web, Instagram, QR) y confirmaciones.
 
 Decisiones de Jorge: la IA confirma directamente lo que cabe en las reglas y
@@ -77,6 +78,40 @@ pero nunca encima de otra cita.
 Las horas se manejan sin librerías con `src/lib/agenda/tiempo.ts` (Intl):
 `instanteLocal` (día y hora de la sucursal → instante UTC, con cambios de
 hora), `partesEnZona`, `textoFechaHora`.
+
+## Modo restaurante (tramo 2)
+
+Se activa en Ajustes → "Tipo de negocio: Restaurante". Lo que cambia:
+
+- **Lo que se reserva es una mesa**, no un artículo de la lista de precios
+  (`servicioMesa` en `disponibilidad.ts`, id `mesa`, `servicio_id` vacío en
+  la cita y `servicio_nombre` "Mesa para N"). Si además hay servicios
+  reservables (un menú degustación, un reservado), siguen funcionando.
+- **Mesas** = recursos de tipo mesa con capacidad mínima y máxima y zona
+  (terraza, interior). Se asigna la **más ajustada** que quepa (para 2, una
+  de 2 antes que una de 4); si no cabe en ninguna y "juntar mesas" está
+  encendido, una **combinación** (`recursos_combinaciones`: dos o más mesas
+  con su capacidad; ocupa todas). La zona se puede pedir.
+- **Turnos** (Comida 13:00–16:00 con última entrada 15:00, Cena…): las
+  entradas van del inicio a la última entrada en pasos de la agenda. Sin
+  turnos, vale el horario del negocio. **Duración según comensales**
+  (hasta 2: 60 min; hasta 4: 90; hasta 8: 120), **aforo por turno** (solo
+  con turnos definidos; sin ellos contaría la comida y la cena juntas) y
+  **grupo grande** igual que en servicios.
+- **Cortesía**: pasados X minutos de la hora sin que llegue nadie
+  (`llegada_en` vacío), el reloj marca la reserva como "no se presentó" y
+  libera la mesa (`repasarCortesia`, cada 5 min; sale la automatización de
+  plantón si está encendida). "Ha llegado" en el detalle pone la hora de
+  llegada y la protege.
+- **Sentar sin reserva**: la mesa queda "en curso" desde ahora mismo, sin
+  reglas (el panel puede reservar incluso en una hora ya pasada).
+- **Vista de sala** (pestaña Sala): las mesas por zona con sus reservas del
+  turno elegido (libre / reservada / por confirmar / sentados); pulsar una
+  mesa libre abre la reserva con esa mesa; una ocupada abre el detalle.
+- **La IA** pregunta siempre cuántas personas, pasa servicio "mesa", zona si
+  la piden y las peticiones (alergias, trona); `cambiar_cita` también cambia
+  el número de personas ("al final somos 2") y con ello la mesa y la
+  duración.
 
 ## Las tres puertas
 
@@ -157,6 +192,22 @@ mensajes automáticos no gastan créditos de Respondi (los cobra Meta).
   sin crédito a mitad de sesión (429); Jorge la recargó y la prueba pasó.
 - `captura-agenda.mjs` (11, navegador real): calendario, detalle, nueva
   cita, semana, recursos, ajustes, formulario de precios con reserva, móvil.
+- `probar-agenda-restaurante.mjs` (30): turnos y última entrada, mesa más
+  ajustada por comensales, zona, combinación para 8, sin mesa para 11 ni
+  para 1, ocupación y vuelta de la mesa, terraza ocupada por el grupo, aforo
+  por turno (y sin turnos no cuenta), duración por comensales, sentar sin
+  reserva, cortesía que libera la mesa (y no toca a los sentados), sin
+  turnos vale el horario, combinaciones.
+- `probar-agenda-ia-restaurante.mjs` (9, OpenAI real): pregunta las
+  personas, reserva mesa para 4 en la terraza (la más ajustada), grupo de
+  12 → caso, "al final somos 2 a las 20:30" cambia hora y personas,
+  cancelar.
+- `captura-restaurante.mjs` (9, navegador real): sala por zonas y turno,
+  nueva reserva con zona, sentar sin reserva, mesas que se juntan, ajustes
+  con turnos, móvil.
+- Ojo al lanzar pruebas: nunca dos a la vez. Todas limpian el mismo
+  inquilino de pruebas y se pisan (pasó el 13-09-2026 con la mecánica del
+  restaurante en segundo plano y la de la IA delante).
 
 ## Verificado en producción
 
@@ -171,5 +222,5 @@ mensajes automáticos no gastan créditos de Respondi (los cobra Meta).
 
 ## Pendiente
 
-- Tramo 2 (restaurante) y tramo 3 (enlace público).
+- Tramo 3 (enlace público).
 - Google Calendar (necesita un proyecto de Google creado por Jorge).

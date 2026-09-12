@@ -6,8 +6,8 @@ import Loading from '@/components/Loading'
 import { ErrorCarga } from '@/components/ui/ErrorCarga'
 import { useToast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
-import { getAgenda, guardarAjustesAgenda, guardarRecurso, borrarRecurso, crearBloqueo, borrarBloqueo, getCitas, getHuecos, crearCitaPanel, moverCitaPanel, cancelarCitaPanel, cambiarEstadoCitaPanel, getHistorialCita } from '@/app/actions/agenda'
-import { ESTADOS_CITA, TIPOS_RECURSO, PASOS_AGENDA, type AjustesAgenda, type Recurso, type Servicio, type HorarioRecurso } from '@/lib/agenda/tipos'
+import { getAgenda, guardarAjustesAgenda, guardarRecurso, borrarRecurso, crearBloqueo, borrarBloqueo, getCitas, getHuecos, crearCitaPanel, moverCitaPanel, cancelarCitaPanel, cambiarEstadoCitaPanel, getHistorialCita, guardarCombinacion, borrarCombinacion } from '@/app/actions/agenda'
+import { ESTADOS_CITA, TIPOS_RECURSO, PASOS_AGENDA, ID_MESA, type AjustesAgenda, type Recurso, type Servicio, type HorarioRecurso, type Combinacion } from '@/lib/agenda/tipos'
 import { partesEnZona, instanteLocal, leerFecha, sumarDias, textoHora, textoFechaHora, diaEnZona, fechaIso } from '@/lib/agenda/tiempo'
 import { DIAS_SEMANA } from '@/lib/dias-semana'
 
@@ -43,12 +43,13 @@ interface Datos {
   lista: any[]
   vinculos: Record<string, string[]>
   vinculos_por_recurso: Record<string, string[]>
+  combinaciones: Combinacion[]
   horario_sucursal: HorarioRecurso[]
   bloqueos: any[]
   nivel_permiso: 'ninguno' | 'lectura' | 'escritura'
 }
 
-type Pestana = 'calendario' | 'recursos' | 'ajustes'
+type Pestana = 'calendario' | 'sala' | 'recursos' | 'ajustes'
 
 export default function AgendaPage() {
   const { showToast } = useToast()
@@ -78,7 +79,7 @@ export default function AgendaPage() {
           <p className="text-sm text-ink-500 mt-1">Citas y reservas de {datos.negocio.nombre}. Hora local: {datos.zona}.</p>
         </div>
         <div className="flex gap-1 p-1 rounded-xl bg-slate-100">
-          {([['calendario', 'Calendario'], ['recursos', 'Recursos'], ['ajustes', 'Ajustes']] as [Pestana, string][]).map(([k, n]) => (
+          {([['calendario', 'Calendario'], ...(datos.ajustes.modo === 'restaurante' ? [['sala', 'Sala']] : []), ['recursos', 'Recursos'], ['ajustes', 'Ajustes']] as [Pestana, string][]).map(([k, n]) => (
             <button key={k} onClick={() => setPestana(k)} className={`px-4 h-9 rounded-lg text-sm font-600 transition ${pestana === k ? 'bg-white shadow text-ink-900' : 'text-ink-500 hover:text-ink-800'}`}>{n}</button>
           ))}
         </div>
@@ -89,18 +90,24 @@ export default function AgendaPage() {
           <strong>La agenda está apagada.</strong> La IA y el enlace de reservas no reservarán hasta que la actives en <button onClick={() => setPestana('ajustes')} className="underline font-600">Ajustes</button>. El equipo sí puede apuntar citas a mano.
         </div>
       )}
-      {datos.ajustes.activa && !datos.servicios.length && (
+      {datos.ajustes.activa && datos.ajustes.modo !== 'restaurante' && !datos.servicios.length && (
         <div className="mb-5 p-4 rounded-xl border border-amber-200 bg-amber-50 text-sm text-amber-900">
           <strong>No hay nada que reservar todavía.</strong> Marca "Se reserva en la agenda" en los servicios de tu <Link href="/dashboard/precios" className="underline font-600">lista de precios</Link>.
         </div>
       )}
-      {datos.ajustes.activa && datos.servicios.length > 0 && !datos.recursos.some(r => r.activo) && (
+      {datos.ajustes.activa && datos.ajustes.modo !== 'restaurante' && datos.servicios.length > 0 && !datos.recursos.some(r => r.activo) && (
         <div className="mb-5 p-4 rounded-xl border border-amber-200 bg-amber-50 text-sm text-amber-900">
           <strong>Falta quién atiende.</strong> Añade al menos un recurso (una persona, una sala, una mesa) en <button onClick={() => setPestana('recursos')} className="underline font-600">Recursos</button>.
         </div>
       )}
+      {datos.ajustes.activa && datos.ajustes.modo === 'restaurante' && !datos.recursos.some(r => r.activo && r.tipo === 'mesa') && (
+        <div className="mb-5 p-4 rounded-xl border border-amber-200 bg-amber-50 text-sm text-amber-900">
+          <strong>Faltan las mesas.</strong> Añade cada mesa con sus comensales en <button onClick={() => setPestana('recursos')} className="underline font-600">Recursos</button>, y los turnos en <button onClick={() => setPestana('ajustes')} className="underline font-600">Ajustes</button>.
+        </div>
+      )}
 
       {pestana === 'calendario' && <Calendario datos={datos} puedeEscribir={puedeEscribir} recargar={cargar} />}
+      {pestana === 'sala' && <Sala datos={datos} puedeEscribir={puedeEscribir} recargar={cargar} />}
       {pestana === 'recursos' && <Recursos datos={datos} puedeEscribir={puedeEscribir} recargar={cargar} />}
       {pestana === 'ajustes' && <Ajustes datos={datos} puedeEscribir={puedeEscribir} recargar={cargar} />}
     </div>
@@ -123,6 +130,8 @@ function Calendario({ datos, puedeEscribir, recargar }: { datos: Datos; puedeEsc
   const [nuevaCita, setNuevaCita] = useState<{ recurso_id?: string | null; inicio?: string } | null>(null)
   const [nuevoBloqueo, setNuevoBloqueo] = useState(false)
   const [mover, setMover] = useState<any | null>(null)
+  const [sentar, setSentar] = useState(false)
+  const restaurante = datos.ajustes.modo === 'restaurante'
 
   const recursosActivos = datos.recursos.filter(r => r.activo)
   const recursosVisibles = filtroRecurso ? recursosActivos.filter(r => r.id === filtroRecurso) : recursosActivos
@@ -200,7 +209,8 @@ function Calendario({ datos, puedeEscribir, recargar }: { datos: Datos; puedeEsc
         {puedeEscribir && (
           <>
             <button onClick={() => setNuevoBloqueo(true)} className={botonSecundario}>Bloquear</button>
-            <button onClick={() => setNuevaCita({})} className={botonPrimario}>+ Nueva cita</button>
+            {restaurante && <button onClick={() => setSentar(true)} className={botonSecundario}>Sentar sin reserva</button>}
+            <button onClick={() => setNuevaCita({})} className={botonPrimario}>{restaurante ? '+ Nueva reserva' : '+ Nueva cita'}</button>
           </>
         )}
       </div>
@@ -299,6 +309,9 @@ function Calendario({ datos, puedeEscribir, recargar }: { datos: Datos; puedeEsc
       )}
       {nuevoBloqueo && (
         <ModalBloqueo datos={datos} fechaInicial={fecha} onClose={() => setNuevoBloqueo(false)} onCreado={async () => { setNuevoBloqueo(false); await cargarCitas(); await recargar() }} />
+      )}
+      {sentar && (
+        <ModalSentar datos={datos} onClose={() => setSentar(false)} onSentado={async () => { setSentar(false); setFecha(hoy); await cargarCitas() }} />
       )}
     </div>
   )
@@ -402,7 +415,7 @@ function DetalleCita({ cita, datos, puedeEscribir, onClose, onCambio, onMover }:
   )
 }
 
-function SelectorHuecos({ datos, servicioId, fecha, personas, recursoId, ignorarCitaId, elegido, onElegir }: { datos: Datos; servicioId: string; fecha: string; personas: number; recursoId: string | null; ignorarCitaId?: string | null; elegido: string | null; onElegir: (inicio: string, recursos: string[]) => void }) {
+function SelectorHuecos({ datos, servicioId, fecha, personas, recursoId, ignorarCitaId, elegido, onElegir, zona }: { datos: Datos; servicioId: string; fecha: string; personas: number; recursoId: string | null; ignorarCitaId?: string | null; elegido: string | null; onElegir: (inicio: string, recursos: string[]) => void; zona?: string | null }) {
   const [huecos, setHuecos] = useState<any[]>([])
   const [motivo, setMotivo] = useState<string | undefined>()
   const [sinReglas, setSinReglas] = useState(false)
@@ -410,11 +423,11 @@ function SelectorHuecos({ datos, servicioId, fecha, personas, recursoId, ignorar
   useEffect(() => {
     if (!servicioId || !leerFecha(fecha)) { setHuecos([]); return }
     setCargando(true)
-    getHuecos({ servicio_id: servicioId, fecha, personas, recurso_id: recursoId, sin_reglas: sinReglas, ignorar_cita_id: ignorarCitaId }).then(r => {
+    getHuecos({ servicio_id: servicioId, fecha, personas, recurso_id: recursoId, sin_reglas: sinReglas, ignorar_cita_id: ignorarCitaId, zona: zona || null }).then(r => {
       if (r.success && r.data) { setHuecos(r.data.huecos); setMotivo(r.data.motivo) } else { setHuecos([]); setMotivo(r.error) }
       setCargando(false)
     })
-  }, [servicioId, fecha, personas, recursoId, sinReglas, ignorarCitaId])
+  }, [servicioId, fecha, personas, recursoId, sinReglas, ignorarCitaId, zona])
   return (
     <div>
       <div className="flex items-center justify-between mb-1.5">
@@ -425,7 +438,7 @@ function SelectorHuecos({ datos, servicioId, fecha, personas, recursoId, ignorar
       <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
         {huecos.map(h => (
           <button type="button" key={h.inicio} onClick={() => onElegir(h.inicio, h.recursos)} className={`px-2.5 h-8 rounded-lg border text-sm ${elegido === h.inicio ? 'bg-brand-600 text-white border-brand-600' : 'bg-white border-slate-300 text-ink-700 hover:border-brand-400'}`}>
-            {textoHora(h.inicio, datos.zona)}{h.plazas !== undefined ? ` (${h.plazas})` : ''}
+            {textoHora(h.inicio, datos.zona)}{h.plazas !== undefined ? ` (${h.plazas})` : ''}{h.turno ? ` · ${h.turno}` : ''}
           </button>
         ))}
       </div>
@@ -435,9 +448,12 @@ function SelectorHuecos({ datos, servicioId, fecha, personas, recursoId, ignorar
 
 function ModalNuevaCita({ datos, inicial, fechaInicial, onClose, onCreada }: { datos: Datos; inicial: { recurso_id?: string | null; inicio?: string }; fechaInicial: string; onClose: () => void; onCreada: () => Promise<void> }) {
   const { showToast } = useToast()
-  const [servicioId, setServicioId] = useState(datos.servicios[0]?.id || '')
+  const restaurante = datos.ajustes.modo === 'restaurante'
+  const [servicioId, setServicioId] = useState(restaurante ? ID_MESA : (datos.servicios[0]?.id || ''))
   const [fecha, setFecha] = useState(inicial.inicio ? diaEnZona(new Date(inicial.inicio), datos.zona) : fechaInicial)
-  const [personas, setPersonas] = useState(1)
+  const [personas, setPersonas] = useState(restaurante ? 2 : 1)
+  const [zona, setZona] = useState('')
+  const zonas = [...new Set(datos.recursos.filter(r => r.activo && r.tipo === 'mesa').map(r => (r.zona || '').trim()).filter(Boolean))]
   const [recursoId, setRecursoId] = useState<string | null>(inicial.recurso_id || null)
   const [inicio, setInicio] = useState<string | null>(inicial.inicio || null)
   const [nombre, setNombre] = useState('')
@@ -448,8 +464,11 @@ function ModalNuevaCita({ datos, inicial, fechaInicial, onClose, onCreada }: { d
   const [estado, setEstado] = useState<'confirmada' | 'pendiente'>('confirmada')
   const [extras, setExtras] = useState<string[]>([])
   const [guardando, setGuardando] = useState(false)
+  const esMesa = servicioId === ID_MESA
   const servicio = datos.servicios.find(s => s.id === servicioId)
-  const candidatos = datos.recursos.filter(r => r.activo && (!servicio?.tipo_recurso || r.tipo === servicio.tipo_recurso) && (!(datos.vinculos_por_recurso[r.id] || []).length || (datos.vinculos_por_recurso[r.id] || []).includes(servicioId)))
+  const candidatos = esMesa
+    ? datos.recursos.filter(r => r.activo && r.tipo === 'mesa' && (!zona || (r.zona || '').toLowerCase().includes(zona.toLowerCase())))
+    : datos.recursos.filter(r => r.activo && (!servicio?.tipo_recurso || r.tipo === servicio.tipo_recurso) && (!(datos.vinculos_por_recurso[r.id] || []).length || (datos.vinculos_por_recurso[r.id] || []).includes(servicioId)))
 
   async function guardar(e: React.FormEvent) {
     e.preventDefault()
@@ -457,27 +476,39 @@ function ModalNuevaCita({ datos, inicial, fechaInicial, onClose, onCreada }: { d
     if (!inicio) return showToast('Elige una hora', 'error')
     if (!nombre.trim() && !telefono.trim() && !email.trim()) return showToast('Pon al menos el nombre o el teléfono del cliente', 'error')
     setGuardando(true)
-    const r = await crearCitaPanel({ servicio_id: servicioId, inicio, personas, recurso_id: recursoId, extras, nombre, telefono, email, notas, peticiones, estado })
+    const r = await crearCitaPanel({ servicio_id: servicioId, inicio, personas, recurso_id: recursoId, extras, nombre, telefono, email, notas, peticiones, estado, zona: esMesa && zona ? zona : null })
     setGuardando(false)
     if (r.success) { showToast('Cita creada', 'success'); await onCreada() } else showToast(r.error || 'No se ha podido crear', 'error')
   }
 
-  if (!datos.servicios.length) return (
+  if (!datos.servicios.length && !restaurante) return (
     <Modal titulo="Nueva cita" onClose={onClose}>
       <p className="text-sm text-ink-600">No hay ningún servicio reservable. Márcalos en la <Link href="/dashboard/precios" className="underline font-600">lista de precios</Link>.</p>
     </Modal>
   )
 
   return (
-    <Modal titulo="Nueva cita" onClose={onClose}>
+    <Modal titulo={restaurante ? 'Nueva reserva' : 'Nueva cita'} onClose={onClose}>
       <form onSubmit={guardar} className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="sm:col-span-2">
-            <label className="block text-xs font-600 text-ink-700 mb-1">Servicio</label>
-            <select value={servicioId} onChange={e => { setServicioId(e.target.value); setInicio(null); setExtras([]) }} className={campo}>
-              {datos.servicios.map(s => <option key={s.id} value={s.id}>{s.nombre} · {s.duracion_minutos || 30} min</option>)}
-            </select>
-          </div>
+          {(!restaurante || datos.servicios.length > 0) && (
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-600 text-ink-700 mb-1">{restaurante ? 'Qué se reserva' : 'Servicio'}</label>
+              <select value={servicioId} onChange={e => { setServicioId(e.target.value); setInicio(null); setExtras([]); setRecursoId(null) }} className={campo}>
+                {restaurante && <option value={ID_MESA}>Mesa</option>}
+                {datos.servicios.map(s => <option key={s.id} value={s.id}>{s.nombre} · {s.duracion_minutos || 30} min</option>)}
+              </select>
+            </div>
+          )}
+          {esMesa && zonas.length > 0 && (
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-600 text-ink-700 mb-1">Zona</label>
+              <select value={zona} onChange={e => { setZona(e.target.value); setInicio(null); setRecursoId(null) }} className={campo}>
+                <option value="">Cualquiera</option>
+                {zonas.map(z => <option key={z} value={z}>{z}</option>)}
+              </select>
+            </div>
+          )}
           <div>
             <label className="block text-xs font-600 text-ink-700 mb-1">Día</label>
             <input type="date" value={fecha} onChange={e => { setFecha(e.target.value); setInicio(null) }} className={campo} required />
@@ -488,10 +519,10 @@ function ModalNuevaCita({ datos, inicial, fechaInicial, onClose, onCreada }: { d
           </div>
           {candidatos.length > 1 && (
             <div className="sm:col-span-2">
-              <label className="block text-xs font-600 text-ink-700 mb-1">Con</label>
+              <label className="block text-xs font-600 text-ink-700 mb-1">{esMesa ? 'Mesa' : 'Con'}</label>
               <select value={recursoId || ''} onChange={e => { setRecursoId(e.target.value || null); setInicio(null) }} className={campo}>
-                <option value="">Quien esté libre</option>
-                {candidatos.map(r => <option key={r.id} value={r.id}>{r.nombre}</option>)}
+                <option value="">{esMesa ? 'La que mejor encaje' : 'Quien esté libre'}</option>
+                {candidatos.map(r => <option key={r.id} value={r.id}>{r.nombre}{esMesa ? ` · ${r.capacidad_min === r.capacidad_max ? r.capacidad_max : `${r.capacidad_min}–${r.capacidad_max}`} personas` : ''}</option>)}
               </select>
             </div>
           )}
@@ -506,7 +537,7 @@ function ModalNuevaCita({ datos, inicial, fechaInicial, onClose, onCreada }: { d
             </div>
           )}
         </div>
-        {servicioId && <SelectorHuecos datos={datos} servicioId={servicioId} fecha={fecha} personas={personas} recursoId={recursoId} elegido={inicio} onElegir={(i) => setInicio(i)} />}
+        {servicioId && <SelectorHuecos datos={datos} servicioId={servicioId} fecha={fecha} personas={personas} recursoId={recursoId} elegido={inicio} onElegir={(i) => setInicio(i)} zona={esMesa ? zona : null} />}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-slate-100">
           <div className="sm:col-span-2"><label className="block text-xs font-600 text-ink-700 mb-1">Nombre del cliente</label><input value={nombre} onChange={e => setNombre(e.target.value)} className={campo} placeholder="Laura García" /></div>
           <div><label className="block text-xs font-600 text-ink-700 mb-1">Teléfono (WhatsApp)</label><input value={telefono} onChange={e => setTelefono(e.target.value)} className={campo} placeholder="+34 600 000 000" /></div>
@@ -676,6 +707,7 @@ function Recursos({ datos, puedeEscribir, recargar }: { datos: Datos; puedeEscri
           ))}
         </div>
       )}
+      {datos.ajustes.modo === 'restaurante' && <Combinaciones datos={datos} puedeEscribir={puedeEscribir} recargar={recargar} />}
       {editando && <ModalRecurso datos={datos} inicial={editando} onClose={() => setEditando(null)} onGuardado={async () => { setEditando(null); await recargar() }} />}
       <ConfirmModal isOpen={!!aBorrar} title={`Borrar "${aBorrar?.nombre || ''}"`} message="Si tiene citas futuras no se podrá borrar; desactívalo en su lugar." confirmText="Borrar" cancelText="Volver" type="danger" onConfirm={borrar} onClose={() => setABorrar(null)} isLoading={ocupado} />
     </div>
@@ -883,5 +915,226 @@ function Ajustes({ datos, puedeEscribir, recargar }: { datos: Datos; puedeEscrib
 
       {puedeEscribir && <div className="flex justify-end"><button type="submit" disabled={guardando} className={botonPrimario}>{guardando ? 'Guardando…' : 'Guardar ajustes'}</button></div>}
     </form>
+  )
+}
+
+// ===========================================================================
+// Restaurante: la sala por turnos, sentar sin reserva y mesas que se juntan
+// ===========================================================================
+function ventanaTurno(datos: Datos, fecha: string, turno: { inicio: string; fin: string } | null) {
+  const p = leerFecha(fecha)!
+  if (!turno) return { desde: instanteLocal(datos.zona, p.anio, p.mes, p.dia, 0, 0), hasta: instanteLocal(datos.zona, p.anio, p.mes, p.dia, 23, 59) }
+  const [hi, mi] = turno.inicio.split(':').map(Number), [hf, mf] = turno.fin.split(':').map(Number)
+  const desde = instanteLocal(datos.zona, p.anio, p.mes, p.dia, hi, mi)
+  let hasta = instanteLocal(datos.zona, p.anio, p.mes, p.dia, hf, mf)
+  if (hasta <= desde) hasta = new Date(hasta.getTime() + 24 * 3600 * 1000)
+  return { desde, hasta }
+}
+
+function Sala({ datos, puedeEscribir, recargar }: { datos: Datos; puedeEscribir: boolean; recargar: () => Promise<void> }) {
+  const zona = datos.zona
+  const [fecha, setFecha] = useState(() => diaEnZona(new Date(), zona))
+  const [turnoIdx, setTurnoIdx] = useState<number>(datos.ajustes.turnos.length ? 0 : -1)
+  const [citas, setCitas] = useState<any[]>([])
+  const [citaAbierta, setCitaAbierta] = useState<any | null>(null)
+  const [nuevaCita, setNuevaCita] = useState<{ recurso_id?: string | null; inicio?: string } | null>(null)
+  const [sentar, setSentar] = useState(false)
+  const [mover, setMover] = useState<any | null>(null)
+  const turno = turnoIdx >= 0 ? datos.ajustes.turnos[turnoIdx] : null
+  const mesas = datos.recursos.filter(r => r.activo && r.tipo === 'mesa')
+  const zonas = [...new Set(mesas.map(m => (m.zona || '').trim() || 'Sin zona'))]
+
+  async function cargarCitas() {
+    const p = leerFecha(fecha)!
+    const desde = instanteLocal(zona, p.anio, p.mes, p.dia, 0, 0)
+    const r = await getCitas(desde.toISOString(), new Date(desde.getTime() + 36 * 3600 * 1000).toISOString())
+    if (r.success && r.data) setCitas(r.data.citas)
+  }
+  useEffect(() => { cargarCitas() }, [fecha])
+
+  const { desde, hasta } = ventanaTurno(datos, fecha, turno)
+  const activas = (c: any) => ['pendiente', 'confirmada', 'en_curso'].includes(c.estado)
+  const deMesa = (id: string) => citas.filter(c => activas(c) && (c.recurso_ids || []).includes(id) && new Date(c.inicio) >= desde && new Date(c.inicio) < hasta).sort((a, b) => new Date(a.inicio).getTime() - new Date(b.inicio).getTime())
+  const hoy = diaEnZona(new Date(), zona)
+  const comensales = mesas.reduce((n, m) => n + deMesa(m.id).reduce((k, c) => k + Number(c.personas || 1), 0), 0)
+  // Cada reserva cuenta una vez aunque ocupe varias mesas
+  const reservasTurno = [...new Map(mesas.flatMap(m => deMesa(m.id)).map(c => [c.id, c])).values()]
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="flex items-center gap-1">
+          <button onClick={() => setFecha(sumarDias(fecha, -1))} className={`${botonSecundario} px-3`} aria-label="Anterior">‹</button>
+          <button onClick={() => setFecha(hoy)} className={botonSecundario}>Hoy</button>
+          <button onClick={() => setFecha(sumarDias(fecha, 1))} className={`${botonSecundario} px-3`} aria-label="Siguiente">›</button>
+        </div>
+        <input type="date" value={fecha} onChange={e => e.target.value && setFecha(e.target.value)} className={`${caja} h-10`} />
+        {datos.ajustes.turnos.length > 0 && (
+          <div className="flex gap-1 p-1 rounded-xl bg-slate-100">
+            {datos.ajustes.turnos.map((t, i) => <button key={i} onClick={() => setTurnoIdx(i)} className={`px-3 h-8 rounded-lg text-sm font-600 ${turnoIdx === i ? 'bg-white shadow text-ink-900' : 'text-ink-500'}`}>{t.nombre}</button>)}
+            <button onClick={() => setTurnoIdx(-1)} className={`px-3 h-8 rounded-lg text-sm font-600 ${turnoIdx === -1 ? 'bg-white shadow text-ink-900' : 'text-ink-500'}`}>Todo el día</button>
+          </div>
+        )}
+        <div className="flex-1" />
+        {puedeEscribir && (
+          <>
+            <button onClick={() => setSentar(true)} className={botonSecundario}>Sentar sin reserva</button>
+            <button onClick={() => setNuevaCita({ inicio: turno ? desde.toISOString() : undefined })} className={botonPrimario}>+ Nueva reserva</button>
+          </>
+        )}
+      </div>
+      <p className="text-sm text-ink-600 mb-3">{reservasTurno.length} {reservasTurno.length === 1 ? 'reserva' : 'reservas'} · {comensales} comensales{datos.ajustes.aforo_por_turno ? ` de ${datos.ajustes.aforo_por_turno}` : ''} · {mesas.length} mesas</p>
+      {mesas.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-ink-500">No hay mesas. Añádelas en Recursos, con su número de comensales y su zona.</div>
+      ) : zonas.map(z => (
+        <div key={z} className="mb-5">
+          <p className="text-xs font-600 uppercase tracking-wide text-ink-500 mb-2">{z}</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2">
+            {mesas.filter(m => ((m.zona || '').trim() || 'Sin zona') === z).map(m => {
+              const suyas = deMesa(m.id)
+              const enCurso = suyas.find(c => c.estado === 'en_curso')
+              const proxima = suyas.find(c => c.estado !== 'en_curso')
+              const estado = enCurso ? 'ocupada' : suyas.length ? (suyas.every(c => c.estado === 'pendiente') ? 'pendiente' : 'reservada') : 'libre'
+              const color = estado === 'ocupada' ? 'bg-sky-50 border-sky-300' : estado === 'reservada' ? 'bg-emerald-50 border-emerald-300' : estado === 'pendiente' ? 'bg-amber-50 border-amber-300' : 'bg-white border-slate-200 hover:border-brand-400'
+              return (
+                <button key={m.id} onClick={() => { if (suyas.length) setCitaAbierta(enCurso || proxima); else if (puedeEscribir) setNuevaCita({ recurso_id: m.id, inicio: turno ? desde.toISOString() : undefined }) }} className={`text-left rounded-xl border p-3 transition ${color}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-600 text-ink-900 truncate">{m.nombre}</span>
+                    <span className="text-[11px] text-ink-500 shrink-0">{m.capacidad_min === m.capacidad_max ? m.capacidad_max : `${m.capacidad_min}–${m.capacidad_max}`} p.</span>
+                  </div>
+                  {suyas.length === 0 ? <p className="text-xs text-ink-400 mt-1">Libre</p> : suyas.slice(0, 3).map(c => (
+                    <p key={c.id} className="text-xs text-ink-700 mt-1 truncate">{textoHora(c.inicio, zona)} · {c.nombre_cliente || 'Cliente'} · {c.personas} p.{c.estado === 'en_curso' ? ' · sentados' : c.estado === 'pendiente' ? ' · por confirmar' : ''}</p>
+                  ))}
+                  {suyas.length > 3 && <p className="text-[11px] text-ink-400 mt-1">y {suyas.length - 3} más</p>}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+      {citaAbierta && <DetalleCita cita={citaAbierta} datos={datos} puedeEscribir={puedeEscribir} onClose={() => setCitaAbierta(null)} onCambio={async () => { await cargarCitas(); setCitaAbierta(null) }} onMover={() => { setMover(citaAbierta); setCitaAbierta(null) }} />}
+      {nuevaCita && <ModalNuevaCita datos={datos} inicial={nuevaCita} fechaInicial={fecha} onClose={() => setNuevaCita(null)} onCreada={async () => { setNuevaCita(null); await cargarCitas() }} />}
+      {mover && <ModalMover cita={mover} datos={datos} onClose={() => setMover(null)} onMovida={async () => { setMover(null); await cargarCitas() }} />}
+      {sentar && <ModalSentar datos={datos} onClose={() => setSentar(false)} onSentado={async () => { setSentar(false); setFecha(hoy); await cargarCitas() }} />}
+    </div>
+  )
+}
+
+function ModalSentar({ datos, onClose, onSentado }: { datos: Datos; onClose: () => void; onSentado: () => Promise<void> }) {
+  const { showToast } = useToast()
+  const [personas, setPersonas] = useState(2)
+  const [nombre, setNombre] = useState('')
+  const [mesaId, setMesaId] = useState('')
+  const [guardando, setGuardando] = useState(false)
+  const mesas = datos.recursos.filter(r => r.activo && r.tipo === 'mesa' && personas >= r.capacidad_min && personas <= r.capacidad_max)
+  async function guardar(e: React.FormEvent) {
+    e.preventDefault()
+    setGuardando(true)
+    const paso = Math.max(5, datos.ajustes.paso_minutos || 15) * 60000
+    const ahora = new Date(Math.floor(Date.now() / paso) * paso).toISOString()
+    const r = await crearCitaPanel({ servicio_id: ID_MESA, inicio: ahora, personas, recurso_id: mesaId || null, nombre: nombre || 'Sin reserva', estado: 'en_curso', forzar: true })
+    setGuardando(false)
+    if (r.success) { showToast('Mesa ocupada', 'success'); await onSentado() } else showToast(r.error || 'No se ha podido sentar', 'error')
+  }
+  return (
+    <Modal titulo="Sentar sin reserva" onClose={onClose}>
+      <form onSubmit={guardar} className="space-y-3">
+        <p className="text-sm text-ink-600">Alguien acaba de entrar: la mesa queda ocupada desde ahora, sin pasar por las reglas de reserva.</p>
+        <div className="grid grid-cols-2 gap-3">
+          <div><label className="block text-xs font-600 text-ink-700 mb-1">Personas</label><input type="number" min={1} max={100} value={personas} onChange={e => { setPersonas(Math.max(1, Number(e.target.value || 1))); setMesaId('') }} className={campo} /></div>
+          <div><label className="block text-xs font-600 text-ink-700 mb-1">Mesa</label>
+            <select value={mesaId} onChange={e => setMesaId(e.target.value)} className={campo}>
+              <option value="">La que mejor encaje</option>
+              {mesas.map(m => <option key={m.id} value={m.id}>{m.nombre}{m.zona ? ` · ${m.zona}` : ''}</option>)}
+            </select>
+          </div>
+        </div>
+        <div><label className="block text-xs font-600 text-ink-700 mb-1">Nombre <span className="font-400 text-ink-400">· opcional</span></label><input value={nombre} onChange={e => setNombre(e.target.value)} className={campo} /></div>
+        <div className="flex justify-end gap-2 pt-2">
+          <button type="button" onClick={onClose} className={botonSecundario}>Cancelar</button>
+          <button type="submit" disabled={guardando} className={botonPrimario}>{guardando ? 'Sentando…' : 'Sentar'}</button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+function Combinaciones({ datos, puedeEscribir, recargar }: { datos: Datos; puedeEscribir: boolean; recargar: () => Promise<void> }) {
+  const { showToast } = useToast()
+  const [editando, setEditando] = useState<Partial<Combinacion> | null>(null)
+  const [aBorrar, setABorrar] = useState<Combinacion | null>(null)
+  const mesas = datos.recursos.filter(r => r.tipo === 'mesa')
+  const nombreDe = (id: string) => mesas.find(m => m.id === id)?.nombre || '?'
+  return (
+    <div className="mt-6">
+      <div className="flex items-center justify-between mb-2">
+        <div>
+          <p className="text-sm font-600 text-ink-900">Mesas que se juntan</p>
+          <p className="text-xs text-ink-500">Para los grupos: si no cabe en una mesa sola, se reserva la combinación entera.</p>
+        </div>
+        {puedeEscribir && mesas.length >= 2 && <button onClick={() => setEditando({ recurso_ids: [], capacidad_min: 1, capacidad_max: 8, activa: true })} className={botonSecundario}>+ Añadir combinación</button>}
+      </div>
+      {datos.combinaciones.length === 0 ? <p className="text-sm text-ink-400">Ninguna todavía.</p> : (
+        <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
+          {datos.combinaciones.map(c => (
+            <li key={c.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
+              <div className="min-w-0">
+                <p className="font-600 text-ink-900 truncate">{c.nombre}{!c.activa ? ' · desactivada' : ''}</p>
+                <p className="text-xs text-ink-500 truncate">{c.recurso_ids.map(nombreDe).join(' + ')} · {c.capacidad_min}–{c.capacidad_max} personas</p>
+              </div>
+              {puedeEscribir && <div className="shrink-0 flex gap-3"><button onClick={() => setEditando(c)} className="text-xs font-600 text-brand-600 hover:underline">Editar</button><button onClick={() => setABorrar(c)} className="text-xs font-600 text-rose-600 hover:underline">Borrar</button></div>}
+            </li>
+          ))}
+        </ul>
+      )}
+      {editando && <ModalCombinacion datos={datos} inicial={editando} onClose={() => setEditando(null)} onGuardado={async () => { setEditando(null); await recargar() }} />}
+      <ConfirmModal isOpen={!!aBorrar} title={`Borrar "${aBorrar?.nombre || ''}"`} message="Las reservas ya hechas con esta combinación no cambian." confirmText="Borrar" cancelText="Volver" type="danger" onConfirm={async () => { if (!aBorrar) return; const r = await borrarCombinacion(aBorrar.id); setABorrar(null); if (r.success) { showToast('Combinación borrada', 'success'); await recargar() } else showToast(r.error || 'No se ha podido borrar', 'error') }} onClose={() => setABorrar(null)} />
+    </div>
+  )
+}
+
+function ModalCombinacion({ datos, inicial, onClose, onGuardado }: { datos: Datos; inicial: Partial<Combinacion>; onClose: () => void; onGuardado: () => Promise<void> }) {
+  const { showToast } = useToast()
+  const [f, setF] = useState<any>({ nombre: '', recurso_ids: [], capacidad_min: 1, capacidad_max: 8, activa: true, ...inicial })
+  const [guardando, setGuardando] = useState(false)
+  const mesas = datos.recursos.filter(r => r.activo && r.tipo === 'mesa')
+  const alternar = (id: string) => {
+    const ids = (f.recurso_ids as string[]).includes(id) ? (f.recurso_ids as string[]).filter(x => x !== id) : [...f.recurso_ids, id]
+    const suma = ids.reduce((n, x) => n + (mesas.find(m => m.id === x)?.capacidad_max || 0), 0)
+    setF({ ...f, recurso_ids: ids, capacidad_max: suma || f.capacidad_max, capacidad_min: Math.min(f.capacidad_min, suma || f.capacidad_min) })
+  }
+  async function guardar(e: React.FormEvent) {
+    e.preventDefault()
+    setGuardando(true)
+    const r = await guardarCombinacion({ id: f.id, nombre: f.nombre, recurso_ids: f.recurso_ids, capacidad_min: Number(f.capacidad_min), capacidad_max: Number(f.capacidad_max), activa: !!f.activa })
+    setGuardando(false)
+    if (r.success) { showToast('Combinación guardada', 'success'); await onGuardado() } else showToast(r.error || 'No se ha podido guardar', 'error')
+  }
+  return (
+    <Modal titulo={f.id ? 'Editar combinación' : 'Nueva combinación de mesas'} onClose={onClose}>
+      <form onSubmit={guardar} className="space-y-3">
+        <div><label className="block text-xs font-600 text-ink-700 mb-1">Nombre <span className="font-400 text-ink-400">· opcional</span></label><input value={f.nombre || ''} onChange={e => setF({ ...f, nombre: e.target.value })} className={campo} placeholder="Mesas 3 y 4" /></div>
+        <div>
+          <p className="text-xs font-600 text-ink-700 mb-1">Mesas que se juntan</p>
+          <div className="flex flex-wrap gap-2">
+            {mesas.map(m => (
+              <label key={m.id} className={`px-2.5 h-8 rounded-lg border text-sm cursor-pointer flex items-center gap-1.5 ${(f.recurso_ids || []).includes(m.id) ? 'bg-brand-50 border-brand-300 text-brand-800' : 'bg-white border-slate-300 text-ink-700'}`}>
+                <input type="checkbox" className="sr-only" checked={(f.recurso_ids || []).includes(m.id)} onChange={() => alternar(m.id)} />
+                {m.nombre} · {m.capacidad_max}
+              </label>
+            ))}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div><label className="block text-xs font-600 text-ink-700 mb-1">Personas mínimo</label><input type="number" min={1} value={f.capacidad_min} onChange={e => setF({ ...f, capacidad_min: Number(e.target.value || 1) })} className={campo} /></div>
+          <div><label className="block text-xs font-600 text-ink-700 mb-1">Personas máximo</label><input type="number" min={1} value={f.capacidad_max} onChange={e => setF({ ...f, capacidad_max: Number(e.target.value || 1) })} className={campo} /></div>
+        </div>
+        <label className="flex items-center gap-2 text-sm text-ink-700 cursor-pointer"><input type="checkbox" checked={!!f.activa} onChange={e => setF({ ...f, activa: e.target.checked })} className="w-4 h-4" /> Activa</label>
+        <div className="flex justify-end gap-2 pt-2">
+          <button type="button" onClick={onClose} className={botonSecundario}>Cancelar</button>
+          <button type="submit" disabled={guardando || (f.recurso_ids || []).length < 2} className={botonPrimario}>{guardando ? 'Guardando…' : 'Guardar'}</button>
+        </div>
+      </form>
+    </Modal>
   )
 }

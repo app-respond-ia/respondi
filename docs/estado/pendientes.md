@@ -229,8 +229,9 @@ momento; en todos los planes; el cliente no se registra. Detalle en
       precios, citas con blindaje en la base de datos, cálculo de huecos,
       herramientas de la IA, calendario, permiso "Agenda", 8 automatizaciones
       (migraciones `20260912190000`, `190100`, `190200`)
-- [ ] Tramo 2: modo restaurante (mesas, turnos, comensales, combinar, vista
-      de sala, cortesía, sin reserva)
+- [x] Tramo 2 (13-09-2026): modo restaurante (mesas por comensales y zona,
+      mesas que se juntan, turnos, duración por comensales, aforo por turno,
+      cortesía que libera la mesa, sentar sin reserva, vista de sala)
 - [ ] Tramo 3: enlace público de reserva y confirmaciones
 - [ ] Google Calendar (proyecto de Google de Jorge), más adelante
 

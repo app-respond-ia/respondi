@@ -7,7 +7,7 @@ import { sinPermiso } from '@/lib/permisos-servidor'
 import { registrarAuditoria } from '@/lib/auditoria'
 import { registrarError } from '@/lib/errores'
 import { getMisPermisos } from '@/app/actions/permisos'
-import { cargarAgenda, huecosDelDia, bloqueosEntre } from '@/lib/agenda/disponibilidad'
+import { cargarAgenda, huecosDelDia, bloqueosEntre, servicioPorId } from '@/lib/agenda/disponibilidad'
 import { crearCita, moverCita, cancelarCita, cambiarEstadoCita, buscarOCrearContacto, normalizarTelefono } from '@/lib/agenda/citas'
 import { AJUSTES_POR_DEFECTO, PASOS_AGENDA, RECURSOS_MAXIMO, TIPOS_RECURSO, type AjustesAgenda, type EstadoCita, type HorarioRecurso } from '@/lib/agenda/tipos'
 import { leerFecha } from '@/lib/agenda/tiempo'
@@ -57,6 +57,7 @@ export async function getAgenda() {
       lista: lista || [],
       vinculos: Object.fromEntries([...agenda.vinculos.entries()].map(([k, v]) => [k, [...v]])),
       vinculos_por_recurso: Object.fromEntries([...agenda.vinculosPorRecurso.entries()].map(([k, v]) => [k, [...v]])),
+      combinaciones: agenda.combinaciones,
       horario_sucursal: agenda.horarioSucursal,
       bloqueos,
       nivel_permiso: nivel,
@@ -277,16 +278,16 @@ export async function getCitas(desde: string, hasta: string) {
   }
 }
 
-export async function getHuecos(p: { servicio_id: string; fecha: string; personas?: number; recurso_id?: string | null; extras?: string[]; sin_reglas?: boolean; ignorar_cita_id?: string | null }) {
+export async function getHuecos(p: { servicio_id: string; fecha: string; personas?: number; recurso_id?: string | null; extras?: string[]; sin_reglas?: boolean; ignorar_cita_id?: string | null; zona?: string | null }) {
   const auth = await sesion()
   if ('error' in auth) return { success: false, error: auth.error }
   if ((await nivelAgenda()) === 'ninguno') return { success: false, error: 'No tienes acceso a la agenda.' }
   if (!leerFecha(p.fecha)) return { success: false, error: 'Fecha no válida.' }
   const agenda = await cargarAgenda(auth.branch_id)
   if (!agenda) return { success: false, error: 'No se ha encontrado la sucursal.' }
-  const servicio = agenda.servicios.find(s => s.id === p.servicio_id)
+  const servicio = servicioPorId(agenda, p.servicio_id, Number(p.personas) || 1)
   if (!servicio) return { success: false, error: 'Ese servicio no se puede reservar.' }
-  const r = await huecosDelDia({ agenda, servicio, fecha: p.fecha, personas: p.personas, recursoId: p.recurso_id, extras: p.extras, sinReglas: !!p.sin_reglas, ignorarCitaId: p.ignorar_cita_id })
+  const r = await huecosDelDia({ agenda, servicio, fecha: p.fecha, personas: p.personas, recursoId: p.recurso_id, extras: p.extras, sinReglas: !!p.sin_reglas, ignorarCitaId: p.ignorar_cita_id, zona: p.zona })
   return { success: true, data: { huecos: r.huecos, motivo: r.motivo, zona: agenda.zona } }
 }
 
@@ -302,7 +303,9 @@ export interface DatosCitaPanel {
   notas?: string | null
   peticiones?: string | null
   forzar?: boolean
-  estado?: 'pendiente' | 'confirmada'
+  // "en_curso" = sentar a quien acaba de entrar sin reserva
+  estado?: 'pendiente' | 'confirmada' | 'en_curso'
+  zona?: string | null
 }
 
 export async function crearCitaPanel(d: DatosCitaPanel) {
@@ -336,7 +339,8 @@ export async function crearCitaPanel(d: DatosCitaPanel) {
     origen: 'panel',
     creado_por: auth.user_id,
     forzar: d.forzar !== false,
-    estado: d.estado
+    estado: d.estado,
+    zona: d.zona || null
   })
   if (!r.ok) return { success: false, error: r.error, codigo: r.codigo }
   await registrarAuditoria({ tenant_id: auth.tenant_id, user_id: auth.user_id, accion: `creó una cita de "${r.cita.servicio_nombre}" para ${r.cita.nombre_cliente || 'un cliente'}`, tabla_afectada: 'citas', registro_id: r.cita.id, valor_nuevo: r.cita })
@@ -403,4 +407,45 @@ export async function getResumenAgenda() {
   const estados: EstadoCita[] = ['pendiente', 'confirmada', 'en_curso']
   const { count: proximas } = await supabaseAdmin.from('citas').select('id', { count: 'exact', head: true }).eq('branch_id', auth.branch_id).in('estado', estados).gte('fin', new Date().toISOString()).lt('inicio', new Date(Date.now() + 24 * 3600 * 1000).toISOString())
   return { success: true, data: { pendientes: pendientes || 0, proximas_24h: proximas || 0 } }
+}
+
+// ---------------------------------------------------------------------------
+// Restaurante: mesas que se juntan
+// ---------------------------------------------------------------------------
+export async function guardarCombinacion(datos: { id?: string; nombre: string; recurso_ids: string[]; capacidad_min: number; capacidad_max: number; activa?: boolean }) {
+  const denegado = await sinPermiso('agenda')
+  if (denegado) return { success: false, error: denegado }
+  const auth = await sesion()
+  if ('error' in auth) return { success: false, error: auth.error }
+  const ids = [...new Set((datos.recurso_ids || []).filter(Boolean))]
+  if (ids.length < 2) return { success: false, error: 'Una combinación necesita al menos dos mesas.' }
+  const { data: mesas } = await supabaseAdmin.from('recursos').select('id, nombre, tipo').eq('branch_id', auth.branch_id).in('id', ids)
+  if ((mesas || []).length !== ids.length || (mesas || []).some((m: any) => m.tipo !== 'mesa')) return { success: false, error: 'Todas tienen que ser mesas de esta sucursal.' }
+  const capMin = Math.max(1, Math.round(Number(datos.capacidad_min || 1)))
+  const capMax = Math.max(capMin, Math.round(Number(datos.capacidad_max || capMin)))
+  const nombre = String(datos.nombre || '').trim().slice(0, 60) || (mesas || []).map((m: any) => m.nombre).join(' + ')
+  const fila = { tenant_id: auth.tenant_id, branch_id: auth.branch_id, nombre, recurso_ids: ids, capacidad_min: capMin, capacidad_max: capMax, activa: datos.activa !== false }
+  let id = datos.id
+  if (id) {
+    const { error } = await supabaseAdmin.from('recursos_combinaciones').update(fila).eq('id', id).eq('branch_id', auth.branch_id)
+    if (error) return { success: false, error: error.message }
+  } else {
+    const { data, error } = await supabaseAdmin.from('recursos_combinaciones').insert(fila).select('id').single()
+    if (error || !data) return { success: false, error: error?.message || 'No se ha podido crear.' }
+    id = data.id
+  }
+  await registrarAuditoria({ tenant_id: auth.tenant_id, user_id: auth.user_id, accion: `${datos.id ? 'editó' : 'añadió'} la combinación de mesas "${nombre}"`, tabla_afectada: 'recursos_combinaciones', registro_id: id, valor_nuevo: fila })
+  return { success: true, data: { id } }
+}
+
+export async function borrarCombinacion(id: string) {
+  const denegado = await sinPermiso('agenda')
+  if (denegado) return { success: false, error: denegado }
+  const auth = await sesion()
+  if ('error' in auth) return { success: false, error: auth.error }
+  const { data: c } = await supabaseAdmin.from('recursos_combinaciones').select('*').eq('id', id).eq('branch_id', auth.branch_id).maybeSingle()
+  if (!c) return { success: false, error: 'Esa combinación no existe.' }
+  await supabaseAdmin.from('recursos_combinaciones').delete().eq('id', id)
+  await registrarAuditoria({ tenant_id: auth.tenant_id, user_id: auth.user_id, accion: `borró la combinación de mesas "${c.nombre}"`, tabla_afectada: 'recursos_combinaciones', registro_id: id, valor_anterior: c })
+  return { success: true }
 }

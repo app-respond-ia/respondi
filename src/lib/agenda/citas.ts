@@ -1,7 +1,8 @@
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { registrarError } from '@/lib/errores'
 import { ESTADOS_ACTIVOS, type Cita, type CodigoErrorCita, type EstadoCita, type OrigenCita, type Servicio } from './tipos'
-import { cargarAgenda, duracionServicio, grupoDeClase, huecosDelDia, patronOcupacion, type Agenda } from './disponibilidad'
+import { cargarAgenda, duracionServicio, grupoDeClase, huecosDelDia, patronOcupacion, servicioPorId, type Agenda } from './disponibilidad'
+import { ID_MESA } from './tipos'
 import { diaEnZona, textoFecha, textoHora } from './tiempo'
 
 // CREAR, MOVER, CANCELAR Y CAMBIAR DE ESTADO UNA CITA.
@@ -36,8 +37,11 @@ export interface DatosNuevaCita {
   creado_por?: string | null
   // El panel: fuera de horario, sin antelación, sin tope por cliente
   forzar?: boolean
-  // Forzar el estado inicial (el panel puede dejarla pendiente a propósito)
+  // Forzar el estado inicial (el panel puede dejarla pendiente a propósito,
+  // o "en curso" para sentar a quien entra sin reserva)
   estado?: EstadoCita
+  // Restaurante: zona preferida
+  zona?: string | null
 }
 
 const CANALES_TELEFONO = new Set(['whatsapp'])
@@ -130,12 +134,12 @@ export async function crearCita(d: DatosNuevaCita): Promise<ResultadoCita> {
   const agenda = await cargarAgenda(d.branch_id)
   if (!agenda) return fallo('no_existe', 'No se ha encontrado la sucursal.')
   if (!agenda.ajustes.activa && !d.forzar) return fallo('agenda_apagada', 'La agenda de este negocio no está activada.')
-  const servicio = agenda.servicios.find(s => s.id === d.servicio_id)
+  const personas = Math.max(1, Math.round(Number(d.personas || 1)))
+  const servicio = servicioPorId(agenda, d.servicio_id, personas)
   if (!servicio || !servicio.reservable) return fallo('servicio', 'Ese servicio no se puede reservar.')
   if (!servicio.disponible && !d.forzar) return fallo('servicio', 'Ese servicio no está disponible ahora mismo.')
   const inicio = new Date(d.inicio)
   if (isNaN(inicio.getTime())) return fallo('antelacion', 'La fecha y hora no son válidas.')
-  const personas = Math.max(1, Math.round(Number(d.personas || 1)))
   const extras = (d.extras || []).filter(e => servicio.extras.some(x => x.nombre.toLowerCase() === String(e).toLowerCase()))
 
   if (!d.forzar) {
@@ -148,7 +152,7 @@ export async function crearCita(d: DatosNuevaCita): Promise<ResultadoCita> {
 
   // ¿Cabe a esa hora, y con qué recursos?
   const fecha = diaEnZona(inicio, agenda.zona)
-  const { huecos, motivo } = await huecosDelDia({ agenda, servicio, fecha, personas, recursoId: d.recurso_id, extras, sinReglas: !!d.forzar, soloInicio: inicio })
+  const { huecos, motivo } = await huecosDelDia({ agenda, servicio, fecha, personas, recursoId: d.recurso_id, extras, sinReglas: !!d.forzar, soloInicio: inicio, zona: d.zona })
   const hueco = huecos.find(h => h.inicio === inicio.toISOString())
   if (!hueco) {
     const ahora = Date.now()
@@ -168,7 +172,7 @@ export async function crearCita(d: DatosNuevaCita): Promise<ResultadoCita> {
       branch_id: d.branch_id,
       contact_id: d.contact_id || null,
       conversation_id: d.conversation_id || null,
-      servicio_id: servicio.id,
+      servicio_id: servicio.id === ID_MESA ? null : servicio.id,
       servicio_nombre: servicio.nombre,
       inicio: inicio.toISOString(),
       fin: fin.toISOString(),
@@ -197,6 +201,8 @@ export async function crearCita(d: DatosNuevaCita): Promise<ResultadoCita> {
   if (resultado?.error === 'ocupado') return fallo('ocupado', 'Alguien acaba de coger ese hueco. Elige otro.')
   if (resultado?.error === 'aforo') return fallo('aforo', resultado.libres ? `Solo quedan ${resultado.libres} plazas en ese hueco.` : 'Ese hueco ya está completo.')
 
+  // Sentado sin reserva: ya ha llegado
+  if (estado === 'en_curso') await supabaseAdmin.from('citas').update({ llegada_en: new Date().toISOString() }).eq('id', resultado.id)
   const cita = await citaPorId(resultado.id)
   if (!cita) return fallo('no_existe', 'La reserva se ha guardado pero no se ha podido leer.')
   await apuntarHistorial(cita, 'creada', { estado, origen: d.origen, personas, servicio: servicio.nombre }, d.origen, d.creado_por)
@@ -212,7 +218,7 @@ function textoAntelacion(minutos: number) {
 
 // ¿Puede el cliente tocar esta cita todavía? (plazo de cancelación)
 function dentroDelPlazo(cita: Cita, agenda: Agenda) {
-  const servicio = agenda.servicios.find(s => s.id === cita.servicio_id)
+  const servicio = servicioPorId(agenda, cita.servicio_id, cita.personas)
   const horas = servicio?.cancelacion_horas ?? agenda.ajustes.cancelacion_horas
   return new Date(cita.inicio).getTime() - Date.now() >= horas * 3600 * 1000
 }
@@ -224,6 +230,8 @@ export interface DatosMover {
   origen: OrigenCita
   usuario_id?: string | null
   forzar?: boolean
+  // "Al final somos 2": cambia también las personas (y con ellas la mesa o la duración)
+  personas?: number | null
 }
 
 export async function moverCita(citaId: string, d: DatosMover): Promise<ResultadoCita> {
@@ -232,7 +240,9 @@ export async function moverCita(citaId: string, d: DatosMover): Promise<Resultad
   if (!ESTADOS_ACTIVOS.includes(cita.estado)) return fallo('estado', 'Esa reserva ya no se puede mover.')
   const agenda = await cargarAgenda(cita.branch_id)
   if (!agenda) return fallo('no_existe', 'No se ha encontrado la sucursal.')
-  const servicio = agenda.servicios.find(s => s.id === cita.servicio_id)
+  const personas = d.personas ? Math.max(1, Math.round(Number(d.personas))) : cita.personas
+  if (d.por === 'cliente' && !d.forzar && personas >= agenda.ajustes.grupo_grande_desde) return fallo('grupo_grande', `A partir de ${agenda.ajustes.grupo_grande_desde} personas la reserva la gestiona una persona del equipo.`)
+  const servicio = servicioPorId(agenda, cita.servicio_id, personas)
   if (!servicio) return fallo('servicio', 'El servicio de esa reserva ya no existe en la lista de precios.')
   if (d.por === 'cliente' && !dentroDelPlazo(cita, agenda)) {
     const horas = servicio.cancelacion_horas ?? agenda.ajustes.cancelacion_horas
@@ -243,10 +253,10 @@ export async function moverCita(citaId: string, d: DatosMover): Promise<Resultad
   const sinReglas = !!d.forzar && d.por === 'negocio'
   const fecha = diaEnZona(inicio, agenda.zona)
   const recursoPreferido = d.recurso_id === undefined ? (cita.recursos?.[0]?.id || null) : d.recurso_id
-  let { huecos, motivo } = await huecosDelDia({ agenda, servicio, fecha, personas: cita.personas, recursoId: recursoPreferido, extras: cita.extras, ignorarCitaId: cita.id, sinReglas, soloInicio: inicio })
+  let { huecos, motivo } = await huecosDelDia({ agenda, servicio, fecha, personas, recursoId: recursoPreferido, extras: cita.extras, ignorarCitaId: cita.id, sinReglas, soloInicio: inicio })
   // Si con su recurso de siempre no cabe, vale otro
   if (!huecos.length && recursoPreferido && d.recurso_id === undefined) {
-    ;({ huecos, motivo } = await huecosDelDia({ agenda, servicio, fecha, personas: cita.personas, extras: cita.extras, ignorarCitaId: cita.id, sinReglas, soloInicio: inicio }))
+    ;({ huecos, motivo } = await huecosDelDia({ agenda, servicio, fecha, personas, extras: cita.extras, ignorarCitaId: cita.id, sinReglas, soloInicio: inicio }))
   }
   const hueco = huecos.find(h => h.inicio === inicio.toISOString())
   if (!hueco) return fallo('sin_hueco', motivo || 'A esa hora no hay hueco.')
@@ -268,9 +278,12 @@ export async function moverCita(citaId: string, d: DatosMover): Promise<Resultad
   if (resultado?.error === 'ocupado') return fallo('ocupado', 'Alguien acaba de coger ese hueco. Elige otro.')
   if (resultado?.error === 'aforo') return fallo('aforo', 'Ese hueco ya está completo.')
 
+  if (personas !== cita.personas) {
+    await supabaseAdmin.from('citas').update({ personas, servicio_nombre: servicio.id === ID_MESA ? servicio.nombre : cita.servicio_nombre, precio_estimado: precioEstimado(servicio, personas, cita.extras) }).eq('id', cita.id)
+  }
   const nueva = await citaPorId(cita.id)
   if (!nueva) return fallo('no_existe', 'La reserva se ha movido pero no se ha podido leer.')
-  await apuntarHistorial(nueva, 'movida', { de: cita.inicio, a: nueva.inicio, por: d.por }, d.origen, d.usuario_id)
+  await apuntarHistorial(nueva, 'movida', { de: cita.inicio, a: nueva.inicio, por: d.por, ...(personas !== cita.personas ? { personas_antes: cita.personas, personas } : {}) }, d.origen, d.usuario_id)
   await dispararEventoAgenda('cita_movida', nueva, agenda, { inicio_anterior: cita.inicio })
   return { ok: true, cita: nueva }
 }
@@ -290,7 +303,7 @@ export async function cancelarCita(citaId: string, d: DatosCancelar): Promise<Re
   const agenda = await cargarAgenda(cita.branch_id)
   if (!agenda) return fallo('no_existe', 'No se ha encontrado la sucursal.')
   if (d.por === 'cliente' && !d.forzar && !dentroDelPlazo(cita, agenda)) {
-    const servicio = agenda.servicios.find(s => s.id === cita.servicio_id)
+    const servicio = servicioPorId(agenda, cita.servicio_id, cita.personas)
     const horas = servicio?.cancelacion_horas ?? agenda.ajustes.cancelacion_horas
     return fallo('plazo_cancelacion', `Ya no se puede cancelar: hay que avisar con ${horas} horas de antelación. Puede pedírselo al equipo.`)
   }
@@ -311,7 +324,7 @@ export async function cancelarCita(citaId: string, d: DatosCancelar): Promise<Re
 }
 
 // Confirmar (si estaba pendiente), empezar, terminar, no se presentó
-export async function cambiarEstadoCita(citaId: string, estado: Extract<EstadoCita, 'confirmada' | 'en_curso' | 'completada' | 'no_presentado'>, d: { origen: OrigenCita; usuario_id?: string | null }): Promise<ResultadoCita> {
+export async function cambiarEstadoCita(citaId: string, estado: Extract<EstadoCita, 'confirmada' | 'en_curso' | 'completada' | 'no_presentado'>, d: { origen: OrigenCita | 'sistema'; usuario_id?: string | null; detalle?: Record<string, any> }): Promise<ResultadoCita> {
   const cita = await citaPorId(citaId)
   if (!cita) return fallo('no_existe', 'Esa reserva no existe.')
   const permitidos: Record<string, EstadoCita[]> = {
@@ -328,7 +341,7 @@ export async function cambiarEstadoCita(citaId: string, estado: Extract<EstadoCi
   // Un plantón suelta el hueco por si aún queda tiempo aprovechable
   if (estado === 'no_presentado') await supabaseAdmin.from('citas_recursos').delete().eq('cita_id', cita.id)
   const nueva = { ...cita, ...cambios } as Cita
-  await apuntarHistorial(nueva, estado, {}, d.origen, d.usuario_id)
+  await apuntarHistorial(nueva, estado, d.detalle || {}, d.origen, d.usuario_id)
   const agenda = await cargarAgenda(cita.branch_id)
   if (agenda) await dispararEventoAgenda(`cita_${estado}`, nueva, agenda)
   return { ok: true, cita: nueva }

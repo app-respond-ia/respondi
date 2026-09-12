@@ -1,5 +1,5 @@
 import { supabaseAdmin } from '@/utils/supabase/admin'
-import { AJUSTES_POR_DEFECTO, ESTADOS_ACTIVOS, type AjustesAgenda, type Bloqueo, type Hueco, type HorarioRecurso, type Recurso, type Servicio } from './tipos'
+import { AJUSTES_POR_DEFECTO, ESTADOS_ACTIVOS, ID_MESA, type AjustesAgenda, type Bloqueo, type Combinacion, type Hueco, type HorarioRecurso, type Recurso, type Servicio } from './tipos'
 import { instanteLocal, leerFecha, minutosDeHora, partesEnZona, seSolapan, sumarDias, zonaValida } from './tiempo'
 
 // CÁLCULO DE HUECOS.
@@ -23,6 +23,8 @@ export interface Agenda {
   // Y al revés: qué servicios hace cada recurso. Un recurso sin entradas
   // hace todos los de su tipo; con entradas, solo esos.
   vinculosPorRecurso: Map<string, Set<string>>
+  // Restaurante: mesas que se pueden juntar
+  combinaciones: Combinacion[]
   negocio: { nombre: string; direccion: string | null; moneda: string }
 }
 
@@ -78,13 +80,14 @@ export async function cargarAgenda(branchId: string): Promise<Agenda | null> {
     .maybeSingle()
   if (!sucursal) return null
 
-  const [{ data: ajustes }, { data: recursos }, { data: horarios }, { data: horarioSucursal }, { data: servicios }, { data: vinculos }] = await Promise.all([
+  const [{ data: ajustes }, { data: recursos }, { data: horarios }, { data: horarioSucursal }, { data: servicios }, { data: vinculos }, { data: combinaciones }] = await Promise.all([
     supabaseAdmin.from('agenda_ajustes').select('*').eq('branch_id', branchId).maybeSingle(),
     supabaseAdmin.from('recursos').select('*').eq('branch_id', branchId).order('orden', { ascending: true }).order('created_at', { ascending: true }),
     supabaseAdmin.from('recursos_horarios').select('recurso_id, dia_semana, apertura, cierre, orden').eq('branch_id', branchId),
     supabaseAdmin.from('business_hours').select('dia_semana, apertura, cierre, cerrado, orden').eq('branch_id', branchId).eq('tipo', 'negocio'),
     supabaseAdmin.from('price_list').select('*').eq('branch_id', branchId).eq('reservable', true),
-    supabaseAdmin.from('recursos_servicios').select('recurso_id, precio_id').eq('branch_id', branchId)
+    supabaseAdmin.from('recursos_servicios').select('recurso_id, precio_id').eq('branch_id', branchId),
+    supabaseAdmin.from('recursos_combinaciones').select('id, nombre, recurso_ids, capacidad_min, capacidad_max, activa').eq('branch_id', branchId).order('capacidad_max', { ascending: true })
   ])
 
   const porRecurso = new Map<string, HorarioRecurso[]>()
@@ -112,8 +115,57 @@ export async function cargarAgenda(branchId: string): Promise<Agenda | null> {
     servicios: (servicios || []).map(servicioDeFila),
     vinculos: mapaVinculos,
     vinculosPorRecurso: porRecursoVinculos,
+    combinaciones: (combinaciones || []) as Combinacion[],
     negocio: { nombre: sucursal.nombre, direccion: sucursal.direccion || null, moneda: sucursal.moneda || 'EUR' }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Restaurante: el "servicio" es la mesa
+// ---------------------------------------------------------------------------
+export function esRestaurante(agenda: Agenda) {
+  return agenda.ajustes.modo === 'restaurante'
+}
+
+// Cuánto dura una mesa según los comensales (los tramos del ajuste; si no hay, 90 min)
+export function duracionMesa(agenda: Agenda, personas: number) {
+  const tramos = [...(agenda.ajustes.duracion_por_comensales || [])].sort((a, b) => a.hasta_personas - b.hasta_personas)
+  const tramo = tramos.find(t => personas <= t.hasta_personas) || tramos[tramos.length - 1]
+  return tramo?.minutos || 90
+}
+
+export function servicioMesa(agenda: Agenda, personas: number): Servicio {
+  const n = Math.max(1, Math.round(personas || 1))
+  return {
+    id: ID_MESA,
+    nombre: `Mesa para ${n}`,
+    tipo: 'servicio',
+    precio: null,
+    precio_tipo: 'consultar',
+    moneda: agenda.negocio.moneda,
+    descripcion: null,
+    disponible: true,
+    visible_ia: true,
+    reservable: true,
+    duracion_minutos: duracionMesa(agenda, n),
+    tiempo_antes_minutos: 0,
+    tiempo_despues_minutos: 0,
+    huecos_internos: [],
+    tipo_recurso: 'mesa',
+    recursos_necesarios: 1,
+    aforo: null,
+    precio_por_persona: false,
+    extras: [],
+    cancelacion_horas: null,
+    confirmacion: null,
+    reservable_online: true
+  }
+}
+
+// El servicio por su id; en un restaurante, sin id (o "mesa") es la mesa
+export function servicioPorId(agenda: Agenda, id: string | null | undefined, personas = 1): Servicio | null {
+  if (esRestaurante(agenda) && (!id || id === ID_MESA)) return servicioMesa(agenda, personas)
+  return agenda.servicios.find(s => s.id === id) || null
 }
 
 // Cuánto dura el servicio para el cliente, con sus extras
@@ -252,6 +304,8 @@ export interface OpcionesHuecos {
   sinReglas?: boolean
   // Solo comprobar una hora concreta
   soloInicio?: Date | null
+  // Restaurante: zona preferida (terraza, interior...)
+  zona?: string | null
 }
 
 // Los huecos de un día para un servicio
@@ -259,6 +313,7 @@ export async function huecosDelDia(o: OpcionesHuecos): Promise<{ huecos: Hueco[]
   const { agenda, servicio } = o
   const fecha = leerFecha(o.fecha)
   if (!fecha) return { huecos: [], motivo: 'La fecha no es válida.' }
+  if (servicio.id === ID_MESA) return huecosRestaurante(o, fecha)
   const personas = Math.max(1, Number(o.personas || 1))
   const ahora = o.ahora || new Date()
   const extras = o.extras || []
@@ -357,6 +412,117 @@ export async function huecosDelDia(o: OpcionesHuecos): Promise<{ huecos: Hueco[]
     huecos.push({ inicio: inicio.toISOString(), fin: fin.toISOString(), recursos: libres.slice(0, necesarios).map(r => r.id), ...(plazasLibres !== undefined ? { plazas: plazasLibres } : {}) })
   }
   return { huecos }
+}
+
+// ---------------------------------------------------------------------------
+// Restaurante: mesas y turnos
+// ---------------------------------------------------------------------------
+// Un hueco es una hora de entrada dentro de un turno (hasta la última
+// entrada) en la que hay una mesa libre donde caben los comensales: primero
+// la mesa más ajustada (una de 4 antes que una de 6), y si no cabe en
+// ninguna y se pueden juntar mesas, una combinación. Se respetan los
+// bloqueos, el aforo por turno y la antelación.
+async function huecosRestaurante(o: OpcionesHuecos, fecha: { anio: number; mes: number; dia: number }): Promise<{ huecos: Hueco[]; motivo?: string }> {
+  const { agenda } = o
+  const personas = Math.max(1, Math.round(Number(o.personas || 1)))
+  const ahora = o.ahora || new Date()
+  const paso = Math.max(5, agenda.ajustes.paso_minutos || 15)
+  const duracion = duracionMesa(agenda, personas)
+  const zona = (o.zona || '').trim().toLowerCase()
+
+  const mesas = agenda.recursos.filter(r => r.activo && r.tipo === 'mesa' && (!o.recursoId || r.id === o.recursoId) && (!zona || (r.zona || '').toLowerCase().includes(zona)))
+  if (!mesas.length) return { huecos: [], motivo: zona ? `No hay mesas en "${o.zona}".` : 'No hay mesas configuradas.' }
+  // Los "asientos" posibles: mesas sueltas donde caben, y combinaciones
+  const asientos: { ids: string[]; capacidad: number; nombre: string }[] = mesas
+    .filter(m => personas >= m.capacidad_min && personas <= m.capacidad_max)
+    .map(m => ({ ids: [m.id], capacidad: m.capacidad_max, nombre: m.nombre }))
+  if (agenda.ajustes.combinar_mesas && !o.recursoId) {
+    for (const c of agenda.combinaciones) {
+      if (!c.activa || personas < c.capacidad_min || personas > c.capacidad_max) continue
+      const suyas = c.recurso_ids.map(id => mesas.find(m => m.id === id))
+      if (suyas.some(m => !m)) continue
+      asientos.push({ ids: c.recurso_ids, capacidad: c.capacidad_max, nombre: c.nombre })
+    }
+  }
+  if (!asientos.length) return { huecos: [], motivo: `No hay mesa para ${personas} ${personas === 1 ? 'persona' : 'personas'}${zona ? ` en "${o.zona}"` : ''}.` }
+  // Las sueltas más ajustadas primero; las combinaciones, después
+  asientos.sort((a, b) => (a.ids.length - b.ids.length) || (a.capacidad - b.capacidad))
+
+  const inicioDia = instanteLocal(agenda.zona, fecha.anio, fecha.mes, fecha.dia, 0, 0)
+  const finDia = new Date(inicioDia.getTime() + 36 * 3600 * 1000)
+  const margen = 6 * 3600 * 1000
+  const [bloqueos, ocupacion, citasDia] = await Promise.all([
+    o.sinReglas ? Promise.resolve([] as Bloqueo[]) : bloqueosEntre(agenda.ajustes.branch_id, new Date(inicioDia.getTime() - margen), new Date(finDia.getTime() + margen)),
+    ocupacionEntre(agenda.ajustes.branch_id, new Date(inicioDia.getTime() - margen), new Date(finDia.getTime() + margen), o.ignorarCitaId),
+    agenda.ajustes.aforo_por_turno ? citasActivasEntre(agenda.ajustes.branch_id, inicioDia, finDia, o.ignorarCitaId) : Promise.resolve([] as { inicio: Date; personas: number }[])
+  ])
+  const ocupadoPor = new Map<string, Ocupacion[]>()
+  for (const oc of ocupacion) { const l = ocupadoPor.get(oc.recurso_id) || []; l.push(oc); ocupadoPor.set(oc.recurso_id, l) }
+  const bloqueadaEn = (mesaId: string, desde: Date, hasta: Date) => bloqueos.some(b => (!b.recurso_id || b.recurso_id === mesaId) && seSolapan(desde.getTime(), hasta.getTime(), new Date(b.desde).getTime(), new Date(b.hasta).getTime()))
+  const libreEn = (mesaId: string, desde: Date, hasta: Date) => !bloqueadaEn(mesaId, desde, hasta) && (ocupadoPor.get(mesaId) || []).every(oc => !seSolapan(desde.getTime(), hasta.getTime(), oc.desde.getTime(), oc.hasta.getTime()))
+
+  // Las ventanas de entrada: los turnos del día (o el horario del negocio si no hay turnos)
+  const aInstante = (hhmm: string) => { const m = minutosDeHora(hhmm); return instanteLocal(agenda.zona, fecha.anio, fecha.mes, fecha.dia, Math.floor(m / 60), m % 60) }
+  let ventanas: { nombre: string; desde: Date; ultimaEntrada: Date; fin: Date }[] = []
+  if (o.sinReglas) {
+    ventanas = [{ nombre: '', desde: new Date(inicioDia.getTime() - margen), ultimaEntrada: new Date(finDia.getTime() + margen), fin: new Date(finDia.getTime() + margen) }]
+  } else if (agenda.ajustes.turnos.length) {
+    for (const t of agenda.ajustes.turnos) {
+      const desde = aInstante(t.inicio)
+      let fin = aInstante(t.fin)
+      if (fin <= desde) fin = new Date(fin.getTime() + 24 * 3600 * 1000)
+      let ultimaEntrada = t.ultima_entrada ? aInstante(t.ultima_entrada) : new Date(fin.getTime() - duracion * 60000)
+      if (ultimaEntrada < desde) ultimaEntrada = new Date(ultimaEntrada.getTime() + 24 * 3600 * 1000)
+      ventanas.push({ nombre: t.nombre, desde, ultimaEntrada, fin })
+    }
+  } else {
+    const pseudo = { usa_horario_sucursal: true, horarios: [] } as unknown as Recurso
+    ventanas = franjasAbiertas(agenda, pseudo, fecha).map(f => ({ nombre: '', desde: f.desde, ultimaEntrada: new Date(f.hasta.getTime() - duracion * 60000), fin: f.hasta }))
+  }
+  if (!ventanas.length) return { huecos: [], motivo: 'Ese día está cerrado.' }
+
+  // Aforo por turno: comensales ya sentados en esa ventana
+  const comensalesEn = (v: { desde: Date; fin: Date }) => citasDia.filter(c => c.inicio >= v.desde && c.inicio < v.fin).reduce((n, c) => n + c.personas, 0)
+  const minAntelacion = o.sinReglas ? 0 : agenda.ajustes.antelacion_minima_minutos * 60000
+  const maxAntelacion = o.sinReglas ? Infinity : agenda.ajustes.antelacion_maxima_dias * 24 * 3600 * 1000
+
+  const huecos: Hueco[] = []
+  for (const v of ventanas) {
+    // El aforo por turno solo tiene sentido con turnos definidos (sin ellos
+    // contaría a los de la comida y a los de la cena juntos)
+    if (agenda.ajustes.aforo_por_turno && agenda.ajustes.turnos.length && !o.sinReglas && comensalesEn(v) + personas > agenda.ajustes.aforo_por_turno) continue
+    const candidatas: Date[] = []
+    if (o.soloInicio) {
+      if (o.soloInicio >= v.desde && o.soloInicio <= v.ultimaEntrada) candidatas.push(o.soloInicio)
+    } else {
+      // Alineadas al paso desde el inicio del turno
+      for (let t = v.desde.getTime(); t <= v.ultimaEntrada.getTime(); t += paso * 60000) candidatas.push(new Date(t))
+    }
+    for (const inicio of candidatas) {
+      if (!o.sinReglas && inicio.getTime() - ahora.getTime() < minAntelacion) continue
+      if (inicio.getTime() - ahora.getTime() > maxAntelacion) continue
+      const fin = new Date(inicio.getTime() + duracion * 60000)
+      const asiento = asientos.find(a => a.ids.every(id => libreEn(id, inicio, fin)))
+      if (!asiento) continue
+      // Copia por hueco: si se repite el mismo array, la respuesta de Next lo
+      // convierte en referencias y quien la lea a mano ve un hueco vacío
+      huecos.push({ inicio: inicio.toISOString(), fin: fin.toISOString(), recursos: [...asiento.ids], ...(v.nombre ? { turno: v.nombre } : {}) })
+    }
+  }
+  return { huecos, ...(huecos.length ? {} : { motivo: `No queda mesa para ${personas} ${personas === 1 ? 'persona' : 'personas'} ese día.` }) }
+}
+
+async function citasActivasEntre(branchId: string, desde: Date, hasta: Date, ignorarCitaId?: string | null): Promise<{ inicio: Date; personas: number }[]> {
+  let consulta = supabaseAdmin
+    .from('citas')
+    .select('inicio, personas, id')
+    .eq('branch_id', branchId)
+    .in('estado', ESTADOS_ACTIVOS)
+    .gte('inicio', desde.toISOString())
+    .lt('inicio', hasta.toISOString())
+  if (ignorarCitaId) consulta = consulta.neq('id', ignorarCitaId)
+  const { data } = await consulta
+  return (data || []).map((c: any) => ({ inicio: new Date(c.inicio), personas: Number(c.personas || 1) }))
 }
 
 // Los huecos de varios días seguidos (para "¿cuándo tienes hueco?")

@@ -203,7 +203,22 @@ export interface Hueco {
   recursos: string[]
   // Para las clases con aforo: plazas que quedan
   plazas?: number
+  // Restaurante: en qué turno cae
+  turno?: string
 }
+
+// Restaurante: mesas que se juntan para un grupo
+export interface Combinacion {
+  id: string
+  nombre: string
+  recurso_ids: string[]
+  capacidad_min: number
+  capacidad_max: number
+  activa: boolean
+}
+
+// El "servicio" de un restaurante es la mesa: no está en la lista de precios
+export const ID_MESA = 'mesa'
 
 export const PASOS_AGENDA = [5, 10, 15, 20, 30, 60]
 

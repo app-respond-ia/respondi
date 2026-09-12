@@ -6,7 +6,7 @@ import { ejecutarPendientes } from '@/lib/automatizaciones/motor'
 import { procesarEvento, repasarPedidosRetrasados, repasarCarritosAbandonados, repasarStockBajo, repasarResumenDiario, repasarClientesEsperando, repasarAniversarios, repasarClientesDormidos, repasarRecompras, repasarGarantias, tiendasConProgramadas, sucursalesConProgramada, lanzarPropiasProgramadas, type TiendaBasica } from '@/lib/tiendas/eventos'
 import { lanzarAutomatizacion } from '@/lib/automatizaciones/motor'
 import { repasarVueltaStock, repasarBajadasDePrecio } from '@/lib/tiendas/intereses'
-import { repasarRecordatoriosCitas, repasarConfirmacionesCitas, repasarClientesSinCita } from '@/lib/agenda/repasos'
+import { repasarRecordatoriosCitas, repasarConfirmacionesCitas, repasarClientesSinCita, repasarCortesia, restaurantesActivos } from '@/lib/agenda/repasos'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -177,6 +177,12 @@ async function repasosProgramados(forzar: Set<string>) {
   for (const { tenant_id, branch_id, ajustes } of await sucursalesConProgramada('pedir_confirmacion_cita')) {
     if (!forzar.has('pedir_confirmacion_cita') && !cadaCinco) continue
     hecho.pedir_confirmacion_cita = (hecho.pedir_confirmacion_cita || 0) + await repasarConfirmacionesCitas(tenant_id, branch_id, ajustes)
+  }
+  // Restaurantes: mesas reservadas a las que no ha llegado nadie pasada la cortesía
+  if (forzar.has('cortesia') || cadaCinco) {
+    for (const { tenant_id, branch_id } of await restaurantesActivos()) {
+      hecho.cortesia = (hecho.cortesia || 0) + await repasarCortesia(tenant_id, branch_id)
+    }
   }
   for (const { tenant_id, branch_id, ajustes } of await sucursalesConProgramada('reactivar_sin_cita')) {
     if (!forzar.has('reactivar_sin_cita') && !(await esSuHora(branch_id, 11))) continue

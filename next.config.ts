@@ -4,7 +4,9 @@ const nextConfig: NextConfig = {
   experimental: {},
   // Librerías de correo (leer el buzón y enviar): se usan tal cual en el
   // servidor, sin empaquetarlas
-  serverExternalPackages: ['imapflow', 'mailparser', 'nodemailer'],
+  // Paquetes que se cargan tal cual en el servidor (no se empaquetan):
+  // pdfjs necesita sus propios archivos al lado para leer los PDF
+  serverExternalPackages: ['imapflow', 'mailparser', 'nodemailer', 'pdfjs-dist', 'mammoth'],
   async redirects() {
     return [
       {

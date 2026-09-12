@@ -56,7 +56,7 @@ NO usa RAG/embeddings — herramienta con filtros estructurados
 por producto. Decisión: los vectores dan resultados aproximados, mal
 encaje para datos estructurados.
 
-## RAG de políticas del negocio
+## RAG de políticas del negocio (verificado el 12-09-2026)
 Sí implementado de verdad: `policy_fragments` (texto troceado +
 `embedding vector`, confirmado uso real de pgvector) +
 `policy_sources` (origen: texto manual o PDF subido). Ambas formas de

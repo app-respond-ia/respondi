@@ -4,6 +4,30 @@ Bugs reales que ya ocurrieron en producción, con su causa raíz.
 Antes de tocar algo parecido, lee esto — muchos son "familia de bug
 repetible" si no se tiene cuidado.
 
+## Los PDF de políticas no se procesaban NUNCA (12-09-2026)
+Al probar el RAG de punta a punta: se sube un PDF, se guarda bien en el
+almacén… y se queda en "procesando" para siempre. El error real era
+`DOMMatrix is not defined`: `pdf-parse` 2.x usa la versión moderna de pdf.js,
+que necesita cosas del navegador que en el servidor no existen. Es decir,
+**ninguna política subida en PDF llegó nunca a la IA** (las escritas a mano sí
+funcionaban, por eso no cantaba).
+
+Arreglado en `src/lib/politicas/leer-archivos.ts` con la versión *legacy* de
+pdf.js (la pensada para servidor), más `pdfjs-dist` y `mammoth` declarados en
+`serverExternalPackages` (si no, el empaquetador no deja al lector encontrar
+sus propios archivos: "Cannot find module pdf.worker.mjs"). De paso se admiten
+.txt y .md además de PDF y Word.
+
+**Y una mejora que salió probando**: con el local abierto 24 h, a "¿a qué hora
+puedo recoger?" la IA contestaba "cuando quieras" aunque las políticas dijeran
+"de 10:00 a 13:00". Ahora, cuando la pregunta va de recoger, entregar, devolver
+o reservar, la respuesta del horario trae ya la norma relacionada (pedirle que
+consulte otra herramienta después no sirve: en ese paso ya está escribiendo).
+
+Pruebas: `probar-politicas` (13 comprobaciones) con un PDF de verdad subido
+desde la pantalla, su procesado, cuatro preguntas contestadas con lo que dice
+el documento, una política escrita a mano, el borrado y el límite de 10 MB.
+
 ## Lista de precios: tres fallos (12-09-2026)
 Repasando la pantalla a fondo (lo pidió Jorge: "la de precios hay que
 revisarla muy bien"):

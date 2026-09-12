@@ -77,18 +77,8 @@ export async function POST(req: Request) {
 
       const buffer = Buffer.from(await fileData.arrayBuffer())
       const extension = source.ruta_archivo.split('.').pop()?.toLowerCase()
-
-      if (extension === 'pdf') {
-        const pdfParse = require('pdf-parse')
-        const pdfData = await pdfParse(buffer)
-        textToProcess = pdfData.text
-      } else if (extension === 'docx') {
-        const mammoth = require('mammoth')
-        const result = await mammoth.extractRawText({ buffer })
-        textToProcess = result.value
-      } else {
-        throw new Error(`Extensión de archivo no soportada: ${extension}`)
-      }
+      const { extraerTextoDeArchivo } = await import('@/lib/politicas/leer-archivos')
+      textToProcess = await extraerTextoDeArchivo(buffer, extension || '')
     } else {
       throw new Error('Tipo de origen desconocido o ruta inválida')
     }

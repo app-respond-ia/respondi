@@ -70,8 +70,8 @@ export default function PoliticasPage() {
     setErrorMsg('')
     const ext = file.name.split('.').pop()?.toLowerCase()
     
-    if (ext !== 'pdf' && ext !== 'docx') {
-      setErrorMsg('Solo se permiten archivos PDF o DOCX.')
+    if (!['pdf', 'docx', 'txt', 'md'].includes(ext || '')) {
+      setErrorMsg('Solo se permiten archivos PDF, Word (.docx), texto (.txt) o Markdown (.md).')
       return
     }
 
@@ -83,7 +83,7 @@ export default function PoliticasPage() {
     setUploading(true)
     try {
       // 1. Obtener URL firmada
-      const urlRes = await getPolicyUploadUrl(file.name, ext, file.size)
+      const urlRes = await getPolicyUploadUrl(file.name, ext!, file.size)
       if (!urlRes.success || !urlRes.data) {
         throw new Error(urlRes.error || 'Error generando URL de subida')
       }
@@ -183,7 +183,7 @@ export default function PoliticasPage() {
             onClick={() => setActiveTab('archivo')}
             className={`flex-1 py-3 px-4 text-center font-medium transition-colors ${activeTab === 'archivo' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
           >
-            Subir Documento (PDF/Word)
+            Subir documento (PDF, Word o texto)
           </button>
           <button 
             onClick={() => setActiveTab('manual')}
@@ -202,10 +202,10 @@ export default function PoliticasPage() {
               onClick={() => fileInputRef.current?.click()}
               className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-colors ${isDragging ? 'border-indigo-500 bg-indigo-50' : 'border-slate-300 hover:border-slate-400 hover:bg-slate-50'} ${uploading ? 'opacity-50 pointer-events-none' : ''}`}
             >
-              <input type="file" ref={fileInputRef} onChange={handleFileInput} className="hidden" accept=".pdf,.docx" />
+              <input type="file" ref={fileInputRef} onChange={handleFileInput} className="hidden" accept=".pdf,.docx,.txt,.md" />
               <UploadCloud className="w-12 h-12 text-slate-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-slate-700 mb-1">Arrastra tu documento aquí o haz clic</h3>
-              <p className="text-slate-500 text-sm">Soporta .PDF y .DOCX hasta 10MB</p>
+              <p className="text-slate-500 text-sm">Admite .PDF, .DOCX, .TXT y .MD, hasta 10 MB</p>
               {uploading && <p className="text-indigo-600 font-medium mt-4">Subiendo y procesando...</p>}
             </div>
           ) : (

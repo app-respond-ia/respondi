@@ -560,6 +560,24 @@ export async function generarRespuesta(conv: any) {
 
   // Escalar a una persona: abre (o reutiliza) el caso y pausa la IA. Lo usa la
   // herramienta escalar_humano y también la revisión del paso 10.
+  // Busca en las políticas del negocio lo que se parezca a una pregunta. La
+  // usan la herramienta `consultar_politicas` y la de horarios.
+  const politicasRelacionadas = async (consulta: string, cuantos = 3): Promise<string> => {
+    try {
+      const embedding = await openai.embeddings.create({ model: 'text-embedding-3-small', input: consulta })
+      const { data: fragmentos, error } = await supabaseAdmin.rpc('match_fragmentos_politicas', {
+        query_embedding: embedding.data[0].embedding,
+        match_branch_id: branchId,
+        match_limit: cuantos
+      })
+      if (error || !fragmentos?.length) return ''
+      return fragmentos.map((f: any) => `- ${f.contenido}`).join('\n')
+    } catch (err: any) {
+      console.error('Error buscando en las políticas:', err?.message)
+      return ''
+    }
+  }
+
   const ejecutarEscalado = async (args: any): Promise<string> => {
     const rule = rules?.find(r => r.id === args.rule_id)
     if (!rule) return 'Error: rule_id no válido para esta sucursal.'
@@ -724,7 +742,20 @@ export async function generarRespuesta(conv: any) {
         } catch (e) {
           formatted += `\nFecha y hora actual en la sucursal: No disponible`
         }
-        
+
+        // El horario del local no es lo mismo que cuándo se recogen o se
+        // entregan los pedidos: eso suele estar en las políticas del negocio.
+        // (Visto en pruebas: con el local abierto 24 h, la IA contestaba que se
+        // podía recoger a cualquier hora, aunque las políticas dijeran otra
+        // cosa.) Si la pregunta va de eso, la norma se trae aquí mismo: pedirle
+        // que llame a otra herramienta después no funciona, porque en ese paso
+        // ya está escribiendo la respuesta.
+        const ultimoDelCliente = [...allMessages].reverse().find((m: any) => m.remitente === 'cliente')?.contenido || ''
+        if (activeSkills.has('consultar_politicas') && /recog|entreg|repart|devolv|reserv|cita|domicilio|env[ií]o/i.test(ultimoDelCliente)) {
+          const relacionadas = await politicasRelacionadas(ultimoDelCliente)
+          if (relacionadas) formatted += `\n\nNormas del negocio relacionadas (tienen prioridad sobre el horario del local):\n${relacionadas}`
+        }
+
         toolResult = formatted
       }
       else if (toolCall.function.name === 'etiquetar_conversacion') {
@@ -825,36 +856,10 @@ export async function generarRespuesta(conv: any) {
         toolResult = await calcularPresupuesto(branchId, Array.isArray(args.lineas) ? args.lineas : [])
       }
       else if (toolCall.function.name === 'consultar_politicas') {
-        try {
-          // Generar embedding de la consulta
-          const embeddingResponse = await openai.embeddings.create({
-            model: 'text-embedding-3-small',
-            input: args.consulta,
-          })
-          const queryEmbedding = embeddingResponse.data[0].embedding
-
-          // Llamar a RPC
-          const { data: fragmentos, error } = await supabaseAdmin.rpc('match_fragmentos_politicas', {
-            query_embedding: queryEmbedding,
-            match_branch_id: branchId,
-            match_limit: 5
-          })
-
-          if (error) {
-            console.error("Error consultando políticas:", error)
-            toolResult = "Error interno al consultar las políticas."
-          } else if (!fragmentos || fragmentos.length === 0) {
-            toolResult = "No se encontró información relevante en las políticas del negocio para esta consulta."
-          } else {
-            toolResult = "Fragmentos de políticas relevantes encontrados:\n"
-            for (const f of fragmentos) {
-              toolResult += `\n- ${f.contenido}`
-            }
-          }
-        } catch (err) {
-          console.error("Error procesando embedding para políticas:", err)
-          toolResult = "Error interno procesando la consulta."
-        }
+        const encontrado = await politicasRelacionadas(args.consulta, 5)
+        toolResult = encontrado
+          ? `Fragmentos de políticas relevantes encontrados:\n${encontrado}`
+          : 'No se encontró información relevante en las políticas del negocio para esta consulta.'
       }
 
       openAiMessages.push({

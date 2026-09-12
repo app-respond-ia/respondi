@@ -160,7 +160,14 @@ mensajes automáticos no gastan créditos de Respondi (los cobra Meta).
 
 ## Verificado en producción
 
-(Se rellena al desplegar cada tramo.)
+- **Tramo 1 (12-09-2026, commit `3aa96f1`)**: `prod-automatizaciones` 9/9
+  (45 automatizaciones, todas listas y apagadas, frenos, dominio
+  inexistente contra Shopify real), `captura-agenda` con `PROD=1` 11/11
+  (calendario con citas, detalle, nueva cita con huecos, semana, recursos,
+  ajustes, formulario de precios con reserva, móvil sin desbordar, sin
+  errores de JavaScript), y el reloj de la base de datos trató un aviso
+  pendiente en 16 s (`prod-latido`). Sin restos y saldo del inquilino de
+  pruebas en 7.
 
 ## Pendiente
 

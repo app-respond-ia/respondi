@@ -6,6 +6,7 @@ import { ejecutarPendientes } from '@/lib/automatizaciones/motor'
 import { procesarEvento, repasarPedidosRetrasados, repasarCarritosAbandonados, repasarStockBajo, repasarResumenDiario, repasarClientesEsperando, repasarAniversarios, repasarClientesDormidos, repasarRecompras, repasarGarantias, tiendasConProgramadas, sucursalesConProgramada, lanzarPropiasProgramadas, type TiendaBasica } from '@/lib/tiendas/eventos'
 import { lanzarAutomatizacion } from '@/lib/automatizaciones/motor'
 import { repasarVueltaStock, repasarBajadasDePrecio } from '@/lib/tiendas/intereses'
+import { repasarRecordatoriosCitas, repasarConfirmacionesCitas, repasarClientesSinCita } from '@/lib/agenda/repasos'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -164,6 +165,22 @@ async function repasosProgramados(forzar: Set<string>) {
   for (const { tenant_id, branch_id, ajustes } of await sucursalesConProgramada('cliente_esperando')) {
     if (!forzar.has('cliente_esperando') && new Date().getMinutes() % 5 !== 0) continue
     hecho.cliente_esperando = (hecho.cliente_esperando || 0) + await repasarClientesEsperando(tenant_id, branch_id, Number(ajustes?.minutos ?? 15))
+  }
+
+  // Agenda: recordatorios y confirmaciones cada 5 minutos; los que llevan
+  // semanas sin venir, cada día a las 11 (no necesitan tienda)
+  const cadaCinco = new Date().getMinutes() % 5 === 0
+  for (const { tenant_id, branch_id, ajustes } of await sucursalesConProgramada('recordatorio_cita')) {
+    if (!forzar.has('recordatorio_cita') && !cadaCinco) continue
+    hecho.recordatorio_cita = (hecho.recordatorio_cita || 0) + await repasarRecordatoriosCitas(tenant_id, branch_id, ajustes)
+  }
+  for (const { tenant_id, branch_id, ajustes } of await sucursalesConProgramada('pedir_confirmacion_cita')) {
+    if (!forzar.has('pedir_confirmacion_cita') && !cadaCinco) continue
+    hecho.pedir_confirmacion_cita = (hecho.pedir_confirmacion_cita || 0) + await repasarConfirmacionesCitas(tenant_id, branch_id, ajustes)
+  }
+  for (const { tenant_id, branch_id, ajustes } of await sucursalesConProgramada('reactivar_sin_cita')) {
+    if (!forzar.has('reactivar_sin_cita') && !(await esSuHora(branch_id, 11))) continue
+    hecho.reactivar_sin_cita = (hecho.reactivar_sin_cita || 0) + await repasarClientesSinCita(tenant_id, branch_id, ajustes)
   }
 
   // Las que ha creado el cliente con reloj ("cada día a las X", "cada hora")

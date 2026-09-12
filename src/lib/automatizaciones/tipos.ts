@@ -8,6 +8,7 @@
 
 export type ClaveCategoria =
   | 'propias'
+  | 'agenda'
   | 'pedidos'
   | 'recuperar'
   | 'vender'
@@ -24,6 +25,7 @@ export interface Categoria {
 
 export const CATEGORIAS: Categoria[] = [
   { clave: 'propias', nombre: 'Mis automatizaciones', descripcion: 'Las que creas tú, a tu medida, con el editor.' },
+  { clave: 'agenda', nombre: 'Citas y reservas', descripcion: 'Recordatorios, confirmaciones y lo que pasa antes y después de cada cita. Necesitan la agenda activada.' },
   { clave: 'pedidos', nombre: 'Pedidos y envíos', descripcion: 'Mantener al cliente informado de su pedido sin que tengas que escribir tú.' },
   { clave: 'recuperar', nombre: 'Recuperar ventas', descripcion: 'Volver a por las ventas que se quedaron a medias.' },
   { clave: 'vender', nombre: 'Vender desde el chat', descripcion: 'Que la IA venda de verdad: busca, recomienda y manda el enlace de compra.' },
@@ -45,6 +47,9 @@ export type Disparador =
   | { tipo: 'mensaje_cliente'; intencion: string }
   // Algo que pasa dentro de Respondi
   | { tipo: 'evento_interno'; evento: string }
+  // Algo que pasa en la agenda (cita creada, movida, cancelada, completada,
+  // no se presentó, confirmada)
+  | { tipo: 'evento_agenda'; evento: string }
 
 // ---------------------------------------------------------------------------
 // Las condiciones: cuándo sí y cuándo no
@@ -116,6 +121,8 @@ export interface Automatizacion {
   estado: 'lista' | 'en_camino'
   // ¿Necesita la tienda conectada?
   requiereTienda: boolean
+  // ¿Necesita la agenda activada?
+  requiereAgenda?: boolean
   // Permisos de Shopify sin los que no puede funcionar
   permisos?: string[]
   // ¿Escribe al cliente por su cuenta? (entonces puede costar dinero en Meta)

@@ -47,6 +47,7 @@ export function definicionDeFila(fila: FilaAutomatizacion): Automatizacion | nul
       categoria: 'propias' as any,
       estado: 'lista',
       requiereTienda: fila.receta.disparador.tipo === 'evento_tienda',
+      requiereAgenda: fila.receta.disparador.tipo === 'evento_agenda',
       permisos: fila.receta.disparador.tipo === 'evento_tienda' ? ['read_orders'] : [],
       escribeAlCliente: escribe,
       marketing: !!fila.marketing,
@@ -85,7 +86,11 @@ export const DISPARADORES_EDITOR: { valor: string; etiqueta: string; disparador:
   { valor: 'orders/fulfilled', etiqueta: 'Cuando se marca un pedido como enviado', disparador: { tipo: 'evento_tienda', evento: 'orders/fulfilled' } },
   { valor: 'orders/cancelled', etiqueta: 'Cuando se cancela un pedido', disparador: { tipo: 'evento_tienda', evento: 'orders/cancelled' } },
   { valor: 'cada_dia', etiqueta: 'Cada día a una hora', disparador: { tipo: 'programado', cada: 'dia', hora: 9 } },
-  { valor: 'cada_hora', etiqueta: 'Cada hora', disparador: { tipo: 'programado', cada: 'hora' } }
+  { valor: 'cada_hora', etiqueta: 'Cada hora', disparador: { tipo: 'programado', cada: 'hora' } },
+  { valor: 'cita_creada', etiqueta: 'Cuando se apunta una cita nueva (agenda)', disparador: { tipo: 'evento_agenda', evento: 'cita_creada' } },
+  { valor: 'cita_cancelada', etiqueta: 'Cuando se cancela una cita (agenda)', disparador: { tipo: 'evento_agenda', evento: 'cita_cancelada' } },
+  { valor: 'cita_completada', etiqueta: 'Cuando termina una cita (agenda)', disparador: { tipo: 'evento_agenda', evento: 'cita_completada' } },
+  { valor: 'cita_no_presentado', etiqueta: 'Cuando un cliente no se presenta (agenda)', disparador: { tipo: 'evento_agenda', evento: 'cita_no_presentado' } }
 ]
 
 export const CAMPOS_CONDICION: { campo: string; etiqueta: string; tipo: 'numero' | 'texto' | 'si_no' }[] = [
@@ -224,6 +229,7 @@ export function limpiarReceta(receta: any): Receta {
     ? { tipo: 'programado', cada: d.cada, ...(d.cada === 'dia' ? { hora: Number(d.hora ?? 9) } : {}) }
     : d.tipo === 'evento_tienda' ? { tipo: 'evento_tienda', evento: String(d.evento) }
     : d.tipo === 'mensaje_cliente' ? { tipo: 'mensaje_cliente', intencion: String(d.intencion) }
+    : d.tipo === 'evento_agenda' ? { tipo: 'evento_agenda', evento: String(d.evento) }
     : { tipo: 'evento_interno', evento: String(d.evento) }
   const pasos: Paso[] = receta.pasos.map((p: any): Paso => {
     switch (p.tipo) {

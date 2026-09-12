@@ -50,7 +50,20 @@ export default function ListaPreciosPage() {
     disponible: true,
     categoria_id: null,
     etiquetas: [],
-    visible_ia: true
+    visible_ia: true,
+    reservable: false,
+    duracion_minutos: null,
+    tiempo_antes_minutos: 0,
+    tiempo_despues_minutos: 0,
+    huecos_internos: [],
+    tipo_recurso: 'persona',
+    recursos_necesarios: 1,
+    aforo: null,
+    precio_por_persona: false,
+    extras: [],
+    cancelacion_horas: null,
+    confirmacion: null,
+    reservable_online: true
   } as any)
 
   const [etiquetaInput, setEtiquetaInput] = useState('')
@@ -98,7 +111,20 @@ export default function ListaPreciosPage() {
       disponible: true,
       categoria_id: null,
       etiquetas: [],
-      visible_ia: true
+      visible_ia: true,
+      reservable: false,
+      duracion_minutos: null,
+      tiempo_antes_minutos: 0,
+      tiempo_despues_minutos: 0,
+      huecos_internos: [],
+      tipo_recurso: 'persona',
+      recursos_necesarios: 1,
+      aforo: null,
+      precio_por_persona: false,
+      extras: [],
+      cancelacion_horas: null,
+      confirmacion: null,
+      reservable_online: true
     } as any)
     setEtiquetaInput('')
     setIsModalOpen(true)
@@ -116,7 +142,20 @@ export default function ListaPreciosPage() {
       disponible: item.disponible !== false,
       categoria_id: item.categoria_id || null,
       etiquetas: item.etiquetas || [],
-      visible_ia: item.visible_ia !== false
+      visible_ia: item.visible_ia !== false,
+      reservable: !!item.reservable,
+      duracion_minutos: item.duracion_minutos ?? null,
+      tiempo_antes_minutos: item.tiempo_antes_minutos ?? 0,
+      tiempo_despues_minutos: item.tiempo_despues_minutos ?? 0,
+      huecos_internos: item.huecos_internos || [],
+      tipo_recurso: item.tipo_recurso || 'persona',
+      recursos_necesarios: item.recursos_necesarios ?? 1,
+      aforo: item.aforo ?? null,
+      precio_por_persona: !!item.precio_por_persona,
+      extras: item.extras || [],
+      cancelacion_horas: item.cancelacion_horas ?? null,
+      confirmacion: item.confirmacion || null,
+      reservable_online: item.reservable_online !== false
     } as any)
     setEtiquetaInput('')
     setIsModalOpen(true)
@@ -629,6 +668,113 @@ export default function ListaPreciosPage() {
                             </button>
                           </span>
                         ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Reservas: lo que hace falta para que este servicio se pueda reservar en la agenda */}
+                  <div className="rounded-xl border border-slate-200 overflow-hidden">
+                    <label className="flex items-center justify-between p-4 bg-slate-50 cursor-pointer">
+                      <div>
+                        <span className="block text-sm font-600 text-ink-900">Se reserva en la agenda</span>
+                        <span className="block text-xs text-ink-500 mt-0.5">Enciéndelo si es algo con cita: un corte, una consulta, una clase, una mesa. La IA y el enlace de reservas lo usarán.</span>
+                      </div>
+                      <div className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0" style={{ backgroundColor: (formData as any).reservable ? '#10b981' : '#e2e8f0' }}>
+                        <input type="checkbox" className="sr-only" checked={!!(formData as any).reservable} onChange={(e) => setFormData({ ...formData, reservable: e.target.checked, duracion_minutos: (formData as any).duracion_minutos || (e.target.checked ? 30 : null) } as any)} />
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${(formData as any).reservable ? 'translate-x-6' : 'translate-x-1'}`} />
+                      </div>
+                    </label>
+                    {(formData as any).reservable && (
+                      <div className="p-4 space-y-4 border-t border-slate-200">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div>
+                            <label className="block text-xs font-600 text-ink-700 mb-1">Duración (minutos)</label>
+                            <input type="number" min={5} max={1440} required value={(formData as any).duracion_minutos ?? ''} onChange={e => setFormData({ ...formData, duracion_minutos: e.target.value === '' ? null : Number(e.target.value) } as any)} className="w-full h-11 px-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:border-brand-500" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-600 text-ink-700 mb-1">Preparar antes (min)</label>
+                            <input type="number" min={0} max={240} value={(formData as any).tiempo_antes_minutos ?? 0} onChange={e => setFormData({ ...formData, tiempo_antes_minutos: Number(e.target.value || 0) } as any)} className="w-full h-11 px-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:border-brand-500" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-600 text-ink-700 mb-1">Recoger después (min)</label>
+                            <input type="number" min={0} max={240} value={(formData as any).tiempo_despues_minutos ?? 0} onChange={e => setFormData({ ...formData, tiempo_despues_minutos: Number(e.target.value || 0) } as any)} className="w-full h-11 px-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:border-brand-500" />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div>
+                            <label className="block text-xs font-600 text-ink-700 mb-1">Lo hace</label>
+                            <select value={(formData as any).tipo_recurso || ''} onChange={e => setFormData({ ...formData, tipo_recurso: e.target.value || null } as any)} className="w-full h-11 px-3 rounded-xl border border-slate-300 text-sm bg-white focus:outline-none focus:border-brand-500">
+                              <option value="persona">Una persona (profesional)</option>
+                              <option value="sala">Una sala o espacio</option>
+                              <option value="equipo">Un equipo o máquina</option>
+                              <option value="mesa">Una mesa</option>
+                              <option value="otro">Otro recurso</option>
+                              <option value="">Cualquier recurso</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-600 text-ink-700 mb-1">Cuántos a la vez</label>
+                            <input type="number" min={1} max={10} value={(formData as any).recursos_necesarios ?? 1} onChange={e => setFormData({ ...formData, recursos_necesarios: Number(e.target.value || 1) } as any)} className="w-full h-11 px-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:border-brand-500" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-600 text-ink-700 mb-1">Plazas por hueco <span className="font-400 text-ink-400">· clases</span></label>
+                            <input type="number" min={1} max={1000} placeholder="Individual" value={(formData as any).aforo ?? ''} onChange={e => setFormData({ ...formData, aforo: e.target.value === '' ? null : Number(e.target.value) } as any)} className="w-full h-11 px-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:border-brand-500" />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-600 text-ink-700 mb-1">Cancelar hasta (horas antes) <span className="font-400 text-ink-400">· vacío = la de la agenda</span></label>
+                            <input type="number" min={0} max={720} value={(formData as any).cancelacion_horas ?? ''} onChange={e => setFormData({ ...formData, cancelacion_horas: e.target.value === '' ? null : Number(e.target.value) } as any)} className="w-full h-11 px-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:border-brand-500" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-600 text-ink-700 mb-1">Confirmación</label>
+                            <select value={(formData as any).confirmacion || ''} onChange={e => setFormData({ ...formData, confirmacion: e.target.value || null } as any)} className="w-full h-11 px-3 rounded-xl border border-slate-300 text-sm bg-white focus:outline-none focus:border-brand-500">
+                              <option value="">La de la agenda</option>
+                              <option value="automatica">Se confirma sola</option>
+                              <option value="manual">La confirma alguien del equipo</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-4">
+                          <label className="flex items-center gap-2 text-sm text-ink-700 cursor-pointer">
+                            <input type="checkbox" checked={!!(formData as any).precio_por_persona} onChange={e => setFormData({ ...formData, precio_por_persona: e.target.checked } as any)} className="w-4 h-4 rounded border-slate-300 text-brand-600" />
+                            El precio es por persona
+                          </label>
+                          <label className="flex items-center gap-2 text-sm text-ink-700 cursor-pointer">
+                            <input type="checkbox" checked={(formData as any).reservable_online !== false} onChange={e => setFormData({ ...formData, reservable_online: e.target.checked } as any)} className="w-4 h-4 rounded border-slate-300 text-brand-600" />
+                            Se puede reservar desde el enlace público
+                          </label>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-600 text-ink-700 mb-1">Ratos libres dentro del servicio <span className="font-400 text-ink-400">· el tinte: aplicar, esperar (libre), aclarar</span></label>
+                          {((formData as any).huecos_internos || []).map((h: any, i: number) => (
+                            <div key={i} className="flex items-center gap-2 mb-2">
+                              <span className="text-xs text-ink-500">Desde el minuto</span>
+                              <input type="number" min={0} value={h.desde_minuto ?? 0} onChange={e => { const l = [...(formData as any).huecos_internos]; l[i] = { ...l[i], desde_minuto: Number(e.target.value || 0) }; setFormData({ ...formData, huecos_internos: l } as any) }} className="w-20 h-9 px-2 rounded-lg border border-slate-300 text-sm" />
+                              <span className="text-xs text-ink-500">libre durante</span>
+                              <input type="number" min={1} value={h.minutos ?? 1} onChange={e => { const l = [...(formData as any).huecos_internos]; l[i] = { ...l[i], minutos: Number(e.target.value || 1) }; setFormData({ ...formData, huecos_internos: l } as any) }} className="w-20 h-9 px-2 rounded-lg border border-slate-300 text-sm" />
+                              <span className="text-xs text-ink-500">min</span>
+                              <button type="button" onClick={() => setFormData({ ...formData, huecos_internos: (formData as any).huecos_internos.filter((_: any, j: number) => j !== i) } as any)} className="text-slate-400 hover:text-red-500 text-lg leading-none">&times;</button>
+                            </div>
+                          ))}
+                          {((formData as any).huecos_internos || []).length < 5 && (
+                            <button type="button" onClick={() => setFormData({ ...formData, huecos_internos: [...((formData as any).huecos_internos || []), { desde_minuto: 30, minutos: 30 }] } as any)} className="text-sm font-600 text-brand-600 hover:text-brand-700">+ Añadir rato libre</button>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-xs font-600 text-ink-700 mb-1">Extras que puede pedir el cliente <span className="font-400 text-ink-400">· opcional</span></label>
+                          {((formData as any).extras || []).map((x: any, i: number) => (
+                            <div key={i} className="flex items-center gap-2 mb-2">
+                              <input type="text" placeholder="Nombre (Con lavado)" value={x.nombre || ''} onChange={e => { const l = [...(formData as any).extras]; l[i] = { ...l[i], nombre: e.target.value }; setFormData({ ...formData, extras: l } as any) }} className="flex-1 h-9 px-2 rounded-lg border border-slate-300 text-sm" />
+                              <input type="number" min={0} step="0.01" placeholder="Precio" value={x.precio ?? ''} onChange={e => { const l = [...(formData as any).extras]; l[i] = { ...l[i], precio: e.target.value === '' ? undefined : Number(e.target.value) }; setFormData({ ...formData, extras: l } as any) }} className="w-24 h-9 px-2 rounded-lg border border-slate-300 text-sm" />
+                              <input type="number" min={0} placeholder="Min" value={x.minutos ?? ''} onChange={e => { const l = [...(formData as any).extras]; l[i] = { ...l[i], minutos: e.target.value === '' ? undefined : Number(e.target.value) }; setFormData({ ...formData, extras: l } as any) }} className="w-20 h-9 px-2 rounded-lg border border-slate-300 text-sm" />
+                              <button type="button" onClick={() => setFormData({ ...formData, extras: (formData as any).extras.filter((_: any, j: number) => j !== i) } as any)} className="text-slate-400 hover:text-red-500 text-lg leading-none">&times;</button>
+                            </div>
+                          ))}
+                          {((formData as any).extras || []).length < 20 && (
+                            <button type="button" onClick={() => setFormData({ ...formData, extras: [...((formData as any).extras || []), { nombre: '', precio: undefined, minutos: undefined }] } as any)} className="text-sm font-600 text-brand-600 hover:text-brand-700">+ Añadir extra</button>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>

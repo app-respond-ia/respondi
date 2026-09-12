@@ -22,6 +22,7 @@ const GRUPOS = [
       { id: 'casos', label: 'Casos' },
       { id: 'conversaciones', label: 'Conversaciones' },
       { id: 'chats', label: 'Chats' },
+      { id: 'agenda', label: 'Agenda' },
       { id: 'novedades', label: 'Novedades del día' },
       { id: 'blacklist', label: 'Blacklist' },
       { id: 'soporte', label: 'Soporte' },

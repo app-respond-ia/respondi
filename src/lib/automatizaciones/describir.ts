@@ -44,6 +44,11 @@ const NOMBRE_EVENTO_INTERNO: Record<string, string> = {
 }
 
 const NOMBRE_CAMPO: Record<string, string> = {
+  'cita.origen': 'el origen de la cita (ia, panel, enlace)',
+  'cita.estado': 'el estado de la cita',
+  'cita.personas': 'las personas de la cita',
+  'cita.es_grupo': 'la cita es de un grupo grande',
+  'cita.servicio': 'el servicio de la cita',
   'pedido.total': 'el total del pedido',
   'pedido.pais': 'el país del pedido',
   'pedido.productos_texto': 'los productos del pedido',
@@ -62,10 +67,25 @@ const NOMBRE_CAMPO: Record<string, string> = {
   'conversacion.etiqueta': 'la conversación lleva la etiqueta'
 }
 
+const NOMBRE_EVENTO_AGENDA: Record<string, string> = {
+  cita_creada: 'Cuando se apunta una cita nueva',
+  cita_movida: 'Cuando se cambia una cita de hora',
+  cita_cancelada: 'Cuando se cancela una cita',
+  cita_confirmada: 'Cuando se confirma una cita pendiente',
+  cita_en_curso: 'Cuando el cliente llega a su cita',
+  cita_completada: 'Cuando termina una cita',
+  cita_no_presentado: 'Cuando un cliente no se presenta a su cita',
+  cita_recordatorio: 'Cuando se acerca la hora de una cita',
+  cita_por_confirmar: 'Cuando toca pedir confirmación de una cita',
+  cliente_sin_cita: 'Cuando un cliente lleva semanas sin venir',
+  hueco_liberado: 'Cuando se libera un hueco que alguien esperaba'
+}
+
 export function describirDisparador(d: Disparador): string {
   if (d.tipo === 'evento_tienda') return NOMBRE_EVENTO[d.evento] || `Cuando pasa "${d.evento}" en la tienda`
   if (d.tipo === 'mensaje_cliente') return NOMBRE_INTENCION[d.intencion] || `Cuando un cliente escribe (${d.intencion})`
   if (d.tipo === 'evento_interno') return NOMBRE_EVENTO_INTERNO[d.evento] || `Cuando pasa "${d.evento}" en Respondi`
+  if (d.tipo === 'evento_agenda') return NOMBRE_EVENTO_AGENDA[d.evento] || `Cuando pasa "${d.evento}" en la agenda`
   if (d.tipo === 'programado') {
     if (d.cada === 'hora') return 'Cada hora'
     if (d.cada === 'semana') return 'Una vez a la semana'

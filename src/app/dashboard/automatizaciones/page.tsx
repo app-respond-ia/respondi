@@ -47,6 +47,7 @@ interface Fila {
   ajustes: Record<string, any>
   ultima_ejecucion: string | null
   falta_tienda: boolean
+  falta_agenda?: boolean
   faltan_permisos: string[]
   // El workflow contado paso a paso
   pasos: { tipo: string; titulo: string; detalle?: string; indice?: number }[]
@@ -374,7 +375,7 @@ function TarjetaAutomatizacion({ fila, abierta, onAbrir, onAlternar, onGuardar, 
   }
 
   const enCamino = fila.estado !== 'lista'
-  const bloqueada = enCamino || !puedeEscribir || fila.falta_tienda || !!fila.faltan_permisos.length
+  const bloqueada = enCamino || !puedeEscribir || fila.falta_tienda || !!fila.falta_agenda || !!fila.faltan_permisos.length
 
   return (
     <article className={`bg-white rounded-2xl border transition ${fila.activa ? 'border-brand-200 shadow-sm' : 'border-slate-200'}`}>
@@ -416,6 +417,9 @@ function TarjetaAutomatizacion({ fila, abierta, onAbrir, onAlternar, onGuardar, 
 
         {fila.falta_tienda && !enCamino && (
           <p className="text-xs text-amber-700 mt-2">Necesita la tienda conectada.</p>
+        )}
+        {fila.falta_agenda && !enCamino && (
+          <p className="text-xs text-amber-700 mt-2">Necesita la agenda activada (Agenda → Ajustes).</p>
         )}
         {!!fila.faltan_permisos.length && (
           <p className="text-xs text-amber-700 mt-2">A tu app de Shopify le faltan permisos: {fila.faltan_permisos.join(', ')}.</p>

@@ -219,6 +219,21 @@ reembolsos y cancelaciones siempre los hace una persona. Detalle y estado en
 - [ ] Editor visual de recetas ("el mapa"), más adelante
 - Soporte automatizado con IA: aplazado por Jorge hasta terminar Shopify
 
+## Prioridad 5 — Agenda de reservas (arrancada el 12-09-2026)
+Decidido con Jorge: agenda para cualquier negocio (también restaurantes),
+tres tramos seguidos; la IA confirma lo que cabe en las reglas y lo raro va
+a una persona (el negocio puede poner confirmación a mano); sin señales de
+momento; en todos los planes; el cliente no se registra. Detalle en
+`docs/integraciones/agenda.md`.
+- [x] Tramo 1 (12-09-2026): recursos, servicios reservables en la lista de
+      precios, citas con blindaje en la base de datos, cálculo de huecos,
+      herramientas de la IA, calendario, permiso "Agenda", 8 automatizaciones
+      (migraciones `20260912190000`, `190100`, `190200`)
+- [ ] Tramo 2: modo restaurante (mesas, turnos, comensales, combinar, vista
+      de sala, cortesía, sin reserva)
+- [ ] Tramo 3: enlace público de reserva y confirmaciones
+- [ ] Google Calendar (proyecto de Google de Jorge), más adelante
+
 ## Invitaciones pendientes — cerrado (10-09-2026)
 Todo el bloque está hecho: `PanelInvitaciones` compartido en
 `/vendedor/clientes`, `/superadmin/vendedores`, `/superadmin/organizaciones`

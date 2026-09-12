@@ -1,5 +1,5 @@
 export type SeccionPermiso = 
-  | 'casos' | 'conversaciones' | 'chats' | 'novedades' | 'contactos'
+  | 'casos' | 'conversaciones' | 'chats' | 'novedades' | 'contactos' | 'agenda'
   | 'skills' | 'precios' | 'reglas' | 'etiquetas' | 'canales'
   | 'usuarios' | 'sucursales' | 'perfil' | 'audit_log' | 'facturacion'
 

@@ -170,6 +170,63 @@ export const PLANTILLAS_PREDISENADAS: Record<string, PlantillaPredisenada> = {
     huecos: ['cliente', 'producto', 'dias'],
     ejemplos: ['Laura', 'Cafetera Moka', '30']
   },
+  // --- Citas y reservas ---
+  aviso_cita_reservada: {
+    nombre: 'respondi_cita_reservada',
+    categoria: 'utilidad',
+    idioma: 'es',
+    cuerpo: 'Hola {{1}}, tu reserva de {{2}} queda apuntada para el {{3}} a las {{4}} en {{5}}. Si necesitas cambiarla o cancelarla, responde a este mensaje.',
+    huecos: ['cliente', 'servicio', 'cita_fecha', 'cita_hora', 'negocio'],
+    ejemplos: ['Laura', 'Corte y peinado', 'jueves 18 de septiembre', '10:30', 'Peluquería Ana']
+  },
+  recordatorio_cita: {
+    nombre: 'respondi_recordatorio_cita',
+    categoria: 'utilidad',
+    idioma: 'es',
+    cuerpo: 'Hola {{1}}, te recordamos tu cita de {{2}} el {{3}} a las {{4}} en {{5}}. Si no puedes venir, responde a este mensaje y buscamos otro hueco.',
+    huecos: ['cliente', 'servicio', 'cita_fecha', 'cita_hora', 'negocio'],
+    ejemplos: ['Laura', 'Corte y peinado', 'jueves 18 de septiembre', '10:30', 'Peluquería Ana']
+  },
+  pedir_confirmacion_cita: {
+    nombre: 'respondi_confirmar_cita',
+    categoria: 'utilidad',
+    idioma: 'es',
+    cuerpo: 'Hola {{1}}, ¿confirmas tu cita de {{2}} el {{3}} a las {{4}}? Responde SÍ para confirmarla o dinos si prefieres cambiarla. Gracias.',
+    huecos: ['cliente', 'servicio', 'cita_fecha', 'cita_hora'],
+    ejemplos: ['Laura', 'Corte y peinado', 'jueves 18 de septiembre', '10:30']
+  },
+  cita_perdida: {
+    nombre: 'respondi_cita_perdida',
+    categoria: 'utilidad',
+    idioma: 'es',
+    cuerpo: 'Hola {{1}}, hoy no hemos podido atenderte en tu cita de {{2}} a las {{3}}. Si quieres, responde a este mensaje y te buscamos otro hueco.',
+    huecos: ['cliente', 'servicio', 'cita_hora'],
+    ejemplos: ['Laura', 'Corte y peinado', '10:30']
+  },
+  resena_tras_cita: {
+    nombre: 'respondi_resena_cita',
+    categoria: 'marketing',
+    idioma: 'es',
+    cuerpo: 'Hola {{1}}, gracias por tu visita a {{2}}. Tu opinión nos ayuda mucho y puedes dejarla en este enlace: {{3}}. Responde BAJA si no quieres más avisos.',
+    huecos: ['cliente', 'negocio', 'enlace'],
+    ejemplos: ['Laura', 'Peluquería Ana', 'https://g.page/r/peluqueria-ana/review']
+  },
+  reactivar_sin_cita: {
+    nombre: 'respondi_te_echamos_de_menos',
+    categoria: 'marketing',
+    idioma: 'es',
+    cuerpo: 'Hola {{1}}, hace {{2}} que no nos vemos en {{3}}. Cuando quieras volver, responde a este mensaje y te buscamos hueco. Responde BAJA si no quieres más avisos.',
+    huecos: ['cliente', 'tiempo', 'negocio'],
+    ejemplos: ['Laura', '6 semanas', 'Peluquería Ana']
+  },
+  hueco_liberado: {
+    nombre: 'respondi_hueco_libre',
+    categoria: 'utilidad',
+    idioma: 'es',
+    cuerpo: 'Hola {{1}}, se ha quedado libre un hueco el {{2}} a las {{3}} para {{4}}. Si lo quieres, responde a este mensaje cuanto antes y te lo reservamos.',
+    huecos: ['cliente', 'cita_fecha', 'cita_hora', 'servicio'],
+    ejemplos: ['Laura', 'jueves 18 de septiembre', '10:30', 'Corte y peinado']
+  },
   cumpleanos: {
     nombre: 'respondi_felicidades',
     categoria: 'marketing',

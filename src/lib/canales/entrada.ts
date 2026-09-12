@@ -97,6 +97,14 @@ export async function registrarMensajeEntrante(m: MensajeEntrante): Promise<{ ok
     await supabaseAdmin.from('contacts').update({ no_promociones: true }).eq('id', (contexto as any).contact_id)
   }
 
+  // "SÍ" a una petición de confirmación de cita: queda anotado en la cita
+  try {
+    const { confirmarCitaPorRespuesta } = await import('@/lib/agenda/repasos')
+    await confirmarCitaPorRespuesta(m.canal.tenant_id, m.canal.branch_id, (contexto as any).contact_id, contenido || '')
+  } catch {
+    // Nunca por esto se deja de guardar el mensaje
+  }
+
   // Aviso a las automatizaciones que actúan cuando entra un mensaje
   // (etiquetar la conversación con datos de la tienda). Va a la cola de la
   // tienda y lo recoge el reloj: aquí no se hace esperar al proveedor.

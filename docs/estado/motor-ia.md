@@ -49,6 +49,14 @@ Resumen; el detalle y el porqué están en `docs/arquitectura.md`, sección
 - Escalar a humano → usa `case_rules` configuradas por sucursal
 - Regla de oro: nunca inventa etiquetas ni reglas fuera de lo
   configurado para esa sucursal
+- Con la tienda conectada (12-09-2026): buscar_en_tienda, estado_del_pedido,
+  enlace_de_compra, apuntar_lista_espera, detectar_intencion,
+  presupuesto_de_tienda; cada una existe solo si su automatización está
+  encendida (`docs/integraciones/shopify.md`)
+- Con la agenda activada (12-09-2026): ver_huecos, reservar_cita,
+  cambiar_cita, cancelar_cita, mis_citas, apuntar_espera_agenda; solo toca
+  las citas del contacto que escribe y lo raro abre un caso
+  (`docs/integraciones/agenda.md`)
 
 ## Búsqueda de catálogo
 NO usa RAG/embeddings — herramienta con filtros estructurados

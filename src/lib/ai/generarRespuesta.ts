@@ -524,6 +524,20 @@ export async function generarRespuesta(conv: any) {
     openAiMessages.push({ role: 'system', content: herramientasTienda.instrucciones })
   }
 
+  // Las herramientas de la agenda (ver huecos, reservar, cambiar, cancelar):
+  // solo si la agenda de la sucursal está activada y hay algo reservable.
+  const { cargarHerramientasDeAgenda, ejecutarHerramientaDeAgenda, esHerramientaDeAgenda } = await import('@/lib/agenda/herramientas-ia')
+  const herramientasAgenda = await cargarHerramientasDeAgenda(branchId, contactId, conversationId)
+  if (herramientasAgenda.definiciones.length) {
+    tools.push(...herramientasAgenda.definiciones)
+    openAiMessages.push({ role: 'system', content: herramientasAgenda.instrucciones })
+  }
+  // Consultar (ver huecos, mis citas) no es lo mismo que actuar (reservar,
+  // cambiar, cancelar, lista de espera): la red de seguridad de abajo mira las dos
+  let agendaEnEstaPasada = false
+  let agendaAccionEnEstaPasada = false
+  const ACCIONES_AGENDA = new Set(['reservar_cita', 'cambiar_cita', 'cancelar_cita', 'apuntar_espera_agenda'])
+
   // Recordatorio del idioma justo después de la conversación: los modelos
   // pequeños hacen más caso a lo último que leen que al principio del todo
   // (en las pruebas, gpt-4.1-mini contestaba en español a un cliente inglés)
@@ -790,6 +804,11 @@ export async function generarRespuesta(conv: any) {
       else if (esHerramientaDeTienda(toolCall.function.name) && herramientasTienda.contexto) {
         toolResult = await ejecutarHerramientaDeTienda(toolCall.function.name, args, herramientasTienda.contexto)
         if (toolCall.function.name === 'detectar_intencion') intencionEnEstaPasada = true
+      }
+      else if (esHerramientaDeAgenda(toolCall.function.name) && herramientasAgenda.contexto) {
+        toolResult = await ejecutarHerramientaDeAgenda(toolCall.function.name, args, herramientasAgenda.contexto)
+        agendaEnEstaPasada = true
+        if (ACCIONES_AGENDA.has(toolCall.function.name)) agendaAccionEnEstaPasada = true
       }
       else if (toolCall.function.name === 'escalar_humano') {
         toolResult = await ejecutarEscalado(args)
@@ -1083,6 +1102,113 @@ export async function generarRespuesta(conv: any) {
     }
   }
 
+  // Red de seguridad fuerte de la agenda: el cliente pide cancelar (de forma
+  // clara) o cambiar a una hora concreta, o dice "sí" a lo que la IA acababa
+  // de proponer, y la IA no lo ha hecho. Se le obliga a usar la herramienta
+  // (visto en pruebas: "ahora mismo lo cambio, un segundo" sin llamarla).
+  const AFIRMA = /^\s*(s[ií]+|vale|ok|okey|perfecto|claro|de acuerdo|eso es|correcto|adelante|hazlo|c[aá]mbiala|canc[eé]lala)\b/i
+  const HORA_EN_TEXTO = /\b\d{1,2}[:.]\d{2}\b|\ba las \d{1,2}\b/i
+  const PIDE_CANCELAR = /\bcanc[eé]la(me|la|melo|mela)?\b|an[uú]la(me|la)?\b|quiero cancelar|cancelar (la |mi |esa )?(cita|reserva)|no (voy a )?poder ir.*cancel/i
+  const NIEGA_CANCELAR = /\bno (quiero|hace falta|la )?(cancel|anul)/i
+  const ultimoDeLaIA = [...allMessages].reverse().find((m: any) => m.remitente === 'ia')?.contenido || ''
+  const textoCliente = pendientesCliente.join(' ')
+  const ultimoCliente = pendientesCliente[pendientesCliente.length - 1] || ''
+  const quiereCancelar = !NIEGA_CANCELAR.test(textoCliente) && (PIDE_CANCELAR.test(textoCliente) || (/cancel|anul/i.test(ultimoDeLaIA) && AFIRMA.test(ultimoCliente)))
+  const quiereCambiar = !quiereCancelar && (
+    (/c[aá]mbi|mu[eé]v|pasar(la|me)|otra hora|otro d[ií]a/i.test(textoCliente) && HORA_EN_TEXTO.test(textoCliente))
+    || (/c[aá]mbi|mu[eé]v/i.test(ultimoDeLaIA) && AFIRMA.test(ultimoCliente) && HORA_EN_TEXTO.test(`${ultimoDeLaIA} ${ultimoCliente}`))
+  )
+  if (herramientasAgenda.contexto && !agendaAccionEnEstaPasada && responseMsg?.content && (quiereCancelar || quiereCambiar)) {
+    const nombreAccion = quiereCancelar ? 'cancelar_cita' : 'cambiar_cita'
+    const herramientaAccion = tools.find((t: any) => t.function?.name === nombreAccion)
+    if (herramientaAccion) {
+      try {
+        openAiMessages.push({ role: 'assistant', content: responseMsg.content })
+        openAiMessages.push({
+          role: 'system',
+          content: `REVISIÓN: el cliente ${quiereCancelar ? 'pide cancelar su cita' : 'pide cambiar su cita a la hora que ha dicho'} y has contestado sin usar ${nombreAccion}. Úsala ahora con lo que sabes${quiereCancelar ? ' (cita_id solo si tiene varias)' : ' (fecha AAAA-MM-DD y hora HH:MM; cita_id solo si tiene varias)'}. Después contesta con lo que devuelva la herramienta, sin prometer nada que no haya confirmado.`
+        })
+        const revision = await openai.chat.completions.create({
+          model: MODELO_IA,
+          messages: openAiMessages,
+          tools: [herramientaAccion],
+          tool_choice: { type: 'function', function: { name: nombreAccion } }
+        })
+        tokensInput += revision.usage?.prompt_tokens || 0
+        tokensOutput += revision.usage?.completion_tokens || 0
+        const r: any = revision.choices[0].message
+        const llamada: any = r.tool_calls?.find((t: any) => t.function?.name === nombreAccion)
+        if (llamada) {
+          const args = (() => { try { return JSON.parse(llamada.function.arguments || '{}') } catch { return {} } })()
+          const resultado = await ejecutarHerramientaDeAgenda(nombreAccion, args, herramientasAgenda.contexto)
+          agendaEnEstaPasada = true
+          agendaAccionEnEstaPasada = true
+          openAiMessages.push(r)
+          openAiMessages.push({ role: 'tool', tool_call_id: llamada.id, content: resultado })
+          const final = await openai.chat.completions.create({ model: MODELO_IA, messages: openAiMessages })
+          tokensInput += final.usage?.prompt_tokens || 0
+          tokensOutput += final.usage?.completion_tokens || 0
+          if (final.choices[0].message.content) responseMsg.content = final.choices[0].message.content
+        }
+      } catch (err: any) {
+        console.error('Revisión fuerte de la agenda fallida:', err?.message)
+      }
+    }
+  }
+
+  // Red de seguridad de la agenda: el cliente habla de reservar, cambiar o
+  // cancelar una cita, la agenda está activa y la IA ha contestado sin tocar
+  // ninguna herramienta de agenda (los modelos baratos a veces proponen horas
+  // de memoria o dicen "te confirmo luego"). Se le pide que lo revise: si ya
+  // sabe servicio y día, que llame a ver_huecos; si no, que pregunte lo que
+  // falta sin inventar horas.
+  const PIDE_AGENDA = /\breserv|\bcita\b|\bcitas\b|\bhueco|disponib|mesa para|hora (tienes|ten[ée]is|hay|me das)|c[oó]geme|ap[uú]nta(me|r)|cancel|cambiar (la |mi )?(cita|reserva|hora)|otro d[ií]a|otra hora/i
+  // Pide cancelar o cambiar de forma clara: entonces no basta con haber consultado
+  const PIDE_ACCION_AGENDA = /cancel|anul|c[aá]mbia(me|la)|cambiar (la |mi )?(cita|reserva|hora)|mu[eé]ve(me|la)|pasar(la|me) a|ap[uú]ntame en la lista/i
+  // Y la propia respuesta promete hacerlo "en un momento": eso es justo lo que
+  // no puede pasar (nadie lo hará luego)
+  const PROMETE_ACCION = /un momento|lo gestiono|procedo|ahora mismo|enseguida|en breve|voy a (cancelar|cambiar|mover|reservar|gestionar|apuntar|comprobar|consultar)|te (cambio|reservo|cancelo|apunto|muevo) (la |tu |el |una )?(cita|reserva|hora)/i
+  const faltaAgenda = !agendaEnEstaPasada || (!agendaAccionEnEstaPasada && pendientesCliente.some(t => PIDE_ACCION_AGENDA.test(t)))
+  const prometeSinHacer = !agendaAccionEnEstaPasada && PROMETE_ACCION.test(responseMsg?.content || '')
+  if (herramientasAgenda.contexto && (faltaAgenda || prometeSinHacer) && responseMsg?.content && (prometeSinHacer || pendientesCliente.some(t => PIDE_AGENDA.test(t)))) {
+    try {
+      const deAgenda = tools.filter((t: any) => esHerramientaDeAgenda(t.function?.name))
+      openAiMessages.push({ role: 'assistant', content: responseMsg.content })
+      openAiMessages.push({
+        role: 'system',
+        content: prometeSinHacer
+          ? 'REVISIÓN: en tu respuesta dices que lo gestionas "en un momento", pero nadie lo hará luego: o lo haces AHORA con la herramienta que toque (reservar_cita, cambiar_cita, cancelar_cita, apuntar_espera_agenda; con ver_huecos antes si necesitas la hora), o escribes de nuevo tu respuesta completa preguntando el dato que te falta. Nunca "un momento".'
+          : agendaEnEstaPasada
+          ? 'REVISIÓN: el cliente pide claramente cancelar o cambiar su cita (o apuntarse en la lista de espera) y solo has consultado, sin hacerlo. Si sabes qué cita y, en un cambio, a qué hora (una que ver_huecos haya dado libre), llama ahora a cancelar_cita, cambiar_cita o apuntar_espera_agenda: la herramienta aplica el plazo y avisa al equipo si no está en plazo. No consultes políticas ni digas que lo mirarás luego. Si de verdad te falta un dato, escribe de nuevo tu respuesta completa preguntándolo.'
+          : 'REVISIÓN: el cliente habla de una reserva o cita y has contestado sin usar las herramientas de la agenda. Si ya sabes el servicio y el día, llama ahora a ver_huecos (o a cambiar_cita, cancelar_cita o mis_citas si es eso lo que pide). Si te falta algún dato, escribe de nuevo tu respuesta completa preguntándolo, sin proponer horas de memoria ni decir que confirmarás luego.'
+      })
+      const revision = await openai.chat.completions.create({ model: MODELO_IA, messages: openAiMessages, tools: deAgenda })
+      tokensInput += revision.usage?.prompt_tokens || 0
+      tokensOutput += revision.usage?.completion_tokens || 0
+      const r: any = revision.choices[0].message
+      const llamadas: any[] = (r.tool_calls || []).filter((t: any) => t.type === 'function' && esHerramientaDeAgenda(t.function?.name))
+      if (llamadas.length) {
+        openAiMessages.push(r)
+        for (const llamada of llamadas) {
+          const args = (() => { try { return JSON.parse(llamada.function.arguments || '{}') } catch { return {} } })()
+          const resultado = await ejecutarHerramientaDeAgenda(llamada.function.name, args, herramientasAgenda.contexto)
+          openAiMessages.push({ role: 'tool', tool_call_id: llamada.id, content: resultado })
+        }
+        agendaEnEstaPasada = true
+        if (llamadas.some((t: any) => ACCIONES_AGENDA.has(t.function?.name))) agendaAccionEnEstaPasada = true
+        const final = await openai.chat.completions.create({ model: MODELO_IA, messages: openAiMessages })
+        tokensInput += final.usage?.prompt_tokens || 0
+        tokensOutput += final.usage?.completion_tokens || 0
+        if (final.choices[0].message.content) responseMsg.content = final.choices[0].message.content
+      } else if (r.content) {
+        responseMsg.content = r.content
+      }
+    } catch (err: any) {
+      console.error('Revisión de la agenda fallida:', err?.message)
+    }
+  }
+  if (herramientasAgenda.contexto?.gestion?.caso) escaladoEnEstaPasada = true
+
   // Si una gestión de la tienda (devolución, cambio de dirección, producto
   // dañado, reclamación) ya ha abierto caso o ha apartado a la IA en esta
   // pasada, el equipo ya lo tiene: la promesa de "una persona lo revisará" es
@@ -1292,7 +1418,8 @@ export async function generarRespuesta(conv: any) {
     contexto_snapshot: {
       herramientas: tools.map((t: any) => t.function?.name).filter(Boolean),
       usadas: ((responseMsg?.tool_calls || []) as any[]).map(t => t.function?.name).filter(Boolean),
-      tienda: !!herramientasTienda.contexto
+      tienda: !!herramientasTienda.contexto,
+      agenda: !!herramientasAgenda.contexto
     }
   })
   if (errorLog) console.error('Error insertando ai_log:', errorLog)

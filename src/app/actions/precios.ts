@@ -17,6 +17,45 @@ export interface PrecioData {
   categoria_id: string | null
   etiquetas: string[]
   visible_ia: boolean
+  // Reservas (agenda): solo si `reservable`
+  reservable?: boolean
+  duracion_minutos?: number | null
+  tiempo_antes_minutos?: number
+  tiempo_despues_minutos?: number
+  huecos_internos?: { desde_minuto: number; minutos: number }[]
+  tipo_recurso?: string | null
+  recursos_necesarios?: number
+  aforo?: number | null
+  precio_por_persona?: boolean
+  extras?: { nombre: string; precio?: number; minutos?: number }[]
+  cancelacion_horas?: number | null
+  confirmacion?: 'automatica' | 'manual' | null
+  reservable_online?: boolean
+}
+
+// Los campos de reserva, limpios y con sus límites. Devuelve un mensaje si
+// algo no cuadra (un servicio reservable sin duración, por ejemplo).
+function camposDeReserva(data: Partial<PrecioData>): { campos: Record<string, any>; error?: string } {
+  const campos: Record<string, any> = {}
+  const entero = (v: any, min: number, max: number, porDefecto: number) => {
+    const n = Math.round(Number(v))
+    return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : porDefecto
+  }
+  if (data.reservable !== undefined) campos.reservable = !!data.reservable
+  if (data.duracion_minutos !== undefined) campos.duracion_minutos = data.duracion_minutos === null || data.duracion_minutos === ('' as any) ? null : entero(data.duracion_minutos, 5, 1440, 30)
+  if (data.tiempo_antes_minutos !== undefined) campos.tiempo_antes_minutos = entero(data.tiempo_antes_minutos, 0, 240, 0)
+  if (data.tiempo_despues_minutos !== undefined) campos.tiempo_despues_minutos = entero(data.tiempo_despues_minutos, 0, 240, 0)
+  if (data.huecos_internos !== undefined) campos.huecos_internos = (Array.isArray(data.huecos_internos) ? data.huecos_internos : []).filter(h => h && Number(h.minutos) > 0).slice(0, 5).map(h => ({ desde_minuto: entero(h.desde_minuto, 0, 1440, 0), minutos: entero(h.minutos, 1, 1440, 1) }))
+  if (data.tipo_recurso !== undefined) campos.tipo_recurso = ['persona', 'mesa', 'sala', 'equipo', 'otro'].includes(String(data.tipo_recurso)) ? data.tipo_recurso : null
+  if (data.recursos_necesarios !== undefined) campos.recursos_necesarios = entero(data.recursos_necesarios, 1, 10, 1)
+  if (data.aforo !== undefined) campos.aforo = data.aforo ? entero(data.aforo, 1, 1000, 1) : null
+  if (data.precio_por_persona !== undefined) campos.precio_por_persona = !!data.precio_por_persona
+  if (data.extras !== undefined) campos.extras = (Array.isArray(data.extras) ? data.extras : []).filter(e => e && String(e.nombre || '').trim()).slice(0, 20).map(e => ({ nombre: String(e.nombre).trim().slice(0, 60), ...(e.precio !== undefined && e.precio !== null && e.precio !== ('' as any) ? { precio: Math.max(0, Number(e.precio) || 0) } : {}), ...(e.minutos ? { minutos: entero(e.minutos, 0, 600, 0) } : {}) }))
+  if (data.cancelacion_horas !== undefined) campos.cancelacion_horas = data.cancelacion_horas === null || data.cancelacion_horas === ('' as any) ? null : entero(data.cancelacion_horas, 0, 720, 24)
+  if (data.confirmacion !== undefined) campos.confirmacion = data.confirmacion === 'automatica' || data.confirmacion === 'manual' ? data.confirmacion : null
+  if (data.reservable_online !== undefined) campos.reservable_online = data.reservable_online !== false
+  if (campos.reservable && !campos.duracion_minutos && data.duracion_minutos !== undefined) return { campos, error: 'Un servicio reservable necesita una duración (en minutos).' }
+  return { campos }
 }
 
 import { getAuthContext } from '@/lib/auth-context'
@@ -56,7 +95,7 @@ export async function crearPrecio(data: PrecioData) {
   // Cada campo con su valor por defecto si no viene: un `undefined` aquí
   // llegaba a la base de datos como vacío y las columnas obligatorias lo
   // rechazaban (pasaba con la moneda y con "disponible")
-  const fila = {
+  const fila: Record<string, any> = {
     tenant_id: auth.tenant_id,
     branch_id: auth.branch_id,
     nombre: (data.nombre || '').trim(),
@@ -68,9 +107,11 @@ export async function crearPrecio(data: PrecioData) {
     disponible: data.disponible ?? true,
     categoria_id: data.categoria_id || null,
     etiquetas: data.etiquetas || [],
-    visible_ia: data.visible_ia ?? true
+    visible_ia: data.visible_ia ?? true,
+    ...camposDeReserva(data).campos
   }
   if (!fila.nombre) return { success: false, error: 'El nombre es obligatorio.' }
+  if (fila.reservable && !fila.duracion_minutos) return { success: false, error: 'Un servicio reservable necesita una duración (en minutos).' }
   if (fila.precio !== null && (typeof fila.precio !== 'number' || isNaN(fila.precio) || fila.precio < 0)) {
     return { success: false, error: 'El precio tiene que ser un número positivo.' }
   }
@@ -117,6 +158,12 @@ export async function actualizarPrecio(id: string, data: Partial<PrecioData>) {
   const cambios: Record<string, any> = {}
   for (const [k, v] of Object.entries(data)) if (v !== undefined) cambios[k] = v
   if ('moneda' in cambios && !cambios.moneda) cambios.moneda = await monedaDeLaSucursal(supabase, auth.branch_id)
+  // Los campos de reserva pasan por su limpieza
+  const reserva = camposDeReserva(data)
+  Object.assign(cambios, reserva.campos)
+  const reservable = cambios.reservable ?? anterior?.reservable
+  const duracion = cambios.duracion_minutos !== undefined ? cambios.duracion_minutos : anterior?.duracion_minutos
+  if (reservable && !duracion) return { success: false, error: 'Un servicio reservable necesita una duración (en minutos).' }
 
   const { data: updatedData, error } = await supabase
     .from('price_list')

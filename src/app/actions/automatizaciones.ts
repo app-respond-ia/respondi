@@ -66,6 +66,8 @@ export async function getAutomatizaciones() {
   const porClave = new Map((guardadas || []).map((g: any) => [g.clave, g]))
   const permisosTienda: string[] = (tienda?.configuracion as any)?.permisos || []
   const tiendaConectada = !!tienda && tienda.estado === 'activo'
+  const { data: agendaAjustes } = await supabase.from('agenda_ajustes').select('activa').eq('branch_id', auth.branch_id).maybeSingle()
+  const agendaActiva = !!agendaAjustes?.activa
 
   // Cada fila del catálogo con lo que el cliente haya guardado encima
   // (encendida, ajustes y, si la ha moldeado, su receta). Después, las suyas.
@@ -107,6 +109,8 @@ export async function getAutomatizaciones() {
       } : null,
       // Qué le impide funcionar ahora mismo
       falta_tienda: a.requiereTienda && !tiendaConectada,
+      requiereAgenda: !!a.requiereAgenda,
+      falta_agenda: !!a.requiereAgenda && !agendaActiva,
       faltan_permisos: a.requiereTienda && tiendaConectada ? permisosQueFaltan(permisosTienda, a.permisos || []) : []
     }
   })
@@ -137,6 +141,8 @@ export async function getAutomatizaciones() {
       pasos: describirReceta(a.receta, ajustes),
       plantilla_predisenada: null,
       falta_tienda: a.requiereTienda && !tiendaConectada,
+      requiereAgenda: !!a.requiereAgenda,
+      falta_agenda: !!a.requiereAgenda && !agendaActiva,
       faltan_permisos: a.requiereTienda && tiendaConectada ? permisosQueFaltan(permisosTienda, a.permisos || []) : []
     })
   }
@@ -181,6 +187,12 @@ export async function cambiarAutomatizacion(clave: string, cambios: { activa?: b
   // más que mirar
   if (activa && definicion.estado !== 'lista') {
     return { success: false, error: 'Esta automatización todavía se está preparando. Muy pronto.' }
+  }
+
+  // Encenderla con la agenda apagada tampoco haría nada
+  if (activa && definicion.requiereAgenda) {
+    const { data: ag } = await supabase.from('agenda_ajustes').select('activa').eq('branch_id', auth.branch_id).maybeSingle()
+    if (!ag?.activa) return { success: false, error: 'Antes tienes que activar la agenda (Agenda → Ajustes).' }
   }
 
   // Encenderla sin tienda conectada no tendría efecto: mejor decirlo

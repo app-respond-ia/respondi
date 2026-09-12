@@ -845,9 +845,195 @@ const BASE: Automatizacion[] = [
       disparador: { tipo: 'evento_interno', evento: 'mensaje_entrante' },
       pasos: [{ tipo: 'etiquetar', etiqueta: '{{etiqueta}}' }]
     }
+  },
+  // =========================================================================
+  // CITAS Y RESERVAS (necesitan la agenda activada, no la tienda)
+  // =========================================================================
+  {
+    clave: 'aviso_cita_reservada',
+    nombre: 'Cita reservada',
+    descripcion: 'Confirmar por escrito cada cita que apunta el equipo o entra por el enlace.',
+    detalle: 'Cuando se crea una cita desde el panel o desde el enlace público, el cliente recibe un mensaje con el servicio, el día y la hora. Las que reserva la IA en el chat no lo necesitan: ya se lo dice ella.',
+    categoria: 'agenda',
+    estado: 'lista',
+    requiereTienda: false,
+    requiereAgenda: true,
+    escribeAlCliente: true,
+    marketing: false,
+    campos: [
+      { clave: 'texto', etiqueta: 'Mensaje', tipo: 'texto_largo', porDefecto: 'Hola {{cliente}}, tu reserva de {{servicio}} queda apuntada para el {{cita_fecha}} a las {{cita_hora}} en {{negocio}}. Si necesitas cambiarla o cancelarla, responde a este mensaje.' },
+      { clave: 'plantilla', etiqueta: 'Plantilla de WhatsApp', tipo: 'plantilla', porDefecto: null, ayuda: 'WhatsApp solo deja escribir a un cliente que lleve más de 24 h sin hablarte usando una plantilla aprobada por Meta. Sin ella, a esos clientes no se les escribe (por correo no hace falta). Usa la que viene hecha: sus huecos se rellenan solos con el nombre, el servicio, el día y la hora.' }
+    ],
+    receta: {
+      disparador: { tipo: 'evento_agenda', evento: 'cita_creada' },
+      pasos: [
+        { tipo: 'comprobar', condiciones: [{ campo: 'cita.origen', operador: 'distinto', valor: 'ia' }] },
+        { tipo: 'mensaje', texto: '', ajuste_texto: 'texto', plantilla: 'plantilla' }
+      ]
+    }
+  },
+  {
+    clave: 'recordatorio_cita',
+    nombre: 'Recordatorio de cita',
+    descripcion: 'Recordar la cita el día antes y un rato antes.',
+    detalle: 'Un aviso a las horas que elijas antes de cada cita confirmada (por defecto 24 h) y, si quieres, un segundo aviso más cerca (2 h). Menos plantones.',
+    categoria: 'agenda',
+    estado: 'lista',
+    requiereTienda: false,
+    requiereAgenda: true,
+    escribeAlCliente: true,
+    marketing: false,
+    campos: [
+      { clave: 'horas_antes', etiqueta: 'Primer aviso (horas antes)', tipo: 'horas', porDefecto: 24, min: 1, max: 168 },
+      { clave: 'segundo_aviso_horas', etiqueta: 'Segundo aviso (horas antes, 0 = ninguno)', tipo: 'horas', porDefecto: 2, min: 0, max: 48 },
+      { clave: 'texto', etiqueta: 'Mensaje', tipo: 'texto_largo', porDefecto: 'Hola {{cliente}}, te recordamos tu cita de {{servicio}} el {{cita_fecha}} a las {{cita_hora}} en {{negocio}}. Si no puedes venir, responde a este mensaje y buscamos otro hueco.' },
+      { clave: 'plantilla', etiqueta: 'Plantilla de WhatsApp', tipo: 'plantilla', porDefecto: null, ayuda: 'WhatsApp solo deja escribir a un cliente que lleve más de 24 h sin hablarte usando una plantilla aprobada por Meta. Sin ella, a esos clientes no se les escribe (por correo no hace falta). Usa la que viene hecha: sus huecos se rellenan solos con el nombre, el servicio, el día y la hora.' }
+    ],
+    receta: {
+      disparador: { tipo: 'evento_agenda', evento: 'cita_recordatorio' },
+      pasos: [
+        { tipo: 'mensaje', texto: '', ajuste_texto: 'texto', plantilla: 'plantilla' }
+      ]
+    }
+  },
+  {
+    clave: 'pedir_confirmacion_cita',
+    nombre: 'Pedir confirmación',
+    descripcion: 'Preguntar si viene y quedarse tranquilo.',
+    detalle: 'Unas horas antes (por defecto 48) se le pregunta al cliente si confirma. Si responde SÍ, la cita queda marcada como confirmada por él y lo ves en la agenda.',
+    categoria: 'agenda',
+    estado: 'lista',
+    requiereTienda: false,
+    requiereAgenda: true,
+    escribeAlCliente: true,
+    marketing: false,
+    campos: [
+      { clave: 'horas_antes', etiqueta: 'Preguntar (horas antes)', tipo: 'horas', porDefecto: 48, min: 2, max: 336 },
+      { clave: 'texto', etiqueta: 'Mensaje', tipo: 'texto_largo', porDefecto: 'Hola {{cliente}}, ¿confirmas tu cita de {{servicio}} el {{cita_fecha}} a las {{cita_hora}}? Responde SÍ para confirmarla o dinos si prefieres cambiarla. Gracias.' },
+      { clave: 'plantilla', etiqueta: 'Plantilla de WhatsApp', tipo: 'plantilla', porDefecto: null, ayuda: 'WhatsApp solo deja escribir a un cliente que lleve más de 24 h sin hablarte usando una plantilla aprobada por Meta. Sin ella, a esos clientes no se les escribe (por correo no hace falta). Usa la que viene hecha: sus huecos se rellenan solos con el nombre, el servicio, el día y la hora.' }
+    ],
+    receta: {
+      disparador: { tipo: 'evento_agenda', evento: 'cita_por_confirmar' },
+      pasos: [
+        { tipo: 'mensaje', texto: '', ajuste_texto: 'texto', plantilla: 'plantilla' }
+      ]
+    }
+  },
+  {
+    clave: 'cita_perdida',
+    nombre: 'No se presentó',
+    descripcion: 'Recuperar al que no vino sin reprocharle nada.',
+    detalle: 'Cuando marcas una cita como "no se presentó", el cliente recibe un mensaje amable ofreciendo otro hueco. Muchos vuelven.',
+    categoria: 'agenda',
+    estado: 'lista',
+    requiereTienda: false,
+    requiereAgenda: true,
+    escribeAlCliente: true,
+    marketing: false,
+    campos: [
+      { clave: 'texto', etiqueta: 'Mensaje', tipo: 'texto_largo', porDefecto: 'Hola {{cliente}}, hoy no hemos podido atenderte en tu cita de {{servicio}} a las {{cita_hora}}. Si quieres, responde a este mensaje y te buscamos otro hueco.' },
+      { clave: 'plantilla', etiqueta: 'Plantilla de WhatsApp', tipo: 'plantilla', porDefecto: null, ayuda: 'WhatsApp solo deja escribir a un cliente que lleve más de 24 h sin hablarte usando una plantilla aprobada por Meta. Sin ella, a esos clientes no se les escribe (por correo no hace falta). Usa la que viene hecha: sus huecos se rellenan solos con el nombre, el servicio, el día y la hora.' }
+    ],
+    receta: {
+      disparador: { tipo: 'evento_agenda', evento: 'cita_no_presentado' },
+      pasos: [
+        { tipo: 'mensaje', texto: '', ajuste_texto: 'texto', plantilla: 'plantilla' }
+      ]
+    }
+  },
+  {
+    clave: 'resena_tras_cita',
+    nombre: 'Reseña tras la cita',
+    descripcion: 'Pedir la opinión cuando acaba de salir contento.',
+    detalle: 'Unas horas después de marcar la cita como terminada se le pide una reseña con tu enlace. Es promoción: solo a quien haya aceptado recibirlas.',
+    categoria: 'agenda',
+    estado: 'lista',
+    requiereTienda: false,
+    requiereAgenda: true,
+    escribeAlCliente: true,
+    marketing: true,
+    campos: [
+      { clave: 'horas', etiqueta: 'Horas después de la cita', tipo: 'horas', porDefecto: 2, min: 1, max: 72 },
+      { clave: 'enlace', etiqueta: 'Enlace para dejar la reseña', tipo: 'texto', porDefecto: '' },
+      { clave: 'texto', etiqueta: 'Mensaje', tipo: 'texto_largo', porDefecto: 'Hola {{cliente}}, gracias por tu visita a {{negocio}}. Tu opinión nos ayuda mucho y puedes dejarla en este enlace: {{enlace}}' },
+      { clave: 'plantilla', etiqueta: 'Plantilla de WhatsApp', tipo: 'plantilla', porDefecto: null, ayuda: 'WhatsApp solo deja escribir a un cliente que lleve más de 24 h sin hablarte usando una plantilla aprobada por Meta. Sin ella, a esos clientes no se les escribe (por correo no hace falta). Usa la que viene hecha: sus huecos se rellenan solos con el nombre, el servicio, el día y la hora.' }
+    ],
+    receta: {
+      disparador: { tipo: 'evento_agenda', evento: 'cita_completada' },
+      pasos: [
+        { tipo: 'esperar', ajuste: 'horas' },
+        { tipo: 'comprobar', condiciones: [{ campo: 'cliente.acepta_marketing', operador: 'es_cierto' }] },
+        { tipo: 'mensaje', texto: '', ajuste_texto: 'texto', plantilla: 'plantilla' }
+      ]
+    }
+  },
+  {
+    clave: 'reactivar_sin_cita',
+    nombre: 'Hace tiempo que no viene',
+    descripcion: 'Un toque al cliente que lleva semanas sin pasar.',
+    detalle: 'Cada día se mira quién tuvo su última cita hace más de X semanas y no tiene ninguna nueva, y se le escribe una vez. Es promoción: solo a quien haya aceptado recibirlas.',
+    categoria: 'agenda',
+    estado: 'lista',
+    requiereTienda: false,
+    requiereAgenda: true,
+    escribeAlCliente: true,
+    marketing: true,
+    campos: [
+      { clave: 'semanas', etiqueta: 'Semanas sin venir', tipo: 'numero', porDefecto: 6, min: 1, max: 52 },
+      { clave: 'texto', etiqueta: 'Mensaje', tipo: 'texto_largo', porDefecto: 'Hola {{cliente}}, hace {{tiempo}} que no nos vemos en {{negocio}}. Cuando quieras volver, responde a este mensaje y te buscamos hueco.' },
+      { clave: 'plantilla', etiqueta: 'Plantilla de WhatsApp', tipo: 'plantilla', porDefecto: null, ayuda: 'WhatsApp solo deja escribir a un cliente que lleve más de 24 h sin hablarte usando una plantilla aprobada por Meta. Sin ella, a esos clientes no se les escribe (por correo no hace falta). Usa la que viene hecha: sus huecos se rellenan solos con el nombre, el servicio, el día y la hora.' }
+    ],
+    receta: {
+      disparador: { tipo: 'evento_agenda', evento: 'cliente_sin_cita' },
+      pasos: [
+        { tipo: 'comprobar', condiciones: [{ campo: 'cliente.acepta_marketing', operador: 'es_cierto' }] },
+        { tipo: 'mensaje', texto: '', ajuste_texto: 'texto', plantilla: 'plantilla' }
+      ]
+    }
+  },
+  {
+    clave: 'hueco_liberado',
+    nombre: 'Hueco liberado',
+    descripcion: 'Avisar a la lista de espera cuando alguien cancela.',
+    detalle: 'Si un cliente pidió un día que estaba lleno y la IA lo apuntó en la lista de espera, en cuanto se cancela una cita de ese día se le avisa por orden de llegada.',
+    categoria: 'agenda',
+    estado: 'lista',
+    requiereTienda: false,
+    requiereAgenda: true,
+    escribeAlCliente: true,
+    marketing: false,
+    campos: [
+      { clave: 'texto', etiqueta: 'Mensaje', tipo: 'texto_largo', porDefecto: 'Hola {{cliente}}, se ha quedado libre un hueco el {{cita_fecha}} a las {{cita_hora}} para {{servicio}}. Si lo quieres, responde a este mensaje cuanto antes y te lo reservamos.' },
+      { clave: 'plantilla', etiqueta: 'Plantilla de WhatsApp', tipo: 'plantilla', porDefecto: null, ayuda: 'WhatsApp solo deja escribir a un cliente que lleve más de 24 h sin hablarte usando una plantilla aprobada por Meta. Sin ella, a esos clientes no se les escribe (por correo no hace falta). Usa la que viene hecha: sus huecos se rellenan solos con el nombre, el servicio, el día y la hora.' }
+    ],
+    receta: {
+      disparador: { tipo: 'evento_agenda', evento: 'hueco_liberado' },
+      pasos: [
+        { tipo: 'mensaje', texto: '', ajuste_texto: 'texto', plantilla: 'plantilla' }
+      ]
+    }
+  },
+  {
+    clave: 'cita_pendiente_aviso',
+    nombre: 'Cita por confirmar',
+    descripcion: 'Que el equipo se entere de cada cita que espera su visto bueno.',
+    detalle: 'Si tienes la confirmación "a mano", cada cita nueva que entra pendiente (de la IA o del enlace) avisa al equipo para que la confirme desde la agenda.',
+    categoria: 'agenda',
+    estado: 'lista',
+    requiereTienda: false,
+    requiereAgenda: true,
+    escribeAlCliente: false,
+    marketing: false,
+    campos: [],
+    receta: {
+      disparador: { tipo: 'evento_agenda', evento: 'cita_creada' },
+      pasos: [
+        { tipo: 'comprobar', condiciones: [{ campo: 'cita.estado', operador: 'igual', valor: 'pendiente' }] },
+        { tipo: 'avisar_equipo', texto: 'Cita pendiente de confirmar: {{cliente}}, {{servicio}}, {{cita_fecha}} a las {{cita_hora}} ({{personas}} personas). Confírmala en la agenda.' }
+      ]
+    }
   }
 ]
-
 // Todas las que escriben al cliente llevan el ajuste "Por dónde escribir",
 // el primero de la lista. Se añade aquí, una sola vez, para que ninguna se
 // quede sin él por despiste.

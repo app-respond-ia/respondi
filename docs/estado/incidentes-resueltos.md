@@ -4,6 +4,55 @@ Bugs reales que ya ocurrieron en producción, con su causa raíz.
 Antes de tocar algo parecido, lee esto — muchos son "familia de bug
 repetible" si no se tiene cuidado.
 
+## Errores técnicos en palabras que se entiendan (12-09-2026)
+Cerrada la auditoría, `src/lib/traducirError.ts` traduce ahora también: las
+reglas de la base de datos con nombre propio (contacto repetido en un canal,
+dos canales del mismo tipo en una sucursal, plantilla repetida, borrar un plan
+que tienen contratado organizaciones…), los códigos que faltaban (dato con
+formato raro, texto demasiado largo, consulta que tarda demasiado, servidor
+saturado) y los avisos de Supabase Auth que salen en el alta (demasiados
+intentos seguidos, contraseña corta, correo sin confirmar). Se distingue si un
+borrado falla porque hay cosas que dependen de eso o si un guardado apunta a
+algo que ya no existe. Probado con `probar-errores` (15 casos).
+
+## Auditoría del esquema y un susto con las claves ajenas (12-09-2026)
+Al auditar el esquema, una consulta sobre `information_schema` dijo que casi
+ninguna columna `*_id` tenía clave ajena. Con los datos comprobados (cero
+filas huérfanas) se añadieron 107 relaciones... y la app empezó a fallar en
+Chats, Conversaciones y Casos: **PostgREST no sabe por cuál de dos relaciones
+iguales unir dos tablas** ("more than one relationship was found").
+
+Lo que pasaba de verdad: las relaciones **ya existían**. `information_schema`
+solo enseña los objetos sobre los que el rol que pregunta tiene permisos, y el
+rol de solo lectura del MCP no los tenía. Se quitaron las 105 duplicadas
+(migración `20260912130000`) y todo volvió a su sitio: 140 comprobaciones de
+las pruebas en verde.
+
+De la auditoría queda lo que sí faltaba de verdad:
+- Dos relaciones: `vendedores.user_id` y `comisiones_log.user_id`.
+- El índice de `channels.plantilla_reapertura_id` (lo avisaba el linter, que
+  ya no avisa de ninguno).
+
+**Reglas que deja**:
+- Para mirar el esquema, `pg_catalog` (`pg_constraint`, `pg_class`…), nunca
+  `information_schema` desde un rol limitado: miente por omisión.
+- Dos claves ajenas entre las mismas dos tablas rompen los `select` con
+  relaciones de PostgREST. Ya había pasado el 11-09 al añadir la plantilla de
+  reapertura; ahora está documentado para no repetirlo una tercera vez.
+
+Avisos del linter que se dejan a propósito:
+- **Índices sin usar (45)**: son de tablas sin tráfico todavía. Se revisan
+  cuando haya clientes de verdad.
+- **Dos políticas permisivas por tabla**: cada tabla tiene una de lectura y
+  otra de escritura, y la de escritura (FOR ALL) también cuenta para leer.
+  Arreglarlo obliga a rehacer las políticas de 17 tablas por una mejora que
+  hoy no se nota.
+- **`vector` en el esquema público** y **funciones `SECURITY DEFINER`
+  ejecutables por usuarios identificados**: esas funciones (`auth_tenant_id`,
+  `auth_puede`…) las usan las propias políticas RLS, así que quitarles el
+  permiso rompería el acceso de todo el mundo. Cada una devuelve solo datos de
+  quien pregunta.
+
 ## Registrarse no funcionaba desde el 10-09-2026 (12-09-2026)
 Al poner los créditos de la prueba en 500 se probó crear una cuenta nueva y
 saltó: `column "estado" is of type estado_organizacion but expression is of

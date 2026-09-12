@@ -197,19 +197,18 @@ se traga en silencio.
       el tramo C: `onboarding/page.tsx` usa `EditorHorarios` (paso 2) y
       `ConfiguracionMensajeIA` con el selector de 3 modos (paso 4). La
       nota se quedó sin marcar
-- [ ] Auditoría completa del esquema de Supabase (FKs faltantes) —
-      hacer después de terminar el diseño de contexto/herramientas de
-      la IA
+- [x] Auditoría completa del esquema de Supabase (12-09-2026): las relaciones
+      ya estaban (una consulta engañosa hizo creer lo contrario, ver
+      `incidentes-resueltos.md`). Faltaban dos (`vendedores.user_id` y
+      `comisiones_log.user_id`) y un índice, ya añadidos. Cero filas huérfanas
+- [x] Bloque 2.1 (traducir errores crudos de Postgres a mensajes
+      entendibles) — hecho (12-09-2026) al cerrar la auditoría
 - [x] Herramienta de presupuestos de la IA — hecho (11-09-2026): con la
       skill "Hacer presupuestos" activada, la IA pasa productos y cantidades
       y `hacer_presupuesto` calcula el total con los precios del catálogo
       (avisa de los "desde", no inventa los "a consultar" ni lo que no
       existe). De paso, el buscador del catálogo ya encuentra los productos
       aunque el cliente escriba sin tildes o en plural
-- [ ] Bloque 2.1 (traducir errores crudos de Postgres a mensajes
-      entendibles) — pausado a propósito hasta cerrar la auditoría de
-      esquema y la estrategia de errores/seguridad, para diseñar el
-      mapeo una sola vez
 - [x] Interceptor de `Toast.tsx` que traducía a ciegas TODO error —
       resuelto (10-09-2026), ver `docs/estado/incidentes-resueltos.md`.
       El arreglo se hizo en `traducirError` y no en el Toast, porque la

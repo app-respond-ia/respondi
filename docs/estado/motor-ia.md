@@ -72,9 +72,11 @@ en la misma tabla, sin distinción para la IA.
   recepción y el caso pasa a revisión humana
 
 ## Resumen de conversación
-`conversations.resumen` — no se genera tras cada respuesta. Pendiente
-como pieza futura: tarea periódica que lo genera cuando una
-conversación lleva 24h sin actividad.
+`conversations.resumen` se genera cuando la conversación lleva 24 h parada
+(cron `job_resumen_inactividad` cada 30 min → `/api/ai/summarize`, que además
+la cierra) y cuando una persona la cierra desde Chats. Ese resumen es lo que
+la IA lee la próxima vez que escribe ese cliente, así que se acuerda de lo que
+encargó. Verificado el 12-09-2026 (`probar-resumenes`, 6 comprobaciones).
 
 ## Consumo de créditos
 Ver `docs/estado/creditos-facturacion.md` — 1 mensaje respondido = 1

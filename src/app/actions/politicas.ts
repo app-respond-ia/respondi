@@ -129,6 +129,9 @@ export async function saveManualPolicy(nombre: string, textoManual: string) {
     const auth = await getAuthContext(supabase)
     if (auth.error) return { success: false, error: auth.error }
 
+    if (!(nombre || '').trim()) throw new Error('Ponle un título a la política.')
+    if ((textoManual || '').trim().length < 10) throw new Error('Escribe el texto de la política (al menos unas palabras).')
+
     const { tenant_id: tenantId, branch_id: branchId, user_id: userId } = auth
     if (!branchId || !tenantId) throw new Error('Contexto inválido')
 

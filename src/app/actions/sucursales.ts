@@ -263,6 +263,10 @@ export async function crearSucursalConDatos(data: {
     return { success: false, error: 'Has alcanzado el límite de sucursales de tu plan' }
   }
 
+  // Sin nombre no se crea: quedaba una sucursal en blanco en el selector
+  if (!(data.nombre || '').trim()) return { success: false, error: 'Ponle un nombre a la sucursal.' }
+  data.nombre = data.nombre.trim()
+
   // Crear una sucursal es una operación completa (la sucursal, su perfil,
   // horarios, catálogo, etiquetas, reglas y quién entra en ella) que el
   // usuario tiene permiso para hacer entera; se acaba de comprobar. Con su

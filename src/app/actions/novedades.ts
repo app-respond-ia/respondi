@@ -50,6 +50,13 @@ export async function crearNovedad(data: NovedadData) {
     return { success: false, error: 'Has alcanzado el límite de 20 novedades por día.' }
   }
 
+  if (!(data.descripcion || '').trim()) return { success: false, error: 'Escribe la novedad antes de guardarla.' }
+  // Si no se dice desde cuándo vale, vale desde hoy
+  const desde = data.fecha_vigencia_inicio || new Date().toISOString()
+  if (data.fecha_vigencia_fin && new Date(data.fecha_vigencia_fin) < new Date(desde)) {
+    return { success: false, error: 'La fecha de fin no puede ser anterior a la de inicio.' }
+  }
+
   let isActivo = true
   if (data.fecha_vigencia_fin !== null) {
     const fin = new Date(data.fecha_vigencia_fin).getTime()
@@ -64,8 +71,8 @@ export async function crearNovedad(data: NovedadData) {
       branch_id: auth.branch_id,
       user_id: auth.user_id,
       tipo_id: data.tipo_id,
-      descripcion: data.descripcion,
-      fecha_vigencia_inicio: data.fecha_vigencia_inicio,
+      descripcion: data.descripcion.trim(),
+      fecha_vigencia_inicio: desde,
       fecha_vigencia_fin: data.fecha_vigencia_fin,
       activo: isActivo
     }])

@@ -95,7 +95,14 @@ export async function actualizarTratoContacto(data: ActualizarTratoContactoData)
   //    puede haber escrito ya a otra tienda: como el usuario solo ve los
   //    contactos de sus tiendas, con su cliente no lo encontraría y crearía un
   //    duplicado. Por eso esta búsqueda la hace el sistema.
-  const { data: existente, error: errBusqueda } = await supabaseAdmin
+    // Sin canal ni identificador no hay contacto: antes fallaba con un error de
+  // base de datos ("null value in column canal")
+  if (!(data.canal || '').trim()) return { success: false, error: 'Elige el canal del contacto.' }
+  if (!(data.identificador_canal || '').trim()) {
+    return { success: false, error: data.canal === 'email' ? 'Escribe la dirección de correo del contacto.' : data.canal === 'whatsapp' ? 'Escribe el número de teléfono del contacto.' : 'Escribe el usuario del contacto.' }
+  }
+
+const { data: existente, error: errBusqueda } = await supabaseAdmin
     .from('contacts')
     .select('*')
     .eq('tenant_id', auth.tenant_id)

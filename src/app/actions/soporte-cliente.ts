@@ -91,6 +91,9 @@ export async function crearTicketCliente(asunto: string, mensajeInicial: string)
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
+  if (typeof asunto !== 'string' || !asunto.trim()) return { success: false, error: 'Ponle un asunto a tu consulta.' }
+  if (typeof mensajeInicial !== 'string' || !mensajeInicial.trim()) return { success: false, error: 'Escribe tu consulta antes de enviarla.' }
+
   const branchId = await resolveBranchId(supabase, auth.user_id)
 
   const { data: ticket, error: ticketError } = await supabase
@@ -99,7 +102,7 @@ export async function crearTicketCliente(asunto: string, mensajeInicial: string)
       tenant_id: auth.tenant_id,
       branch_id: branchId,
       user_id: auth.user_id,
-      asunto: asunto,
+      asunto: asunto.trim(),
       estatus: 'abierto'
     })
     .select()

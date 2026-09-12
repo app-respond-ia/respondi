@@ -76,11 +76,13 @@ export async function crearRolPersonalizado(data: {
   const check = await canManageRole(auth.user_id, newLevel, auth.tenant_id)
   if (!check.allowed) return { success: false, error: check.error }
 
+  if (!(data.nombre || '').trim()) return { success: false, error: 'Ponle un nombre al rol.' }
+
   const { data: result, error } = await supabaseAdmin
     .from('roles_personalizados')
     .insert([{
       tenant_id: auth.tenant_id,
-      nombre: data.nombre,
+      nombre: data.nombre.trim(),
       descripcion: data.descripcion || null,
       nivel: newLevel,
       permisos: data.permisos

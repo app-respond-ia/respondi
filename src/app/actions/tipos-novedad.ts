@@ -37,14 +37,16 @@ export async function crearTipoNovedad(data: TipoNovedadData) {
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
+  if (!(data.nombre || '').trim()) return { success: false, error: 'Ponle un nombre al tipo de novedad.' }
+
   const { data: insertedData, error } = await supabase
     .from('tipos_novedad')
     .insert([{
       tenant_id: auth.tenant_id,
       branch_id: auth.branch_id,
-      nombre: data.nombre,
-      icono: data.icono,
-      color: data.color
+      nombre: data.nombre.trim(),
+      icono: data.icono || 'rayo',
+      color: data.color || '#6366f1'
     }])
     .select()
     .single()

@@ -4,6 +4,25 @@ Bugs reales que ya ocurrieron en producción, con su causa raíz.
 Antes de tocar algo parecido, lee esto — muchos son "familia de bug
 repetible" si no se tiene cuidado.
 
+## Formularios vacíos: errores técnicos y datos basura (12-09-2026)
+Barrido de todas las pantallas llamando a cada "crear" con los campos vacíos
+(`probar-formularios`, 13 comprobaciones). Antes:
+- **Etiquetas**, **Novedades del día** y **Soporte**: el usuario veía el error
+  crudo de la base de datos ("null value in column …").
+- **Tipos de novedad**, **Políticas escritas a mano** y **Sucursal nueva**:
+  ¡se creaban! Quedaba un tipo sin nombre, una política vacía y una sucursal en
+  blanco en el selector.
+
+Ahora las nueve acciones (etiquetas, reglas, novedades, tipos de novedad,
+roles, contactos, categorías, precios, políticas, notas, soporte y sucursales)
+avisan con una frase entendible y no guardan nada. Donde faltaba un valor que
+la base de datos sí exige (color, icono, fecha de inicio, "activa"), se pone
+uno por defecto en vez de mandar vacío.
+
+**Regla**: la validación del formulario en pantalla no basta — la acción del
+servidor tiene que comprobar lo mismo, porque se puede llamar sin pasar por la
+pantalla.
+
 ## Los PDF de políticas no se procesaban NUNCA (12-09-2026)
 Al probar el RAG de punta a punta: se sube un PDF, se guarda bien en el
 almacén… y se queda en "procesando" para siempre. El error real era

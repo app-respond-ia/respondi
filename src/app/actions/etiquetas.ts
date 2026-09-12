@@ -80,6 +80,8 @@ export async function crearEtiqueta(data: EtiquetaData) {
 
   if (fetchError) return { success: false, error: fetchError.message }
 
+  if (!(data.nombre || '').trim()) return { success: false, error: 'Ponle un nombre a la etiqueta.' }
+
   const nuevoOrden = currentTags && currentTags.length > 0 ? currentTags[0].orden - 1 : 0
 
   const { data: insertedData, error } = await supabase
@@ -87,10 +89,10 @@ export async function crearEtiqueta(data: EtiquetaData) {
     .insert([{
       tenant_id: auth.tenant_id,
       branch_id: auth.branch_id,
-      nombre: data.nombre,
-      descripcion_intencion: data.descripcion_intencion,
-      color: data.color,
-      activa: data.activa,
+      nombre: (data.nombre || '').trim(),
+      descripcion_intencion: data.descripcion_intencion || null,
+      color: data.color || '#64748b',
+      activa: data.activa ?? true,
       es_plantilla: false,
       orden: nuevoOrden
     }])

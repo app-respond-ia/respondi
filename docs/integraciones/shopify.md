@@ -261,6 +261,13 @@ valor). Por correo no hace falta nada de esto.
   pruebas abren la ventana de 24 h insertando el mensaje ya agrupado y con
   la IA en pausa (`abrirVentana`), no con `llegaPorMeta`.
 
+### Verificado en producción (12-09-2026, commit `0f1af93`)
+- Tras el despliegue de canal + plantillas + editor + 18 listas + IA:
+  `prod-automatizaciones` 9/9 (18 listas / 19 en preparación, todas
+  apagadas, frenos, dominio inexistente contra Shopify real),
+  `captura-shopify` con `PROD=1` 6/6, y el reloj de la base de datos trató un
+  aviso pendiente en 11 s (`prod-latido`).
+
 ### Verificado en producción (12-09-2026, commit `316f015`)
 - Pantallas Tienda online y Automatizaciones en respondi.vercel.app, en
   ordenador y móvil, sin errores (`captura-shopify` con `PROD=1`, 6/6).

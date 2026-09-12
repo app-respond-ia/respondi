@@ -39,8 +39,9 @@ export async function POST(req: Request) {
   const resumen: Record<string, string> = {}
   const empezar = Date.now()
   for (const canal of canales || []) {
-    // Que una pasada lenta no se coma la siguiente
-    if (Date.now() - empezar > 45000) break
+    // Que una pasada lenta no se coma la siguiente: se revisa cada minuto, así
+    // que se corta a los 25 s y los buzones que falten van en la siguiente
+    if (Date.now() - empezar > 25000) break
     const config = canal.configuracion as ConfigCorreo
     try {
       const contrasena = await leerContrasenaCorreo(canal.id)

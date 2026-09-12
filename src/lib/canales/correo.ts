@@ -82,9 +82,9 @@ function clienteImap(config: ConfigCorreo, contrasena: string) {
     secure: config.imap.seguro,
     auth: { user: config.usuario, pass: contrasena },
     logger: false,
-    connectionTimeout: 15000,
-    greetingTimeout: 10000,
-    socketTimeout: 30000
+    connectionTimeout: 10000,
+    greetingTimeout: 8000,
+    socketTimeout: 20000
   })
   // Si el servidor corta la conexión cuando ya hemos terminado, la librería
   // lanza el error por su cuenta y en Node eso tumba el proceso

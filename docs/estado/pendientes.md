@@ -149,6 +149,23 @@ solo la lista viva).
       `messages.adjuntos` y se ven en Chats; el primero sigue en
       `media_url`, que es lo que mira la IA
 
+## Lo que necesita algo de Jorge (nada de esto puede hacerlo Claude solo)
+- [ ] **Stripe**: crear la cuenta (modo prueba vale) y pasar las claves. El
+      código de suscripción está a medias esperándolas; sin cuenta no se puede
+      ni escribir con sentido (faltan los precios y los identificadores) ni
+      probar. Es lo único que bloquea cobrar
+- [ ] **Dominio en Resend**: hoy la cuenta solo envía a
+      `app.respond.ia@gmail.com`, así que ninguna invitación llega a nadie de
+      fuera. Hace falta decidir el dominio y pegar 3 registros DNS
+- [ ] **Vercel a Pro** antes de cobrar (el plan gratis es solo uso personal)
+- [ ] **Supabase a Pro** para la protección de contraseñas filtradas
+- [ ] **Papeleo de Meta** (verificación de Atsura) y número de WhatsApp de
+      prueba para probar con un móvil de verdad
+- [ ] **Whaticket**: escribir a su soporte preguntando si pueden avisar a
+      Respondi de los mensajes entrantes. Si no pueden, se quita de la pantalla
+- [ ] **Outlook / Microsoft 365 en el correo**: registrar una app en Microsoft
+      (Azure) para su inicio de sesión
+
 ## Prioridad 4 — Shopify Fase 1
 - [ ] Conexión real con la API de Shopify (catálogo/stock/pedidos)
 - [ ] Caso de uso WISMO
@@ -188,9 +205,6 @@ se traga en silencio.
       vista `saldos_actuales_ia` (único aviso de nivel ERROR, dejaba ver
       el saldo de créditos de TODAS las organizaciones) — corregidos y
       verificados con RLS real
-- [ ] **Protección de contraseñas filtradas** (HaveIBeenPwned): se intentó
-      activar por la API el 11-09-2026 y Supabase responde que solo está en su
-      plan Pro. Activarla cuando se pase a Pro
 - [x] Tramo D de horarios — resuelto (10-09-2026). Al auditarlo salieron
       6 fallos más en la misma función, ver `incidentes-resueltos.md`
 - [x] Unificar el editor de horarios del onboarding — ya estaba hecho en
@@ -213,8 +227,6 @@ se traga en silencio.
       resuelto (10-09-2026), ver `docs/estado/incidentes-resueltos.md`.
       El arreglo se hizo en `traducirError` y no en el Toast, porque la
       función se llamaba igual de mal desde otros 13 sitios.
-- [ ] Stripe (Pieza B) — falta crear la cuenta de Stripe; resto del
-      código ya preparado (ver `docs/estado/creditos-facturacion.md`)
 - [x] Migrar `create_trial_account` al RPC `crear_cuenta_completa` — ya
       estaba: la función no existe ni en el código ni en la base de datos
 - [x] Columna `plans.dias_trial` editable — hecho (10-09-2026). El 14

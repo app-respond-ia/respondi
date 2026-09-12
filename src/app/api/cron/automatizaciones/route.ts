@@ -3,7 +3,7 @@ import crypto from 'crypto'
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { registrarError } from '@/lib/errores'
 import { ejecutarPendientes } from '@/lib/automatizaciones/motor'
-import { procesarEvento, repasarPedidosRetrasados, tiendasConProgramadas, type TiendaBasica } from '@/lib/tiendas/eventos'
+import { procesarEvento, repasarPedidosRetrasados, repasarCarritosAbandonados, repasarStockBajo, repasarResumenDiario, repasarClientesEsperando, tiendasConProgramadas, sucursalesConProgramada, lanzarPropiasProgramadas, type TiendaBasica } from '@/lib/tiendas/eventos'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -28,6 +28,10 @@ export async function POST(req: Request) {
 
   const empezar = Date.now()
   const resumen: Record<string, any> = {}
+  // Con la clave del cron se puede pedir un repaso ahora mismo, sin esperar a
+  // su hora: { "forzar": ["carrito_abandonado"] }. Lo usan las pruebas.
+  const cuerpo: any = await req.json().catch(() => ({}))
+  const forzar = new Set<string>(Array.isArray(cuerpo?.forzar) ? cuerpo.forzar.map(String) : [])
 
   // 1. Avisos de la tienda sin tratar
   const { data: eventos, error: errEventos } = await supabaseAdmin
@@ -63,7 +67,7 @@ export async function POST(req: Request) {
   // 3. Los repasos programados, solo en su hora en punto
   if (Date.now() - empezar < PRESUPUESTO_MS) {
     try {
-      resumen.repasos = await repasosProgramados()
+      resumen.repasos = await repasosProgramados(forzar)
     } catch (e: any) {
       await registrarError({
         origen: 'cron',
@@ -80,14 +84,47 @@ export async function POST(req: Request) {
 // Los repasos que no dependen de un aviso de Shopify sino del reloj. Se
 // ejecutan en el primer minuto de su hora (en la zona horaria de la sucursal)
 // y el freno de "una vez por cosa" evita repetir.
-async function repasosProgramados() {
+async function repasosProgramados(forzar: Set<string>) {
   const hecho: Record<string, number> = {}
+  const primerMinutoDeHora = new Date().getMinutes() < 5
 
-  const retrasados = await tiendasConProgramadas('pedido_retrasado')
-  for (const { tienda, ajustes } of retrasados) {
-    if (!(await esSuHora(tienda.branch_id, 9))) continue
+  // Cada día a las 9: pedidos pagados que siguen sin salir
+  for (const { tienda, ajustes } of await tiendasConProgramadas('pedido_retrasado')) {
+    if (!forzar.has('pedido_retrasado') && !(await esSuHora(tienda.branch_id, 9))) continue
     hecho.pedido_retrasado = (hecho.pedido_retrasado || 0) + await repasarPedidosRetrasados(tienda, Number(ajustes?.dias) || 3)
   }
+
+  // Cada hora: carritos que llevan más de X horas sin terminar la compra
+  for (const { tienda, ajustes } of await tiendasConProgramadas('carrito_abandonado')) {
+    if (!forzar.has('carrito_abandonado') && !primerMinutoDeHora) continue
+    hecho.carrito_abandonado = (hecho.carrito_abandonado || 0) + await repasarCarritosAbandonados(tienda, Number(ajustes?.esperar_horas) || 2)
+  }
+
+  // Cada día a la hora que diga el cliente: stock por debajo del mínimo
+  for (const { tienda, ajustes } of await tiendasConProgramadas('aviso_stock_bajo')) {
+    if (!forzar.has('aviso_stock_bajo') && !(await esSuHora(tienda.branch_id, Number(ajustes?.hora ?? 9)))) continue
+    hecho.aviso_stock_bajo = (hecho.aviso_stock_bajo || 0) + await repasarStockBajo(tienda, Number(ajustes?.minimo ?? 3))
+  }
+
+  // Cada día a la hora que diga el cliente: el resumen del día para el equipo
+  for (const { tienda, ajustes } of await tiendasConProgramadas('resumen_diario')) {
+    if (!forzar.has('resumen_diario') && !(await esSuHora(tienda.branch_id, Number(ajustes?.hora ?? 20)))) continue
+    hecho.resumen_diario = (hecho.resumen_diario || 0) + await repasarResumenDiario(tienda)
+  }
+
+  // Cada vuelta: clientes que llevan más de X minutos sin respuesta (no
+  // necesita tienda)
+  for (const { tenant_id, branch_id, ajustes } of await sucursalesConProgramada('cliente_esperando')) {
+    if (!forzar.has('cliente_esperando') && new Date().getMinutes() % 5 !== 0) continue
+    hecho.cliente_esperando = (hecho.cliente_esperando || 0) + await repasarClientesEsperando(tenant_id, branch_id, Number(ajustes?.minutos ?? 15))
+  }
+
+  // Las que ha creado el cliente con reloj ("cada día a las X", "cada hora")
+  const propias = await lanzarPropiasProgramadas(
+    forzar.has('propias') ? async () => true : esSuHora,
+    () => forzar.has('propias') || primerMinutoDeHora
+  )
+  if (propias) hecho.propias = propias
 
   return hecho
 }

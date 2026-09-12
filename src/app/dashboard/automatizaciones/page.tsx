@@ -5,8 +5,17 @@ import Link from 'next/link'
 import Loading from '@/components/Loading'
 import { ErrorCarga } from '@/components/ui/ErrorCarga'
 import { useToast } from '@/components/ui/Toast'
-import { getAutomatizaciones, cambiarAutomatizacion, getHistorialAutomatizaciones } from '@/app/actions/automatizaciones'
+import { getAutomatizaciones, cambiarAutomatizacion, getHistorialAutomatizaciones, enviarPlantillaPredisenada, restablecerReceta, borrarAutomatizacionPropia } from '@/app/actions/automatizaciones'
 import { getMisPermisos } from '@/app/actions/permisos'
+import { CANALES_SALIDA, type Receta } from '@/lib/automatizaciones/tipos'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
+import { EditorReceta } from './EditorReceta'
+
+// La receta con la que nace una automatización propia nueva
+const RECETA_NUEVA: Receta = {
+  disparador: { tipo: 'evento_tienda', evento: 'orders/create' },
+  pasos: [{ tipo: 'avisar_equipo', texto: 'Ha entrado el pedido {{pedido}} de {{cliente}} por {{total}}.' }]
+}
 
 // Las automatizaciones que trae Respondi hechas, ordenadas por categorías.
 // Todas nacen apagadas: el cliente enciende una a una las que quiera y ajusta
@@ -39,6 +48,31 @@ interface Fila {
   ultima_ejecucion: string | null
   falta_tienda: boolean
   faltan_permisos: string[]
+  // El workflow contado paso a paso
+  pasos: { tipo: string; titulo: string; detalle?: string; indice?: number }[]
+  // ¿La creó el cliente? ¿La ha moldeado? Y su receta, para el editor
+  propia: boolean
+  moldeada: boolean
+  receta: Receta
+  plantilla_predisenada: {
+    nombre: string
+    categoria: 'utilidad' | 'marketing'
+    cuerpo: string
+    ejemplo: string
+    estado: 'no_enviada' | 'pendiente' | 'aprobada' | 'rechazada' | 'pausada' | 'desactivada'
+    motivo_rechazo: string | null
+    id: string | null
+    en_uso: boolean
+  } | null
+}
+
+const TEXTO_PLANTILLA: Record<string, { texto: string; color: string }> = {
+  no_enviada: { texto: 'Sin enviar a Meta', color: 'bg-slate-100 text-slate-600' },
+  pendiente: { texto: 'Meta la está revisando', color: 'bg-amber-50 text-amber-700' },
+  aprobada: { texto: 'Aprobada por Meta', color: 'bg-emerald-50 text-emerald-700' },
+  rechazada: { texto: 'Rechazada por Meta', color: 'bg-red-50 text-red-700' },
+  pausada: { texto: 'Pausada por Meta', color: 'bg-red-50 text-red-700' },
+  desactivada: { texto: 'Desactivada por Meta', color: 'bg-red-50 text-red-700' }
 }
 
 interface Categoria { clave: string; nombre: string; descripcion: string }
@@ -71,6 +105,11 @@ export default function AutomatizacionesPage() {
   const [filas, setFilas] = useState<Fila[]>([])
   const [tienda, setTienda] = useState<{ dominio: string; nombre: string | null; estado: string } | null>(null)
   const [plantillas, setPlantillas] = useState<Plantilla[]>([])
+  const [canales, setCanales] = useState<string[]>([])
+  const [etiquetas, setEtiquetas] = useState<string[]>([])
+  const [maximoPropias, setMaximoPropias] = useState(20)
+  const [creando, setCreando] = useState(false)
+  const [confirmarBorrar, setConfirmarBorrar] = useState<Fila | null>(null)
   const [movimientos, setMovimientos] = useState<Movimiento[]>([])
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
   const [abierta, setAbierta] = useState<string | null>(null)
@@ -96,6 +135,9 @@ export default function AutomatizacionesPage() {
     setCategorias(d.categorias)
     setFilas(d.automatizaciones)
     setPlantillas(d.plantillas || [])
+    setCanales(d.canales || [])
+    setEtiquetas(d.etiquetas || [])
+    setMaximoPropias(d.maximo_propias || 20)
     setTienda(d.tienda)
     setCargando(false)
 
@@ -130,6 +172,23 @@ export default function AutomatizacionesPage() {
     }
   }
 
+  async function restablecer(fila: Fila) {
+    setGuardando(fila.clave)
+    const r = await restablecerReceta(fila.clave)
+    setGuardando(null)
+    if (r.success) { showToast('Vuelve a ser la receta de Respondi', 'success'); cargar() }
+    else showToast(r.error || 'No se ha podido restablecer', 'error')
+  }
+
+  async function borrar() {
+    if (!confirmarBorrar) return
+    const fila = confirmarBorrar
+    setConfirmarBorrar(null)
+    const r = await borrarAutomatizacionPropia(fila.clave)
+    if (r.success) { showToast(`"${fila.nombre}" borrada`, 'success'); cargar() }
+    else showToast(r.error || 'No se ha podido borrar', 'error')
+  }
+
   if (cargando) return <Loading />
   if (errorCarga) return <ErrorCarga onReintentar={cargar} />
   if (nivelPermiso === 'ninguno') {
@@ -142,6 +201,7 @@ export default function AutomatizacionesPage() {
 
   const encendidas = filas.filter(f => f.activa).length
   const listas = filas.filter(f => f.estado === 'lista').length
+  const propias = filas.filter(f => f.propia).length
 
   return (
     <div className="p-6 sm:p-10 max-w-4xl w-full mx-auto pb-20">
@@ -177,13 +237,43 @@ export default function AutomatizacionesPage() {
 
       {categorias.map(categoria => {
         const deLaCategoria = filas.filter(f => f.categoria === categoria.clave)
-        if (!deLaCategoria.length) return null
+        const esPropias = categoria.clave === 'propias'
+        if (!deLaCategoria.length && !esPropias) return null
         return (
           <section key={categoria.clave} className="mb-8">
-            <div className="mb-3">
-              <h2 className="font-display font-700 text-lg text-ink-900">{categoria.nombre}</h2>
-              <p className="text-sm text-ink-500">{categoria.descripcion}</p>
+            <div className="mb-3 flex items-start gap-3 flex-wrap">
+              <div className="flex-1 min-w-0">
+                <h2 className="font-display font-700 text-lg text-ink-900">{categoria.nombre}</h2>
+                <p className="text-sm text-ink-500">{categoria.descripcion}</p>
+              </div>
+              {esPropias && (
+                <button
+                  onClick={() => setCreando(true)}
+                  disabled={!puedeEscribir || creando || propias >= maximoPropias}
+                  className="px-4 h-10 rounded-xl bg-brand-600 text-white text-sm font-600 hover:bg-brand-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  + Crear automatización
+                </button>
+              )}
             </div>
+            {esPropias && creando && (
+              <article className="bg-white rounded-2xl border border-brand-200 shadow-sm p-4 sm:p-5 mb-3">
+                <h3 className="font-600 text-ink-900">Nueva automatización</h3>
+                <p className="text-sm text-ink-500">Elige cuándo se dispara, si hay condiciones, y qué hace. Nace apagada.</p>
+                <EditorReceta
+                  clave={null}
+                  esPropia
+                  inicial={RECETA_NUEVA}
+                  ajustes={{}}
+                  etiquetas={etiquetas}
+                  onGuardado={() => { setCreando(false); cargar() }}
+                  onCancelar={() => setCreando(false)}
+                />
+              </article>
+            )}
+            {esPropias && !deLaCategoria.length && !creando && (
+              <p className="text-sm text-ink-400 mb-3">Todavía no has creado ninguna. Puedes tener hasta {maximoPropias} por sucursal.</p>
+            )}
             <div className="space-y-3">
               {deLaCategoria.map(fila => (
                 <TarjetaAutomatizacion
@@ -196,12 +286,27 @@ export default function AutomatizacionesPage() {
                   puedeEscribir={puedeEscribir}
                   ocupada={guardando === fila.clave}
                   plantillas={plantillas}
+                  canales={canales}
+                  etiquetas={etiquetas}
+                  onRecargar={cargar}
+                  onRestablecer={() => restablecer(fila)}
+                  onBorrar={() => setConfirmarBorrar(fila)}
                 />
               ))}
             </div>
           </section>
         )
       })}
+
+      <ConfirmModal
+        isOpen={!!confirmarBorrar}
+        onClose={() => setConfirmarBorrar(null)}
+        onConfirm={borrar}
+        title={`¿Borrar "${confirmarBorrar?.nombre}"?`}
+        message="Se borra la automatización y su registro. Lo que estuviera esperando no se hará."
+        confirmText="Borrar"
+        type="danger"
+      />
 
       {!!movimientos.length && (
         <section className="mb-8">
@@ -233,7 +338,7 @@ export default function AutomatizacionesPage() {
   )
 }
 
-function TarjetaAutomatizacion({ fila, abierta, onAbrir, onAlternar, onGuardar, puedeEscribir, ocupada, plantillas }: {
+function TarjetaAutomatizacion({ fila, abierta, onAbrir, onAlternar, onGuardar, puedeEscribir, ocupada, plantillas, canales, etiquetas, onRecargar, onRestablecer, onBorrar }: {
   fila: Fila
   abierta: boolean
   onAbrir: () => void
@@ -242,9 +347,31 @@ function TarjetaAutomatizacion({ fila, abierta, onAbrir, onAlternar, onGuardar, 
   puedeEscribir: boolean
   ocupada: boolean
   plantillas: Plantilla[]
+  canales: string[]
+  etiquetas: string[]
+  onRecargar: () => void
+  onRestablecer: () => void
+  onBorrar: () => void
 }) {
+  const { showToast } = useToast()
   const [ajustes, setAjustes] = useState<Record<string, any>>(fila.ajustes)
+  const [enviandoPlantilla, setEnviandoPlantilla] = useState(false)
+  const [otraPlantilla, setOtraPlantilla] = useState(false)
+  const [editando, setEditando] = useState(false)
   useEffect(() => { setAjustes(fila.ajustes) }, [fila.ajustes])
+
+  async function enviarPlantilla() {
+    setEnviandoPlantilla(true)
+    const r = await enviarPlantillaPredisenada(fila.clave)
+    setEnviandoPlantilla(false)
+    if (r.success) {
+      const estado = (r.data as any)?.estado
+      showToast(estado === 'aprobada' ? 'La plantilla ya estaba aprobada: se usará sola' : 'Plantilla enviada a Meta. Te avisaremos aquí cuando la aprueben', 'success')
+      onRecargar()
+    } else {
+      showToast(r.error || 'No se ha podido enviar la plantilla', 'error')
+    }
+  }
 
   const enCamino = fila.estado !== 'lista'
   const bloqueada = enCamino || !puedeEscribir || fila.falta_tienda || !!fila.faltan_permisos.length
@@ -258,6 +385,12 @@ function TarjetaAutomatizacion({ fila, abierta, onAbrir, onAlternar, onGuardar, 
               <h3 className="font-600 text-ink-900">{fila.nombre}</h3>
               {enCamino && (
                 <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[11px] font-600">En preparación</span>
+              )}
+              {fila.propia && (
+                <span className="px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 text-[11px] font-600">Tuya</span>
+              )}
+              {fila.moldeada && (
+                <span className="px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 text-[11px] font-600">Moldeada por ti</span>
               )}
               {fila.marketing && (
                 <span className="px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 text-[11px] font-600">Promoción</span>
@@ -302,6 +435,52 @@ function TarjetaAutomatizacion({ fila, abierta, onAbrir, onAlternar, onGuardar, 
               </p>
             )}
 
+            {/* El workflow, paso a paso, y el editor para moldearlo */}
+            {editando ? (
+              <EditorReceta
+                clave={fila.clave}
+                esPropia={fila.propia}
+                inicial={fila.receta}
+                ajustes={fila.ajustes}
+                nombre={fila.nombre}
+                descripcion={fila.propia ? fila.descripcion : undefined}
+                marketing={fila.propia ? fila.marketing : undefined}
+                etiquetas={etiquetas}
+                onGuardado={() => { setEditando(false); onRecargar() }}
+                onCancelar={() => setEditando(false)}
+              />
+            ) : !!fila.pasos?.length && (
+              <div className="mt-4">
+                <div className="flex items-center gap-3 flex-wrap mb-2">
+                  <p className="text-xs uppercase tracking-wider text-ink-400 font-600">Cómo funciona</p>
+                  {puedeEscribir && !enCamino && (
+                    <button type="button" onClick={() => setEditando(true)} className="text-xs font-600 text-brand-600 hover:text-brand-700 transition">
+                      {fila.propia ? 'Editar' : 'Moldear a mi gusto'}
+                    </button>
+                  )}
+                  {fila.moldeada && puedeEscribir && (
+                    <button type="button" onClick={onRestablecer} disabled={ocupada} className="text-xs font-600 text-ink-500 hover:text-ink-800 transition disabled:opacity-50">
+                      Volver a la de Respondi
+                    </button>
+                  )}
+                  {fila.propia && puedeEscribir && (
+                    <button type="button" onClick={onBorrar} className="text-xs font-600 text-red-600 hover:text-red-700 transition">
+                      Borrar
+                    </button>
+                  )}
+                </div>
+                <ol className="relative border-l-2 border-slate-200 ml-2 space-y-3">
+                  {fila.pasos.map((p, i) => (
+                    <li key={i} className="pl-4 relative">
+                      <span className={`absolute -left-[7px] top-1.5 w-3 h-3 rounded-full border-2 border-white ${p.tipo === 'disparador' ? 'bg-brand-600' : p.tipo === 'condicion' || p.tipo === 'comprobar' ? 'bg-amber-400' : p.tipo === 'esperar' ? 'bg-slate-300' : 'bg-emerald-500'}`}></span>
+                      <p className="text-sm text-ink-800">{p.titulo}</p>
+                      {p.detalle && <p className="text-xs text-ink-500 mt-0.5 italic">«{p.detalle}»</p>}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
+
             {!!fila.campos.length && (
               <div className="mt-4 space-y-3">
                 {fila.campos.map(campo => (
@@ -319,6 +498,84 @@ function TarjetaAutomatizacion({ fila, abierta, onAbrir, onAlternar, onGuardar, 
                         />
                         {ajustes[campo.clave] ? 'Sí' : 'No'}
                       </label>
+                    ) : campo.tipo === 'canal' ? (
+                      <div>
+                        <select
+                          id={`${fila.clave}-${campo.clave}`}
+                          value={ajustes[campo.clave] ?? 'auto'}
+                          onChange={e => setAjustes(a => ({ ...a, [campo.clave]: e.target.value }))}
+                          disabled={!puedeEscribir}
+                          className={`w-full ${caja} bg-white`}
+                        >
+                          {CANALES_SALIDA.map(c => {
+                            const faltan = c.necesita.filter(n => !canales.includes(n))
+                            return (
+                              <option key={c.valor} value={c.valor}>
+                                {c.etiqueta}{faltan.length ? ` (${faltan.map(n => n === 'whatsapp' ? 'WhatsApp' : 'correo').join(' y ')} sin conectar)` : ''}
+                              </option>
+                            )
+                          })}
+                        </select>
+                        {!canales.length && (
+                          <p className="text-xs text-amber-700 mt-1">
+                            No tienes WhatsApp ni correo conectados: sin uno de los dos no se puede escribir a nadie. <Link href="/dashboard/canales" className="underline underline-offset-2 font-600">Ir a Canales</Link>.
+                          </p>
+                        )}
+                      </div>
+                    ) : campo.tipo === 'plantilla' && fila.plantilla_predisenada ? (
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                        <div className="flex items-center gap-2 flex-wrap mb-2">
+                          <span className={`px-2 py-0.5 rounded-full text-[11px] font-600 ${TEXTO_PLANTILLA[fila.plantilla_predisenada.estado]?.color || 'bg-slate-100 text-slate-600'}`}>
+                            {TEXTO_PLANTILLA[fila.plantilla_predisenada.estado]?.texto || fila.plantilla_predisenada.estado}
+                          </span>
+                          <span className="text-[11px] text-ink-400">Plantilla de {fila.plantilla_predisenada.categoria === 'marketing' ? 'promoción' : 'utilidad'} · escrita por Respondi para que Meta la apruebe</span>
+                        </div>
+                        {/* Como la vería el cliente, con datos de ejemplo */}
+                        <div className="bg-[#e7ffdb] rounded-2xl rounded-tl-sm px-3 py-2 text-sm text-ink-800 max-w-md shadow-sm">
+                          {fila.plantilla_predisenada.ejemplo}
+                        </div>
+                        {fila.plantilla_predisenada.estado === 'rechazada' && fila.plantilla_predisenada.motivo_rechazo && (
+                          <p className="text-xs text-red-700 mt-2">Meta la ha rechazado: {fila.plantilla_predisenada.motivo_rechazo}. Avísanos y la revisamos.</p>
+                        )}
+                        {fila.plantilla_predisenada.estado === 'aprobada' && (
+                          <p className="text-xs text-emerald-700 mt-2">{fila.plantilla_predisenada.en_uso ? 'Lista: la automatización la usa sola.' : 'Aprobada. Pulsa el botón para que la automatización la use.'}</p>
+                        )}
+                        {fila.plantilla_predisenada.estado === 'pendiente' && (
+                          <p className="text-xs text-amber-700 mt-2">Meta suele tardar de unos minutos a un día. En cuanto la apruebe, se usará sola.</p>
+                        )}
+                        <div className="flex items-center gap-3 flex-wrap mt-3">
+                          {(fila.plantilla_predisenada.estado === 'no_enviada' || fila.plantilla_predisenada.estado === 'rechazada' || (fila.plantilla_predisenada.estado === 'aprobada' && !fila.plantilla_predisenada.en_uso)) && (
+                            <button
+                              type="button"
+                              onClick={enviarPlantilla}
+                              disabled={!puedeEscribir || enviandoPlantilla || !canales.includes('whatsapp')}
+                              className="px-4 h-9 rounded-xl bg-ink-900 text-white text-sm font-600 transition hover:bg-ink-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {enviandoPlantilla ? 'Enviando…' : fila.plantilla_predisenada.estado === 'aprobada' ? 'Usar esta plantilla' : 'Enviar a Meta para que la apruebe'}
+                            </button>
+                          )}
+                          {!canales.includes('whatsapp') && (
+                            <span className="text-xs text-amber-700">Necesitas WhatsApp conectado con Meta.</span>
+                          )}
+                          <button type="button" onClick={() => setOtraPlantilla(v => !v)} className="text-xs font-600 text-ink-500 hover:text-ink-800 transition">
+                            {otraPlantilla ? 'Ocultar' : 'Usar otra plantilla mía'}
+                          </button>
+                        </div>
+                        {otraPlantilla && (
+                          <select
+                            id={`${fila.clave}-${campo.clave}`}
+                            value={ajustes[campo.clave] ?? ''}
+                            onChange={e => setAjustes(a => ({ ...a, [campo.clave]: e.target.value || null }))}
+                            disabled={!puedeEscribir}
+                            className={`w-full ${caja} bg-white mt-3`}
+                          >
+                            <option value="">Sin plantilla (solo a quien te haya escrito en las últimas 24 h)</option>
+                            {plantillas.map(p => (
+                              <option key={p.id} value={p.id}>{p.nombre} · {p.idioma}</option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
                     ) : campo.tipo === 'plantilla' ? (
                       <div>
                         <select

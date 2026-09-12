@@ -7,6 +7,7 @@
 // ejecutará igual, sin tocar nada más.
 
 export type ClaveCategoria =
+  | 'propias'
   | 'pedidos'
   | 'recuperar'
   | 'vender'
@@ -22,6 +23,7 @@ export interface Categoria {
 }
 
 export const CATEGORIAS: Categoria[] = [
+  { clave: 'propias', nombre: 'Mis automatizaciones', descripcion: 'Las que creas tú, a tu medida, con el editor.' },
   { clave: 'pedidos', nombre: 'Pedidos y envíos', descripcion: 'Mantener al cliente informado de su pedido sin que tengas que escribir tú.' },
   { clave: 'recuperar', nombre: 'Recuperar ventas', descripcion: 'Volver a por las ventas que se quedaron a medias.' },
   { clave: 'vender', nombre: 'Vender desde el chat', descripcion: 'Que la IA venda de verdad: busca, recomienda y manda el enlace de compra.' },
@@ -92,7 +94,7 @@ export interface Receta {
 export interface CampoAjuste {
   clave: string
   etiqueta: string
-  tipo: 'texto' | 'texto_largo' | 'numero' | 'horas' | 'dias' | 'interruptor' | 'plantilla' | 'hora'
+  tipo: 'texto' | 'texto_largo' | 'numero' | 'horas' | 'dias' | 'interruptor' | 'plantilla' | 'hora' | 'canal'
   ayuda?: string
   porDefecto: any
   min?: number
@@ -120,6 +122,28 @@ export interface Automatizacion {
   marketing: boolean
   campos: CampoAjuste[]
   receta: Receta
+  // La plantilla de WhatsApp que viene hecha (solo las que escriben al cliente)
+  plantilla?: import('./plantillas-predisenadas').PlantillaPredisenada
+}
+
+// Por dónde escribe al cliente una automatización. Solo WhatsApp y correo:
+// en Instagram y Facebook el negocio no puede empezar una conversación (Meta
+// solo deja contestar), y el pedido de Shopify tampoco trae esas cuentas.
+export type CanalSalida = 'auto' | 'whatsapp' | 'email' | 'ambos'
+export const CANALES_SALIDA: { valor: CanalSalida; etiqueta: string; necesita: ('whatsapp' | 'email')[] }[] = [
+  { valor: 'auto', etiqueta: 'Automático: WhatsApp si hay teléfono; si no, correo', necesita: [] },
+  { valor: 'whatsapp', etiqueta: 'Solo WhatsApp', necesita: ['whatsapp'] },
+  { valor: 'email', etiqueta: 'Solo correo', necesita: ['email'] },
+  { valor: 'ambos', etiqueta: 'Los dos: WhatsApp y correo', necesita: ['whatsapp', 'email'] }
+]
+
+// El ajuste que llevan todas las automatizaciones que escriben al cliente
+export const CAMPO_CANAL: CampoAjuste = {
+  clave: 'canal',
+  etiqueta: 'Por dónde escribir',
+  tipo: 'canal',
+  porDefecto: 'auto',
+  ayuda: 'El correo sale gratis desde tu propio buzón. Cada aviso por WhatsApp lo cobra Meta y casi siempre necesita una plantilla aprobada.'
 }
 
 // Los ajustes de una automatización: los que haya guardado el cliente, y

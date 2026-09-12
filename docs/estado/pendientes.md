@@ -199,11 +199,23 @@ reembolsos y cancelaciones siempre los hace una persona. Detalle y estado en
       Shopify con firma, pantallas Tienda online y Automatizaciones. Probado
       con Shopify y Meta simulados: `probar-tienda` (46) y
       `probar-motor-automatizaciones` (40)
-- [x] Primeras 5 automatizaciones listas: Pedido confirmado, Pedido enviado,
-      Pedido cancelado, Pedido retrasado, Aviso de pedido grande
-- [ ] Las otras 32, de cinco en cinco, cada una con su prueba
-- [ ] Herramientas de la IA con datos de la tienda (buscar, estado del
-      pedido con identidad, enlace de compra, descuento)
+- [x] Canal por automatización, plantillas prediseñadas con botón a Meta,
+      workflow dibujado, editor de recetas (moldear las nuestras y crear las
+      propias, con «probar con un pedido de ejemplo») — hechos el 12-09-2026
+      con el «hazlo todo de una» de Jorge. Decidido por defecto: propias para
+      todos los planes, tope 20 por sucursal, plantillas en español
+- [x] 18 automatizaciones listas (ver `docs/integraciones/shopify.md`)
+- [ ] Las otras 19, de cinco en cinco, cada una con su prueba. Las que
+      quedan necesitan piezas nuevas: detectar intención en el chat (cambio de
+      dirección, devolución, dañado, reclamación, reserva), historial de
+      precios (bajó de precio), «quién preguntó por qué» (vuelve el stock),
+      descuentos en Shopify (segundo aviso de carrito, cumpleaños), importar
+      catálogo y políticas, etiquetar desde Respondi hacia Shopify y al revés
+- [x] Herramientas de la IA con datos de la tienda: buscar, estado del pedido
+      con identidad, enlace de compra (con tope). Queda el descuento desde el
+      chat
+- [ ] Baja de promociones: cuando un cliente responde «BAJA», dejar de
+      mandarle marketing (hoy el consentimiento viene solo de Shopify)
 - [ ] Verificación contra una tienda de desarrollo real (necesita que Jorge
       cree la cuenta de Partner de Shopify: pide verificar un correo y
       aceptar su contrato)

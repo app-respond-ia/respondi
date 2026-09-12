@@ -1,4 +1,5 @@
-import type { Automatizacion } from './tipos'
+import { CAMPO_CANAL, type Automatizacion } from './tipos'
+import { PLANTILLAS_PREDISENADAS } from './plantillas-predisenadas'
 
 // LAS 37 AUTOMATIZACIONES QUE VIENEN HECHAS.
 //
@@ -9,7 +10,7 @@ import type { Automatizacion } from './tipos'
 // Los huecos que se rellenan al enviar: {{cliente}} {{pedido}} {{total}}
 // {{seguimiento}} {{producto}} {{enlace}} {{codigo}} {{negocio}} {{dias}}
 
-export const AUTOMATIZACIONES: Automatizacion[] = [
+const BASE: Automatizacion[] = [
   // =========================================================================
   // PEDIDOS Y ENVÍOS
   // =========================================================================
@@ -19,7 +20,7 @@ export const AUTOMATIZACIONES: Automatizacion[] = [
     descripcion: 'La IA contesta al momento con el estado real del pedido.',
     detalle: 'Cuando alguien pregunta por su pedido, la IA lo busca en tu tienda y le dice en qué punto está y cuándo llega. Antes de dar ningún dato comprueba que el pedido es suyo.',
     categoria: 'pedidos',
-    estado: 'en_camino',
+    estado: 'lista',
     requiereTienda: true,
     permisos: ['read_orders', 'read_fulfillments'],
     escribeAlCliente: false,
@@ -78,7 +79,7 @@ export const AUTOMATIZACIONES: Automatizacion[] = [
     descripcion: 'Comprobar que ha llegado bien.',
     detalle: 'Cuando el transportista marca el paquete como entregado, se le pregunta al cliente si está todo correcto. Si contesta que no, la IA abre un caso para tu equipo.',
     categoria: 'pedidos',
-    estado: 'en_camino',
+    estado: 'lista',
     requiereTienda: true,
     permisos: ['read_orders', 'read_fulfillments'],
     escribeAlCliente: true,
@@ -146,7 +147,7 @@ export const AUTOMATIZACIONES: Automatizacion[] = [
     descripcion: 'Pedir que confirme antes de preparar el paquete.',
     detalle: 'En los pedidos que se pagan al recibirlos, se le pide al cliente que confirme por el chat. Si no contesta en el plazo que pongas, se abre un caso para que lo llaméis antes de enviar nada.',
     categoria: 'pedidos',
-    estado: 'en_camino',
+    estado: 'lista',
     requiereTienda: true,
     permisos: ['read_orders'],
     escribeAlCliente: true,
@@ -173,7 +174,7 @@ export const AUTOMATIZACIONES: Automatizacion[] = [
     descripcion: 'Pedir el dato que falta antes de que sea un problema.',
     detalle: 'Si un pedido entra sin teléfono, sin número de piso o con la dirección incompleta, la IA lo pide por el chat y lo deja anotado en el caso.',
     categoria: 'pedidos',
-    estado: 'en_camino',
+    estado: 'lista',
     requiereTienda: true,
     permisos: ['read_orders'],
     escribeAlCliente: true,
@@ -184,7 +185,7 @@ export const AUTOMATIZACIONES: Automatizacion[] = [
     ],
     receta: {
       disparador: { tipo: 'evento_tienda', evento: 'orders/create' },
-      condiciones: [{ campo: 'pedido.falta_dato', operador: 'es_cierto' }],
+      condiciones: [{ campo: 'pedido.falta_dato', operador: 'existe' }],
       pasos: [
         { tipo: 'mensaje', texto: '', ajuste_texto: 'texto', plantilla: 'plantilla' },
         { tipo: 'etiquetar', etiqueta: 'Falta información' }
@@ -222,20 +223,19 @@ export const AUTOMATIZACIONES: Automatizacion[] = [
     descripcion: 'Recordar lo que se dejó a medias.',
     detalle: 'Cuando alguien llena el carrito y no termina de pagar, se le escribe pasado el rato que tú digas con lo que se dejó y el enlace para terminar.',
     categoria: 'recuperar',
-    estado: 'en_camino',
+    estado: 'lista',
     requiereTienda: true,
     permisos: ['read_orders'],
     escribeAlCliente: true,
     marketing: false,
     campos: [
-      { clave: 'esperar_horas', etiqueta: 'Esperar antes de escribir', tipo: 'horas', porDefecto: 2, min: 1, max: 72 },
+      { clave: 'esperar_horas', etiqueta: 'Horas sin terminar la compra antes de escribir', tipo: 'horas', porDefecto: 2, min: 1, max: 72, ayuda: 'Se mira cada hora; solo se escribe una vez por carrito, y nunca por carritos de hace más de una semana.' },
       { clave: 'texto', etiqueta: 'Mensaje', tipo: 'texto_largo', porDefecto: 'Hola {{cliente}}, veo que te quedó {{producto}} en el carrito. Si quieres, lo terminas aquí: {{enlace}}' },
       { clave: 'plantilla', etiqueta: 'Plantilla de WhatsApp', tipo: 'plantilla', porDefecto: null, ayuda: 'WhatsApp solo deja escribir a un cliente que lleve más de 24 h sin hablarte usando una plantilla aprobada por Meta. Sin ella, a esos clientes no se les escribe (por correo no hace falta). Sus huecos se rellenan por orden con: nombre del cliente, número de pedido, total y enlace.' }
     ],
     receta: {
       disparador: { tipo: 'programado', cada: 'hora' },
       pasos: [
-        { tipo: 'esperar', ajuste: 'esperar_horas' },
         { tipo: 'comprobar', condiciones: [{ campo: 'carrito.comprado', operador: 'es_falso' }] },
         { tipo: 'mensaje', texto: '', ajuste_texto: 'texto', plantilla: 'plantilla' }
       ]
@@ -399,7 +399,7 @@ export const AUTOMATIZACIONES: Automatizacion[] = [
     descripcion: 'La IA busca en tu tienda y recomienda con precios y stock reales.',
     detalle: 'Cuando alguien pregunta por un producto, la IA lo busca en tu catálogo de Shopify: precio de hoy, si queda, y el enlace. Sin inventarse nada.',
     categoria: 'vender',
-    estado: 'en_camino',
+    estado: 'lista',
     requiereTienda: true,
     permisos: ['read_products', 'read_inventory'],
     escribeAlCliente: false,
@@ -418,7 +418,7 @@ export const AUTOMATIZACIONES: Automatizacion[] = [
     descripcion: 'La IA prepara el pedido y manda el enlace para pagar.',
     detalle: 'Cuando el cliente ya sabe lo que quiere, la IA le prepara el carrito en tu tienda y le manda un enlace para que pague en dos toques. El pago siempre se hace en tu Shopify.',
     categoria: 'vender',
-    estado: 'en_camino',
+    estado: 'lista',
     requiereTienda: true,
     permisos: ['read_products', 'write_draft_orders'],
     escribeAlCliente: false,
@@ -498,7 +498,7 @@ export const AUTOMATIZACIONES: Automatizacion[] = [
     descripcion: 'Pedir la opinión cuando ya lo ha disfrutado.',
     detalle: 'Unos días después de la entrega se le pide una reseña, con el enlace donde quieras recibirla. Es promoción: solo a quien la haya aceptado.',
     categoria: 'posventa',
-    estado: 'en_camino',
+    estado: 'lista',
     requiereTienda: true,
     permisos: ['read_orders'],
     escribeAlCliente: true,
@@ -524,7 +524,7 @@ export const AUTOMATIZACIONES: Automatizacion[] = [
     descripcion: 'Enviar las instrucciones justo cuando le llega.',
     detalle: 'Al recibir el pedido, el cliente recibe los consejos de uso o cuidado de lo que ha comprado. Menos dudas, menos devoluciones.',
     categoria: 'posventa',
-    estado: 'en_camino',
+    estado: 'lista',
     requiereTienda: true,
     permisos: ['read_orders', 'read_products'],
     escribeAlCliente: true,
@@ -596,7 +596,7 @@ export const AUTOMATIZACIONES: Automatizacion[] = [
     descripcion: 'Reconocer a quien más te compra.',
     detalle: 'Cuando un cliente pasa del número de compras o del gasto que tú marques, se le etiqueta como VIP en Shopify, se avisa a tu equipo y la IA le trata acorde.',
     categoria: 'posventa',
-    estado: 'en_camino',
+    estado: 'lista',
     requiereTienda: true,
     permisos: ['read_customers', 'read_orders'],
     escribeAlCliente: false,
@@ -609,10 +609,9 @@ export const AUTOMATIZACIONES: Automatizacion[] = [
     receta: {
       disparador: { tipo: 'evento_tienda', evento: 'orders/create' },
       pasos: [
-        { tipo: 'comprobar', condiciones: [{ campo: 'cliente.compras', operador: 'mayor', ajuste: 'compras_minimas' }] },
-        { tipo: 'etiquetar_en_tienda', etiqueta: 'VIP' },
-        { tipo: 'etiquetar', etiqueta: 'VIP' },
-        { tipo: 'avisar_equipo', texto: '{{cliente}} ya es cliente VIP.' }
+        { tipo: 'comprobar', condiciones: [{ campo: 'cliente.es_vip', operador: 'es_cierto' }] },
+        { tipo: 'etiquetar_en_tienda', etiqueta: '{{etiqueta_vip}}' },
+        { tipo: 'avisar_equipo', texto: '{{cliente}} ya es cliente VIP ({{compras}} compras, {{gasto}} en total).' }
       ]
     }
   },
@@ -719,7 +718,7 @@ export const AUTOMATIZACIONES: Automatizacion[] = [
     descripcion: 'Enterarte antes de quedarte sin producto.',
     detalle: 'Cada día se repasa el stock de tu tienda y se avisa a tu equipo de lo que está por debajo del mínimo que pongas.',
     categoria: 'equipo',
-    estado: 'en_camino',
+    estado: 'lista',
     requiereTienda: true,
     permisos: ['read_products', 'read_inventory'],
     escribeAlCliente: false,
@@ -739,7 +738,7 @@ export const AUTOMATIZACIONES: Automatizacion[] = [
     descripcion: 'Un resumen del día, sin entrar a mirar.',
     detalle: 'A la hora que elijas, tu equipo recibe un resumen: pedidos, ventas, conversaciones atendidas por la IA y lo que quedó pendiente.',
     categoria: 'equipo',
-    estado: 'en_camino',
+    estado: 'lista',
     requiereTienda: true,
     permisos: ['read_orders'],
     escribeAlCliente: false,
@@ -749,7 +748,7 @@ export const AUTOMATIZACIONES: Automatizacion[] = [
     ],
     receta: {
       disparador: { tipo: 'programado', cada: 'dia', hora: 20 },
-      pasos: [{ tipo: 'avisar_equipo', texto: 'Resumen del día.' }]
+      pasos: [{ tipo: 'avisar_equipo', texto: '{{resumen}}' }]
     }
   },
   {
@@ -758,16 +757,16 @@ export const AUTOMATIZACIONES: Automatizacion[] = [
     descripcion: 'Avisar si alguien lleva rato sin respuesta.',
     detalle: 'Si una conversación con un cliente que ha comprado lleva sin contestar más de los minutos que pongas, tu equipo recibe un aviso.',
     categoria: 'equipo',
-    estado: 'en_camino',
+    estado: 'lista',
     requiereTienda: false,
     escribeAlCliente: false,
     marketing: false,
     campos: [
-      { clave: 'minutos', etiqueta: 'Minutos sin respuesta', tipo: 'numero', porDefecto: 15, min: 1, max: 600, sufijo: 'minutos' }
+      { clave: 'minutos', etiqueta: 'Minutos sin respuesta', tipo: 'numero', porDefecto: 15, min: 5, max: 600, sufijo: 'minutos', ayuda: 'Se comprueba cada 5 minutos. Se avisa una vez por cada mensaje que se quede sin contestar.' }
     ],
     receta: {
       disparador: { tipo: 'programado', cada: 'hora' },
-      pasos: [{ tipo: 'avisar_equipo', texto: '{{cliente}} lleva esperando respuesta.' }]
+      pasos: [{ tipo: 'avisar_equipo', texto: '{{cliente}} lleva {{minutos}} minutos sin respuesta por {{canal}}.' }]
     }
   },
 
@@ -846,6 +845,27 @@ export const AUTOMATIZACIONES: Automatizacion[] = [
     }
   }
 ]
+
+// Todas las que escriben al cliente llevan el ajuste "Por dónde escribir",
+// el primero de la lista. Se añade aquí, una sola vez, para que ninguna se
+// quede sin él por despiste.
+// Una copia del ajuste por automatización, no el mismo objeto: al devolver
+// la lista a la pantalla, Next convierte los objetos repetidos en referencias
+// y quien lea la respuesta a mano (las pruebas) ve un hueco en vez del campo.
+//
+// También se les pone su plantilla de WhatsApp prediseñada. Y si Meta
+// considera esa plantilla de marketing (carrito abandonado, vuelve el stock...),
+// la automatización entera pasa a ser de promoción: solo se escribe a quien
+// haya aceptado recibirlas, aunque a nosotros nos parezca un simple aviso.
+export const AUTOMATIZACIONES: Automatizacion[] = BASE.map(a => {
+  if (!a.escribeAlCliente) return a
+  const plantilla = PLANTILLAS_PREDISENADAS[a.clave]
+  const marketing = a.marketing || plantilla?.categoria === 'marketing'
+  const detalle = marketing && !a.marketing
+    ? `${a.detalle} Meta lo considera promoción, así que solo se manda a quien haya aceptado recibirlas.`
+    : a.detalle
+  return { ...a, marketing, detalle, campos: [{ ...CAMPO_CANAL }, ...a.campos], ...(plantilla ? { plantilla } : {}) }
+})
 
 export function automatizacionPorClave(clave: string) {
   return AUTOMATIZACIONES.find(a => a.clave === clave) || null

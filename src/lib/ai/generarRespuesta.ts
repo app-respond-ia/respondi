@@ -514,6 +514,16 @@ export async function generarRespuesta(conv: any) {
     })
   }
 
+  // Las herramientas con datos de la tienda online (productos, pedidos,
+  // enlace de compra): solo las que gobiernan las automatizaciones que el
+  // negocio haya encendido. Viven en su propio archivo para no engordar este.
+  const { cargarHerramientasDeTienda, ejecutarHerramientaDeTienda, esHerramientaDeTienda } = await import('@/lib/tiendas/herramientas-ia')
+  const herramientasTienda = await cargarHerramientasDeTienda(branchId, contactId)
+  if (herramientasTienda.definiciones.length) {
+    tools.push(...herramientasTienda.definiciones)
+    openAiMessages.push({ role: 'system', content: herramientasTienda.instrucciones })
+  }
+
   // Recordatorio del idioma justo después de la conversación: los modelos
   // pequeños hacen más caso a lo último que leen que al principio del todo
   // (en las pruebas, gpt-4.1-mini contestaba en español a un cliente inglés)
@@ -762,6 +772,9 @@ export async function generarRespuesta(conv: any) {
       else if (toolCall.function.name === 'etiquetar_conversacion') {
         toolResult = await aplicarEtiqueta(args.category_id)
       }
+      else if (esHerramientaDeTienda(toolCall.function.name) && herramientasTienda.contexto) {
+        toolResult = await ejecutarHerramientaDeTienda(toolCall.function.name, args, herramientasTienda.contexto)
+      }
       else if (toolCall.function.name === 'escalar_humano') {
         toolResult = await ejecutarEscalado(args)
       }
@@ -966,6 +979,48 @@ export async function generarRespuesta(conv: any) {
       }
     } catch (err: any) {
       console.error('Revisión del presupuesto fallida:', err?.message)
+    }
+  }
+
+  // Red de seguridad: el cliente pide comprar (o el enlace para pagar) y la IA
+  // ha contestado con el enlace del producto para que se apañe él, en vez de
+  // prepararle el carrito con `enlace_de_compra` (visto en pruebas con
+  // gpt-4o-mini). Se le obliga a usar la herramienta, como con el presupuesto.
+  const PIDE_COMPRAR = /enlace (de|para) pag|para pagar|quiero comprar|c[oó]mprame|h[aá]zme el pedido|prep[aá]rame|me lo llevo|lo quiero|quiero \d+ |mándame el enlace|mandame el enlace/i
+  const herramientaCompra = tools.find((t: any) => t.function?.name === 'enlace_de_compra')
+  const yaConEnlaceDePago = /invoices\/|\/checkouts\//.test(responseMsg?.content || '')
+  if (herramientaCompra && herramientasTienda.contexto && responseMsg?.content && !yaConEnlaceDePago && pendientesCliente.some(t => PIDE_COMPRAR.test(t))) {
+    try {
+      openAiMessages.push({ role: 'assistant', content: responseMsg.content })
+      openAiMessages.push({
+        role: 'system',
+        content: 'REVISIÓN: el cliente quiere comprar y has contestado sin usar enlace_de_compra. Úsala ahora con los productos y cantidades que ha dicho (los nombres tal como los ha dicho). Si de verdad no ha concretado qué quiere, pásale una lista vacía.'
+      })
+      const revision = await openai.chat.completions.create({
+        model: MODELO_IA,
+        messages: openAiMessages,
+        tools: [herramientaCompra],
+        tool_choice: { type: 'function', function: { name: 'enlace_de_compra' } }
+      })
+      tokensInput += revision.usage?.prompt_tokens || 0
+      tokensOutput += revision.usage?.completion_tokens || 0
+      const r: any = revision.choices[0].message
+      const llamada: any = r.tool_calls?.find((t: any) => t.function?.name === 'enlace_de_compra')
+      if (llamada) {
+        const args = (() => { try { return JSON.parse(llamada.function.arguments || '{}') } catch { return {} } })()
+        const lineas = Array.isArray(args.lineas) ? args.lineas : []
+        if (lineas.length) {
+          const resultado = await ejecutarHerramientaDeTienda('enlace_de_compra', args, herramientasTienda.contexto)
+          openAiMessages.push(r)
+          openAiMessages.push({ role: 'tool', tool_call_id: llamada.id, content: resultado })
+          const final = await openai.chat.completions.create({ model: MODELO_IA, messages: openAiMessages })
+          tokensInput += final.usage?.prompt_tokens || 0
+          tokensOutput += final.usage?.completion_tokens || 0
+          if (final.choices[0].message.content) responseMsg.content = final.choices[0].message.content
+        }
+      }
+    } catch (err: any) {
+      console.error('Revisión del enlace de compra fallida:', err?.message)
     }
   }
 

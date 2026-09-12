@@ -154,9 +154,64 @@ puede hacerla Claude).
   "Últimos movimientos" (hecho / no hacía falta y por qué / esperando / error).
   Las que aún no están construidas se ven en gris, "En preparación", y no
   se pueden encender.
-- **Automatizaciones listas y probadas (5 de 37)**: Pedido confirmado,
-  Pedido enviado, Pedido cancelado o reembolsado, Pedido retrasado (repaso
-  diario a las 9 h de la sucursal) y Aviso de pedido grande.
+- **Automatizaciones listas y probadas (18 de 37)**:
+  - Pedidos y envíos: Pedido confirmado, Pedido enviado, Pedido entregado
+    (Shopify avisa del envío con `fulfillments/update` y
+    `shipment_status: delivered`; se va a por el pedido a la tienda),
+    Pedido retrasado (repaso diario a las 9 h), Pedido cancelado, Confirmar
+    contra reembolso (espera la respuesta; sin ella abre caso; «ha
+    contestado» se vuelve a mirar en el momento), Falta información del
+    pedido.
+  - Recuperar ventas: Carrito abandonado (repaso cada hora de
+    `abandonedCheckouts`; solo carritos de más de X horas y menos de una
+    semana; Meta lo considera promoción).
+  - Vender desde el chat: Venta asistida, Carrito armado por la IA, ¿Dónde
+    está mi pedido? — son las herramientas de la IA (ver más abajo).
+  - Posventa: Pedir reseña (marketing), Cómo usarlo, Cliente VIP (por compras
+    o por gasto; etiqueta al cliente en Shopify con `tagsAdd`).
+  - Para tu equipo: Aviso de pedido grande, Aviso de stock bajo (repaso
+    diario a la hora elegida), Resumen diario (pedidos y ventas de la tienda
+    + conversaciones, respuestas de la IA y casos pendientes), Cliente
+    esperando (cada 5 min; no necesita tienda).
+- **Canal por automatización** (12-09-2026): ajuste «Por dónde escribir» en
+  las 18 que escriben al cliente: automático (WhatsApp si hay teléfono, si no
+  correo), solo WhatsApp, solo correo, los dos. Con «los dos» cuenta dos
+  mensajes. Si por el canal elegido no se puede, se explica en el registro.
+  Los correos de automatización llevan su propio asunto y salen como correo
+  nuevo (no se enganchan al último hilo del cliente).
+- **Plantillas prediseñadas** (`plantillas-predisenadas.ts`): una por
+  automatización que escribe, escrita para que Meta la apruebe (utilidad o
+  marketing según las normas de Meta: carrito abandonado, vuelve el stock,
+  bajó de precio, dormido, recompra, reseña y cumpleaños son marketing aunque
+  parezcan avisos). Botón «Enviar a Meta para que la apruebe» en la tarjeta;
+  el estado llega solo por el webhook de Meta; al aprobarse queda elegida y
+  se usa sin tocar nada. Sus huecos se rellenan por nombre (`huecos`), no por
+  orden. Una rechazada se borra en Meta antes de reenviarla. Texto no
+  editable; «Usar otra plantilla mía» para el camino de expertos.
+- **El workflow dibujado** (`describir.ts`): cada tarjeta enseña la receta
+  en cristiano (disparador → condiciones → pasos), y es lo mismo que usa el
+  botón de probar.
+- **Editor de recetas** (`EditorReceta.tsx`, `definiciones.ts`): moldear las
+  de Respondi (se guarda la receta en `automatizaciones.receta`; «Volver a la
+  de Respondi» la vacía; los ajustes que la receta ya no usa se esconden) y
+  crear las propias (`clave propia_*`, nombre, descripción, «es promoción»;
+  tope de 20 por sucursal). Disparadores, condiciones y pasos de listas
+  cerradas; `problemaDeReceta` es la única puerta y rechaza pasos que no
+  existen (reembolsar), esperas de más de 30 días, etc. «Probar con un
+  pedido de ejemplo» (`simularReceta`) cuenta qué haría sin hacer nada y
+  avisa (sin plantilla aprobada, etiqueta inexistente, canal sin conectar).
+  Las propias con reloj las lanza el cron (`lanzarPropiasProgramadas`).
+- **Herramientas de la IA con la tienda** (`herramientas-ia.ts`): existen
+  solo si está encendida la automatización que las gobierna —
+  `buscar_en_tienda` (Venta asistida: precio de hoy, stock, enlace),
+  `estado_del_pedido` (¿Dónde está mi pedido?: solo si escribe desde el
+  teléfono/correo del pedido o da el correo/teléfono con el que compró; nunca
+  cancela ni reembolsa) y `enlace_de_compra` (Carrito armado por la IA: crea
+  un pedido borrador en Shopify y da el enlace de pago; por encima del
+  importe máximo avisa al equipo y no da enlace). Dos enganches en
+  `generarRespuesta.ts`, el resto fuera.
+- **Cron**: acepta `{ "forzar": ["carrito_abandonado", ...] }` con la clave
+  para lanzar un repaso sin esperar a su hora (lo usan las pruebas).
 
 ### Plantillas de WhatsApp: lo que hay que saber
 Un cliente que compra en la web normalmente **no te ha escrito por WhatsApp
@@ -167,14 +222,44 @@ la plantilla se rellenan siempre por orden: nombre, nº de pedido, total,
 enlace. Solo valen plantillas de solo texto (sin foto ni botones que pidan
 valor). Por correo no hace falta nada de esto.
 
-### Pruebas (scratchpad de la sesión)
-- `probar-tienda.mjs` — 46 comprobaciones: conexión, token en Vault y que
-  no sale por ningún sitio, permisos, Shopify que frena/cae/congela, misma
-  tienda en dos sitios, catálogo de 37, frenos de la pantalla.
-- `probar-motor-automatizaciones.mjs` — 40 comprobaciones de punta a punta
-  (Shopify simulado + Meta simulado): firma, apagada, encendida → WhatsApp
-  real, no repetir, condiciones, seguimiento, ventana de 24 h, plantilla
-  aprobada, registro, apagar a media espera, cron recoge lo huérfano.
+### Pruebas (scratchpad de la sesión; todas contra Shopify y Meta simulados)
+- `probar-tienda.mjs` (46): conexión, token en Vault y que no sale por
+  ningún sitio, permisos, Shopify que frena/cae/congela, misma tienda en dos
+  sitios, catálogo de 37, frenos de la pantalla.
+- `probar-motor-automatizaciones.mjs` (73): firma del aviso, apagada,
+  encendida → WhatsApp real, no repetir, condiciones, seguimiento, ventana de
+  24 h, plantilla del cliente, plantilla prediseñada (enviar, Meta aprueba
+  por webhook, se usa sola con los huecos por nombre, rechazo con motivo y
+  reenvío), canal (solo correo con asunto propio, los dos, solo WhatsApp sin
+  teléfono, automático que cae al correo), registro, apagar a media espera,
+  cron recoge lo huérfano.
+- `probar-editor.mjs` (45): lo que no se deja guardar, crear una propia,
+  probar con un pedido de ejemplo sin tocar nada, el motor ejecuta la receta
+  del cliente (aviso, etiqueta, caso), editar, moldear una de Respondi y
+  volver, espera a medias y apagar, borrar, tope de 20.
+- `probar-automatizaciones-2.mjs` (29): Pedido entregado (aviso de envío →
+  pedido en la tienda), Falta información, Contra reembolso (espera, sin
+  respuesta abre caso; con respuesta no), Carrito abandonado (repaso forzado,
+  consentimiento, no repetir), Stock bajo (una vez al día).
+- `probar-automatizaciones-3.mjs` (21): Cómo usarlo (espera 0 = en el acto),
+  Pedir reseña (espera un día, solo con consentimiento, con el enlace del
+  ajuste), Cliente VIP (por compras y por gasto; etiqueta en Shopify), Resumen
+  diario, Cliente esperando (y no la ya contestada).
+- `probar-herramientas-tienda.mjs` (18, con OpenAI de verdad): precio y
+  enlace reales, agotado, inexistente, estado del pedido desde su teléfono /
+  con su correo / con un correo falso, nunca cancela, enlace de compra con
+  borrador en Shopify, tope que avisa al equipo. Deja el saldo en 7.
+- `captura-shopify.mjs` (22, navegador real, ordenador y móvil): conectar
+  desde la ventana, webhook, las 37 con interruptor, plantilla prediseñada
+  con botón, workflow dibujado, moldear, crear una propia y probarla.
+- Regresión que sigue en verde: `probar-whatsapp` (25), `probar-plantillas`
+  (44), `contrato-conversaciones` (40), `probar-configuracion` (20),
+  `probar-correo` (31), `probar-motor-ia` (todos los escenarios).
+- Ojo con la base de datos compartida: la IA de producción contesta a
+  cualquier mensaje de cliente que meta una prueba y, al fallar el envío con
+  el token falso, marca el canal de WhatsApp de prueba como «error». Las
+  pruebas abren la ventana de 24 h insertando el mensaje ya agrupado y con
+  la IA en pausa (`abrirVentana`), no con `llegaPorMeta`.
 
 ### Verificado en producción (12-09-2026, commit `316f015`)
 - Pantallas Tienda online y Automatizaciones en respondi.vercel.app, en
@@ -190,18 +275,30 @@ valor). Por correo no hace falta nada de esto.
   pendiente, no llamándolos a mano.
 
 ### Pendiente
-- Las otras 32 automatizaciones, de cinco en cinco, cada una con su prueba.
-  Siguientes: Pedido entregado (Shopify avisa por `fulfillments/update`,
-  no hay tema "delivered"), Falta información, Contra reembolso, Carrito
-  abandonado, Aviso de stock bajo.
-- Herramientas de la IA con datos de la tienda: `buscar_en_tienda`,
-  `estado_del_pedido` (con comprobación de identidad), enlace de compra y
-  descuento. Sin ellas, las de "Vender desde el chat" y "¿Dónde está mi
-  pedido?" no pueden estar listas.
-- Registrar los webhooks desde la app (hoy el cliente los pega a mano en
-  Shopify; con `write_webhooks`... no: los custom apps no lo permiten por
-  API, así que se queda a mano y documentado en la pantalla).
+- Las 19 automatizaciones que quedan, de cinco en cinco, cada una con su
+  prueba. Necesitan piezas que aún no existen:
+  - Detectar la intención en el chat (cambio de dirección, devolución,
+    producto dañado, reclamación, reserva/lista de espera, presupuesto con
+    precios de la tienda, producto relacionado): un disparador
+    `mensaje_cliente` que el motor de IA dispare al etiquetar.
+  - Crear descuentos en Shopify (`discountCodeBasicCreate`): segundo aviso
+    de carrito, cumpleaños; y el descuento desde el chat.
+  - Historial de precios (bajó de precio) y «quién preguntó por qué» (te
+    aviso cuando vuelva): guardar el interés del cliente al buscar.
+  - Repasos de clientes: dormido (`customers` por última compra), recompra
+    (pedidos por producto y fecha), garantía por vencer (pedidos por fecha),
+    cumpleaños/aniversario (fecha de la primera compra).
+  - Pago iniciado sin terminar (`checkouts/update`), cambio de dirección
+    a tiempo.
+  - Mantenimiento: importar catálogo (productos → lista de precios),
+    importar políticas (`shopPolicies` → fuentes de políticas con
+    embeddings), etiquetar clientes en Shopify desde las etiquetas de
+    Respondi, y al revés.
+- Baja de promociones: al responder «BAJA», dejar de mandar marketing (un
+  campo propio en `contacts`, porque el consentimiento hoy viene de Shopify).
+- Registrar los webhooks desde la app no es posible en apps personalizadas:
+  se queda a mano y explicado en la pantalla.
 - Pasada de verificación contra una tienda de desarrollo real (Jorge crea
-  la cuenta de Partner). Ahí se confirma la versión de la API.
-- Editor visual de recetas ("el mapa"): el motor ya lee `automatizaciones.receta`
-  cuando no está vacía, pero todavía no hay pantalla.
+  la cuenta de Partner). Ahí se confirma la versión de la API (`2026-01`).
+- El mapa visual (cajas y flechas): la misma receta que ya edita el editor
+  de lista; solo cambia la piel.

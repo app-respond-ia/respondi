@@ -21,7 +21,7 @@ async function apuntar(messageId: string, cambios: Record<string, any>) {
 export async function enviarMensajeSaliente(messageId: string): Promise<Resultado> {
   const { data: msg } = await supabaseAdmin
     .from('messages')
-    .select('id, tenant_id, conversation_id, remitente, contenido, plantilla, estado_envio, intentos_envio, conversations(branch_id, canal, contacts(identificador_canal))')
+    .select('id, tenant_id, conversation_id, remitente, contenido, plantilla, asunto, estado_envio, intentos_envio, conversations(branch_id, canal, contacts(identificador_canal))')
     .eq('id', messageId)
     .maybeSingle()
 
@@ -165,10 +165,14 @@ async function enviarPorCorreo(
     .order('timestamp', { ascending: false })
     .limit(1)
     .maybeSingle()
+  // Un correo que empieza el negocio (un aviso de pedido de una
+  // automatización) ya trae su asunto y va como correo nuevo. Una respuesta
+  // de la IA o de un agente sigue el hilo del cliente ("Re: ...").
+  const propio = (msg.asunto || '').trim()
   const base = (hilo?.asunto || '').trim()
-  const asunto = base ? (/^(re|aw|rv|res)\s*:/i.test(base) ? base : `Re: ${base}`) : `Mensaje de ${config.nombre_remitente || config.direccion}`
-  const referencias = (hilo?.email_referencias || '').split(/\s+/).filter(Boolean)
-  const enRespuestaA = hilo?.identificador_externo && /^<.+>$/.test(hilo.identificador_externo) ? hilo.identificador_externo : null
+  const asunto = propio || (base ? (/^(re|aw|rv|res)\s*:/i.test(base) ? base : `Re: ${base}`) : `Mensaje de ${config.nombre_remitente || config.direccion}`)
+  const referencias = propio ? [] : (hilo?.email_referencias || '').split(/\s+/).filter(Boolean)
+  const enRespuestaA = !propio && hilo?.identificador_externo && /^<.+>$/.test(hilo.identificador_externo) ? hilo.identificador_externo : null
 
   await apuntar(msg.id, { estado_envio: 'pendiente', intentos_envio: intentos, ultimo_intento_envio: new Date().toISOString() })
   try {

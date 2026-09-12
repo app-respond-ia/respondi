@@ -245,7 +245,13 @@ se traga en silencio.
 - [x] Rutas huérfanas — `src/app/auth/verificar/route.ts` ya no existe y
       `auth/procesar-hash` sí se usa (desde `auth/callback` y
       `usuarios-globales`). La nota estaba desfasada
-- [ ] Plantilla "Invite user" en Supabase, sin usar (limpieza en el panel)
+- [x] Plantilla "Invite user" de Supabase (12-09-2026): ya no la usa nada.
+      Detrás de esa nota había un fallo de verdad: "reenviar invitación"
+      seguía llamando al sistema de invitaciones de Supabase y mandaba a la
+      persona a `/aceptar-invitacion`, donde no podía hacer nada. Ahora
+      reenvía el mismo correo de Respondi con el enlace bueno. La plantilla de
+      Supabase es una de las suyas por defecto: no se puede borrar, pero ya no
+      se manda nunca
 - [ ] Excedentes sobre límites del plan (`plans.precio_credito_adicional`,
       `plans.precio_sucursal_extra`) — existen en el formulario pero
       sin flujo de cobro real todavía

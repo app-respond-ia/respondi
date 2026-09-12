@@ -95,5 +95,7 @@ Sin enlaces mágicos con token (diseño abandonado — ver
 `docs/estado/incidentes-resueltos.md`). Tabla `invitaciones_pendientes`
 + función `resolverAltaUsuario()`, enganchada tanto en el camino de
 Google OAuth como en el de email+contraseña. Verificado end-to-end
-para tipo `vendedor`. Pendiente verificar `invitarUsuario`
+para tipo `vendedor`. `invitarUsuario` verificado de punta a punta el
+11-09-2026 y el reenvío arreglado el 12-09-2026 (usaba el sistema viejo de
+Supabase): `probar-invitacion`, 9 comprobaciones con navegador real
 (`usuario_organizacion`) de principio a fin.

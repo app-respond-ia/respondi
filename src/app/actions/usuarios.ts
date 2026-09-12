@@ -257,30 +257,53 @@ export async function actualizarUsuario(id: string, data: Partial<{ nombre: stri
   return { success: true, data: updated }
 }
 
+// Volver a mandar el correo de una invitación que sigue pendiente. Antes
+// usaba el sistema de invitaciones de Supabase (su propia plantilla "Invite
+// user" y la pantalla /aceptar-invitacion), que dejó de usarse cuando las
+// invitaciones pasaron a `invitaciones_pendientes` con nuestro propio correo:
+// reenviar mandaba a la persona a un sitio donde no podía hacer nada. Ahora
+// manda exactamente el mismo correo que la invitación original.
 export async function reenviarInvitacion(email: string) {
   const supabase = await createClient()
   const auth = await getAuthContext(supabase)
   if (auth.error) return { success: false, error: auth.error }
 
-  const { data: userRow } = await supabase
-    .from('users')
-    .select('id')
-    .eq('email', email)
-    .eq('tenant_id', auth.tenant_id)
-    .eq('invitacion_aceptada', false)
-    .single()
+  const { data: invitacion } = await supabaseAdmin
+    .from('invitaciones_pendientes')
+    .select('id, email, datos, aceptada')
+    .eq('email', email.trim().toLowerCase())
+    .eq('tipo', 'usuario_organizacion')
+    .eq('aceptada', false)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
 
-  if (!userRow) {
-    return { success: false, error: 'No se encontró una invitación pendiente para ese email en tu organización' }
+  if (!invitacion || (invitacion.datos as any)?.tenant_id !== auth.tenant_id) {
+    return { success: false, error: 'No hay ninguna invitación pendiente para ese correo en tu organización.' }
   }
 
-  const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/aceptar-invitacion`
+  const { error: emailError } = await enviarEmailInvitacion({
+    email: invitacion.email,
+    actionLink: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/registro-trial?inv=${invitacion.id}`,
+    rol: 'agente'
   })
-
-  if (inviteError) {
-    return { success: false, error: `No se pudo reenviar: ${inviteError.message}` }
+  if (emailError) {
+    await registrarError({
+      origen: 'app',
+      descripcion: 'Fallo al reenviar el correo de invitación',
+      stacktrace: JSON.stringify(emailError),
+      tenant_id: auth.tenant_id
+    })
+    return { success: false, error: 'No se ha podido enviar el correo. Inténtalo en un momento.' }
   }
+
+  await registrarAuditoria({
+    tenant_id: auth.tenant_id,
+    user_id: auth.user_id,
+    accion: `reenvió la invitación a "${invitacion.email}"`,
+    tabla_afectada: 'invitaciones_pendientes',
+    registro_id: invitacion.id
+  })
 
   return { success: true }
 }

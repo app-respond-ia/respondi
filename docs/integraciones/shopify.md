@@ -312,6 +312,18 @@ valor). Por correo no hace falta nada de esto.
   pruebas abren la ventana de 24 h insertando el mensaje ya agrupado y con
   la IA en pausa (`abrirVentana`), no con `llegaPorMeta`.
 
+### Verificado en producción (12-09-2026, commit `a899e2a`)
+- Tras el despliegue de las 37 listas + gestiones de tienda para la IA:
+  `prod-automatizaciones` 9/9 (37 listas, ninguna en preparación, todas
+  apagadas, frenos, dominio inexistente contra Shopify real),
+  `captura-shopify` con `PROD=1` 6/6 (ordenador y móvil, sin errores de
+  JavaScript), y el reloj de la base de datos trató un aviso pendiente en
+  8 s (`prod-latido`). Sin restos y saldo del inquilino de pruebas en 7.
+- Ojo al comprobar despliegues: los identificadores de las server actions
+  del build local no valen en Vercel (dan "Server action not found" aunque
+  el despliegue esté hecho); hay que leerlos del JS de producción, como hace
+  `prod-automatizaciones`, o mirar los deployments en GitHub.
+
 ### Verificado en producción (12-09-2026, commit `0f1af93`)
 - Tras el despliegue de canal + plantillas + editor + 18 listas + IA:
   `prod-automatizaciones` 9/9 (18 listas / 19 en preparación, todas

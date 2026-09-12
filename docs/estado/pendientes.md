@@ -149,6 +149,28 @@ solo la lista viva).
       `messages.adjuntos` y se ven en Chats; el primero sigue en
       `media_url`, que es lo que mira la IA
 
+## Repaso completo antes de Shopify (12-09-2026)
+Revisión a fondo pedida por Jorge ("revisa cada milímetro"). Lo que salió, ya
+arreglado y verificado, está en `incidentes-resueltos.md`: registrarse estaba
+roto, la lista de precios no dejaba añadir productos y duplicaba al importar,
+los PDF de políticas no se procesaban nunca, formularios vacíos que creaban
+basura, errores técnicos a la vista del usuario y un par de carreras del canal
+de correo.
+
+Pruebas que quedan hechas y se pueden repetir cuando haga falta:
+`contrato-conversaciones` (40), `probar-whatsapp` (25), `probar-plantillas`
+(44), `probar-correo` (31), `probar-ia-correo` (10), `probar-precios` (19),
+`probar-plantilla-precios` (11), `probar-politicas` (13), `probar-formularios`
+(13), `probar-configuracion` (20), `probar-resumenes` (6), `probar-motor-ia`,
+`probar-multimedia`, `probar-presupuestos` (5), `probar-idioma`,
+`probar-jerarquia`, `probar-promesas`, `probar-limite-canales` (6),
+`probar-alta-creditos` (4), `probar-invitacion` (9), `probar-errores` (15),
+`probar-reintento` (4) y, en navegador, `captura-precios` (11),
+`captura-plantillas`, `captura-correo` y `revisar-paginas` (todas las
+pantallas, en ordenador y en móvil). En producción: `prod-correo` (10),
+`prod-plantillas` (7), `prod-e2e` (4), `prod-planes` (4), `probar-alta-web` (4)
+y `probar-invitacion` (9).
+
 ## Lo que necesita algo de Jorge (nada de esto puede hacerlo Claude solo)
 - [ ] **Stripe**: crear la cuenta (modo prueba vale) y pasar las claves. El
       código de suscripción está a medias esperándolas; sin cuenta no se puede

@@ -188,11 +188,27 @@ y `probar-invitacion` (9).
 - [ ] **Outlook / Microsoft 365 en el correo**: registrar una app en Microsoft
       (Azure) para su inicio de sesión
 
-## Prioridad 4 — Shopify Fase 1
-- [ ] Conexión real con la API de Shopify (catálogo/stock/pedidos)
-- [ ] Caso de uso WISMO
-- (Catálogo conversacional, recuperación de carritos, devoluciones y
-  fidelización van después, una vez validado lo anterior)
+## Prioridad 4 — Shopify y automatizaciones (arrancado el 12-09-2026)
+Decidido con Jorge: todas las automatizaciones prediseñadas (37, por
+categorías), cada una la enciende el cliente; construir de cinco en cinco y
+probar cada una; la IA puede mandar enlaces de compra y descuentos, pero
+reembolsos y cancelaciones siempre los hace una persona. Detalle y estado en
+`docs/integraciones/shopify.md`.
+- [x] Cimientos (12-09-2026): tabla de tiendas con el token en Vault, motor
+      de recetas con cola y registro, cron cada minuto, entrada de avisos de
+      Shopify con firma, pantallas Tienda online y Automatizaciones. Probado
+      con Shopify y Meta simulados: `probar-tienda` (46) y
+      `probar-motor-automatizaciones` (40)
+- [x] Primeras 5 automatizaciones listas: Pedido confirmado, Pedido enviado,
+      Pedido cancelado, Pedido retrasado, Aviso de pedido grande
+- [ ] Las otras 32, de cinco en cinco, cada una con su prueba
+- [ ] Herramientas de la IA con datos de la tienda (buscar, estado del
+      pedido con identidad, enlace de compra, descuento)
+- [ ] Verificación contra una tienda de desarrollo real (necesita que Jorge
+      cree la cuenta de Partner de Shopify: pide verificar un correo y
+      aceptar su contrato)
+- [ ] Editor visual de recetas ("el mapa"), más adelante
+- Soporte automatizado con IA: aplazado por Jorge hasta terminar Shopify
 
 ## Invitaciones pendientes — cerrado (10-09-2026)
 Todo el bloque está hecho: `PanelInvitaciones` compartido en

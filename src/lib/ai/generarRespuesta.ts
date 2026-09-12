@@ -636,6 +636,7 @@ export async function generarRespuesta(conv: any) {
   // Poner una etiqueta a la conversación (la llama la herramienta y, si la IA
   // se la salta, el etiquetado obligatorio de más abajo)
   let etiquetadoEnEstaPasada = false
+  let presupuestoEnEstaPasada = false
   const aplicarEtiqueta = async (categoryId: string): Promise<string> => {
     let toolResult = ''
     const targetCategory = categories?.find(c => c.id === categoryId)
@@ -854,6 +855,7 @@ export async function generarRespuesta(conv: any) {
       else if (toolCall.function.name === 'hacer_presupuesto') {
         const { calcularPresupuesto } = await import('@/lib/ai/presupuesto')
         toolResult = await calcularPresupuesto(branchId, Array.isArray(args.lineas) ? args.lineas : [])
+        presupuestoEnEstaPasada = true
       }
       else if (toolCall.function.name === 'consultar_politicas') {
         const encontrado = await politicasRelacionadas(args.consulta, 5)
@@ -920,6 +922,50 @@ export async function generarRespuesta(conv: any) {
       } catch (e: any) {
         console.error('Etiquetado obligatorio fallido:', e?.message)
       }
+    }
+  }
+
+  // Red de seguridad: el cliente pide un total o un presupuesto y la IA ha
+  // contestado sin usar `hacer_presupuesto` (visto en pruebas: decía el precio
+  // de un producto y del otro "no tengo información, te respondo luego", en
+  // vez de calcularlo). Se le pide que lo haga con la herramienta.
+  const PIDE_PRESUPUESTO = /presupuesto|precio total|en total|cu[áa]nto (me )?(ser[íi]a|costar[íi]a|cuesta|vale|sale)|cuanto seria|qu[ée] precio.*(todo|junto)/i
+  const pendientesCliente = allMessages.filter((m: any) => m.remitente === 'cliente' && m.agrupado !== true).map((m: any) => m.contenido || '')
+  const herramientaPresupuesto = tools.find((t: any) => t.function?.name === 'hacer_presupuesto')
+  if (herramientaPresupuesto && !presupuestoEnEstaPasada && responseMsg?.content && pendientesCliente.some(t => PIDE_PRESUPUESTO.test(t))) {
+    try {
+      openAiMessages.push({ role: 'assistant', content: responseMsg.content })
+      openAiMessages.push({
+        role: 'system',
+        content: 'REVISIÓN: el cliente está pidiendo un total o un presupuesto y has contestado sin usar hacer_presupuesto. Úsala ahora con lo que ha pedido: el nombre de cada cosa tal como la ha dicho el cliente y su cantidad. Si no ha pedido nada concreto, pásale una lista vacía.'
+      })
+      // Obligada: si se le deja elegir, a veces contesta "te lo digo luego"
+      const revision = await openai.chat.completions.create({
+        model: MODELO_IA,
+        messages: openAiMessages,
+        tools: [herramientaPresupuesto],
+        tool_choice: { type: 'function', function: { name: 'hacer_presupuesto' } }
+      })
+      tokensInput += revision.usage?.prompt_tokens || 0
+      tokensOutput += revision.usage?.completion_tokens || 0
+      const r: any = revision.choices[0].message
+      const llamada: any = r.tool_calls?.find((t: any) => t.function?.name === 'hacer_presupuesto')
+      if (llamada) {
+        const { calcularPresupuesto } = await import('@/lib/ai/presupuesto')
+        const args = (() => { try { return JSON.parse(llamada.function.arguments || '{}') } catch { return {} } })()
+        const resultado = await calcularPresupuesto(branchId, Array.isArray(args.lineas) ? args.lineas : [])
+        presupuestoEnEstaPasada = true
+        openAiMessages.push(r)
+        openAiMessages.push({ role: 'tool', tool_call_id: llamada.id, content: resultado })
+        const final = await openai.chat.completions.create({ model: MODELO_IA, messages: openAiMessages })
+        tokensInput += final.usage?.prompt_tokens || 0
+        tokensOutput += final.usage?.completion_tokens || 0
+        if (final.choices[0].message.content) responseMsg.content = final.choices[0].message.content
+      } else if (r.content) {
+        responseMsg.content = r.content
+      }
+    } catch (err: any) {
+      console.error('Revisión del presupuesto fallida:', err?.message)
     }
   }
 

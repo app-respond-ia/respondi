@@ -76,7 +76,7 @@ function traducirError(e: any, donde: 'leer' | 'enviar'): ErrorCorreo {
 }
 
 function clienteImap(config: ConfigCorreo, contrasena: string) {
-  return new ImapFlow({
+  const cliente = new ImapFlow({
     host: config.imap.host,
     port: config.imap.puerto,
     secure: config.imap.seguro,
@@ -86,6 +86,12 @@ function clienteImap(config: ConfigCorreo, contrasena: string) {
     greetingTimeout: 10000,
     socketTimeout: 30000
   })
+  // Si el servidor corta la conexión cuando ya hemos terminado, la librería
+  // lanza el error por su cuenta y en Node eso tumba el proceso
+  // ("uncaughtException: Socket timeout"). Se recoge aquí: quien esté usando
+  // el cliente ya recibe el error por su lado.
+  cliente.on('error', () => {})
+  return cliente
 }
 
 function transporteSmtp(config: ConfigCorreo, contrasena: string) {

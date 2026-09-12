@@ -4,6 +4,33 @@ Bugs reales que ya ocurrieron en producción, con su causa raíz.
 Antes de tocar algo parecido, lee esto — muchos son "familia de bug
 repetible" si no se tiene cuidado.
 
+## Lista de precios: tres fallos (12-09-2026)
+Repasando la pantalla a fondo (lo pidió Jorge: "la de precios hay que
+revisarla muy bien"):
+
+1. **Añadir un producto no funcionaba.** El formulario no manda la moneda y la
+   columna no admite vacío: la base de datos contestaba *"null value in column
+   moneda"*. La pantalla solo ponía moneda al elegir "a consultar" (y ponía
+   dólares a mano). Ahora la pone el servidor con la de la sucursal, y
+   `crearPrecio` rellena con su valor por defecto cualquier campo que no
+   venga, en vez de mandar vacíos que la base rechaza.
+2. **Importar la plantilla duplicaba toda la lista.** La plantilla se descarga
+   con los productos que el negocio ya tiene; al reimportarla se insertaban
+   otra vez. Ahora lo que coincide en el nombre se **actualiza** y solo se crea
+   lo nuevo; el aviso dice cuántos de cada. Reimportar el mismo archivo ya no
+   cambia nada.
+3. **La moneda no se podía cambiar en ningún sitio.** Se elegía al configurar
+   el negocio y se quedaba para siempre. Ahora está en Perfil de la sucursal,
+   al lado del huso horario.
+
+La generación de la plantilla de Excel se sacó a `src/lib/precios/plantilla.ts`
+(antes vivía dentro de la pantalla y no se podía probar): 11 comprobaciones
+sobre el archivo generado —encabezados, filas con su categoría y subcategoría,
+la hoja escondida, los desplegables y las listas dependientes— y una segunda
+lectura con otra librería distinta para asegurar que Excel lo abre bien.
+Pruebas: `probar-plantilla-precios` (11), `probar-precios` (19) y
+`captura-precios` en navegador (11, con descarga e importación de verdad).
+
 ## Errores técnicos en palabras que se entiendan (12-09-2026)
 Cerrada la auditoría, `src/lib/traducirError.ts` traduce ahora también: las
 reglas de la base de datos con nombre propio (contacto repetido en un canal,

@@ -22,7 +22,7 @@ export async function getPerfilSucursal() {
   // 1. Obtener datos de la sucursal
   const { data: sucursal } = await supabase
     .from('sucursales')
-    .select('id, nombre, direccion, pais, timezone')
+    .select('id, nombre, direccion, pais, timezone, moneda')
     .eq('id', branchId)
     .eq('tenant_id', userData.tenant_id)
     .single()
@@ -76,7 +76,7 @@ export async function getDatosPerfilSucursal() {
       { data: filasIA, error: errHorasIA },
       { data: tiposNovedad, error: errTipos }
     ] = await Promise.all([
-      supabase.from('sucursales').select('id, nombre, direccion, pais, timezone').eq('id', branchId).eq('tenant_id', tenantId).single(),
+      supabase.from('sucursales').select('id, nombre, direccion, pais, timezone, moneda').eq('id', branchId).eq('tenant_id', tenantId).single(),
       supabase.from('business_profiles').select('id, servicios, politicas, idioma_base, tono, msg_fuera_horario, abrir_caso_fuera_horario, modo_horario_ia').eq('branch_id', branchId).single(),
       supabase.from('business_hours').select('*').eq('branch_id', branchId).eq('tipo', 'negocio').order('dia_semana', { ascending: true }).order('orden', { ascending: true }),
       supabase.from('business_hours').select('*').eq('branch_id', branchId).eq('tipo', 'ia').order('dia_semana', { ascending: true }).order('orden', { ascending: true }),
@@ -122,6 +122,7 @@ export async function savePerfilSucursal(data: {
   direccion: string, 
   pais: string,
   timezone: string, 
+  moneda?: string,
   servicios: string, 
   politicas: {titulo: string, descripcion: string}[], 
   idioma_base: string, 
@@ -147,7 +148,7 @@ export async function savePerfilSucursal(data: {
 
   const { data: sucursalAnterior } = await supabase
     .from('sucursales')
-    .select('nombre, direccion, timezone')
+    .select('nombre, direccion, timezone, moneda')
     .eq('id', branchId)
     .single()
 
@@ -164,7 +165,10 @@ export async function savePerfilSucursal(data: {
       nombre: data.nombreSucursal,
       direccion: data.direccion,
       pais: data.pais,
-      timezone: data.timezone
+      timezone: data.timezone,
+      // La moneda de la lista de precios: se elegía al configurar el negocio y
+      // luego no había forma de cambiarla
+      ...(data.moneda ? { moneda: data.moneda } : {})
     })
     .eq('id', branchId)
     .eq('tenant_id', userData.tenant_id)

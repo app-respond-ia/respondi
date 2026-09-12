@@ -36,6 +36,21 @@ const TAILWIND_SAFELIST = [
 ]
 
 export default function PerfilSucursalPage() {
+  // Las monedas con las que trabaja el público de Respondi
+  const MONEDAS = [
+    { codigo: 'EUR', nombre: 'Euro' },
+    { codigo: 'USD', nombre: 'Dólar estadounidense' },
+    { codigo: 'GBP', nombre: 'Libra esterlina' },
+    { codigo: 'MXN', nombre: 'Peso mexicano' },
+    { codigo: 'COP', nombre: 'Peso colombiano' },
+    { codigo: 'ARS', nombre: 'Peso argentino' },
+    { codigo: 'CLP', nombre: 'Peso chileno' },
+    { codigo: 'PEN', nombre: 'Sol peruano' },
+    { codigo: 'DOP', nombre: 'Peso dominicano' },
+    { codigo: 'VES', nombre: 'Bolívar venezolano' },
+    { codigo: 'BRL', nombre: 'Real brasileño' }
+  ]
+
   const timezones = useMemo(() => {
     try {
       const tzList = Intl.supportedValuesOf('timeZone')
@@ -66,6 +81,7 @@ export default function PerfilSucursalPage() {
     direccion: '',
     pais: '',
     timezone: '',
+    moneda: 'EUR',
     servicios: '',
     politicas: [] as {titulo: string, descripcion: string}[],
     idioma_base: 'es',
@@ -163,6 +179,7 @@ export default function PerfilSucursalPage() {
           direccion: sucursal?.direccion || '',
           pais: sucursal?.pais || '',
           timezone: sucursal?.timezone || 'America/Caracas',
+          moneda: sucursal?.moneda || 'EUR',
           servicios: perfil?.servicios || '',
           politicas: perfil?.politicas || [],
           idioma_base: perfil?.idioma_base || 'es',
@@ -324,6 +341,23 @@ export default function PerfilSucursalPage() {
                     <option key={tz.id} value={tz.id}>{tz.label}</option>
                   ))}
                 </select>
+              </div>
+
+              <div>
+                <label htmlFor="moneda" className="block text-sm font-semibold text-slate-700 mb-1.5">Moneda</label>
+                <select
+                  id="moneda"
+                  name="moneda"
+                  value={formData.moneda}
+                  onChange={handleChange}
+                  disabled={nivelPermiso !== 'escritura'}
+                  className="w-full h-11 px-4 rounded-xl border border-slate-300 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition outline-none bg-white"
+                >
+                  {MONEDAS.map(m => (
+                    <option key={m.codigo} value={m.codigo}>{m.codigo} · {m.nombre}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-slate-500 mt-1">La que usa tu lista de precios y la que dice la IA al dar precios.</p>
               </div>
             </div>
 

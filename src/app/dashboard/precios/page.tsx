@@ -211,92 +211,10 @@ export default function ListaPreciosPage() {
   }
 
   const descargarPlantilla = async () => {
-    const ExcelJS = await import('exceljs')
-    const wb = new ExcelJS.Workbook()
-    const ws = wb.addWorksheet('Precios')
-
-    ws.columns = [
-      { header: 'nombre', key: 'nombre', width: 30 },
-      { header: 'tipo', key: 'tipo', width: 14 },
-      { header: 'precio_tipo', key: 'precio_tipo', width: 14 },
-      { header: 'precio', key: 'precio', width: 10 },
-      { header: 'categoria', key: 'categoria', width: 20 },
-      { header: 'subcategoria', key: 'subcategoria', width: 20 },
-      { header: 'descripcion', key: 'descripcion', width: 40 },
-    ]
-
-    ws.getRow(1).font = { bold: true }
-    ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEDE9FE' } }
-
-    if (items.length > 0) {
-      items.forEach(item => {
-        ws.addRow({
-          nombre: item.nombre,
-          tipo: item.tipo,
-          precio_tipo: item.precio_tipo,
-          precio: item.precio ?? '',
-          categoria: getCategoryName(item.categoria_id).cat,
-          subcategoria: getCategoryName(item.categoria_id).sub,
-          descripcion: item.descripcion || ''
-        })
-      })
-    }
-
-    const wsData = wb.addWorksheet('DatosOcultos', { state: 'hidden' })
-    const categoriasNombres = categoriasRaiz.map(c => c.nombre)
-    
-    let maxSubcats = 0
-    categoriasRaiz.forEach((cat, index) => {
-      const subs = subcategoriasDe(cat.id)
-      if (subs.length > maxSubcats) maxSubcats = subs.length
-      const colLetter = wsData.getColumn(index + 1).letter
-      const col = wsData.getColumn(index + 1)
-      col.values = [cat.nombre, ...subs.map(s => s.nombre)]
-      
-      const numRows = Math.max(subs.length, 1)
-      wb.definedNames.add(`'DatosOcultos'!$${colLetter}$2:$${colLetter}$${numRows + 1}`, `SUBCAT_${index + 1}`)
-    })
-
-    const startRow = items.length > 0 ? items.length + 2 : 2
-    for (let i = 2; i <= (startRow + 500); i++) {
-      ws.getCell(`B${i}`).dataValidation = {
-        type: 'list', allowBlank: false, formulae: ['"producto,servicio"'],
-        showErrorMessage: true, errorTitle: 'Valor inválido',
-        error: 'Selecciona "producto" o "servicio" de la lista.'
-      }
-      ws.getCell(`C${i}`).dataValidation = {
-        type: 'list', allowBlank: false, formulae: ['"exacto,desde,consultar"'],
-        showErrorMessage: true, errorTitle: 'Valor inválido',
-        error: 'Selecciona "exacto", "desde" o "consultar" de la lista.'
-      }
-      ws.getCell(`D${i}`).dataValidation = {
-        type: 'custom',
-        allowBlank: true,
-        formulae: [`C${i}<>"consultar"`],
-        showErrorMessage: true,
-        errorTitle: 'Valor inválido',
-        error: 'No puedes indicar un precio si el tipo es "consultar".'
-      }
-      
-      if (categoriasNombres.length > 0) {
-        const lastColLetter = wsData.getColumn(categoriasNombres.length).letter
-        ws.getCell(`E${i}`).dataValidation = {
-          type: 'list', allowBlank: true, formulae: [`'DatosOcultos'!$A$1:$${lastColLetter}$1`],
-          showErrorMessage: false
-        }
-        
-        if (maxSubcats > 0) {
-          const headerRange = `'DatosOcultos'!$A$1:$${lastColLetter}$1`
-          ws.getCell(`F${i}`).dataValidation = {
-            type: 'list', allowBlank: true, formulae: [`INDIRECT("SUBCAT_"&MATCH($E${i}, ${headerRange}, 0))`],
-            showErrorMessage: false
-          }
-        }
-      }
-    }
-
+    const { construirPlantillaPrecios } = await import('@/lib/precios/plantilla')
+    const wb = await construirPlantillaPrecios(items as any, categorias as any)
     const buffer = await wb.xlsx.writeBuffer()
-    const blob = new Blob([buffer], { type: 'application/octet-stream' })
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -310,56 +228,9 @@ export default function ListaPreciosPage() {
     if (!file) return
     const esCSV = file.name.toLowerCase().endsWith('.csv')
 
-    const procesarFilas = (rows: any[][]) => {
-      if (rows.length < 2) {
-        setImportPreview({ validos: [], errores: [{ fila: 1, nombre: '—', error: 'El archivo está vacío o solo tiene encabezados' }] })
-        setIsImportModalOpen(true)
-        return
-      }
-
-      const validos: any[] = []
-      const errores: { fila: number, nombre: string, error: string }[] = []
-
-      for (let i = 1; i < rows.length; i++) {
-        const row = rows[i]
-        const fila = i + 1
-        const nombre = row[0]?.toString().trim()
-        const tipo = row[1]?.toString().trim().toLowerCase() || 'producto'
-        const precio_tipo = row[2]?.toString().trim().toLowerCase() || 'exacto'
-        const precioRaw = row[3]?.toString().trim()
-        const categoria = row[4]?.toString().trim() || null
-        const subcategoria = row[5]?.toString().trim() || null
-        const descripcion = row[6]?.toString().trim() || null
-
-        if (!nombre) {
-          errores.push({ fila, nombre: '(vacío)', error: 'El nombre es obligatorio' })
-          continue
-        }
-        if (!['producto', 'servicio'].includes(tipo)) {
-          errores.push({ fila, nombre, error: `Tipo inválido: "${tipo}". Debe ser "producto" o "servicio"` })
-          continue
-        }
-        if (!['exacto', 'desde', 'consultar'].includes(precio_tipo)) {
-          errores.push({ fila, nombre, error: `precio_tipo inválido: "${precio_tipo}". Debe ser "exacto", "desde" o "consultar"` })
-          continue
-        }
-
-        let precio: number | null = null
-        if (precio_tipo !== 'consultar') {
-          if (!precioRaw) {
-            errores.push({ fila, nombre, error: 'El precio es obligatorio cuando precio_tipo no es "consultar"' })
-            continue
-          }
-          precio = parseFloat(precioRaw.replace(',', '.'))
-          if (isNaN(precio) || precio < 0) {
-            errores.push({ fila, nombre, error: `Precio inválido: "${precioRaw}". Debe ser un número positivo` })
-            continue
-          }
-        }
-
-        validos.push({ nombre, tipo, precio, precio_tipo, categoria, subcategoria, descripcion })
-      }
-
+    const procesarFilas = async (rows: any[][]) => {
+      const { validarFilasPrecios } = await import('@/lib/precios/plantilla')
+      const { validos, errores } = validarFilasPrecios(rows)
       setImportPreview({ validos, errores })
       setIsImportModalOpen(true)
     }
@@ -369,7 +240,7 @@ export default function ListaPreciosPage() {
         const Papa = (await import('papaparse')).default
         const text = await file.text()
         const result = Papa.parse<string[]>(text.trim(), { skipEmptyLines: true })
-        procesarFilas(result.data)
+        await procesarFilas(result.data)
       } else {
         const ExcelJS = await import('exceljs')
         const buffer = await file.arrayBuffer()
@@ -381,7 +252,7 @@ export default function ListaPreciosPage() {
           const values = (row.values as any[]).slice(1)
           rows.push(values.map(v => v?.toString?.() ?? v ?? ''))
         })
-        procesarFilas(rows)
+        await procesarFilas(rows)
       }
     } catch (err) {
       setImportPreview({ validos: [], errores: [{ fila: 0, nombre: '—', error: 'Error al leer el archivo. Asegúrate de que sea un .xlsx o .csv válido' }] })
@@ -398,7 +269,14 @@ export default function ListaPreciosPage() {
     if (res.success) {
       setIsImportModalOpen(false)
       setImportPreview(null)
-      showToast(`${res.total} producto${res.total === 1 ? '' : 's'} importado${res.total === 1 ? '' : 's'} correctamente ✓`, 'success')
+      const nuevos = (res as any).nuevos ?? res.total
+      const actualizados = (res as any).actualizados ?? 0
+      showToast(
+        actualizados > 0
+          ? `${nuevos} producto${nuevos === 1 ? '' : 's'} nuevo${nuevos === 1 ? '' : 's'} y ${actualizados} actualizado${actualizados === 1 ? '' : 's'} ✓`
+          : `${nuevos} producto${nuevos === 1 ? '' : 's'} importado${nuevos === 1 ? '' : 's'} correctamente ✓`,
+        'success'
+      )
       cargar()
     } else {
       showToast(res.error || 'Error al importar', 'error')
@@ -414,7 +292,8 @@ export default function ListaPreciosPage() {
     const dataToSave: PrecioData = { ...formData }
     if (dataToSave.precio_tipo === 'consultar') {
       dataToSave.precio = null
-      dataToSave.moneda = 'USD'
+      // La moneda la pone el servidor con la de la sucursal (antes se forzaba
+      // a dólares aquí, y en el resto de casos se enviaba vacía y fallaba)
     } else {
       // Si el precio viene como string desde el input, convertirlo a number
       if (typeof dataToSave.precio === 'string') {
@@ -475,6 +354,7 @@ export default function ListaPreciosPage() {
             <HelpPopover content={
               <div className="space-y-3">
                 <p><strong className="text-brand-300">Formatos aceptados:</strong> .xlsx o .csv. Recomendamos descargar y usar nuestra plantilla.</p>
+                    <p><strong className="text-brand-300">Ojo:</strong> la plantilla se descarga con lo que ya tienes. Al importarla, lo que coincida en el nombre se actualiza y solo se crea lo que sea nuevo.</p>
                 <div className="space-y-1.5 opacity-90">
                   <p><strong>nombre:</strong> Obligatorio. Texto libre.</p>
                   <p><strong>tipo:</strong> producto o servicio.</p>

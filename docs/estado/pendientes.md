@@ -305,3 +305,13 @@ se traga en silencio.
 - [ ] Excedentes sobre límites del plan (`plans.precio_credito_adicional`,
       `plans.precio_sucursal_extra`) — existen en el formulario pero
       sin flujo de cobro real todavía
+- [x] Cron `revisar-bloqueos` con el tiempo de espera por defecto de pg_net
+      (5 s): cuando Vercel tardaba en arrancar, la llamada se daba por perdida
+      (6-8 veces por hora en `net._http_response`). Igualado a 60 s como los
+      demás (12-09-2026, migración `20260912160000`), verificado
+- [ ] Llamadas del reloj que se cuelgan 60 s enteros: 1-3 por hora, a
+      cualquier cron, desde antes de Shopify. La app no llega ni a leer la
+      base de datos (el aviso pendiente se trató limpio al minuto siguiente en
+      3,8 s). Todos los crones se recuperan solos en la vuelta siguiente, así
+      que no bloquea; para afinarlo hacen falta los logs de Vercel de esos
+      minutos (cold start vs. Supabase)

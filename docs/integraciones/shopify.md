@@ -176,6 +176,19 @@ valor). Por correo no hace falta nada de esto.
   real, no repetir, condiciones, seguimiento, ventana de 24 h, plantilla
   aprobada, registro, apagar a media espera, cron recoge lo huérfano.
 
+### Verificado en producción (12-09-2026, commit `316f015`)
+- Pantallas Tienda online y Automatizaciones en respondi.vercel.app, en
+  ordenador y móvil, sin errores (`captura-shopify` con `PROD=1`, 6/6).
+- Acciones reales contra producción (`prod-automatizaciones`, 9/9): las 37
+  llegan apagadas, 5 listas / 32 en preparación, los frenos responden con
+  su mensaje, y conectar un dominio inexistente llama a Shopify de verdad y
+  devuelve "No existe ninguna tienda con ese dominio" sin guardar nada.
+- El reloj de la base de datos (pg_cron) recogió un aviso pendiente por su
+  cuenta y la app respondió `200 {"avisos":1}` en 3,8 s (`prod-latido`).
+  Ojo: la clave `CRON_INTERNAL_SECRET` de `.env.local` no es la de
+  producción; los crons de producción se prueban así, dejando trabajo
+  pendiente, no llamándolos a mano.
+
 ### Pendiente
 - Las otras 32 automatizaciones, de cinco en cinco, cada una con su prueba.
   Siguientes: Pedido entregado (Shopify avisa por `fulfillments/update`,

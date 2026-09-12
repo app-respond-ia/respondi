@@ -3,7 +3,9 @@ import crypto from 'crypto'
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { registrarError } from '@/lib/errores'
 import { ejecutarPendientes } from '@/lib/automatizaciones/motor'
-import { procesarEvento, repasarPedidosRetrasados, repasarCarritosAbandonados, repasarStockBajo, repasarResumenDiario, repasarClientesEsperando, tiendasConProgramadas, sucursalesConProgramada, lanzarPropiasProgramadas, type TiendaBasica } from '@/lib/tiendas/eventos'
+import { procesarEvento, repasarPedidosRetrasados, repasarCarritosAbandonados, repasarStockBajo, repasarResumenDiario, repasarClientesEsperando, repasarAniversarios, repasarClientesDormidos, repasarRecompras, repasarGarantias, tiendasConProgramadas, sucursalesConProgramada, lanzarPropiasProgramadas, type TiendaBasica } from '@/lib/tiendas/eventos'
+import { lanzarAutomatizacion } from '@/lib/automatizaciones/motor'
+import { repasarVueltaStock, repasarBajadasDePrecio } from '@/lib/tiendas/intereses'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -110,6 +112,51 @@ async function repasosProgramados(forzar: Set<string>) {
   for (const { tienda, ajustes } of await tiendasConProgramadas('resumen_diario')) {
     if (!forzar.has('resumen_diario') && !(await esSuHora(tienda.branch_id, Number(ajustes?.hora ?? 20)))) continue
     hecho.resumen_diario = (hecho.resumen_diario || 0) + await repasarResumenDiario(tienda)
+  }
+
+  // Cada hora: productos con gente esperando que vuelven a tener stock
+  for (const { tienda } of await tiendasConProgramadas('aviso_vuelve_stock')) {
+    if (!forzar.has('aviso_vuelve_stock') && !primerMinutoDeHora) continue
+    hecho.aviso_vuelve_stock = (hecho.aviso_vuelve_stock || 0) + await repasarVueltaStock(tienda)
+  }
+
+  // Cada día a las 10: productos por los que preguntaron y han bajado de precio
+  for (const { tienda, ajustes } of await tiendasConProgramadas('bajo_de_precio')) {
+    if (!forzar.has('bajo_de_precio') && !(await esSuHora(tienda.branch_id, 10))) continue
+    hecho.bajo_de_precio = (hecho.bajo_de_precio || 0) + await repasarBajadasDePrecio(tienda, Number(ajustes?.bajada_minima ?? 10))
+  }
+
+  // Cada día a las 9: aniversario de una compra de hace un año
+  for (const { tienda } of await tiendasConProgramadas('cumpleanos')) {
+    if (!forzar.has('cumpleanos') && !(await esSuHora(tienda.branch_id, 9))) continue
+    hecho.cumpleanos = (hecho.cumpleanos || 0) + await repasarAniversarios(tienda)
+  }
+
+  // Cada día a las 11: clientes dormidos y recompras
+  for (const { tienda, ajustes } of await tiendasConProgramadas('cliente_dormido')) {
+    if (!forzar.has('cliente_dormido') && !(await esSuHora(tienda.branch_id, 11))) continue
+    hecho.cliente_dormido = (hecho.cliente_dormido || 0) + await repasarClientesDormidos(tienda, Number(ajustes?.dias ?? 90))
+  }
+  for (const { tienda, ajustes } of await tiendasConProgramadas('recompra')) {
+    if (!forzar.has('recompra') && !(await esSuHora(tienda.branch_id, 11))) continue
+    hecho.recompra = (hecho.recompra || 0) + await repasarRecompras(tienda, Number(ajustes?.dias ?? 30))
+  }
+  // Cada día a las 10: garantías por vencer
+  for (const { tienda, ajustes } of await tiendasConProgramadas('garantia_por_vencer')) {
+    if (!forzar.has('garantia_por_vencer') && !(await esSuHora(tienda.branch_id, 10))) continue
+    hecho.garantia_por_vencer = (hecho.garantia_por_vencer || 0) + await repasarGarantias(tienda, Number(ajustes?.meses_garantia ?? 24), Number(ajustes?.avisar_dias_antes ?? 30))
+  }
+  // Mantenimiento: el catálogo cada día a la hora elegida; las políticas los lunes a las 5
+  const hoy = new Date().toISOString().slice(0, 10)
+  for (const { tienda, ajustes } of await tiendasConProgramadas('importar_catalogo')) {
+    if (!forzar.has('importar_catalogo') && !(await esSuHora(tienda.branch_id, Number(ajustes?.hora ?? 4)))) continue
+    const r = await lanzarAutomatizacion('importar_catalogo', { tenant_id: tienda.tenant_id, branch_id: tienda.branch_id, tienda_id: tienda.id, referencia: `importar_catalogo:${hoy}${forzar.has('importar_catalogo') ? ':' + Date.now() : ''}` })
+    if (r.lanzada) hecho.importar_catalogo = (hecho.importar_catalogo || 0) + 1
+  }
+  for (const { tienda } of await tiendasConProgramadas('importar_politicas')) {
+    if (!forzar.has('importar_politicas') && !(new Date().getDay() === 1 && (await esSuHora(tienda.branch_id, 5)))) continue
+    const r = await lanzarAutomatizacion('importar_politicas', { tenant_id: tienda.tenant_id, branch_id: tienda.branch_id, tienda_id: tienda.id, referencia: `importar_politicas:${hoy}${forzar.has('importar_politicas') ? ':' + Date.now() : ''}` })
+    if (r.lanzada) hecho.importar_politicas = (hecho.importar_politicas || 0) + 1
   }
 
   // Cada vuelta: clientes que llevan más de X minutos sin respuesta (no

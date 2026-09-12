@@ -124,6 +124,8 @@ export function describirPaso(paso: Paso, ajustes: Record<string, any> = {}): { 
       return { titulo: `Abrir un caso para el equipo${paso.prioridad === 'alta' ? ' (prioridad alta)' : paso.prioridad === 'baja' ? ' (prioridad baja)' : ''}`, detalle: paso.asunto }
     case 'avisar_equipo':
       return { titulo: 'Avisar al equipo', detalle: paso.texto }
+    case 'pausar_ia':
+      return { titulo: 'La IA deja de contestar: sigue una persona' }
     case 'crear_descuento': {
       const pct = paso.ajuste_porcentaje ? ajustes[paso.ajuste_porcentaje] : paso.porcentaje
       return { titulo: `Crear un código de descuento${pct ? ` del ${pct}%` : ''} en la tienda` }

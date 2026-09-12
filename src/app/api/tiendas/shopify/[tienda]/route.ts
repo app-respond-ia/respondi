@@ -76,7 +76,12 @@ export async function POST(req: Request, { params }: Ctx) {
 
   // La referencia: el pedido al que se refiere. Con ella, si Shopify manda el
   // mismo aviso dos veces (lo hace cuando duda si llegó), solo se trata uno.
-  const referencia = String(datos?.admin_graphql_api_id || datos?.id || idAviso || Date.now())
+  // Los avisos de checkout y de envío llegan varias veces por el mismo objeto
+  // (uno por cada cambio): ahí lo que no puede repetirse es la entrega.
+  const porCambio = evento.startsWith('checkouts/') || evento.startsWith('fulfillments/')
+  const referencia = porCambio
+    ? String(idAviso || `${datos?.id}:${datos?.updated_at || Date.now()}`)
+    : String(datos?.admin_graphql_api_id || datos?.id || idAviso || Date.now())
 
   const { data: apuntado, error } = await supabaseAdmin
     .from('tienda_eventos')

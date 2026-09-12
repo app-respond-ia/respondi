@@ -90,5 +90,42 @@ export async function registrarMensajeEntrante(m: MensajeEntrante): Promise<{ ok
     .eq('motivo_bloqueo', 'ventana_cerrada')
 
   await supabaseAdmin.from('channels').update({ ultima_actividad: new Date().toISOString() }).eq('id', m.canal.id)
+
+  // "BAJA": el cliente no quiere más promociones. Manda sobre lo que diga la
+  // tienda, y las automatizaciones de promoción lo respetan desde ya.
+  if (/^\s*(baja|stop|no m[aá]s (avisos|mensajes|promociones))\s*[.!]*\s*$/i.test(contenido || '')) {
+    await supabaseAdmin.from('contacts').update({ no_promociones: true }).eq('id', (contexto as any).contact_id)
+  }
+
+  // Aviso a las automatizaciones que actúan cuando entra un mensaje
+  // (etiquetar la conversación con datos de la tienda). Va a la cola de la
+  // tienda y lo recoge el reloj: aquí no se hace esperar al proveedor.
+  await encolarEventoInterno(m.canal.tenant_id, m.canal.branch_id, 'mensaje_entrante', conversationId, {
+    conversation_id: conversationId,
+    contact_id: (contexto as any).contact_id,
+    canal: m.canal.tipo,
+    identificador: m.contactoExterno,
+    nombre: m.nombreContacto
+  })
+
   return { ok: true, messageId: nuevo.id }
+}
+
+// Un evento interno para las automatizaciones, en la cola de la tienda de la
+// sucursal (si no hay tienda conectada, no hay automatización que lo quiera)
+export async function encolarEventoInterno(tenantId: string, branchId: string, evento: string, referencia: string, datos: Record<string, any>) {
+  try {
+    const { data: tienda } = await supabaseAdmin.from('tiendas').select('id').eq('branch_id', branchId).eq('estado', 'activo').maybeSingle()
+    if (!tienda) return
+    await supabaseAdmin.from('tienda_eventos').insert({
+      tenant_id: tenantId,
+      branch_id: branchId,
+      tienda_id: tienda.id,
+      tipo: `interno:${evento}`,
+      referencia: `${evento}:${referencia}:${Date.now()}`,
+      datos
+    })
+  } catch {
+    // Un evento interno que no se apunta no rompe la entrada del mensaje
+  }
 }

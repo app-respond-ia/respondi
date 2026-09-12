@@ -137,7 +137,9 @@ puede hacerla Claude).
 - **Motor** `src/lib/automatizaciones/motor.ts`: ejecuta las recetas
   (`tipos.ts` es el idioma; `catalogo.ts` las 37). Pasos construidos:
   `esperar`, `comprobar`, `mensaje` (texto o plantilla), `avisar_equipo`,
-  `abrir_caso`, `etiquetar`. Frenos: una vez por cosa, tope de 500
+  `abrir_caso` (una conversación tiene como mucho un caso: si ya lo tiene,
+  el motivo nuevo se anota en él, se reabre si estaba resuelto y sube de
+  prioridad si toca), `etiquetar`. Frenos: una vez por cosa, tope de 500
   mensajes/día por sucursal, promociones solo con consentimiento, fuera de
   la ventana de 24 h de WhatsApp solo con plantilla aprobada (si no hay, se
   omite y se explica en el registro). Apagar una automatización cancela lo
@@ -154,7 +156,32 @@ puede hacerla Claude).
   "Últimos movimientos" (hecho / no hacía falta y por qué / esperando / error).
   Las que aún no están construidas se ven en gris, "En preparación", y no
   se pueden encender.
-- **Automatizaciones listas y probadas (18 de 37)**:
+- **Las 37 automatizaciones listas y probadas** (las 19 últimas, 12-09-2026):
+  - Piezas nuevas: tabla `intereses_producto` (quién preguntó por qué y a
+    qué precio; la alimenta la IA y la lista de espera), `contacts.no_promociones`
+    (responder «BAJA», «STOP» o «no más avisos» corta las promociones aunque
+    Shopify diga lo contrario), `price_list.origen_externo` (para importar sin
+    duplicar), paso `crear_descuento` (código de un solo uso en Shopify,
+    `discountCodeBasicCreate`, con caducidad), paso `pausar_ia`, paso
+    `ia_responde` (la instrucción vuelve a la IA), pasos `importar_catalogo` /
+    `importar_politicas`, eventos internos (`carrito_primer_aviso_enviado`
+    directo; `mensaje_entrante` y `conversacion_etiquetada` por la cola
+    `tienda_eventos` con tipo `interno:*`), y las etiquetas que necesita cada
+    automatización se crean solas al encenderla (`ETIQUETAS_NECESARIAS`).
+  - IA: `detectar_intencion` (solo con las intenciones de las
+    automatizaciones encendidas: cambio de dirección, devolución, dañado,
+    reclamación) lanza la automatización sobre esa misma conversación y
+    devuelve a la IA cómo contestar; `apuntar_lista_espera`;
+    `presupuesto_de_tienda` (con la misma red forzada que el presupuesto de
+    catálogo); relacionados por tipo de producto; intereses al buscar.
+  - Repasos nuevos en el cron: vuelve el stock (cada hora), bajó de precio
+    (10 h), aniversario (9 h, una compra de hace un año: Shopify no guarda
+    cumpleaños), dormidos y recompras (11 h), garantías (10 h), catálogo (a la
+    hora elegida), políticas (lunes 5 h). Todos con `forzar`.
+  - Webhooks: `checkouts/update` (pago iniciado: solo con forma de pago
+    elegida y sin completar); la referencia de los avisos de checkout y de
+    envío es la entrega (Shopify manda varios por el mismo objeto).
+- **Por grupos**:
   - Pedidos y envíos: Pedido confirmado, Pedido enviado, Pedido entregado
     (Shopify avisa del envío con `fulfillments/update` y
     `shipment_status: delivered`; se va a por el pedido a la tienda),
@@ -249,6 +276,30 @@ valor). Por correo no hace falta nada de esto.
   enlace reales, agotado, inexistente, estado del pedido desde su teléfono /
   con su correo / con un correo falso, nunca cancela, enlace de compra con
   borrador en Shopify, tope que avisa al equipo. Deja el saldo en 7.
+- `probar-automatizaciones-4.mjs` (26): segundo aviso con descuento (evento
+  interno, espera, descuento real en la tienda, y no si ya compró), BAJA,
+  aniversario, lista de espera → vuelve el stock, bajó de precio, etiquetar
+  conversaciones por datos de la tienda, etiquetar clientes en Shopify.
+- `probar-automatizaciones-5.mjs` (27): pago iniciado sin terminar,
+  cliente dormido (ventana de una semana), recompra, garantía por vencer,
+  importar catálogo (categorías, precios, agotados, reimportar sin duplicar,
+  retirados, no toca lo manual), importar políticas (y no reprocesar si no
+  cambian).
+- `probar-herramientas-tienda-2.mjs` (19, OpenAI real): devolución,
+  dañado, reclamación (la IA se aparta), cambio de dirección tarde y a
+  tiempo (en la misma conversación que la devolución), presupuesto con
+  precios de la tienda. Esta prueba destapó dos fallos reales, ya
+  arreglados: el filtro de herramientas de tienda solo conocía las cuatro
+  primeras y contestaba "no disponible" a `detectar_intencion` y a
+  `presupuesto_de_tienda` (la IA decía "voy a consultar y te digo"); y
+  tras abrir la automatización un caso de devolución, la red de "prometió
+  una persona sin escalar" volvía a escalar y pausaba la IA, con lo que
+  los siguientes mensajes del cliente se quedaban sin respuesta. Ahora la
+  gestión deja dicho qué ha hecho (caso, aviso, pausa) y el motor de la IA
+  lo cuenta como escalado ya hecho. Y un tercero: con la devolución abierta,
+  el cambio de dirección del mismo cliente no podía abrir su caso (una
+  conversación, un caso) y se quedaba reintentando; ahora se anota en el
+  caso que ya hay y lo sube a prioridad alta.
 - `captura-shopify.mjs` (22, navegador real, ordenador y móvil): conectar
   desde la ventana, webhook, las 37 con interruptor, plantilla prediseñada
   con botón, workflow dibujado, moldear, crear una propia y probarla.
@@ -282,27 +333,6 @@ valor). Por correo no hace falta nada de esto.
   pendiente, no llamándolos a mano.
 
 ### Pendiente
-- Las 19 automatizaciones que quedan, de cinco en cinco, cada una con su
-  prueba. Necesitan piezas que aún no existen:
-  - Detectar la intención en el chat (cambio de dirección, devolución,
-    producto dañado, reclamación, reserva/lista de espera, presupuesto con
-    precios de la tienda, producto relacionado): un disparador
-    `mensaje_cliente` que el motor de IA dispare al etiquetar.
-  - Crear descuentos en Shopify (`discountCodeBasicCreate`): segundo aviso
-    de carrito, cumpleaños; y el descuento desde el chat.
-  - Historial de precios (bajó de precio) y «quién preguntó por qué» (te
-    aviso cuando vuelva): guardar el interés del cliente al buscar.
-  - Repasos de clientes: dormido (`customers` por última compra), recompra
-    (pedidos por producto y fecha), garantía por vencer (pedidos por fecha),
-    cumpleaños/aniversario (fecha de la primera compra).
-  - Pago iniciado sin terminar (`checkouts/update`), cambio de dirección
-    a tiempo.
-  - Mantenimiento: importar catálogo (productos → lista de precios),
-    importar políticas (`shopPolicies` → fuentes de políticas con
-    embeddings), etiquetar clientes en Shopify desde las etiquetas de
-    Respondi, y al revés.
-- Baja de promociones: al responder «BAJA», dejar de mandar marketing (un
-  campo propio en `contacts`, porque el consentimiento hoy viene de Shopify).
 - Registrar los webhooks desde la app no es posible en apps personalizadas:
   se queda a mano y explicado en la pantalla.
 - Pasada de verificación contra una tienda de desarrollo real (Jorge crea

@@ -76,6 +76,8 @@ export type Paso =
   | { tipo: 'etiquetar'; etiqueta: string }
   | { tipo: 'abrir_caso'; asunto: string; prioridad?: 'baja' | 'normal' | 'alta' }
   | { tipo: 'avisar_equipo'; texto: string }
+  // Que la IA deje de contestar en esa conversación (la sigue una persona)
+  | { tipo: 'pausar_ia' }
   | { tipo: 'crear_descuento'; ajuste_porcentaje?: string; porcentaje?: number; dias_validez?: number }
   | { tipo: 'enlace_compra' }
   | { tipo: 'etiquetar_en_tienda'; etiqueta: string }

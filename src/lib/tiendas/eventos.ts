@@ -105,6 +105,28 @@ export function contextoDePedidoGraphql(nodo: any, tienda: TiendaBasica): Contex
   }
 }
 
+// Un checkout (carrito con el pago empezado), como lo manda Shopify
+export function contextoDeCheckout(c: any, tienda: TiendaBasica): Contexto {
+  const cliente = c?.customer || {}
+  const productos = (c?.line_items || []).map((l: any) => l?.title).filter(Boolean)
+  return {
+    tenant_id: tienda.tenant_id,
+    branch_id: tienda.branch_id,
+    tienda_id: tienda.id,
+    referencia: `checkout:${c?.token || c?.id}`,
+    carrito: { enlace: c?.abandoned_checkout_url || null, comprado: false, productos },
+    pedido: { total: numero(c?.total_price), moneda: c?.currency || tienda.moneda || 'EUR', productos },
+    producto: { nombre: productos.join(', ') },
+    cliente: {
+      nombre: [cliente.first_name, cliente.last_name].filter(Boolean).join(' ').trim() || String(c?.shipping_address?.name || '').trim() || null,
+      email: c?.email || cliente.email || null,
+      telefono: c?.phone || cliente.phone || c?.shipping_address?.phone || null,
+      acepta_marketing: aceptaMarketing(cliente) || c?.buyer_accepts_marketing === true,
+      id_tienda: cliente.id ? String(cliente.id) : null
+    }
+  }
+}
+
 function numero(valor: any): number | undefined {
   if (valor === undefined || valor === null || valor === '') return undefined
   const n = Number(valor)
@@ -144,6 +166,27 @@ function datoQueFalta(pedido: any): string | null {
 export async function repartirEvento(eventoCrudo: string, datos: any, tienda: TiendaBasica) {
   let evento = eventoCrudo
   let contexto: Contexto | null = null
+
+  // Los eventos internos (de Respondi, no de Shopify) tienen su propio camino
+  if (eventoCrudo.startsWith('interno:')) return await repartirEventoInterno(eventoCrudo.slice('interno:'.length), datos, tienda)
+
+  // Un pago empezado y no terminado: Shopify avisa del checkout con la forma
+  // de pago ya elegida (`gateway`) y sin completar
+  if (eventoCrudo === 'checkouts/update' || eventoCrudo === 'checkouts/create') {
+    if (datos?.completed_at) return { lanzadas: 0, detalle: 'el pago se completó' }
+    if (!datos?.gateway && !(datos?.payment_gateway_names || []).length) return { lanzadas: 0, detalle: 'todavía no ha llegado al pago' }
+    const interesadas = (await automatizacionesActivas(tienda.branch_id)).filter(
+      ({ definicion }) => definicion.receta.disparador.tipo === 'evento_tienda' && definicion.receta.disparador.evento === 'checkouts/update'
+    )
+    if (!interesadas.length) return { lanzadas: 0, detalle: 'ninguna automatización encendida espera este aviso' }
+    const contexto = contextoDeCheckout(datos, tienda)
+    let lanzadas = 0
+    for (const { definicion } of interesadas) {
+      const r = await lanzarAutomatizacion(definicion.clave, contexto)
+      if (r.lanzada) lanzadas++
+    }
+    return { lanzadas }
+  }
 
   // Los avisos de envío traen solo el envío, no el pedido: se va a por el
   // pedido a la tienda. Y "entregado" no es un tema propio de Shopify, sino
@@ -407,6 +450,175 @@ export async function repasarClientesEsperando(tenantId: string, branchId: strin
       minutos: esperando,
       canal: c.canal === 'email' ? 'correo' : c.canal
     })
+    if (r.lanzada) lanzadas++
+  }
+  return lanzadas
+}
+
+// ---------------------------------------------------------------------------
+// Eventos internos: lo que pasa en Respondi y mira a la tienda
+// ---------------------------------------------------------------------------
+const CONSULTA_PEDIDOS_DEL_CLIENTE = `query pedidosDelCliente($query: String!) {
+  orders(first: 10, query: $query, sortKey: CREATED_AT, reverse: true) {
+    nodes { id name cancelledAt displayFinancialStatus displayFulfillmentStatus customer { id } }
+  }
+}`
+
+async function pedidosDelContacto(tienda: TiendaBasica, canal: string | null, identificador: string | null) {
+  if (!identificador) return [] as any[]
+  const filtro = canal === 'email' ? `email:${identificador}` : `phone:${identificador}`
+  const datos = await consultarTienda<any>(tienda, CONSULTA_PEDIDOS_DEL_CLIENTE, { query: filtro })
+  return (datos?.orders?.nodes || []) as any[]
+}
+
+async function repartirEventoInterno(evento: string, datos: any, tienda: TiendaBasica) {
+  const activas = await automatizacionesActivas(tienda.branch_id)
+  const quiere = (clave: string) => activas.some(a => a.definicion.clave === clave)
+
+  if (evento === 'mensaje_entrante' && quiere('etiquetar_conversaciones')) {
+    const pedidos = await pedidosDelContacto(tienda, datos?.canal, datos?.identificador)
+    const vivos = pedidos.filter(p => !p.cancelledAt)
+    const enCurso = vivos.some(p => p.displayFulfillmentStatus !== 'FULFILLED' && ['PAID', 'AUTHORIZED', 'PARTIALLY_PAID', 'PENDING'].includes(p.displayFinancialStatus))
+    const etiqueta = enCurso ? 'Pedido en curso' : vivos.length ? 'Ya ha comprado' : 'Cliente nuevo'
+    const r = await lanzarAutomatizacion('etiquetar_conversaciones', {
+      tenant_id: tienda.tenant_id,
+      branch_id: tienda.branch_id,
+      tienda_id: tienda.id,
+      // Una vez por conversación y etiqueta
+      referencia: `${datos?.conversation_id}:${etiqueta}`,
+      etiqueta,
+      cliente: {
+        nombre: datos?.nombre || null,
+        telefono: datos?.canal === 'whatsapp' ? datos?.identificador : null,
+        email: datos?.canal === 'email' ? datos?.identificador : null,
+        compras: vivos.length
+      }
+    })
+    return { lanzadas: r.lanzada ? 1 : 0, detalle: r.lanzada ? undefined : r.motivo }
+  }
+
+  if (evento === 'conversacion_etiquetada' && quiere('etiquetar_clientes_shopify')) {
+    const pedidos = await pedidosDelContacto(tienda, datos?.canal, datos?.identificador)
+    const idCliente = pedidos.find(p => p.customer?.id)?.customer?.id || null
+    if (!idCliente) return { lanzadas: 0, detalle: 'el contacto no es cliente de la tienda' }
+    const r = await lanzarAutomatizacion('etiquetar_clientes_shopify', {
+      tenant_id: tienda.tenant_id,
+      branch_id: tienda.branch_id,
+      tienda_id: tienda.id,
+      referencia: `${idCliente}:${datos?.etiqueta}`,
+      etiqueta: String(datos?.etiqueta || ''),
+      cliente: { nombre: datos?.nombre || null, id_tienda: idCliente, telefono: datos?.canal === 'whatsapp' ? datos?.identificador : null, email: datos?.canal === 'email' ? datos?.identificador : null }
+    })
+    return { lanzadas: r.lanzada ? 1 : 0, detalle: r.lanzada ? undefined : r.motivo }
+  }
+
+  return { lanzadas: 0, detalle: 'ninguna automatización encendida espera este evento' }
+}
+
+// ---------------------------------------------------------------------------
+// Aniversario: una compra hace justo un año (Shopify no guarda cumpleaños)
+// ---------------------------------------------------------------------------
+export async function repasarAniversarios(tienda: TiendaBasica) {
+  const haceUnAno = new Date(Date.now() - 365 * 24 * 3600 * 1000)
+  const dia = haceUnAno.toISOString().slice(0, 10)
+  const siguiente = new Date(haceUnAno.getTime() + 24 * 3600 * 1000).toISOString().slice(0, 10)
+  const datos = await consultarTienda<any>(tienda, CONSULTA_PEDIDOS, { query: `created_at:>=${dia} created_at:<${siguiente}`, first: 50 })
+  let lanzadas = 0
+  const vistos = new Set<string>()
+  for (const nodo of datos?.orders?.nodes || []) {
+    if (nodo.cancelledAt) continue
+    const contexto = contextoDePedidoGraphql(nodo, tienda)
+    const clave = contexto.cliente?.id_tienda || contexto.cliente?.email || contexto.cliente?.telefono
+    if (!clave || vistos.has(clave)) continue
+    vistos.add(clave)
+    contexto.referencia = `aniversario:${clave}:${new Date().getFullYear()}`
+    const r = await lanzarAutomatizacion('cumpleanos', contexto)
+    if (r.lanzada) lanzadas++
+  }
+  return lanzadas
+}
+
+// ---------------------------------------------------------------------------
+// Repasos por fechas: dormido, recompra, garantía
+// ---------------------------------------------------------------------------
+const CONSULTA_CLIENTES = `query clientes($cursor: String) {
+  customers(first: 100, after: $cursor, query: "orders_count:>0") {
+    pageInfo { hasNextPage endCursor }
+    nodes { id firstName lastName email phone numberOfOrders amountSpent { amount } emailMarketingConsent { marketingState } lastOrder { createdAt } }
+  }
+}`
+
+// Clientes cuya última compra fue hace entre X y X+7 días (una ventana de una
+// semana para que el aviso salga una vez, aunque el repaso sea diario)
+export async function repasarClientesDormidos(tienda: TiendaBasica, dias: number) {
+  const ahora = Date.now()
+  const desde = ahora - (dias + 7) * 24 * 3600 * 1000
+  const hasta = ahora - dias * 24 * 3600 * 1000
+  const { data: fila } = await supabaseAdmin.from('tiendas').select('configuracion').eq('id', tienda.id).maybeSingle()
+  const enlace = (fila?.configuracion as any)?.direccion_publica || `https://${tienda.dominio}`
+  let lanzadas = 0
+  let cursor: string | null = null
+  for (let pagina = 0; pagina < 10; pagina++) {
+    const datos: any = await consultarTienda<any>(tienda, CONSULTA_CLIENTES, { cursor })
+    for (const c of datos?.customers?.nodes || []) {
+      const ultima = c?.lastOrder?.createdAt ? new Date(c.lastOrder.createdAt).getTime() : 0
+      if (!ultima || ultima < desde || ultima > hasta) continue
+      const r = await lanzarAutomatizacion('cliente_dormido', {
+        tenant_id: tienda.tenant_id,
+        branch_id: tienda.branch_id,
+        tienda_id: tienda.id,
+        referencia: `dormido:${c.id}:${new Date(ultima).toISOString().slice(0, 10)}`,
+        enlace,
+        cliente: {
+          nombre: [c.firstName, c.lastName].filter(Boolean).join(' ').trim() || null,
+          email: c.email || null,
+          telefono: c.phone || null,
+          acepta_marketing: c?.emailMarketingConsent?.marketingState === 'SUBSCRIBED',
+          compras: Number(c.numberOfOrders) || 0,
+          gasto: Number(c.amountSpent?.amount) || 0,
+          id_tienda: c.id
+        }
+      })
+      if (r.lanzada) lanzadas++
+    }
+    if (!datos?.customers?.pageInfo?.hasNextPage) break
+    cursor = datos.customers.pageInfo.endCursor
+  }
+  return lanzadas
+}
+
+// Pedidos hechos hace exactamente X días (ventana de un día)
+async function pedidosDeHace(tienda: TiendaBasica, dias: number) {
+  const dia = new Date(Date.now() - dias * 24 * 3600 * 1000).toISOString().slice(0, 10)
+  const siguiente = new Date(Date.now() - (dias - 1) * 24 * 3600 * 1000).toISOString().slice(0, 10)
+  const datos = await consultarTienda<any>(tienda, CONSULTA_PEDIDOS, { query: `created_at:>=${dia} created_at:<${siguiente}`, first: 50 })
+  return ((datos?.orders?.nodes || []) as any[]).filter(n => !n.cancelledAt)
+}
+
+// Recompra: X días después de una compra, por si se le acaba
+export async function repasarRecompras(tienda: TiendaBasica, dias: number) {
+  let lanzadas = 0
+  for (const nodo of await pedidosDeHace(tienda, dias)) {
+    const contexto = contextoDePedidoGraphql(nodo, tienda)
+    contexto.referencia = `recompra:${nodo.id}`
+    const primero = contexto.pedido?.productos?.[0]
+    contexto.producto = { nombre: primero || 'lo que compraste', enlace: `https://${tienda.dominio}` }
+    const r = await lanzarAutomatizacion('recompra', contexto)
+    if (r.lanzada) lanzadas++
+  }
+  return lanzadas
+}
+
+// Garantía: aviso X días antes de que venza (meses de garantía desde la compra)
+export async function repasarGarantias(tienda: TiendaBasica, mesesGarantia: number, avisarDiasAntes: number) {
+  const dias = Math.max(1, Math.round(mesesGarantia * 30.44) - avisarDiasAntes)
+  let lanzadas = 0
+  for (const nodo of await pedidosDeHace(tienda, dias)) {
+    const contexto = contextoDePedidoGraphql(nodo, tienda)
+    contexto.referencia = `garantia:${nodo.id}`
+    contexto.producto = { nombre: contexto.pedido?.productos?.join(', ') || 'tu compra' }
+    contexto.dias = avisarDiasAntes
+    const r = await lanzarAutomatizacion('garantia_por_vencer', contexto)
     if (r.lanzada) lanzadas++
   }
   return lanzadas

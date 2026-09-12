@@ -111,7 +111,8 @@ export const PASOS_EDITOR: { tipo: Paso['tipo']; etiqueta: string }[] = [
   { tipo: 'comprobar', etiqueta: 'Seguir solo si…' },
   { tipo: 'avisar_equipo', etiqueta: 'Avisar al equipo' },
   { tipo: 'abrir_caso', etiqueta: 'Abrir un caso' },
-  { tipo: 'etiquetar', etiqueta: 'Etiquetar la conversación' }
+  { tipo: 'etiquetar', etiqueta: 'Etiquetar la conversación' },
+  { tipo: 'crear_descuento', etiqueta: 'Crear un código de descuento en la tienda' }
 ]
 
 const MAX_PASOS = 15
@@ -158,7 +159,7 @@ export function problemaDeReceta(receta: any, opciones: { propia: boolean }): st
   // contesta, crear descuento...), pero tampoco admiten nada que el motor no
   // conozca: "reembolsar" no existe para nadie.
   const permitidos = new Set<string>(PASOS_EDITOR.map(p => p.tipo))
-  const delMotor = new Set<string>([...permitidos, 'ia_responde', 'crear_descuento', 'enlace_compra', 'etiquetar_en_tienda', 'importar_catalogo', 'importar_politicas'])
+  const delMotor = new Set<string>([...permitidos, 'ia_responde', 'pausar_ia', 'crear_descuento', 'enlace_compra', 'etiquetar_en_tienda', 'importar_catalogo', 'importar_politicas'])
   for (const [i, p] of receta.pasos.entries()) {
     const n = i + 1
     if (!p || typeof p.tipo !== 'string') return `El paso ${n} no tiene tipo.`
@@ -192,6 +193,12 @@ export function problemaDeReceta(receta: any, opciones: { propia: boolean }): st
         if (String(p.asunto).length > 200) return `El paso ${n}: el asunto no puede pasar de 200 caracteres.`
         if (p.prioridad && !['baja', 'normal', 'alta'].includes(p.prioridad)) return `El paso ${n}: la prioridad tiene que ser baja, normal o alta.`
         break
+      case 'crear_descuento': {
+        const pct = p.ajuste_porcentaje ? undefined : Number(p.porcentaje)
+        if (pct !== undefined && (!Number.isFinite(pct) || pct < 1 || pct > 90)) return `El paso ${n}: el descuento tiene que estar entre 1 y 90 %.`
+        if (p.dias_validez !== undefined && (!Number.isFinite(Number(p.dias_validez)) || Number(p.dias_validez) < 1 || Number(p.dias_validez) > 90)) return `El paso ${n}: los días de validez tienen que estar entre 1 y 90.`
+        break
+      }
       case 'etiquetar':
         if (!String(p.etiqueta || '').trim()) return `El paso ${n} (etiquetar) no dice qué etiqueta.`
         if (String(p.etiqueta).length > 60) return `El paso ${n}: el nombre de la etiqueta es demasiado largo.`
@@ -227,6 +234,7 @@ export function limpiarReceta(receta: any): Receta {
       case 'abrir_caso': return { tipo: 'abrir_caso', asunto: String(p.asunto || '').trim(), prioridad: p.prioridad || 'normal' }
       case 'etiquetar': return { tipo: 'etiquetar', etiqueta: String(p.etiqueta || '').trim() }
       case 'ia_responde': return { tipo: 'ia_responde', instruccion: String(p.instruccion || '').trim() }
+      case 'pausar_ia': return { tipo: 'pausar_ia' }
       case 'crear_descuento': return { tipo: 'crear_descuento', ...(p.ajuste_porcentaje ? { ajuste_porcentaje: String(p.ajuste_porcentaje) } : {}), ...(p.porcentaje ? { porcentaje: Number(p.porcentaje) } : {}), ...(p.dias_validez ? { dias_validez: Number(p.dias_validez) } : {}) }
       case 'enlace_compra': return { tipo: 'enlace_compra' }
       case 'etiquetar_en_tienda': return { tipo: 'etiquetar_en_tienda', etiqueta: String(p.etiqueta || '').trim() }
@@ -346,7 +354,16 @@ export function simularReceta(definicion: Automatizacion, ajustes: Record<string
     }
     if (paso.tipo === 'avisar_equipo') { salida.push({ titulo: d.titulo, resultado: 'haria', detalle: rellenar(paso.texto, contexto, ajustes) }); continue }
     if (paso.tipo === 'abrir_caso') { salida.push({ titulo: d.titulo, resultado: 'haria', detalle: rellenar(paso.asunto, contexto, ajustes) }); continue }
-    if (['ia_responde', 'crear_descuento', 'enlace_compra', 'etiquetar_en_tienda', 'importar_catalogo', 'importar_politicas'].includes(paso.tipo)) {
+    if (paso.tipo === 'crear_descuento') {
+      if (!entorno.tiendaConectada) { salida.push({ titulo: d.titulo, resultado: 'pararia', detalle: 'Sin tienda conectada no se puede crear el descuento.' }); return salida }
+      salida.push({ titulo: d.titulo, resultado: 'haria', detalle: 'Se crearía un código de un solo uso en Shopify (en la prueba: EJEMPLO10).' })
+      continue
+    }
+    if (paso.tipo === 'etiquetar_en_tienda') { salida.push({ titulo: d.titulo, resultado: entorno.tiendaConectada ? 'haria' : 'pararia', detalle: entorno.tiendaConectada ? undefined : 'Sin tienda conectada no se puede etiquetar en Shopify.' }); if (!entorno.tiendaConectada) return salida; continue }
+    if (paso.tipo === 'ia_responde') { salida.push({ titulo: d.titulo, resultado: 'haria', detalle: paso.instruccion }); continue }
+    if (paso.tipo === 'pausar_ia') { salida.push({ titulo: d.titulo, resultado: 'haria' }); continue }
+    if (paso.tipo === 'importar_catalogo' || paso.tipo === 'importar_politicas') { salida.push({ titulo: d.titulo, resultado: entorno.tiendaConectada ? 'haria' : 'pararia', detalle: entorno.tiendaConectada ? 'No manda mensajes a nadie.' : 'Hace falta la tienda conectada.' }); if (!entorno.tiendaConectada) return salida; continue }
+    if (['enlace_compra'].includes(paso.tipo)) {
       salida.push({ titulo: d.titulo, resultado: 'aviso', detalle: 'Este paso todavía se está construyendo: de momento la automatización se pararía aquí.' })
       return salida
     }

@@ -198,7 +198,7 @@ const BASE: Automatizacion[] = [
     descripcion: 'Atender el cambio mientras aún se puede.',
     detalle: 'Si el cliente pide cambiar la dirección y el pedido todavía no ha salido, se abre un caso urgente y se avisa a tu equipo al momento. Si ya salió, la IA se lo explica y ofrece las opciones.',
     categoria: 'pedidos',
-    estado: 'en_camino',
+    estado: 'lista',
     requiereTienda: true,
     permisos: ['read_orders'],
     escribeAlCliente: false,
@@ -208,8 +208,8 @@ const BASE: Automatizacion[] = [
       disparador: { tipo: 'mensaje_cliente', intencion: 'cambio_direccion' },
       pasos: [
         { tipo: 'comprobar', condiciones: [{ campo: 'pedido.enviado', operador: 'es_falso' }] },
-        { tipo: 'abrir_caso', asunto: 'Cambio de dirección: pedido {{pedido}}', prioridad: 'alta' },
-        { tipo: 'avisar_equipo', texto: 'Cambio de dirección pendiente en el pedido {{pedido}}: aún no ha salido.' }
+        { tipo: 'abrir_caso', asunto: 'Cambio de dirección: pedido {{pedido}}. {{detalle_cliente}}', prioridad: 'alta' },
+        { tipo: 'avisar_equipo', texto: 'Cambio de dirección pendiente en el pedido {{pedido}}: aún no ha salido. {{detalle_cliente}}' }
       ]
     }
   },
@@ -247,7 +247,7 @@ const BASE: Automatizacion[] = [
     descripcion: 'Un último empujón con un código de descuento.',
     detalle: 'Si tras el primer recordatorio sigue sin comprar, se le manda un código de descuento hecho a su medida, que caduca. Es promoción: solo se manda a quien haya aceptado recibirlas.',
     categoria: 'recuperar',
-    estado: 'en_camino',
+    estado: 'lista',
     requiereTienda: true,
     permisos: ['read_orders', 'write_discounts'],
     escribeAlCliente: true,
@@ -256,7 +256,7 @@ const BASE: Automatizacion[] = [
       { clave: 'esperar_horas', etiqueta: 'Esperar tras el primer aviso', tipo: 'horas', porDefecto: 22, min: 1, max: 168 },
       { clave: 'porcentaje', etiqueta: 'Descuento', tipo: 'numero', porDefecto: 10, min: 1, max: 50, sufijo: '%' },
       { clave: 'dias_validez', etiqueta: 'Días que vale el código', tipo: 'dias', porDefecto: 3, min: 1, max: 30 },
-      { clave: 'texto', etiqueta: 'Mensaje', tipo: 'texto_largo', porDefecto: 'Te dejo un {{descuento}} para que lo termines: usa el código {{codigo}} antes de que caduque. {{enlace}}' },
+      { clave: 'texto', etiqueta: 'Mensaje', tipo: 'texto_largo', porDefecto: 'Hola {{cliente}}, tu carrito con {{producto}} sigue esperando. Te dejo un {{descuento}} con el código {{codigo}} (caduca en pocos días): {{enlace}}' },
       { clave: 'plantilla', etiqueta: 'Plantilla de WhatsApp', tipo: 'plantilla', porDefecto: null, ayuda: 'WhatsApp solo deja escribir a un cliente que lleve más de 24 h sin hablarte usando una plantilla aprobada por Meta. Sin ella, a esos clientes no se les escribe (por correo no hace falta). Sus huecos se rellenan por orden con: nombre del cliente, número de pedido, total y enlace.' }
     ],
     receta: {
@@ -275,7 +275,7 @@ const BASE: Automatizacion[] = [
     descripcion: 'Ofrecer ayuda a quien se atascó pagando.',
     detalle: 'Alguien que llega a la pantalla de pago y no termina suele tener un problema concreto (la tarjeta, los gastos de envío). Se le escribe enseguida para ayudarle, no para venderle.',
     categoria: 'recuperar',
-    estado: 'en_camino',
+    estado: 'lista',
     requiereTienda: true,
     permisos: ['read_orders'],
     escribeAlCliente: true,
@@ -300,7 +300,7 @@ const BASE: Automatizacion[] = [
     descripcion: 'Apuntar a quien pregunta por algo agotado y avisarle al reponer.',
     detalle: 'Si alguien pregunta por un producto sin stock, la IA le ofrece avisarle. Cuando el producto vuelve a tener stock en Shopify, le llega el mensaje automáticamente.',
     categoria: 'recuperar',
-    estado: 'en_camino',
+    estado: 'lista',
     requiereTienda: true,
     permisos: ['read_products', 'read_inventory'],
     escribeAlCliente: true,
@@ -323,7 +323,7 @@ const BASE: Automatizacion[] = [
     descripcion: 'Avisar a quien preguntó por algo que ahora está más barato.',
     detalle: 'Se recuerda por qué productos ha preguntado cada cliente. Si bajan de precio en tu tienda, se le avisa. Es promoción: solo a quien la haya aceptado.',
     categoria: 'recuperar',
-    estado: 'en_camino',
+    estado: 'lista',
     requiereTienda: true,
     permisos: ['read_products'],
     escribeAlCliente: true,
@@ -345,9 +345,9 @@ const BASE: Automatizacion[] = [
     clave: 'cliente_dormido',
     nombre: 'Cliente dormido',
     descripcion: 'Volver a por quien hace mucho que no compra.',
-    detalle: 'Cada día se busca a los clientes que llevan sin comprar los días que tú digas y se les escribe. Es promoción: solo a quien la haya aceptado.',
+    detalle: 'Cada día se busca a los clientes de tu tienda cuya última compra fue hace los días que tú digas (con una semana de margen para que el aviso salga una sola vez) y se les escribe con el enlace de la tienda. Es promoción: solo a quien la haya aceptado.',
     categoria: 'recuperar',
-    estado: 'en_camino',
+    estado: 'lista',
     requiereTienda: true,
     permisos: ['read_customers', 'read_orders'],
     escribeAlCliente: true,
@@ -369,9 +369,9 @@ const BASE: Automatizacion[] = [
     clave: 'recompra',
     nombre: 'Recompra o reposición',
     descripcion: 'Recordar justo cuando se le está acabando.',
-    detalle: 'Para lo que se gasta (café, cremas, recambios), se calcula cuándo se le va a acabar y se le recuerda. Es promoción: solo a quien la haya aceptado.',
+    detalle: 'Para lo que se gasta (café, cremas, recambios): pasados los días que tú digas desde una compra, se le recuerda lo que compró con el enlace de la tienda. Es promoción: solo a quien la haya aceptado.',
     categoria: 'recuperar',
-    estado: 'en_camino',
+    estado: 'lista',
     requiereTienda: true,
     permisos: ['read_orders', 'read_products'],
     escribeAlCliente: true,
@@ -437,7 +437,7 @@ const BASE: Automatizacion[] = [
     descripcion: 'Ofrecer lo que pega con lo que se lleva.',
     detalle: 'Al cerrar una venta o al hablar de un producto, la IA sugiere uno que lo acompaña. Es promoción: solo a quien la haya aceptado.',
     categoria: 'vender',
-    estado: 'en_camino',
+    estado: 'lista',
     requiereTienda: true,
     permisos: ['read_products'],
     escribeAlCliente: false,
@@ -456,7 +456,7 @@ const BASE: Automatizacion[] = [
     descripcion: 'Presupuestos con los precios de Shopify, no con una lista aparte.',
     detalle: 'Cuando el cliente pide un presupuesto, la IA lo hace con los precios y las existencias de tu tienda, y lo deja escrito en la conversación.',
     categoria: 'vender',
-    estado: 'en_camino',
+    estado: 'lista',
     requiereTienda: true,
     permisos: ['read_products'],
     escribeAlCliente: false,
@@ -473,7 +473,7 @@ const BASE: Automatizacion[] = [
     descripcion: 'Guardar la vez cuando no hay stock.',
     detalle: 'Si no queda producto, la IA apunta al cliente en la lista y abre un caso para que tu equipo lo tenga controlado al reponer.',
     categoria: 'vender',
-    estado: 'en_camino',
+    estado: 'lista',
     requiereTienda: true,
     permisos: ['read_products', 'read_inventory'],
     escribeAlCliente: false,
@@ -548,7 +548,7 @@ const BASE: Automatizacion[] = [
     descripcion: 'Avisar antes de que se acabe la garantía.',
     detalle: 'Antes de que venza la garantía de lo que compró, se le avisa por si quiere revisarlo o ampliarla.',
     categoria: 'posventa',
-    estado: 'en_camino',
+    estado: 'lista',
     requiereTienda: true,
     permisos: ['read_orders'],
     escribeAlCliente: true,
@@ -566,11 +566,11 @@ const BASE: Automatizacion[] = [
   },
   {
     clave: 'cumpleanos',
-    nombre: 'Cumpleaños o aniversario',
-    descripcion: 'Felicitar con un detalle.',
-    detalle: 'Felicita el cumpleaños, o el aniversario de su primera compra si no sabes la fecha de nacimiento, con un código de descuento. Es promoción: solo a quien la haya aceptado.',
+    nombre: 'Aniversario de compra',
+    descripcion: 'Un detalle cuando hace un año de su compra.',
+    detalle: 'Shopify no guarda cumpleaños, así que se celebra el aniversario: cuando hace justo un año de una compra, se le felicita con un código de descuento de un solo uso creado en tu tienda. Es promoción: solo a quien la haya aceptado.',
     categoria: 'posventa',
-    estado: 'en_camino',
+    estado: 'lista',
     requiereTienda: true,
     permisos: ['read_customers', 'write_discounts'],
     escribeAlCliente: true,
@@ -578,7 +578,7 @@ const BASE: Automatizacion[] = [
     campos: [
       { clave: 'porcentaje', etiqueta: 'Descuento', tipo: 'numero', porDefecto: 10, min: 1, max: 50, sufijo: '%' },
       { clave: 'dias_validez', etiqueta: 'Días que vale el código', tipo: 'dias', porDefecto: 15, min: 1, max: 90 },
-      { clave: 'texto', etiqueta: 'Mensaje', tipo: 'texto_largo', porDefecto: '¡Felicidades, {{cliente}}! Te dejo un {{descuento}} de regalo con el código {{codigo}}.' },
+      { clave: 'texto', etiqueta: 'Mensaje', tipo: 'texto_largo', porDefecto: '¡Hola, {{cliente}}! Hoy hace un año que compraste en {{negocio}}. Para celebrarlo, te dejo un {{descuento}} de regalo con el código {{codigo}}.' },
       { clave: 'plantilla', etiqueta: 'Plantilla de WhatsApp', tipo: 'plantilla', porDefecto: null, ayuda: 'WhatsApp solo deja escribir a un cliente que lleve más de 24 h sin hablarte usando una plantilla aprobada por Meta. Sin ella, a esos clientes no se les escribe (por correo no hace falta). Sus huecos se rellenan por orden con: nombre del cliente, número de pedido, total y enlace.' }
     ],
     receta: {
@@ -625,7 +625,7 @@ const BASE: Automatizacion[] = [
     descripcion: 'La IA explica cómo se devuelve y recoge los datos.',
     detalle: 'La IA cuenta tu política de devoluciones (la de tu Shopify), comprueba si el pedido está en plazo, recoge el motivo y abre el caso. El reembolso lo hace siempre una persona.',
     categoria: 'devoluciones',
-    estado: 'en_camino',
+    estado: 'lista',
     requiereTienda: true,
     permisos: ['read_orders', 'read_content'],
     escribeAlCliente: false,
@@ -638,7 +638,7 @@ const BASE: Automatizacion[] = [
       pasos: [
         { tipo: 'ia_responde', instruccion: 'Explica la política de devoluciones y pide el motivo y el número de pedido.' },
         { tipo: 'etiquetar', etiqueta: 'Devolución' },
-        { tipo: 'abrir_caso', asunto: 'Devolución del pedido {{pedido}}', prioridad: 'normal' }
+        { tipo: 'abrir_caso', asunto: 'Devolución del pedido {{pedido}}. {{detalle_cliente}}', prioridad: 'normal' }
       ]
     }
   },
@@ -648,7 +648,7 @@ const BASE: Automatizacion[] = [
     descripcion: 'Pedir la foto y pasarlo a una persona, rápido.',
     detalle: 'Si llega roto o no es lo que pidió, la IA pide una foto, la guarda en el caso y avisa a tu equipo con prioridad alta.',
     categoria: 'devoluciones',
-    estado: 'en_camino',
+    estado: 'lista',
     requiereTienda: true,
     permisos: ['read_orders'],
     escribeAlCliente: false,
@@ -661,8 +661,8 @@ const BASE: Automatizacion[] = [
       pasos: [
         { tipo: 'ia_responde', instruccion: 'Discúlpate, pide una foto de lo que ha llegado y dile que lo pasas a una persona ahora mismo.' },
         { tipo: 'etiquetar', etiqueta: 'Incidencia' },
-        { tipo: 'abrir_caso', asunto: 'Producto dañado o equivocado: pedido {{pedido}}', prioridad: 'alta' },
-        { tipo: 'avisar_equipo', texto: 'Incidencia con el pedido {{pedido}}: producto dañado o equivocado.' }
+        { tipo: 'abrir_caso', asunto: 'Producto dañado o equivocado: pedido {{pedido}}. {{detalle_cliente}}', prioridad: 'alta' },
+        { tipo: 'avisar_equipo', texto: 'Incidencia con el pedido {{pedido}}: producto dañado o equivocado. {{detalle_cliente}}' }
       ]
     }
   },
@@ -672,7 +672,7 @@ const BASE: Automatizacion[] = [
     descripcion: 'Que una queja no se quede en el chat.',
     detalle: 'Cuando la IA detecta una queja seria, para de contestar, etiqueta la conversación y avisa a una persona de tu equipo.',
     categoria: 'devoluciones',
-    estado: 'en_camino',
+    estado: 'lista',
     requiereTienda: false,
     escribeAlCliente: false,
     marketing: false,
@@ -680,9 +680,11 @@ const BASE: Automatizacion[] = [
     receta: {
       disparador: { tipo: 'mensaje_cliente', intencion: 'reclamacion' },
       pasos: [
+        { tipo: 'ia_responde', instruccion: 'Pide disculpas con calma, no discutas, no prometas soluciones concretas y dile que una persona del equipo se hace cargo ahora mismo.' },
         { tipo: 'etiquetar', etiqueta: 'Reclamación' },
-        { tipo: 'abrir_caso', asunto: 'Reclamación de {{cliente}}', prioridad: 'alta' },
-        { tipo: 'avisar_equipo', texto: 'Reclamación de {{cliente}}: la IA ha dejado de contestar y espera a una persona.' }
+        { tipo: 'abrir_caso', asunto: 'Reclamación de {{cliente}}: {{detalle_cliente}}', prioridad: 'alta' },
+        { tipo: 'avisar_equipo', texto: 'Reclamación de {{cliente}}: la IA ha dejado de contestar y espera a una persona. {{detalle_cliente}}' },
+        { tipo: 'pausar_ia' }
       ]
     }
   },
@@ -777,9 +779,9 @@ const BASE: Automatizacion[] = [
     clave: 'importar_catalogo',
     nombre: 'Importar el catálogo',
     descripcion: 'Traer tus productos de Shopify a la lista de precios.',
-    detalle: 'Cada día se traen los productos, precios y existencias de tu tienda a la lista de precios de Respondi, para que la IA los tenga a mano al instante. No cambia nada en Shopify.',
+    detalle: 'Cada día se traen los productos, precios y existencias de tu tienda a la lista de precios de Respondi (cada tipo de producto de Shopify se convierte en una categoría). Vuelve a importar sin duplicar, no toca lo que añadiste a mano y lo que desaparece de la tienda queda como no disponible. No cambia nada en Shopify.',
     categoria: 'mantenimiento',
-    estado: 'en_camino',
+    estado: 'lista',
     requiereTienda: true,
     permisos: ['read_products', 'read_inventory'],
     escribeAlCliente: false,
@@ -797,9 +799,9 @@ const BASE: Automatizacion[] = [
     clave: 'importar_politicas',
     nombre: 'Importar las políticas de la tienda',
     descripcion: 'Que la IA conozca tus políticas de envío y devolución.',
-    detalle: 'Se traen las políticas que tienes escritas en Shopify (envíos, devoluciones, privacidad) y se añaden a las normas que consulta la IA antes de contestar.',
+    detalle: 'Cada lunes se traen las políticas que tienes escritas en Shopify (envíos, devoluciones, privacidad, condiciones) y se añaden a las normas que consulta la IA antes de contestar. Si no han cambiado, no se vuelven a procesar.',
     categoria: 'mantenimiento',
-    estado: 'en_camino',
+    estado: 'lista',
     requiereTienda: true,
     permisos: ['read_content'],
     escribeAlCliente: false,
@@ -816,7 +818,7 @@ const BASE: Automatizacion[] = [
     descripcion: 'Llevar a Shopify lo que se aprende en el chat.',
     detalle: 'Cuando la IA etiqueta una conversación (interesado en X, cliente difícil, VIP...), esa etiqueta se pone también en la ficha del cliente en Shopify.',
     categoria: 'mantenimiento',
-    estado: 'en_camino',
+    estado: 'lista',
     requiereTienda: true,
     permisos: ['read_customers'],
     escribeAlCliente: false,
@@ -831,9 +833,9 @@ const BASE: Automatizacion[] = [
     clave: 'etiquetar_conversaciones',
     nombre: 'Etiquetar conversaciones con datos de la tienda',
     descripcion: 'Marcar quién ha comprado y quién no.',
-    detalle: 'Al entrar un mensaje, se mira si esa persona tiene pedidos en tu tienda y se etiqueta la conversación (cliente nuevo, cliente que repite, pedido en curso).',
+    detalle: 'Al entrar un mensaje, se mira si esa persona tiene pedidos en tu tienda y se etiqueta la conversación : «Cliente nuevo», «Ya ha comprado» o «Pedido en curso». Las tres etiquetas se crean solas al encenderla.',
     categoria: 'mantenimiento',
-    estado: 'en_camino',
+    estado: 'lista',
     requiereTienda: true,
     permisos: ['read_orders', 'read_customers'],
     escribeAlCliente: false,

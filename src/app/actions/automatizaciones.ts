@@ -242,6 +242,13 @@ export async function cambiarAutomatizacion(clave: string, cambios: { activa?: b
   // Una propia que no existe no se puede "crear" desde aquí: solo con el editor
   if (esPropia(clave) && !guardada) return { success: false, error: 'Esa automatización no existe.' }
 
+  // Las etiquetas que la automatización va a poner tienen que existir: se
+  // crean al encenderla (la IA nunca inventa etiquetas; esto lo decide el
+  // cliente al pulsar el interruptor)
+  if (activa && cambios.activa && ETIQUETAS_NECESARIAS[clave]) {
+    await asegurarEtiquetas(auth, ETIQUETAS_NECESARIAS[clave])
+  }
+
   const { error } = await supabase
     .from('automatizaciones')
     .upsert({
@@ -266,6 +273,39 @@ export async function cambiarAutomatizacion(clave: string, cambios: { activa?: b
   }
 
   return { success: true, data: { clave, activa, ajustes } }
+}
+
+// Las etiquetas de conversación que necesita cada automatización para
+// funcionar. Se crean al encenderla si no existen.
+const ETIQUETAS_NECESARIAS: Record<string, string[]> = {
+  falta_informacion_pedido: ['Falta información'],
+  reserva_lista_espera: ['Lista de espera'],
+  devolucion_guiada: ['Devolución'],
+  producto_danado: ['Incidencia'],
+  reclamacion: ['Reclamación'],
+  etiquetar_conversaciones: ['Cliente nuevo', 'Ya ha comprado', 'Pedido en curso']
+}
+
+async function asegurarEtiquetas(auth: any, nombres: string[]) {
+  const { data: existentes } = await supabaseAdmin
+    .from('message_categories')
+    .select('nombre')
+    .eq('branch_id', auth.branch_id)
+  const hay = new Set((existentes || []).map((e: any) => String(e.nombre).toLowerCase()))
+  const faltan = nombres.filter(n => !hay.has(n.toLowerCase()))
+  if (!faltan.length) return
+  await supabaseAdmin.from('message_categories').insert(faltan.map((nombre, i) => ({
+    tenant_id: auth.tenant_id,
+    branch_id: auth.branch_id,
+    nombre,
+    descripcion_intencion: 'Etiqueta que pone una automatización de Respondi.',
+    color: '#8b5cf6',
+    activa: true,
+    es_plantilla: false,
+    orden: 90 + i,
+    es_fallback: false,
+    es_protegida: false
+  })))
 }
 
 // Lo último que han hecho las automatizaciones, para que se vea que trabajan

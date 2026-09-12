@@ -865,6 +865,36 @@ crea queda asignado. Verificado con `probar-configuracion` (20
 comprobaciones con un agente de permisos mezclados, por la app y atacando
 la base de datos, incluido llenar el plan hasta 5 sucursales).
 
+## La IA decía "no tengo esa función" con la tienda conectada (resuelto, 12-09-2026)
+
+Con Shopify conectada y "Devolución guiada" o "Presupuesto con la tienda"
+encendidas, la IA recibía bien las herramientas `detectar_intencion` y
+`presupuesto_de_tienda` y las llamaba, pero el filtro que comprueba que la
+automatización que gobierna cada herramienta esté encendida solo conocía las
+cuatro primeras (buscar, estado del pedido, enlace de compra, lista de
+espera). A esas dos les contestaba "Esta herramienta no está disponible en
+este negocio", y la IA se lo creía: "voy a consultar las políticas y te digo
+luego" o "no dispongo de la función de presupuesto". Ni caso, ni etiqueta, ni
+aviso al equipo. Se vio anotando en `ai_logs.contexto_snapshot` qué
+herramientas recibe el modelo y qué contestan (eso se ha quedado, es útil).
+
+Segundo fallo en la misma prueba: la devolución abre un caso, la IA dice
+—con razón— que "una persona revisará el reembolso", y la red de seguridad
+de "prometió una persona sin escalar" volvía a escalar y pausaba la IA. Los
+dos mensajes siguientes del cliente en esa conversación se ignoraban
+("IA pausada por agente"). Ahora la gestión deja dicho qué ha hecho (caso,
+aviso, pausa) y el motor lo cuenta como escalado ya hecho en esa pasada: no
+se escala dos veces, y si la reclamación aparta a la IA, su despedida sale
+igualmente.
+
+Tercero, de la misma prueba: con el caso de la devolución todavía abierto, el
+cambio de dirección del mismo cliente no podía abrir el suyo (el índice
+`unique_active_case` impone un caso por conversación), el paso fallaba con
+"duplicate key" y se quedaba reintentando sin que nadie lo viera. El paso
+`abrir_caso` hace ahora lo mismo que el escalado de la IA: anota el motivo
+nuevo en el caso que ya hay, lo reabre si estaba resuelto y le sube la
+prioridad si la gestión nueva es más urgente.
+
 ## Los mensajes no salían hacia el WhatsApp del cliente (resuelto, 11-09-2026)
 Donde debía enviarse la respuesta de la IA, `generarRespuesta` solo dejaba un
 registro `SIMULACION_N8N_WEBHOOK` en la auditoría: ni las respuestas de la IA,

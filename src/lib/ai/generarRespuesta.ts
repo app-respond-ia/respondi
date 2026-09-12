@@ -518,7 +518,7 @@ export async function generarRespuesta(conv: any) {
   // enlace de compra): solo las que gobiernan las automatizaciones que el
   // negocio haya encendido. Viven en su propio archivo para no engordar este.
   const { cargarHerramientasDeTienda, ejecutarHerramientaDeTienda, esHerramientaDeTienda } = await import('@/lib/tiendas/herramientas-ia')
-  const herramientasTienda = await cargarHerramientasDeTienda(branchId, contactId)
+  const herramientasTienda = await cargarHerramientasDeTienda(branchId, contactId, conversationId)
   if (herramientasTienda.definiciones.length) {
     tools.push(...herramientasTienda.definiciones)
     openAiMessages.push({ role: 'system', content: herramientasTienda.instrucciones })
@@ -708,8 +708,23 @@ export async function generarRespuesta(conv: any) {
       }
     }
     if (/^Etiqueta aplicada|^Ignorado/.test(toolResult)) etiquetadoEnEstaPasada = true
+    // Aviso a las automatizaciones que llevan las etiquetas a Shopify
+    if (/^Etiqueta aplicada/.test(toolResult) && targetCategory) {
+      try {
+        const { encolarEventoInterno } = await import('@/lib/canales/entrada')
+        const { data: contacto } = await supabaseAdmin.from('contacts').select('canal, identificador_canal, nombre').eq('id', contactId).maybeSingle()
+        await encolarEventoInterno(tenantId, branchId, 'conversacion_etiquetada', `${conversationId}:${targetCategory.id}`, {
+          conversation_id: conversationId, contact_id: contactId, etiqueta: targetCategory.nombre,
+          canal: contacto?.canal || null, identificador: contacto?.identificador_canal || null, nombre: contacto?.nombre || null
+        })
+      } catch {
+        // Nunca por esto se deja de contestar
+      }
+    }
     return toolResult
   }
+
+  let intencionEnEstaPasada = false
 
   // 8. Manejo de Tool Calls
   if (responseMsg.tool_calls) {
@@ -774,6 +789,7 @@ export async function generarRespuesta(conv: any) {
       }
       else if (esHerramientaDeTienda(toolCall.function.name) && herramientasTienda.contexto) {
         toolResult = await ejecutarHerramientaDeTienda(toolCall.function.name, args, herramientasTienda.contexto)
+        if (toolCall.function.name === 'detectar_intencion') intencionEnEstaPasada = true
       }
       else if (toolCall.function.name === 'escalar_humano') {
         toolResult = await ejecutarEscalado(args)
@@ -944,29 +960,32 @@ export async function generarRespuesta(conv: any) {
   // vez de calcularlo). Se le pide que lo haga con la herramienta.
   const PIDE_PRESUPUESTO = /presupuesto|precio total|en total|cu[áa]nto (me )?(ser[íi]a|costar[íi]a|cuesta|vale|sale)|cuanto seria|qu[ée] precio.*(todo|junto)/i
   const pendientesCliente = allMessages.filter((m: any) => m.remitente === 'cliente' && m.agrupado !== true).map((m: any) => m.contenido || '')
-  const herramientaPresupuesto = tools.find((t: any) => t.function?.name === 'hacer_presupuesto')
+  // Con la tienda conectada y su presupuesto encendido, manda el de la tienda
+  const herramientaPresupuesto = tools.find((t: any) => t.function?.name === 'presupuesto_de_tienda') || tools.find((t: any) => t.function?.name === 'hacer_presupuesto')
   if (herramientaPresupuesto && !presupuestoEnEstaPasada && responseMsg?.content && pendientesCliente.some(t => PIDE_PRESUPUESTO.test(t))) {
     try {
       openAiMessages.push({ role: 'assistant', content: responseMsg.content })
       openAiMessages.push({
         role: 'system',
-        content: 'REVISIÓN: el cliente está pidiendo un total o un presupuesto y has contestado sin usar hacer_presupuesto. Úsala ahora con lo que ha pedido: el nombre de cada cosa tal como la ha dicho el cliente y su cantidad. Si no ha pedido nada concreto, pásale una lista vacía.'
+        content: `REVISIÓN: el cliente está pidiendo un total o un presupuesto y has contestado sin usar ${herramientaPresupuesto.function.name}. Úsala ahora con lo que ha pedido: el nombre de cada cosa tal como la ha dicho el cliente y su cantidad. Si no ha pedido nada concreto, pásale una lista vacía.`
       })
       // Obligada: si se le deja elegir, a veces contesta "te lo digo luego"
       const revision = await openai.chat.completions.create({
         model: MODELO_IA,
         messages: openAiMessages,
         tools: [herramientaPresupuesto],
-        tool_choice: { type: 'function', function: { name: 'hacer_presupuesto' } }
+        tool_choice: { type: 'function', function: { name: herramientaPresupuesto.function.name } }
       })
       tokensInput += revision.usage?.prompt_tokens || 0
       tokensOutput += revision.usage?.completion_tokens || 0
       const r: any = revision.choices[0].message
-      const llamada: any = r.tool_calls?.find((t: any) => t.function?.name === 'hacer_presupuesto')
+      const llamada: any = r.tool_calls?.find((t: any) => t.function?.name === herramientaPresupuesto.function.name)
       if (llamada) {
         const { calcularPresupuesto } = await import('@/lib/ai/presupuesto')
         const args = (() => { try { return JSON.parse(llamada.function.arguments || '{}') } catch { return {} } })()
-        const resultado = await calcularPresupuesto(branchId, Array.isArray(args.lineas) ? args.lineas : [])
+        const resultado = llamada.function.name === 'presupuesto_de_tienda' && herramientasTienda.contexto
+          ? await ejecutarHerramientaDeTienda('presupuesto_de_tienda', args, herramientasTienda.contexto)
+          : await calcularPresupuesto(branchId, Array.isArray(args.lineas) ? args.lineas : [])
         presupuestoEnEstaPasada = true
         openAiMessages.push(r)
         openAiMessages.push({ role: 'tool', tool_call_id: llamada.id, content: resultado })
@@ -1023,6 +1042,56 @@ export async function generarRespuesta(conv: any) {
       console.error('Revisión del enlace de compra fallida:', err?.message)
     }
   }
+
+  // Red de seguridad: el cliente quiere devolver, cambiar la dirección, dice
+  // que le llegó roto o pone una queja, la automatización correspondiente
+  // está encendida, y la IA ha contestado sin avisar con detectar_intencion
+  // (visto en pruebas: prefería "consultar las políticas y te digo luego").
+  // Se le obliga, y con lo que devuelve la herramienta reescribe la respuesta.
+  const PIDE_GESTION = /devol|reembols|cambiar (la )?direcci|otra direcci|roto|rota|da[ñn]ad|en mal estado|equivocad|no es lo que (ped|compr)|reclamaci|queja|verg[üu]enza|responsable|denunci|hoja de reclamaciones/i
+  const herramientaIntencion = tools.find((t: any) => t.function?.name === 'detectar_intencion')
+  if (herramientaIntencion && herramientasTienda.contexto && !intencionEnEstaPasada && responseMsg?.content && pendientesCliente.some(t => PIDE_GESTION.test(t))) {
+    try {
+      openAiMessages.push({ role: 'assistant', content: responseMsg.content })
+      openAiMessages.push({
+        role: 'system',
+        content: 'REVISIÓN: el cliente está pidiendo una gestión (devolución, cambio de dirección, producto dañado o reclamación) y has contestado sin usar detectar_intencion. Úsala ahora con la intención que corresponda, el número de pedido si lo ha dicho y un resumen de lo que cuenta. Después contesta siguiendo sus instrucciones.'
+      })
+      const revision = await openai.chat.completions.create({
+        model: MODELO_IA,
+        messages: openAiMessages,
+        tools: [herramientaIntencion],
+        tool_choice: { type: 'function', function: { name: 'detectar_intencion' } }
+      })
+      tokensInput += revision.usage?.prompt_tokens || 0
+      tokensOutput += revision.usage?.completion_tokens || 0
+      const r: any = revision.choices[0].message
+      const llamada: any = r.tool_calls?.find((t: any) => t.function?.name === 'detectar_intencion')
+      if (llamada) {
+        const args = (() => { try { return JSON.parse(llamada.function.arguments || '{}') } catch { return {} } })()
+        const resultado = await ejecutarHerramientaDeTienda('detectar_intencion', args, herramientasTienda.contexto)
+        intencionEnEstaPasada = true
+        openAiMessages.push(r)
+        openAiMessages.push({ role: 'tool', tool_call_id: llamada.id, content: resultado })
+        const final = await openai.chat.completions.create({ model: MODELO_IA, messages: openAiMessages })
+        tokensInput += final.usage?.prompt_tokens || 0
+        tokensOutput += final.usage?.completion_tokens || 0
+        if (final.choices[0].message.content) responseMsg.content = final.choices[0].message.content
+      }
+    } catch (err: any) {
+      console.error('Revisión de la intención fallida:', err?.message)
+    }
+  }
+
+  // Si una gestión de la tienda (devolución, cambio de dirección, producto
+  // dañado, reclamación) ya ha abierto caso o ha apartado a la IA en esta
+  // pasada, el equipo ya lo tiene: la promesa de "una persona lo revisará" es
+  // verdad y no hay que escalar otra vez (visto en pruebas: la revisión de
+  // abajo volvía a escalar y pausaba la IA en mitad de una devolución, y los
+  // siguientes mensajes del cliente se quedaban sin contestar). Y si la IA
+  // queda pausada, ha sido ella misma ahora: su despedida tiene que salir.
+  const gestionDeTienda = herramientasTienda.contexto?.gestion
+  if (gestionDeTienda?.caso || gestionDeTienda?.pausa) escaladoEnEstaPasada = true
 
   // 10. Guardar respuesta final en messages
   let insertId = null
@@ -1217,7 +1286,14 @@ export async function generarRespuesta(conv: any) {
     tokens_input: tokensInput,
     tokens_output: tokensOutput,
     costo_estimado_usd: costeTotal,
-    resultado: isFallback ? 'fallo' : 'respondio'
+    resultado: isFallback ? 'fallo' : 'respondio',
+    // Qué herramientas tenía el modelo a mano y cuáles usó: es lo primero que
+    // hace falta cuando "la IA no ha hecho X" y hay que saber si podía
+    contexto_snapshot: {
+      herramientas: tools.map((t: any) => t.function?.name).filter(Boolean),
+      usadas: ((responseMsg?.tool_calls || []) as any[]).map(t => t.function?.name).filter(Boolean),
+      tienda: !!herramientasTienda.contexto
+    }
   })
   if (errorLog) console.error('Error insertando ai_log:', errorLog)
 

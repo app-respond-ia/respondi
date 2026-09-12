@@ -185,6 +185,38 @@ async function refrescarContexto(ejecucion: FilaEjecucion, contexto: Contexto) {
       .gt('timestamp', ejecucion.created_at)
     contexto.cliente = { ...(contexto.cliente || {}), ha_contestado: (count || 0) > 0 }
   }
+  // ¿Ha comprado ya el carrito? Si hay un pedido suyo en la tienda desde que
+  // se vio el carrito, sí (Shopify no relaciona el pedido con el carrito
+  // abandonado de forma fiable, así que se mira por su correo o teléfono)
+  if (contexto.carrito && contexto.tienda_id && (contexto.cliente?.email || contexto.cliente?.telefono)) {
+    try {
+      const { data: tienda } = await supabaseAdmin.from('tiendas').select('id, dominio').eq('id', contexto.tienda_id).maybeSingle()
+      if (tienda) {
+        const { consultarTienda } = await import('@/lib/tiendas/shopify')
+        const desde = (ejecucion.created_at || new Date().toISOString()).slice(0, 10)
+        const filtro = contexto.cliente?.email ? `email:${contexto.cliente.email}` : `phone:${contexto.cliente?.telefono}`
+        const r = await consultarTienda<any>(tienda, `query pedidos($query: String!) { orders(first: 1, query: $query) { nodes { id } } }`, { query: `${filtro} created_at:>=${desde}` })
+        contexto.carrito = { ...contexto.carrito, comprado: (r?.orders?.nodes || []).length > 0 }
+      }
+    } catch {
+      // Si la tienda no responde, se deja como estaba: mejor no escribir de más
+      contexto.carrito = { ...contexto.carrito, comprado: contexto.carrito.comprado ?? false }
+    }
+  }
+}
+
+// Algo que pasa dentro de Respondi y puede disparar automatizaciones
+// (primer aviso de carrito enviado, conversación etiquetada...)
+export async function dispararEventoInterno(evento: string, contexto: Contexto) {
+  const interesadas = (await automatizacionesActivas(contexto.branch_id)).filter(
+    ({ definicion }) => definicion.receta.disparador.tipo === 'evento_interno' && definicion.receta.disparador.evento === evento
+  )
+  let lanzadas = 0
+  for (const { definicion } of interesadas) {
+    const r = await lanzarAutomatizacion(definicion.clave, { ...contexto })
+    if (r.lanzada) lanzadas++
+  }
+  return lanzadas
 }
 
 export async function continuarEjecucion(ejecucion: FilaEjecucion): Promise<Resultado> {
@@ -230,6 +262,11 @@ export async function continuarEjecucion(ejecucion: FilaEjecucion): Promise<Resu
     try {
       const r = await ejecutarPaso(paso, definicion, ejecucion, contexto, ajustes)
       if (r?.parar) return await cerrar(ejecucion, 'omitida', r.detalle)
+      // Lo que un paso añade al contexto (un código de descuento) tiene que
+      // sobrevivir a una espera: se guarda con la ejecución
+      if (r?.guardar) {
+        await supabaseAdmin.from('automatizaciones_ejecuciones').update({ datos: contexto as any }).eq('id', ejecucion.id)
+      }
     } catch (e: any) {
       const intentos = (ejecucion.intentos || 0) + 1
       if (intentos >= MAX_INTENTOS) {
@@ -262,7 +299,7 @@ export async function continuarEjecucion(ejecucion: FilaEjecucion): Promise<Resu
 async function cerrar(ejecucion: FilaEjecucion, estado: 'hecha' | 'omitida' | 'error' | 'cancelada', detalle?: string): Promise<Resultado> {
   await supabaseAdmin
     .from('automatizaciones_ejecuciones')
-    .update({ estado, detalle: detalle || null, actualizado_en: new Date().toISOString() })
+    .update({ estado, ...(detalle !== undefined || estado !== 'hecha' ? { detalle: detalle || null } : {}), actualizado_en: new Date().toISOString() })
     .eq('id', ejecucion.id)
   if (estado === 'hecha') {
     await supabaseAdmin
@@ -343,7 +380,7 @@ export function rellenarHuecos(texto: string, contexto: Contexto, ajustes: Recor
     // puesto el cliente en los ajustes (por ejemplo, dónde dejar la reseña)
     enlace: contexto.carrito?.enlace || contexto.producto?.enlace || contexto.enlace || String(ajustes.enlace || '').trim(),
     codigo: contexto.codigo_descuento || '',
-    descuento: ajustes.porcentaje ? `${ajustes.porcentaje}%` : '',
+    descuento: contexto.descuento_porcentaje ? `${contexto.descuento_porcentaje}%` : ajustes.porcentaje ? `${ajustes.porcentaje}%` : '',
     dias: String(ajustes.avisar_dias_antes ?? ajustes.dias ?? ''),
     falta: contexto.pedido?.falta_dato || '',
     etiqueta: contexto.etiqueta || ''
@@ -368,10 +405,12 @@ async function ejecutarPaso(
   ejecucion: FilaEjecucion,
   contexto: Contexto,
   ajustes: Record<string, any>
-): Promise<{ parar?: boolean; detalle?: string } | void> {
+): Promise<{ parar?: boolean; detalle?: string; guardar?: boolean } | void> {
   switch (paso.tipo) {
     case 'mensaje':
       return await pasoMensaje(paso, definicion, ejecucion, contexto, ajustes)
+    case 'crear_descuento':
+      return await pasoCrearDescuento(paso, contexto, ajustes)
     case 'avisar_equipo':
       return await pasoAvisarEquipo(paso, definicion, ejecucion, contexto, ajustes)
     case 'abrir_caso':
@@ -380,6 +419,16 @@ async function ejecutarPaso(
       return await pasoEtiquetar(paso, ejecucion, contexto, ajustes)
     case 'etiquetar_en_tienda':
       return await pasoEtiquetarEnTienda(paso, contexto, ajustes)
+    case 'ia_responde':
+      // La instrucción se la lleva la IA en su siguiente respuesta (la
+      // herramienta detectar_intencion la lee de la ejecución)
+      contexto.instruccion_ia = [contexto.instruccion_ia, paso.instruccion].filter(Boolean).join(' ')
+      return { guardar: true }
+    case 'pausar_ia':
+      return await pasoPausarIa(ejecucion, contexto)
+    case 'importar_catalogo':
+    case 'importar_politicas':
+      return await pasoImportar(paso.tipo, ejecucion, contexto, ajustes)
     default:
       // Los pasos que todavía no sabe hacer el motor no rompen nada: se
       // apuntan y la automatización sigue. Ninguna automatización 'lista'
@@ -422,6 +471,17 @@ async function pasoMensaje(
   const canalElegido = (ajustes.canal || 'auto') as CanalSalida
   const { destinos, motivo } = await buscarDestinos(contexto, canalElegido)
   if (!destinos.length) return { parar: true, detalle: motivo || 'No hay forma de escribir a este cliente.' }
+
+  // Quien respondió BAJA no recibe promociones, diga lo que diga Shopify
+  if (definicion.marketing) {
+    const { data: contactos } = await supabaseAdmin
+      .from('contacts')
+      .select('id, no_promociones')
+      .in('id', destinos.map(d => d.contact_id))
+    if ((contactos || []).some((c: any) => c.no_promociones)) {
+      return { parar: true, detalle: 'Este cliente pidió no recibir promociones (respondió BAJA).' }
+    }
+  }
 
   // Se escribe por cada destino (uno, o dos si está puesto "los dos"). Lo que
   // no se pueda por un canal no impide el otro; al final se cuenta qué salió.
@@ -485,6 +545,46 @@ async function pasoMensaje(
       actualizado_en: new Date().toISOString()
     })
     .eq('id', ejecucion.id)
+
+  // El primer aviso de carrito abandonado da pie al segundo (con descuento)
+  if (definicion.clave === 'carrito_abandonado') {
+    await dispararEventoInterno('carrito_primer_aviso_enviado', contexto)
+  }
+}
+
+// --- Crear un código de descuento en la tienda ---------------------------
+async function pasoCrearDescuento(
+  paso: Extract<Paso, { tipo: 'crear_descuento' }>,
+  contexto: Contexto,
+  ajustes: Record<string, any>
+) {
+  if (!contexto.tienda_id) return { parar: true, detalle: 'Hace falta la tienda conectada para crear un descuento.' }
+  const porcentaje = Math.max(1, Math.min(90, Number(paso.ajuste_porcentaje ? ajustes[paso.ajuste_porcentaje] : paso.porcentaje) || 10))
+  const dias = Math.max(1, Number(ajustes.dias_validez ?? paso.dias_validez ?? 3) || 3)
+  const { data: tienda } = await supabaseAdmin.from('tiendas').select('id, dominio').eq('id', contexto.tienda_id).maybeSingle()
+  if (!tienda) return { parar: true, detalle: 'La tienda ya no está conectada.' }
+
+  const codigo = `RESPONDI${porcentaje}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`
+  const { consultarTienda } = await import('@/lib/tiendas/shopify')
+  const r = await consultarTienda<any>(tienda, `mutation crear($basicCodeDiscount: DiscountCodeBasicInput!) {
+    discountCodeBasicCreate(basicCodeDiscount: $basicCodeDiscount) { codeDiscountNode { id } userErrors { field message } }
+  }`, {
+    basicCodeDiscount: {
+      title: `Respondi ${porcentaje}% (${codigo})`,
+      code: codigo,
+      startsAt: new Date().toISOString(),
+      endsAt: new Date(Date.now() + dias * 24 * 3600 * 1000).toISOString(),
+      usageLimit: 1,
+      appliesOncePerCustomer: true,
+      customerSelection: { all: true },
+      customerGets: { value: { percentage: porcentaje / 100 }, items: { all: true } }
+    }
+  })
+  const errores = r?.discountCodeBasicCreate?.userErrors || []
+  if (errores.length) throw new Error(`Shopify no ha creado el descuento: ${errores.map((e: any) => e.message).join('; ')}`)
+  contexto.codigo_descuento = codigo
+  contexto.descuento_porcentaje = porcentaje
+  return { guardar: true }
 }
 
 function asuntoDelCorreo(definicion: Automatizacion, contexto: Contexto) {
@@ -608,8 +708,13 @@ async function buscarDestinos(contexto: Contexto, canal: CanalSalida = 'auto'): 
 }
 
 // Para los pasos que solo necesitan "la conversación con este cliente"
-// (abrir caso, etiquetar): la que haya, por el canal que sea
+// (abrir caso, etiquetar, pausar): si la automatización nació en una
+// conversación concreta (la IA detectó algo), es esa; si no, la que haya por
+// el canal que sea
 async function buscarDestino(contexto: Contexto): Promise<Destino | null> {
+  if (contexto.conversation_id && contexto.contact_id) {
+    return { canal: (contexto.canal_conversacion || 'whatsapp') as 'whatsapp' | 'email', contact_id: contexto.contact_id, conversation_id: contexto.conversation_id }
+  }
   const { destinos } = await buscarDestinos(contexto, 'auto')
   return destinos[0] || null
 }
@@ -646,7 +751,55 @@ async function pasoAbrirCaso(
   ajustes: Record<string, any>
 ) {
   const destino = await buscarDestino(contexto)
-  const { data: caso, error } = await supabaseAdmin
+  const descripcion = rellenarHuecos(paso.asunto, contexto, ajustes)
+  const prioridad = paso.prioridad || 'normal'
+
+  // Regla del modelo: una conversación tiene como mucho UN caso (lo impone el
+  // índice único `unique_active_case`). Si ya lo tiene, no se abre otro: el
+  // motivo nuevo se anota en él (igual que hace el escalado de la IA), se
+  // reabre si estaba resuelto y sube de prioridad si esta gestión es más
+  // urgente. Visto en pruebas: con la devolución abierta, el cambio de
+  // dirección del mismo cliente fallaba por el índice y nadie se enteraba.
+  if (destino?.conversation_id) {
+    const { data: existente } = await supabaseAdmin
+      .from('cases')
+      .select('id, estatus, descripcion, prioridad, agente_id')
+      .eq('conversation_id', destino.conversation_id)
+      .eq('tenant_id', ejecucion.tenant_id)
+      .order('fecha_apertura', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (existente) {
+      const { casoTerminado } = await import('@/lib/casos/estados')
+      const terminado = casoTerminado(existente.estatus)
+      const rango: Record<string, number> = { baja: 0, normal: 1, alta: 2 }
+      const cambios: Record<string, any> = {}
+      if (terminado) {
+        cambios.estatus = existente.agente_id ? 'atendiendo' : 'pendiente'
+        cambios.fecha_cierre = null
+      }
+      if ((rango[prioridad] ?? 1) > (rango[existente.prioridad] ?? 1)) cambios.prioridad = prioridad
+      if (Object.keys(cambios).length) {
+        const { error } = await supabaseAdmin.from('cases').update(cambios).eq('id', existente.id)
+        if (error) throw new Error(`No se ha podido actualizar el caso: ${error.message}`)
+      }
+      if (descripcion && descripcion !== existente.descripcion) {
+        await supabaseAdmin.from('case_notes').insert({
+          tenant_id: ejecucion.tenant_id,
+          case_id: existente.id,
+          user_id: null,
+          nota: terminado ? `Caso reabierto: ${descripcion}` : `Nuevo motivo: ${descripcion}`
+        })
+      }
+      await supabaseAdmin
+        .from('automatizaciones_ejecuciones')
+        .update({ contact_id: destino.contact_id || null, conversation_id: destino.conversation_id })
+        .eq('id', ejecucion.id)
+      return
+    }
+  }
+
+  const { error } = await supabaseAdmin
     .from('cases')
     .insert({
       tenant_id: ejecucion.tenant_id,
@@ -654,19 +807,16 @@ async function pasoAbrirCaso(
       contact_id: destino?.contact_id || null,
       conversation_id: destino?.conversation_id || null,
       tipo: 'normal',
-      descripcion: rellenarHuecos(paso.asunto, contexto, ajustes),
-      prioridad: paso.prioridad || 'normal',
+      descripcion,
+      prioridad,
       estatus: 'pendiente'
     })
-    .select('id')
-    .single()
   if (error) throw new Error(`No se ha podido abrir el caso: ${error.message}`)
 
   await supabaseAdmin
     .from('automatizaciones_ejecuciones')
     .update({ contact_id: destino?.contact_id || null, conversation_id: destino?.conversation_id || null })
     .eq('id', ejecucion.id)
-  return void caso
 }
 
 // --- Etiquetar la conversación --------------------------------------------
@@ -695,6 +845,39 @@ async function pasoEtiquetar(
     .insert({ conversation_id: destino.conversation_id, category_id: etiqueta.id })
     .select()
     .maybeSingle()
+}
+
+// --- La IA deja de contestar en esa conversación ---------------------------
+async function pasoPausarIa(ejecucion: FilaEjecucion, contexto: Contexto) {
+  const destino = await buscarDestino(contexto)
+  if (!destino) return { parar: true, detalle: 'No hay conversación que pausar.' }
+  await supabaseAdmin
+    .from('conversations')
+    .update({ ia_pausada: true })
+    .eq('id', destino.conversation_id)
+  contexto.ia_pausada = true
+  return { guardar: true }
+}
+
+// --- Traer de la tienda a Respondi (catálogo, políticas) ------------------
+async function pasoImportar(tipo: 'importar_catalogo' | 'importar_politicas', ejecucion: FilaEjecucion, contexto: Contexto, ajustes: Record<string, any>) {
+  const { data: tienda } = await supabaseAdmin
+    .from('tiendas')
+    .select('id, tenant_id, branch_id, dominio, moneda')
+    .eq('branch_id', ejecucion.branch_id)
+    .eq('estado', 'activo')
+    .maybeSingle()
+  if (!tienda) return { parar: true, detalle: 'Hace falta la tienda conectada.' }
+  const { importarCatalogo, importarPoliticas } = await import('@/lib/tiendas/importar')
+  if (tipo === 'importar_catalogo') {
+    const r = await importarCatalogo(tienda as any, { soloActivos: ajustes.solo_activos !== false })
+    contexto.resultado = `${r.total} productos en la tienda: ${r.nuevos} nuevos, ${r.actualizados} actualizados, ${r.retirados} retirados${r.saltados ? `, ${r.saltados} no publicados` : ''}.`
+  } else {
+    const r = await importarPoliticas(tienda as any)
+    contexto.resultado = `${r.total} políticas en la tienda: ${r.nuevas} nuevas, ${r.actualizadas} actualizadas.`
+  }
+  await supabaseAdmin.from('automatizaciones_ejecuciones').update({ detalle: contexto.resultado }).eq('id', ejecucion.id)
+  return { guardar: true }
 }
 
 // --- Poner una etiqueta al cliente en Shopify --------------------------------

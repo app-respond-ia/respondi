@@ -204,18 +204,15 @@ reembolsos y cancelaciones siempre los hace una persona. Detalle y estado en
       propias, con «probar con un pedido de ejemplo») — hechos el 12-09-2026
       con el «hazlo todo de una» de Jorge. Decidido por defecto: propias para
       todos los planes, tope 20 por sucursal, plantillas en español
-- [x] 18 automatizaciones listas (ver `docs/integraciones/shopify.md`)
-- [ ] Las otras 19, de cinco en cinco, cada una con su prueba. Las que
-      quedan necesitan piezas nuevas: detectar intención en el chat (cambio de
-      dirección, devolución, dañado, reclamación, reserva), historial de
-      precios (bajó de precio), «quién preguntó por qué» (vuelve el stock),
-      descuentos en Shopify (segundo aviso de carrito, cumpleaños), importar
-      catálogo y políticas, etiquetar desde Respondi hacia Shopify y al revés
+- [x] **Las 37 automatizaciones listas y probadas** (12-09-2026; migración
+      `20260912180000`: intereses de producto, baja de promociones, origen
+      externo en la lista de precios). Detalle en `docs/integraciones/shopify.md`
 - [x] Herramientas de la IA con datos de la tienda: buscar, estado del pedido
-      con identidad, enlace de compra (con tope). Queda el descuento desde el
-      chat
-- [ ] Baja de promociones: cuando un cliente responde «BAJA», dejar de
-      mandarle marketing (hoy el consentimiento viene solo de Shopify)
+      con identidad, enlace de compra (con tope), lista de espera, detectar
+      intención, presupuesto con precios de la tienda, relacionados
+- [x] Baja de promociones: «BAJA» corta el marketing aunque Shopify diga que sí
+- [ ] Descuento a mano desde el chat (que la IA pueda ofrecer un código si el
+      negocio lo permite): hoy los descuentos salen solo por automatización
 - [ ] Verificación contra una tienda de desarrollo real (necesita que Jorge
       cree la cuenta de Partner de Shopify: pide verificar un correo y
       aceptar su contrato)

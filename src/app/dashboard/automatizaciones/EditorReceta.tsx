@@ -60,7 +60,6 @@ function sinIds(pasos: PasoEditable[]): Paso[] {
 const NOMBRE_TIPO: Record<string, string> = Object.fromEntries(PASOS_EDITOR.map(p => [p.tipo, p.etiqueta]))
 const NO_EDITABLES: Record<string, string> = {
   ia_responde: 'La IA contesta',
-  crear_descuento: 'Crear un código de descuento en la tienda',
   enlace_compra: 'Preparar el carrito y mandar el enlace para pagar',
   etiquetar_en_tienda: 'Poner una etiqueta al cliente en Shopify',
   importar_catalogo: 'Traer los productos de la tienda',
@@ -115,6 +114,7 @@ export function EditorReceta({ clave, esPropia, inicial, ajustes, nombre: nombre
       : nuevoTipo === 'comprobar' ? { tipo: 'comprobar', condiciones: [{ campo: 'pedido.total', operador: 'mayor', valor: 100 }], _id: id }
       : nuevoTipo === 'avisar_equipo' ? { tipo: 'avisar_equipo', texto: 'Pedido {{pedido}} de {{cliente}}', _id: id }
       : nuevoTipo === 'abrir_caso' ? { tipo: 'abrir_caso', asunto: 'Revisar el pedido {{pedido}}', prioridad: 'normal', _id: id }
+      : nuevoTipo === 'crear_descuento' ? { tipo: 'crear_descuento', porcentaje: 10, dias_validez: 3, _id: id }
       : { tipo: 'etiquetar', etiqueta: etiquetas[0] || '', _id: id }
     setPasos(ps => [...ps, nuevo])
   }
@@ -332,6 +332,15 @@ function EditorPaso({ paso, etiquetas, onChange }: { paso: PasoEditable; etiquet
             <option value="normal">Prioridad normal</option>
             <option value="alta">Prioridad alta</option>
           </select>
+        </div>
+      )
+    case 'crear_descuento':
+      return (
+        <div className="flex items-center gap-2 flex-wrap text-sm text-ink-600">
+          <input type="number" min={1} max={90} value={paso.porcentaje ?? 10} onChange={e => onChange({ porcentaje: Number(e.target.value) } as any)} className={`${caja} w-24`} />
+          % de descuento, válido
+          <input type="number" min={1} max={90} value={paso.dias_validez ?? 3} onChange={e => onChange({ dias_validez: Number(e.target.value) } as any)} className={`${caja} w-24`} />
+          días. El código queda en el hueco {'{{codigo}}'} para el mensaje siguiente.
         </div>
       )
     case 'etiquetar':

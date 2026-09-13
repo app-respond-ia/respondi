@@ -5,6 +5,8 @@ import { useState, useEffect } from 'react'
 import { getSkillsGlobales, crearSkillGlobal, actualizarSkillGlobal, eliminarSkillGlobal } from '@/app/actions/skills-globales'
 import { useSuperadminPermisos } from '@/components/layout/SuperadminPermisosContext'
 import { useToast } from '@/components/ui/Toast'
+import { Tabla } from '@/components/ui/Tabla'
+import { PAGINA } from '@/lib/ui'
 
 export default function SuperadminSkillsPage() {
   const [skills, setSkills] = useState<any[]>([])
@@ -89,7 +91,7 @@ export default function SuperadminSkillsPage() {
   }
 
   return (
-    <>
+    <div className={PAGINA}>
       <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
         <div>
           <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Skills de IA</h1>
@@ -103,46 +105,55 @@ export default function SuperadminSkillsPage() {
         )}
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100">
-        {loading ? (
-          <Loading />
-        ) : skills.length === 0 ? (
-          <div className="p-8 text-center text-ink-500">No hay skills creadas.</div>
-        ) : (
-          skills.map(s => (
-            <div key={s.id} className="flex items-center gap-4 p-4">
-              <div className="w-10 h-10 rounded-xl bg-brand-100 text-brand-700 flex items-center justify-center shrink-0">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+      <Tabla
+        filas={skills}
+        idDe={s => s.id}
+        cargando={loading}
+        nombre={['skill', 'skills']}
+        buscar={{ placeholder: 'Buscar skills…', en: s => `${s.nombre || ''} ${s.descripcion || ''}` }}
+        pestanas={[
+          { id: 'todas', etiqueta: 'Todas' },
+          { id: 'defecto', etiqueta: 'Activas por defecto', filtro: s => !!s.activa_por_defecto },
+          { id: 'ocultas', etiqueta: 'Ocultas para clientes', filtro: s => !s.visible_cliente }
+        ]}
+        ordenInicial={{ clave: 'nombre', direccion: 'asc' }}
+        columnas={[
+          { clave: 'nombre', titulo: 'Skill', enMovil: 'titulo', valor: s => s.nombre, render: s => (
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-brand-100 text-brand-700 flex items-center justify-center shrink-0">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-600 text-ink-900">{s.nombre}</p>
-                <p className="text-xs text-ink-500 mt-0.5">{s.descripcion}</p>
-                <div className="flex items-center gap-2 mt-1 flex-wrap">
-                  {!s.visible_cliente && (
-                    <span className="text-[10px] font-600 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">Oculta para clientes</span>
-                  )}
-                  {!s.cliente_puede_toggle && (
-                    <span className="text-[10px] font-600 px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">El cliente no puede cambiarla</span>
-                  )}
-                  <span className={`text-[10px] font-600 px-1.5 py-0.5 rounded ${s.activa_por_defecto ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                    {s.activa_por_defecto ? 'Activa por defecto' : 'Desactivada por defecto'}
-                  </span>
-                </div>
+              <div className="min-w-0">
+                <p className="font-600 text-ink-900 truncate">{s.nombre}</p>
+                <p className="text-xs text-ink-500 truncate">{s.descripcion}</p>
               </div>
-              {canWrite && (
-                <div className="flex items-center gap-1 shrink-0">
-                  <button onClick={() => openEditar(s)} className="p-1.5 rounded-lg text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                  </button>
-                  <button onClick={() => handleEliminar(s.id)} className="p-1.5 rounded-lg text-ink-400 hover:text-red-500 hover:bg-red-50 transition">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                  </button>
-                </div>
-              )}
             </div>
-          ))
-        )}
-      </div>
+          ) },
+          { clave: 'defecto', titulo: 'Por defecto', valor: s => s.activa_por_defecto ? 'Activa' : 'Desactivada', render: s => (
+            <span className={`inline-block text-[10px] font-600 px-1.5 py-0.5 rounded whitespace-nowrap ${s.activa_por_defecto ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+              {s.activa_por_defecto ? 'Activa' : 'Desactivada'}
+            </span>
+          ) },
+          { clave: 'cliente', titulo: 'Para el cliente', valor: s => `${s.visible_cliente ? 'La ve' : 'Oculta'}${s.cliente_puede_toggle ? '' : ', no la cambia'}`, render: s => (
+            <div className="flex flex-wrap gap-1">
+              {!s.visible_cliente && <span className="text-[10px] font-600 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 whitespace-nowrap">Oculta</span>}
+              {!s.cliente_puede_toggle && <span className="text-[10px] font-600 px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 whitespace-nowrap">No la puede cambiar</span>}
+              {s.visible_cliente && s.cliente_puede_toggle && <span className="text-xs text-ink-400">La ve y la cambia</span>}
+            </div>
+          ) }
+        ]}
+        acciones={canWrite ? (s => (
+          <div className="flex items-center gap-1">
+            <button onClick={() => openEditar(s)} className="p-1.5 rounded-lg text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition" title="Editar">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+            </button>
+            <button onClick={() => handleEliminar(s.id)} className="p-1.5 rounded-lg text-ink-400 hover:text-red-500 hover:bg-red-50 transition" title="Eliminar">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            </button>
+          </div>
+        )) : undefined}
+        vacio={<div><h3 className="text-lg font-600 text-ink-900 mb-1">No hay skills creadas</h3><p className="text-ink-500 text-sm">Las skills que crees aquí las verán todas las organizaciones.</p></div>}
+      />
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50">
@@ -208,6 +219,6 @@ export default function SuperadminSkillsPage() {
           </div>
         </div>
       )}
-    </>
+    </div>
   )
 }

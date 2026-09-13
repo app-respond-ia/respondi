@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react'
 import { getSuperadminRoles, crearSuperadminRol, actualizarSuperadminRol, eliminarSuperadminRol } from '@/app/actions/superadmin'
 import { useSuperadminPermisos } from '@/components/layout/SuperadminPermisosContext'
 import { useToast } from '@/components/ui/Toast'
+import { Tabla } from '@/components/ui/Tabla'
 
 type PermisoUI = {
   seccion: string
@@ -59,7 +60,6 @@ export default function SuperadminRolesPage() {
   const [roles, setRoles] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const { showToast } = useToast()
-  const [searchQuery, setSearchQuery] = useState('')
 
   // Modal
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -164,8 +164,7 @@ export default function SuperadminRolesPage() {
 
   if (loading) return <Loading />
 
-  const filteredRoles = roles
-    .filter(r => r.nombre.toLowerCase().includes(searchQuery.toLowerCase()))
+  const filteredRoles = [...roles]
     .sort((a, b) => {
       // Propietario siempre primero
       if (a.es_propietario && !b.es_propietario) return -1
@@ -188,32 +187,41 @@ export default function SuperadminRolesPage() {
         )}
       </div>
 
-      {/* Lista de roles */}
-      <div className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100">
-        {filteredRoles.map(rol => (
-          <div key={rol.id} className="flex items-center gap-4 p-4">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${rol.es_propietario ? 'bg-amber-100 text-amber-700' : 'bg-brand-100 text-brand-700'}`}>
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+      <Tabla
+        filas={filteredRoles}
+        idDe={r => r.id}
+        nombre={['rol', 'roles']}
+        buscar={{ placeholder: 'Buscar roles…', en: r => `${r.nombre || ''} ${r.descripcion || ''}` }}
+        columnas={[
+          { clave: 'nombre', titulo: 'Rol', enMovil: 'titulo', valor: r => r.nombre, render: r => (
+            <div className="flex items-center gap-3 min-w-0">
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${r.es_propietario ? 'bg-amber-100 text-amber-700' : 'bg-brand-100 text-brand-700'}`}>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+              </div>
+              <div className="min-w-0">
+                <p className="font-600 text-ink-900 truncate">{r.nombre}</p>
+                {r.descripcion && <p className="text-xs text-ink-500 truncate">{r.descripcion}</p>}
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-600 text-ink-900">{rol.nombre}</p>
-              <p className="text-xs text-ink-500 mt-0.5">
-                {rol.descripcion && <span className="mr-2">{rol.descripcion}</span>}
-                <span className="text-ink-400 font-600">Nivel {rol.nivel}</span>
-                <span className="text-ink-400 mx-2">·</span>
-                <span className="text-ink-400">{getResumenPermisos(rol)}</span>
-              </p>
-            </div>
-            <div className="flex items-center gap-1 shrink-0">
-              {canWrite && !rol.es_propietario && (
-                <button onClick={() => openEditar(rol)} className="p-1.5 rounded-lg text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                </button>
-              )}
-            </div>
+          ) },
+          { clave: 'nivel', titulo: 'Nivel', valor: r => r.nivel ?? 5, render: r => (
+            <span className="text-sm text-ink-600 whitespace-nowrap">Nivel {r.nivel}</span>
+          ) },
+          { clave: 'permisos', titulo: 'Permisos', valor: r => getResumenPermisos(r), render: r => (
+            <span className={`text-sm whitespace-nowrap ${r.es_propietario ? 'text-amber-700 font-600' : 'text-ink-500'}`}>{getResumenPermisos(r)}</span>
+          ) }
+        ]}
+        acciones={r => (
+          <div className="flex items-center gap-1">
+            {canWrite && !r.es_propietario && (
+              <button onClick={() => openEditar(r)} className="p-1.5 rounded-lg text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition" title="Editar">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+              </button>
+            )}
           </div>
-        ))}
-      </div>
+        )}
+        vacio={<div><h3 className="text-lg font-600 text-ink-900 mb-1">No hay roles</h3><p className="text-ink-500 text-sm">Crea niveles de acceso para tu equipo interno.</p></div>}
+      />
 
       {/* MODAL */}
       {isModalOpen && (

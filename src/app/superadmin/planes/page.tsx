@@ -23,7 +23,7 @@ export default function PlanesPage() {
 
   const defaultFormData = {
     nombre: '', precio_usd: 0, creditos_mensuales: 1000, canales_max: 1, sucursales_max: 1, 
-    usuarios_max: 1, precio_sucursal_extra: 15, 
+    usuarios_max: 1,
     dias_retencion_mensajes: 30, dias_trial: 0, creditos_diarios_trial: 0, modelo_ia: 'gpt-4o-mini',
     precio_input_usd_millon: 0.20, precio_output_usd_millon: 1.20,
     activo: false, acumula_creditos: false, stripe_price_id: '',
@@ -55,7 +55,6 @@ export default function PlanesPage() {
         canales_max: plan.canales_max || 0,
         sucursales_max: plan.sucursales_max || 0,
         usuarios_max: plan.usuarios_max || 0,
-        precio_sucursal_extra: plan.precio_sucursal_extra || 0,
         dias_retencion_mensajes: plan.dias_retencion_mensajes || 30,
         dias_trial: plan.dias_trial ?? 14,
         creditos_diarios_trial: plan.creditos_diarios_trial ?? 0,
@@ -234,9 +233,7 @@ export default function PlanesPage() {
                     </li>
                   </ul>
                   <div className="mt-6 pt-5 border-t border-slate-100">
-                    <p className="text-xs text-ink-500 mb-1">Costo adicional:</p>
-                    <p className="text-xs text-ink-700">${p.precio_sucursal_extra} por sucursal extra</p>
-                    <p className="text-[11px] text-ink-400 mt-1">Sin créditos sueltos: para más respuestas de IA, un plan mayor.</p>
+                    <p className="text-[11px] text-ink-400">Sin extras sueltos: para más respuestas de IA, un plan mayor.</p>
                     <p className={`text-[11px] mt-1 ${p.stripe_price_id ? 'text-indigo-600' : 'text-amber-600'}`}>{p.stripe_price_id ? 'Stripe: precio listo' : Number(p.precio_usd) > 0 ? 'Stripe: sin precio (pulsa «Sincronizar con Stripe»)' : 'Stripe: no se cobra'}</p>
                   </div>
                 </div>
@@ -414,14 +411,8 @@ export default function PlanesPage() {
 
                 {/* Bloque Extras */}
                 <div>
-                  <h3 className="text-sm font-600 text-ink-900 mb-3 uppercase tracking-wide">Costos extra</h3>
-                  <p className="text-[11px] text-ink-400 mb-3">No se venden créditos sueltos (decidido el 13-09-2026): si un cliente necesita más respuestas de IA, sube de plan o se le hace un plan a medida. Los créditos de regalo se dan desde Organizaciones → Recarga manual.</p>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-500 text-ink-600 mb-1.5">Precio x Sucursal extra ($)</label>
-                      <input type="number" step="0.01" value={formData.precio_sucursal_extra} onChange={e => setFormData({...formData, precio_sucursal_extra: parseFloat(e.target.value)})} className="w-full h-10 px-3 rounded-lg border border-slate-300 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-100" />
-                    </div>
-                  </div>
+                  <h3 className="text-sm font-600 text-ink-900 mb-3 uppercase tracking-wide">Extras</h3>
+                  <p className="text-[11px] text-ink-400">No se cobra nada suelto (decidido con Jorge el 13-09-2026): ni créditos ni sucursales. Si un cliente necesita más, sube de plan o se le hace un plan a medida. Los créditos de regalo se dan desde Organizaciones → Recarga manual.</p>
                 </div>
 
               </div>

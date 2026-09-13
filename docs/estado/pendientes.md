@@ -218,13 +218,20 @@ reembolsos y cancelaciones siempre los hace una persona. Detalle y estado en
       con identidad, enlace de compra (con tope), lista de espera, detectar
       intención, presupuesto con precios de la tienda, relacionados
 - [x] Baja de promociones: «BAJA» corta el marketing aunque Shopify diga que sí
-- [ ] Descuento a mano desde el chat (que la IA pueda ofrecer un código si el
-      negocio lo permite): hoy los descuentos salen solo por automatización
+- Descuento a mano desde el chat: descartado por Jorge (14-09-2026). No todos
+  los clientes tienen tienda (una peluquería, por ejemplo), así que los
+  descuentos se quedan donde están: en las automatizaciones de tienda
 - [ ] Verificación contra una tienda de desarrollo real (necesita que Jorge
       cree la cuenta de Partner de Shopify: pide verificar un correo y
       aceptar su contrato)
-- [ ] Editor visual de recetas ("el mapa"), más adelante
-- Soporte automatizado con IA: aplazado por Jorge hasta terminar Shopify
+- [x] Editor visual de recetas ("el mapa") (14-09-2026): en Automatizaciones,
+      junto a «Cómo funciona», un interruptor Lista/Mapa. La misma receta
+      dibujada con cajas y flechas (`MapaReceta.tsx`), sin librerías: la
+      espera se pinta sobre la flecha y «comprobar» enseña su salida de «si
+      no se cumple, aquí se para»
+- [x] Soporte automatizado con IA (14-09-2026): hecho y ampliado. El
+      asistente no solo responde dudas, también hace cambios con
+      confirmación. Ver `core-plataforma.md`
 
 ## Prioridad 5 — Agenda de reservas (arrancada el 12-09-2026)
 Decidido con Jorge: agenda para cualquier negocio (también restaurantes),
@@ -286,8 +293,8 @@ Tramo 3, pantallas — hecho (13-09-2026), ver `docs/convenciones.md`
       Node frente al del navegador), corregido con idioma fijo
 - [x] Verificado en producción (13-09-2026, tras el despliegue): la misma
       revisión contra respondi.vercel.app, 144 pantallas, 0 con problemas
-- [ ] Skills y Roles de superadmin siguen como tarjetas de configuración (no
-      son listas de datos)
+- [x] Skills y Roles de superadmin pasados a tabla (14-09-2026): buscador,
+      orden y, en Skills, pestañas por estado
 Después:
 - [x] Stripe (13-09-2026): Checkout, cambio de plan en la suscripción,
       webhook que activa el plan y recarga créditos, portal, sincronización
@@ -398,16 +405,16 @@ se traga en silencio.
       reenvía el mismo correo de Respondi con el enlace bueno. La plantilla de
       Supabase es una de las suyas por defecto: no se puede borrar, pero ya no
       se manda nunca
-- [ ] Excedentes sobre límites del plan (`plans.precio_credito_adicional`,
-      `plans.precio_sucursal_extra`) — existen en el formulario pero
-      sin flujo de cobro real todavía
+- [x] Excedentes sobre límites del plan (14-09-2026): quitados del formulario
+      de planes. No se cobra nada suelto, ni créditos ni sucursales: quien
+      necesite más, sube de plan o se le hace un plan a medida. Las columnas
+      `plans.precio_credito_adicional` y `plans.precio_sucursal_extra` siguen
+      en la base de datos (borrar columnas se pregunta antes)
 - [x] Cron `revisar-bloqueos` con el tiempo de espera por defecto de pg_net
       (5 s): cuando Vercel tardaba en arrancar, la llamada se daba por perdida
       (6-8 veces por hora en `net._http_response`). Igualado a 60 s como los
       demás (12-09-2026, migración `20260912160000`), verificado
-- [ ] Llamadas del reloj que se cuelgan 60 s enteros: 1-3 por hora, a
-      cualquier cron, desde antes de Shopify. La app no llega ni a leer la
-      base de datos (el aviso pendiente se trató limpio al minuto siguiente en
-      3,8 s). Todos los crones se recuperan solos en la vuelta siguiente, así
-      que no bloquea; para afinarlo hacen falta los logs de Vercel de esos
-      minutos (cold start vs. Supabase)
+- [x] Llamadas del reloj que se colgaban 60 s enteros (14-09-2026): era
+      `/api/cron/revisar-bloqueos`, que esperaba a la IA dentro de un
+      `after()` y con eso mantenía la conexión abierta. Ahora solo desbloquea
+      y lo recoge el reparto de la IA. Detalle en `incidentes-resueltos.md`

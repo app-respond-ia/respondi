@@ -99,3 +99,61 @@ para tipo `vendedor`. `invitarUsuario` verificado de punta a punta el
 11-09-2026 y el reenvío arreglado el 12-09-2026 (usaba el sistema viejo de
 Supabase): `probar-invitacion`, 9 comprobaciones con navegador real
 (`usuario_organizacion`) de principio a fin.
+
+## Asistente de IA del panel (14-09-2026)
+Decidido con Jorge: el chat de Ayuda y soporte deja de ser solo soporte y
+pasa a **hacer cosas**. El cliente pide lo que quiere en su idioma («créame
+una etiqueta de devoluciones», «los lunes abrimos de 9 a 14 y de 16 a 20»,
+«sube el corte de pelo a 15 euros») y el asistente lo prepara, lo enseña en
+una tarjeta y lo ejecuta **solo cuando el cliente confirma**.
+
+Dónde: `/dashboard/soporte`, pestaña «Asistente». El ticket hacia nuestro
+equipo sigue en la otra pestaña, para lo que el asistente no puede resolver.
+
+Cómo está montado:
+- `src/lib/asistente/herramientas.ts` — 25 herramientas. Cada una llama a la
+  **misma acción del panel** que usa la pantalla (`crearEtiqueta`,
+  `saveHorarios`, `guardarAjustesAgenda`, `invitarUsuario`…). Por eso hereda
+  gratis los permisos, las validaciones y la auditoría: el asistente no
+  puede hacer nada que el usuario no pudiera hacer a mano. Aquí no se
+  escribe en la base de datos directamente.
+  - Mirar (9): etiquetas, reglas, precios, horarios, agenda, automatizaciones,
+    usuarios, canales (sin claves) y ficha del negocio.
+  - Cambiar (16): crear/cambiar/borrar etiquetas, reglas y artículos de la
+    lista de precios; horarios; ficha del negocio; encender y apagar
+    automatizaciones; ajustes y recursos de la agenda; invitar usuarios y
+    cambiar su rol o su acceso.
+- `src/lib/asistente/asistente.ts` — el motor. Mirar se ejecuta al momento;
+  cambiar **nunca**: devuelve una propuesta. Las instrucciones le prohíben
+  decir «ya está hecho».
+- `src/app/actions/asistente.ts` — preguntar y confirmar, separados a
+  propósito. Los argumentos de la propuesta se guardan en el servidor
+  (`asistente_acciones`), no viajan por el navegador: nadie puede cambiarlos
+  entre la propuesta y el sí. Al confirmar se vuelven a comprobar los
+  permisos (pueden haber cambiado) y se descarta si tiene más de una hora.
+- Borrar algo va marcado como peligroso: botón rojo, modal de confirmación y
+  la consecuencia escrita («las conversaciones que la tengan la perderán»).
+- Migración `20260914100000_asistente.sql`: `asistente_conversaciones`,
+  `asistente_mensajes`, `asistente_acciones` (cada uno ve solo las suyas) y
+  `audit_log.por_asistente`.
+
+En el registro de cambios se ve **la IA y el usuario** (lo pidió Jorge así):
+`por_asistente` marca que lo ejecutó el asistente y `user_id` sigue siendo la
+persona que lo pidió. La pantalla lo enseña como el nombre de la persona con
+una etiqueta «Asistente de IA» debajo, y sale también en el CSV exportado.
+
+Lo que NO hace: claves de canales, planes y cobros, borrar la organización, y
+leer o escribir conversaciones con clientes finales (para eso está Chats).
+
+Créditos: el asistente **no gasta los créditos de IA del cliente**. Lleva su
+propio modelo (`ASISTENTE_MODELO_IA`, por defecto `gpt-4o-mini`). El motivo:
+si pedir ayuda gastara créditos, usar Respondi saldría caro justo cuando el
+cliente está atascado.
+
+Probado con un OpenAI simulado (`openai-simulado.mjs`, el SDK respeta
+`OPENAI_BASE_URL`): `probar-asistente.mjs`, 29 comprobaciones, 0 fallos.
+Cubre que mirar lee datos de verdad, que cambiar no toca nada antes de
+confirmar, que al confirmar se ejecuta y queda bien en la auditoría, que
+confirmar dos veces no duplica, descartar, borrar con aviso, fallos con
+motivo claro, varias propuestas a la vez, caducidad, propuestas inventadas y
+que el saldo de créditos no se mueve.

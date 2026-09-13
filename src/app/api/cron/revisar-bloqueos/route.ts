@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { after } from 'next/server'
 import crypto from 'crypto'
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { isFueraDeHorario } from '@/lib/horarios'
@@ -93,31 +92,27 @@ export async function POST(req: Request) {
       }
 
       if (desbloquear) {
-        // ACTUALIZACIÓN DE LIBERACIÓN + CANDADO EN LA MISMA OPERACIÓN
+        // Se quita el bloqueo y ya está: NO se pone candado ni se llama a la
+        // IA desde aquí.
+        //
+        // Antes esta ruta se encargaba ella misma de disparar /api/ai/process
+        // dentro de un `after()`. El problema (visto el 14-09-2026): en Vercel
+        // la conexión no se cierra hasta que termina el `after()`, y ese
+        // `after()` esperaba a una respuesta de la IA, que tarda. Resultado:
+        // pg_net se quedaba colgado los 60 s enteros y daba la llamada por
+        // perdida (1-3 veces por hora, siempre en los múltiplos de 5 minutos,
+        // que es cuando corre este cron).
+        //
+        // Como `disparar_webhook_ia()` pasa cada 20 segundos y coge cualquier
+        // conversación con `motivo_bloqueo IS NULL` que tenga algo sin
+        // contestar, basta con desbloquear: la recoge él, con su propio
+        // candado, y no hay dos sitios llamando a la IA.
         const { error: updateError } = await supabaseAdmin
           .from('conversations')
-          .update({ 
-            motivo_bloqueo: null, 
-            bloqueada_desde: null, 
-            ia_procesando_desde: new Date().toISOString() // Candado para evitar choque con cron principal
-          })
+          .update({ motivo_bloqueo: null, bloqueada_desde: null })
           .eq('id', conv.id)
 
-        if (!updateError) {
-          // DISPARAR EL WEBHOOK EN SEGUNDO PLANO
-          after(() => {
-            fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'https://respondi.vercel.app'}/api/ai/process`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${secret}`
-              },
-              body: JSON.stringify({ conversation_id: conv.id })
-            }).catch(err => console.error('Error triggering webhook for', conv.id, err))
-          })
-          
-          procesadas++
-        }
+        if (!updateError) procesadas++
       }
     } catch (err) {
       console.error(`Error procesando conversación bloqueada ${conv.id}:`, err)

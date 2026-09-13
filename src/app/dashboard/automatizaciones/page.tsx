@@ -12,6 +12,7 @@ import { getMisPermisos } from '@/app/actions/permisos'
 import { CANALES_SALIDA, type Receta } from '@/lib/automatizaciones/tipos'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { EditorReceta } from './EditorReceta'
+import MapaReceta from './MapaReceta'
 
 // La receta con la que nace una automatización propia nueva
 const RECETA_NUEVA: Receta = {
@@ -366,6 +367,8 @@ function TarjetaAutomatizacion({ fila, abierta, onAbrir, onAlternar, onGuardar, 
   const [editorPlantilla, setEditorPlantilla] = useState(false)
   const [otraPlantilla, setOtraPlantilla] = useState(false)
   const [editando, setEditando] = useState(false)
+  // Cómo se enseña la receta: la lista de siempre o el mapa de cajas
+  const [vista, setVista] = useState<'lista' | 'mapa'>('lista')
   useEffect(() => { setAjustes(fila.ajustes) }, [fila.ajustes])
 
   async function enviarPlantilla() {
@@ -464,6 +467,19 @@ function TarjetaAutomatizacion({ fila, abierta, onAbrir, onAlternar, onGuardar, 
               <div className="mt-4">
                 <div className="flex items-center gap-3 flex-wrap mb-2">
                   <p className="text-xs uppercase tracking-wider text-ink-400 font-600">Cómo funciona</p>
+                  {/* La misma receta, en lista o dibujada */}
+                  <div className="inline-flex rounded-lg border border-slate-200 overflow-hidden">
+                    {([['lista', 'Lista'], ['mapa', 'Mapa']] as const).map(([v, nombre]) => (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => setVista(v)}
+                        className={`px-2.5 py-1 text-[11px] font-600 transition ${vista === v ? 'bg-brand-50 text-brand-700' : 'text-ink-500 hover:text-ink-800'}`}
+                      >
+                        {nombre}
+                      </button>
+                    ))}
+                  </div>
                   {puedeEscribir && !enCamino && (
                     <button type="button" onClick={() => setEditando(true)} className="text-xs font-600 text-brand-600 hover:text-brand-700 transition">
                       {fila.propia ? 'Editar' : 'Moldear a mi gusto'}
@@ -480,15 +496,19 @@ function TarjetaAutomatizacion({ fila, abierta, onAbrir, onAlternar, onGuardar, 
                     </button>
                   )}
                 </div>
-                <ol className="relative border-l-2 border-slate-200 ml-2 space-y-3">
-                  {fila.pasos.map((p, i) => (
-                    <li key={i} className="pl-4 relative">
-                      <span className={`absolute -left-[7px] top-1.5 w-3 h-3 rounded-full border-2 border-white ${p.tipo === 'disparador' ? 'bg-brand-600' : p.tipo === 'condicion' || p.tipo === 'comprobar' ? 'bg-amber-400' : p.tipo === 'esperar' ? 'bg-slate-300' : 'bg-emerald-500'}`}></span>
-                      <p className="text-sm text-ink-800">{p.titulo}</p>
-                      {p.detalle && <p className="text-xs text-ink-500 mt-0.5 italic">«{p.detalle}»</p>}
-                    </li>
-                  ))}
-                </ol>
+                {vista === 'mapa' ? (
+                  <MapaReceta pasos={fila.pasos} />
+                ) : (
+                  <ol className="relative border-l-2 border-slate-200 ml-2 space-y-3">
+                    {fila.pasos.map((p, i) => (
+                      <li key={i} className="pl-4 relative">
+                        <span className={`absolute -left-[7px] top-1.5 w-3 h-3 rounded-full border-2 border-white ${p.tipo === 'disparador' ? 'bg-brand-600' : p.tipo === 'condicion' || p.tipo === 'comprobar' ? 'bg-amber-400' : p.tipo === 'esperar' ? 'bg-slate-300' : 'bg-emerald-500'}`}></span>
+                        <p className="text-sm text-ink-800">{p.titulo}</p>
+                        {p.detalle && <p className="text-xs text-ink-500 mt-0.5 italic">«{p.detalle}»</p>}
+                      </li>
+                    ))}
+                  </ol>
+                )}
               </div>
             )}
 

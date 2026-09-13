@@ -1036,3 +1036,37 @@ mismos ids; las limpiezas solo borran lo simulado (dominio
 `5000000000000xx`). A medio plazo lo sano es una **sucursal solo para
 pruebas** dentro de la organización de pruebas, para que nada real conviva
 con las baterías.
+
+## El reloj se colgaba 60 segundos enteros, 1-3 veces por hora (resuelto, 14-09-2026)
+Desde antes de Shopify, varias llamadas de pg_cron por hora se daban por
+perdidas con `Timeout of 60000 ms reached` en `net._http_response`. Como
+todos los crones se recuperaban solos en la vuelta siguiente, no bloqueaba
+nada y se quedó apuntado como pendiente de mirar con los logs de Vercel.
+
+Se resolvió sin los logs, leyendo el propio error. En todas las llamadas
+fallidas el DNS tardaba milisegundos y el saludo TCP/SSL también: el tiempo
+entero se iba en `HTTP Request/Response time: ~59,9 s`. O sea, no era un
+arranque en frío ni la red: la conexión se abría bien y **no se cerraba**.
+Y todas caían en múltiplos de 5 minutos, que es justo cuando corre
+`disparador-revision-bloqueos` (`*/5`).
+
+Causa: `/api/cron/revisar-bloqueos` desbloqueaba la conversación, se ponía el
+candado (`ia_procesando_desde`) y llamaba ella misma a `/api/ai/process`
+dentro de un `after()`. En Vercel la conexión no se cierra hasta que termina
+el `after()`, y ese `after()` esperaba a una respuesta de la IA, que tarda
+lo que tarda OpenAI. Resultado: pg_net esperando los 60 s enteros. El arreglo
+del 12-09-2026 (subir el tiempo de espera de pg_net de 5 s a 60 s) trataba el
+síntoma: antes fallaba a los 5 s y después a los 60.
+
+Arreglo: la ruta ya solo desbloquea (`motivo_bloqueo = null`) y no pone
+candado ni llama a nadie. `disparar_webhook_ia()` pasa cada 20 segundos y
+coge cualquier conversación con `motivo_bloqueo IS NULL` que tenga algo sin
+contestar, así que la recoge él, con su propio candado, y no hay dos sitios
+llamando a la IA. Medido en local: 463 ms con una conversación que
+desbloquear, 99 ms sin nada (antes, 60 000 ms). `probar-bloqueos.mjs`,
+6 comprobaciones.
+
+Regla que deja: en Vercel, **nunca esperar dentro de `after()` a algo que
+tarde**, y menos a una llamada HTTP a la propia app. Si hay trabajo que
+encadenar, se deja marcado en la base de datos y lo recoge el cron que ya
+pasa por ahí.

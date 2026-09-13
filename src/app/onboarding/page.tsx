@@ -1,4 +1,6 @@
 'use client'
+import { SelectorPrefijo } from '@/components/ui/CampoTelefono'
+import { separarTelefono } from '@/lib/paises'
 import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
@@ -128,10 +130,10 @@ export default function OnboardingPage() {
         let prefijo = '+34'
         let num = ''
         if (d.s0.telefono) {
-          const match = d.s0.telefono.match(/^(\+\d{1,4})(.*)$/)
-          if (match) {
-            prefijo = match[1]
-            num = match[2]
+          const partes = separarTelefono(d.s0.telefono)
+          if (partes) {
+            prefijo = partes.prefijo
+            num = partes.numero
           } else {
             num = d.s0.telefono
           }
@@ -432,24 +434,8 @@ export default function OnboardingPage() {
                     <div>
                       <label className="block text-sm font-medium text-ink-700 mb-1.5">Teléfono <span className="text-ink-400 font-normal">· opcional</span></label>
                       <div className="flex gap-2">
-                        <select value={s0.prefijoPais} onChange={e => setS0({...s0, prefijoPais: e.target.value})}
-                          className="w-[120px] h-12 px-3 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition">
-                          <option value="+34">🇪🇸 +34</option>
-                          <option value="+52">🇲🇽 +52</option>
-                          <option value="+57">🇨🇴 +57</option>
-                          <option value="+54">🇦🇷 +54</option>
-                          <option value="+56">🇨🇱 +56</option>
-                          <option value="+51">🇵🇪 +51</option>
-                          <option value="+58">🇻🇪 +58</option>
-                          <option value="+593">🇪🇨 +593</option>
-                          <option value="+598">🇺🇾 +598</option>
-                          <option value="+595">🇵🇾 +595</option>
-                          <option value="+591">🇧🇴 +591</option>
-                          <option value="+1809">🇩🇴 +1809</option>
-                          <option value="+502">🇬🇹 +502</option>
-                          <option value="+506">🇨🇷 +506</option>
-                          <option value="+507">🇵🇦 +507</option>
-                        </select>
+                        <SelectorPrefijo prefijo={s0.prefijoPais} onCambiar={p => setS0({...s0, prefijoPais: p})}
+                          className="w-36 shrink-0 h-12 px-2 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition" />
                         <input type="tel" value={s0.telefono}
                           onChange={e => setS0({...s0, telefono: e.target.value.replace(/\D/g, '')})}
                           placeholder="612 345 678"

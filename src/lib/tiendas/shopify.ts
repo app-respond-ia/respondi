@@ -234,6 +234,8 @@ export const PERMISOS_RECOMENDADOS = [
   'read_orders',
   'read_fulfillments',
   'read_customers',
+  // Para etiquetar clientes en Shopify desde las automatizaciones
+  'write_customers',
   'read_shipping',
   'read_content',
   'write_draft_orders',

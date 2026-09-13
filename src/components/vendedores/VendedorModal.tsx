@@ -5,6 +5,8 @@ import { crearVendedor, actualizarVendedor, añadirNotaVendedor } from '@/app/ac
 import { useToast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { emailValido } from '@/lib/invitaciones'
+import { CampoTelefono } from '@/components/ui/CampoTelefono'
+import { separarTelefono, unirTelefono } from '@/lib/paises'
 
 interface VendedorModalProps {
   isOpen: boolean
@@ -191,9 +193,12 @@ export default function VendedorModal({ isOpen, onClose, mode, vendedor, onSucce
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-500 text-ink-700 mb-1.5">Teléfono</label>
-                    <input type="text" placeholder="+34..." value={formData.telefono}
-                      onChange={e => setFormData({...formData, telefono: e.target.value})}
-                      className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100 transition" />
+                    <CampoTelefono
+                      prefijo={separarTelefono(formData.telefono)?.prefijo || '+34'}
+                      numero={separarTelefono(formData.telefono)?.numero || formData.telefono.replace(/[^\d\s]/g, '')}
+                      onCambiar={v => setFormData({...formData, telefono: v.numero.trim() ? (unirTelefono(v.prefijo, v.numero) || `${v.prefijo}${v.numero.replace(/\D/g, '')}`) : ''})}
+                      claseSelect="h-10 px-2 rounded-xl border border-slate-300 bg-white text-sm w-28 shrink-0 focus:outline-none focus:border-brand-500"
+                      claseInput="flex-1 min-w-0 h-10 px-3 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100 transition" />
                   </div>
                   <div>
                     <label className="block text-xs font-500 text-ink-700 mb-1.5">DNI / NIF</label>

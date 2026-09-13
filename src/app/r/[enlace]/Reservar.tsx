@@ -4,12 +4,13 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { getHuecosPublicos, crearReservaPublica } from '@/app/actions/reservas-publicas'
 import { textoHora, textoFechaHora, sumarDias, partesEnZona } from '@/lib/agenda/tiempo'
+import { CampoTelefono } from '@/components/ui/CampoTelefono'
 
 // El formulario público de reserva, en tres pasos: qué, cuándo, quién.
 // Pensado para el móvil (la mayoría llega desde Instagram o un QR).
 
 interface Datos {
-  negocio: { nombre: string; direccion: string | null; zona_horaria: string }
+  negocio: { nombre: string; direccion: string | null; zona_horaria: string; pais: string | null; prefijo: string }
   modo: 'servicios' | 'restaurante'
   paso_minutos: number
   antelacion_minima_minutos: number
@@ -34,6 +35,11 @@ const dinero = (n: number | null, moneda: string, tipo: string, porPersona: bool
 export default function Reservar({ enlace, datos }: { enlace: string; datos: Datos }) {
   const restaurante = datos.modo === 'restaurante'
   const zona = datos.negocio.zona_horaria
+  // Si quien reserva está en otra zona horaria, se avisa: las horas son las del negocio
+  const [otraZona, setOtraZona] = useState(false)
+  useEffect(() => {
+    try { setOtraZona(Intl.DateTimeFormat().resolvedOptions().timeZone !== zona) } catch { setOtraZona(false) }
+  }, [zona])
   const [paso, setPaso] = useState<1 | 2 | 3 | 4>(1)
   const [servicioId, setServicioId] = useState(restaurante ? 'mesa' : (datos.servicios[0]?.id || ''))
   const [personas, setPersonas] = useState(restaurante ? 2 : 1)
@@ -46,6 +52,7 @@ export default function Reservar({ enlace, datos }: { enlace: string; datos: Dat
   const [buscando, setBuscando] = useState(false)
   const [inicio, setInicio] = useState<string | null>(null)
   const [nombre, setNombre] = useState('')
+  const [prefijo, setPrefijo] = useState(datos.negocio.prefijo || '+34')
   const [telefono, setTelefono] = useState('')
   const [email, setEmail] = useState('')
   const [peticiones, setPeticiones] = useState('')
@@ -88,7 +95,7 @@ export default function Reservar({ enlace, datos }: { enlace: string; datos: Dat
     setError(null)
     if (!inicio) return setError('Elige una hora.')
     setEnviando(true)
-    const r = await crearReservaPublica(enlace, { servicio_id: servicioId, inicio, personas, recurso_id: profesionalId || null, zona: zonaMesa || null, extras, nombre, telefono, email, peticiones, acepta, web })
+    const r = await crearReservaPublica(enlace, { servicio_id: servicioId, inicio, personas, recurso_id: profesionalId || null, zona: zonaMesa || null, extras, nombre, prefijo, telefono, email, peticiones, acepta, web })
     setEnviando(false)
     if (r.success && r.data) { setHecha(r.data); setPaso(4); window.scrollTo({ top: 0 }) }
     else { setError(r.error || 'No se ha podido hacer la reserva.'); if ((r as any).volver_a_huecos) { setPaso(2); setInicio(null) } }
@@ -228,7 +235,7 @@ export default function Reservar({ enlace, datos }: { enlace: string; datos: Dat
                   </div>
                   <div>
                     <label className="block text-sm font-600 text-ink-700 mb-1">Otro día</label>
-                    <input type="date" value={fecha} min={datos.hoy} max={datos.hasta} onChange={e => e.target.value && setFecha(e.target.value)} className={campo} />
+                    <input type="date" value={fecha} min={datos.hoy} max={datos.hasta} onChange={e => e.target.value && e.target.value >= datos.hoy && e.target.value <= datos.hasta && setFecha(e.target.value)} className={campo} />
                   </div>
                   {buscando ? <p className="text-sm text-ink-500">Buscando huecos…</p> : huecos.length === 0 ? (
                     <p className="text-sm text-ink-600">{motivo || 'No queda hueco ese día.'} Prueba otro día.</p>
@@ -242,6 +249,7 @@ export default function Reservar({ enlace, datos }: { enlace: string; datos: Dat
                       </div>
                     </div>
                   ))}
+                  {otraZona && <p className="text-xs text-ink-500">Las horas son las de {datos.negocio.nombre} ({zona.replace(/_/g, ' ')}), no las de tu teléfono.</p>}
                   <button type="button" disabled={!inicio} onClick={() => setPaso(3)} className={`${boton} w-full bg-brand-600 text-white`}>Continuar</button>
                 </div>
               )}
@@ -253,7 +261,10 @@ export default function Reservar({ enlace, datos }: { enlace: string; datos: Dat
               {paso === 3 && (
                 <div className="mt-4 space-y-3">
                   <div><label className="block text-sm font-600 text-ink-700 mb-1">Nombre</label><input value={nombre} onChange={e => setNombre(e.target.value)} className={campo} required autoComplete="name" /></div>
-                  <div><label className="block text-sm font-600 text-ink-700 mb-1">WhatsApp</label><input value={telefono} onChange={e => setTelefono(e.target.value)} className={campo} placeholder="+34 600 000 000" inputMode="tel" autoComplete="tel" /></div>
+                  <div>
+                    <label htmlFor="reserva-telefono" className="block text-sm font-600 text-ink-700 mb-1">WhatsApp <span className="font-400 text-ink-400">· prefijo y número</span></label>
+                    <CampoTelefono id="reserva-telefono" prefijo={prefijo} numero={telefono} onCambiar={v => { setPrefijo(v.prefijo); setTelefono(v.numero) }} placeholder="600 000 000" />
+                  </div>
                   <div><label className="block text-sm font-600 text-ink-700 mb-1">Correo <span className="font-400 text-ink-400">· si prefieres que te escribamos ahí</span></label><input type="email" value={email} onChange={e => setEmail(e.target.value)} className={campo} autoComplete="email" /></div>
                   <div><label className="block text-sm font-600 text-ink-700 mb-1">¿Algo que debamos saber? <span className="font-400 text-ink-400">· opcional</span></label><input value={peticiones} onChange={e => setPeticiones(e.target.value)} className={campo} placeholder={restaurante ? 'Alergias, trona, celebración…' : 'Alergias, preferencias…'} /></div>
                   <div className="hidden" aria-hidden="true"><label>Web<input tabIndex={-1} autoComplete="off" value={web} onChange={e => setWeb(e.target.value)} /></label></div>

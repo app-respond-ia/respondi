@@ -9,7 +9,28 @@ export const ETIQUETA_ESTADO_PLANTILLA: Record<string, string> = {
   pendiente: 'En revisión',
   rechazada: 'Rechazada',
   pausada: 'Pausada por Meta',
-  desactivada: 'Desactivada por Meta'
+  desactivada: 'Desactivada por Meta',
+  borrada: 'Borrada en Meta'
+}
+
+// Qué dato va en cada hueco de una plantilla prediseñada, en palabras
+export const NOMBRE_HUECO: Record<string, string> = {
+  cliente: 'nombre del cliente',
+  pedido: 'número de pedido',
+  total: 'total del pedido',
+  seguimiento: 'enlace de seguimiento',
+  producto: 'producto',
+  enlace: 'enlace',
+  codigo: 'código de descuento',
+  descuento: 'descuento',
+  dias: 'días',
+  falta: 'dato que falta',
+  negocio: 'nombre del negocio',
+  servicio: 'servicio',
+  cita_fecha: 'fecha de la cita',
+  cita_hora: 'hora de la cita',
+  tiempo: 'tiempo sin venir',
+  etiqueta: 'etiqueta'
 }
 
 export const ETIQUETA_CATEGORIA_PLANTILLA: Record<string, string> = {

@@ -314,10 +314,9 @@ export async function crearCitaPanel(d: DatosCitaPanel) {
   const auth = await sesion()
   if ('error' in auth) return { success: false, error: auth.error }
 
-  const { data: sucursal } = await supabaseAdmin.from('sucursales').select('pais').eq('id', auth.branch_id).maybeSingle()
-  const telefono = completarTelefono(d.telefono, sucursal?.pais)
+  const telefono = completarTelefono(d.telefono)
   const email = String(d.email || '').trim().toLowerCase() || null
-  if (String(d.telefono || '').trim() && !telefono) return { success: false, error: 'El teléfono no parece correcto (con prefijo, por ejemplo +34...).' }
+  if (String(d.telefono || '').trim() && !telefono) return { success: false, error: 'El teléfono no parece correcto. Elige el prefijo del país y escribe el número.' }
   if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { success: false, error: 'El correo no parece correcto.' }
   let contacto: { id: string } | null = null
   if (telefono) contacto = await buscarOCrearContacto(auth.tenant_id, 'whatsapp', telefono, d.nombre)

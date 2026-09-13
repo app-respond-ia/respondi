@@ -5,6 +5,7 @@ import { registrarError } from '@/lib/errores'
 import { cargarAgenda, esRestaurante, huecosDelDia, servicioPorId, type Agenda } from '@/lib/agenda/disponibilidad'
 import { crearCita, moverCita, cancelarCita, buscarOCrearContacto, citaPorToken, completarTelefono } from '@/lib/agenda/citas'
 import { diaEnZona, leerFecha, sumarDias } from '@/lib/agenda/tiempo'
+import { unirTelefono, prefijoDelPais } from '@/lib/paises'
 import { ESTADOS_ACTIVOS, ID_MESA, type Cita } from '@/lib/agenda/tipos'
 
 // EL ENLACE PÚBLICO DE RESERVA (tramo 3). Sin cuenta ni contraseña: el
@@ -44,7 +45,9 @@ function resumenPublico(agenda: Agenda) {
   const restaurante = esRestaurante(agenda)
   const mesas = agenda.recursos.filter(r => r.activo && r.tipo === 'mesa')
   return {
-    negocio: { nombre: agenda.negocio.nombre, direccion: agenda.negocio.direccion, zona_horaria: agenda.zona },
+    // El país del negocio solo sirve para preseleccionar el prefijo: el
+    // cliente elige el suyo
+    negocio: { nombre: agenda.negocio.nombre, direccion: agenda.negocio.direccion, zona_horaria: agenda.zona, pais: agenda.negocio.pais, prefijo: prefijoDelPais(agenda.negocio.pais) || '+34' },
     modo: agenda.ajustes.modo,
     paso_minutos: agenda.ajustes.paso_minutos,
     antelacion_minima_minutos: agenda.ajustes.antelacion_minima_minutos,
@@ -75,6 +78,8 @@ export async function getHuecosPublicos(enlace: string, p: { servicio_id: string
   const r = await agendaPorEnlace(enlace)
   if (!r) return { success: false, error: 'Este enlace de reservas no está activo.' }
   if (!leerFecha(p.fecha)) return { success: false, error: 'Fecha no válida.' }
+  // Un día que ya ha pasado (en la hora del negocio) no tiene huecos
+  if (p.fecha < diaEnZona(new Date(), r.agenda.zona)) return { success: true, data: { huecos: [], motivo: 'Ese día ya ha pasado.' } }
   const personas = Math.max(1, Math.min(500, Math.round(Number(p.personas) || 1)))
   const servicio = servicioPorId(r.agenda, p.servicio_id, personas)
   if (!servicio || (servicio.id !== ID_MESA && !servicio.reservable_online)) return { success: false, error: 'Ese servicio no se reserva por internet.' }
@@ -92,6 +97,8 @@ export interface DatosReservaPublica {
   zona?: string | null
   extras?: string[]
   nombre: string
+  // El prefijo del país va aparte del número (el cliente lo elige siempre)
+  prefijo?: string | null
   telefono?: string | null
   email?: string | null
   peticiones?: string | null
@@ -133,9 +140,13 @@ export async function crearReservaPublica(enlace: string, d: DatosReservaPublica
   if (!d.acepta) return { success: false, error: 'Tienes que aceptar la política de privacidad.' }
   const nombre = String(d.nombre || '').trim().slice(0, 80)
   if (nombre.length < 2) return { success: false, error: 'Dinos tu nombre.' }
-  const telefono = completarTelefono(d.telefono, r.agenda.negocio.pais)
+  const telefono = telefonoPublico(d.prefijo, d.telefono)
   const email = String(d.email || '').trim().toLowerCase()
-  if (String(d.telefono || '').trim() && !telefono) return { success: false, error: 'El teléfono no parece correcto. Ponlo con el prefijo del país, por ejemplo +34 600 000 000.' }
+  if (String(d.telefono || '').trim() && !telefono) return { success: false, error: 'El teléfono no parece correcto. Elige el prefijo de tu país y escribe solo el número.' }
+  // Ni una hora que ya ha pasado ni una fecha inventada
+  const instante = new Date(String(d.inicio || ''))
+  if (isNaN(instante.getTime())) return { success: false, error: 'La fecha y hora no son válidas.' }
+  if (instante.getTime() < Date.now()) return { success: false, error: 'Esa hora ya ha pasado. Elige otra, por favor.', volver_a_huecos: true }
   if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { success: false, error: 'El correo no parece correcto.' }
   if (!telefono && !email) return { success: false, error: 'Necesitamos tu WhatsApp o tu correo para confirmarte la reserva.' }
   const personas = Math.max(1, Math.min(500, Math.round(Number(d.personas) || 1)))
@@ -173,6 +184,15 @@ export async function crearReservaPublica(enlace: string, d: DatosReservaPublica
   return { success: true, data: citaPublica(res.cita, r.agenda) }
 }
 
+// El teléfono del formulario público: prefijo elegido + número. Si el número
+// ya viene internacional ("+34 600..."), se respeta.
+function telefonoPublico(prefijo: string | null | undefined, numero: string | null | undefined): string | null {
+  const n = String(numero || '').trim()
+  if (!n) return null
+  const completo = /^(\+|00)/.test(n) ? completarTelefono(n) : unirTelefono(prefijo, n)
+  return completo ? completarTelefono(completo) : null
+}
+
 // --- Gestionar una reserva con su llave ------------------------------------
 async function reservaPorToken(token: string): Promise<{ cita: Cita; agenda: Agenda } | null> {
   const cita = await citaPorToken(String(token || ''))
@@ -203,6 +223,9 @@ export async function getHuecosPorToken(token: string, fecha: string) {
 export async function moverReservaPorToken(token: string, inicio: string) {
   const r = await reservaPorToken(token)
   if (!r) return { success: false, error: 'No encontramos esa reserva.' }
+  const instante = new Date(String(inicio || ''))
+  if (isNaN(instante.getTime())) return { success: false, error: 'La fecha y hora no son válidas.' }
+  if (instante.getTime() < Date.now()) return { success: false, error: 'Esa hora ya ha pasado. Elige otra, por favor.' }
   const res = await moverCita(r.cita.id, { inicio: String(inicio || ''), por: 'cliente', origen: 'enlace' })
   if (!res.ok) return { success: false, error: res.error, codigo: res.codigo }
   return { success: true, data: citaPublica(res.cita, r.agenda) }

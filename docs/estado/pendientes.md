@@ -244,22 +244,19 @@ momento; en todos los planes; el cliente no se registra. Detalle en
 - [ ] Google Calendar (proyecto de Google de Jorge), más adelante
 
 ## Prioridad 6 — Bloque acordado el 13-09-2026 (orden decidido con Jorge)
-Tramo 1, lo rápido:
-- [ ] Prefijo telefónico siempre obligatorio y en un campo aparte (página
-      pública de reserva y formularios de Respondi), con todos los países
-      del mundo ordenados. El país de la sucursal es independiente del
-      teléfono del cliente
-- [ ] Página pública de reserva: no dejar reservar en un día ni una hora ya
-      pasados
-- [ ] Plantillas de WhatsApp editables por cada cliente, con versiones e
-      historial: usar una aprobada mientras otra está en revisión, volver a
-      una versión anterior; todas vienen prediseñadas
-- [ ] Al conectar WhatsApp por Meta, suscribir la app a la cuenta de
-      WhatsApp Business (`subscribed_apps`) y comprobarlo: hoy no se hace y
-      Meta no entrega nada (pasó el 13-09-2026)
-- [ ] Tienda online: guía completa para el cliente con todos los pasos de
-      Shopify; renombrar "Clave secreta de la app" (es la clave de firma de
-      los webhooks); añadir `write_customers` a la lista de permisos
+Tramo 1, lo rápido — hecho (13-09-2026):
+- [x] Prefijo telefónico siempre obligatorio y en un campo aparte (página
+      pública de reserva, cita nueva del panel, Contactos, onboarding,
+      vendedores), con los 243 países del mundo ordenados
+      (`src/lib/paises.ts`). El país de la sucursal solo preselecciona
+- [x] Página pública de reserva: ni día ni hora ya pasados, y aviso de zona
+      horaria si quien reserva está en otra. Ver `integraciones/agenda.md`
+- [x] Plantillas de WhatsApp con versiones e historial, editables (también
+      las prediseñadas). Ver `canales-mensajeria.md`
+- [x] Al conectar WhatsApp por Meta se suscribe la app a la cuenta
+      (`subscribed_apps`); sin eso Meta no entrega nada
+- [x] Tienda online: guía completa de Shopify, "Clave de firma de los
+      webhooks" con su nombre real y `write_customers` en permisos y guía
 Tramo 2, créditos y planes:
 - [ ] Créditos en la cabecera con color (verde >30 %, amarillo 10–30 %,
       rojo <10 % o agotados); aviso al 20 % y al 0 por campana y correo

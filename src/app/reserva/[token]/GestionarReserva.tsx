@@ -113,7 +113,7 @@ export default function GestionarReserva({ token, inicial }: { token: string; in
                   )
                 })}
               </div>
-              <input type="date" value={fecha} min={reserva.hoy} max={reserva.hasta} onChange={e => e.target.value && setFecha(e.target.value)} className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white text-base" />
+              <input type="date" value={fecha} min={reserva.hoy} max={reserva.hasta} onChange={e => e.target.value && (!reserva.hoy || e.target.value >= reserva.hoy) && (!reserva.hasta || e.target.value <= reserva.hasta) && setFecha(e.target.value)} className="w-full h-12 px-4 rounded-xl border border-slate-300 bg-white text-base" />
               {buscando ? <p className="text-sm text-ink-500">Buscando huecos…</p> : huecos.length === 0 ? <p className="text-sm text-ink-600">{motivo || 'No queda hueco ese día.'}</p> : (
                 <div className="flex flex-wrap gap-2">
                   {huecos.map((h: any) => <button type="button" key={h.inicio} onClick={() => setInicio(h.inicio)} className={`px-3 h-11 rounded-xl border text-sm font-600 ${inicio === h.inicio ? 'bg-brand-600 border-brand-600 text-white' : 'bg-white border-slate-300 text-ink-800'}`}>{textoHora(h.inicio, zona)}</button>)}

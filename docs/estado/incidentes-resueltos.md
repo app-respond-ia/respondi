@@ -986,3 +986,20 @@ columna que la sustente —no existe un campo de origen del caso—, así que de
 momento se distingue por si el caso tiene descripción (los crea el sistema)
 o no (los abre la entrada de mensajes). Si esa métrica importa, hace falta
 una columna `origen` de verdad.
+
+## WhatsApp conectado y verde, pero no llega ningún mensaje (13-09-2026)
+
+Jorge conectó el número de pruebas de Meta en Canales, verificó el webhook,
+activó el campo `messages`, la app estaba publicada y `hello_world` le
+llegó al móvil. Contestó y la IA no dijo nada: en la base de datos no había
+contacto, ni mensaje, ni error, y `channels.ultima_actividad` seguía nulo.
+
+Causa: Meta solo manda los avisos a las apps **suscritas a la cuenta de
+WhatsApp Business** (`GET /{WABA}/subscribed_apps` listaba solo "WA DevX
+Webhook Events 1P App", la app interna de la pantalla de pruebas de Meta).
+Poner la dirección del webhook en la app no suscribe nada. Se arregló a mano
+con `POST /{WABA}/subscribed_apps` y el siguiente mensaje entró y se
+contestó. Desde este día lo hace `conectarWhatsAppMeta` (y la verificación
+del webhook lo repite en segundo plano). Regla: si un canal Meta está
+"activo" y `ultima_actividad` sigue nulo después de escribirle, mirar primero
+`subscribed_apps`.

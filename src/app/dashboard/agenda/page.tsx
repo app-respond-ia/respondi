@@ -7,6 +7,8 @@ import { ErrorCarga } from '@/components/ui/ErrorCarga'
 import { useToast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { getAgenda, guardarAjustesAgenda, guardarRecurso, borrarRecurso, crearBloqueo, borrarBloqueo, getCitas, getHuecos, crearCitaPanel, moverCitaPanel, cancelarCitaPanel, cambiarEstadoCitaPanel, getHistorialCita, guardarCombinacion, borrarCombinacion } from '@/app/actions/agenda'
+import { CampoTelefono } from '@/components/ui/CampoTelefono'
+import { prefijoDelPais, unirTelefono } from '@/lib/paises'
 import { ESTADOS_CITA, TIPOS_RECURSO, PASOS_AGENDA, ID_MESA, type AjustesAgenda, type Recurso, type Servicio, type HorarioRecurso, type Combinacion } from '@/lib/agenda/tipos'
 import { partesEnZona, instanteLocal, leerFecha, sumarDias, textoHora, textoFechaHora, diaEnZona, fechaIso } from '@/lib/agenda/tiempo'
 import { DIAS_SEMANA } from '@/lib/dias-semana'
@@ -37,7 +39,7 @@ const COLOR_ESTADO: Record<string, string> = {
 interface Datos {
   ajustes: AjustesAgenda
   zona: string
-  negocio: { nombre: string; direccion: string | null; moneda: string }
+  negocio: { nombre: string; direccion: string | null; moneda: string; pais?: string | null }
   recursos: Recurso[]
   servicios: Servicio[]
   lista: any[]
@@ -457,6 +459,7 @@ function ModalNuevaCita({ datos, inicial, fechaInicial, onClose, onCreada }: { d
   const [recursoId, setRecursoId] = useState<string | null>(inicial.recurso_id || null)
   const [inicio, setInicio] = useState<string | null>(inicial.inicio || null)
   const [nombre, setNombre] = useState('')
+  const [prefijo, setPrefijo] = useState(prefijoDelPais(datos.negocio.pais) || '+34')
   const [telefono, setTelefono] = useState('')
   const [email, setEmail] = useState('')
   const [notas, setNotas] = useState('')
@@ -476,7 +479,9 @@ function ModalNuevaCita({ datos, inicial, fechaInicial, onClose, onCreada }: { d
     if (!inicio) return showToast('Elige una hora', 'error')
     if (!nombre.trim() && !telefono.trim() && !email.trim()) return showToast('Pon al menos el nombre o el teléfono del cliente', 'error')
     setGuardando(true)
-    const r = await crearCitaPanel({ servicio_id: servicioId, inicio, personas, recurso_id: recursoId, extras, nombre, telefono, email, notas, peticiones, estado, zona: esMesa && zona ? zona : null })
+    const telefonoCompleto = telefono.trim() ? unirTelefono(prefijo, telefono) : null
+    if (telefono.trim() && !telefonoCompleto) return showToast('El teléfono no parece correcto: elige el prefijo y escribe solo el número', 'error')
+    const r = await crearCitaPanel({ servicio_id: servicioId, inicio, personas, recurso_id: recursoId, extras, nombre, telefono: telefonoCompleto || '', email, notas, peticiones, estado, zona: esMesa && zona ? zona : null })
     setGuardando(false)
     if (r.success) { showToast('Cita creada', 'success'); await onCreada() } else showToast(r.error || 'No se ha podido crear', 'error')
   }
@@ -540,7 +545,7 @@ function ModalNuevaCita({ datos, inicial, fechaInicial, onClose, onCreada }: { d
         {servicioId && <SelectorHuecos datos={datos} servicioId={servicioId} fecha={fecha} personas={personas} recursoId={recursoId} elegido={inicio} onElegir={(i) => setInicio(i)} zona={esMesa ? zona : null} />}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-slate-100">
           <div className="sm:col-span-2"><label className="block text-xs font-600 text-ink-700 mb-1">Nombre del cliente</label><input value={nombre} onChange={e => setNombre(e.target.value)} className={campo} placeholder="Laura García" /></div>
-          <div><label className="block text-xs font-600 text-ink-700 mb-1">Teléfono (WhatsApp)</label><input value={telefono} onChange={e => setTelefono(e.target.value)} className={campo} placeholder="+34 600 000 000" /></div>
+          <div><label htmlFor="cita-telefono" className="block text-xs font-600 text-ink-700 mb-1">Teléfono (WhatsApp)</label><CampoTelefono id="cita-telefono" prefijo={prefijo} numero={telefono} onCambiar={v => { setPrefijo(v.prefijo); setTelefono(v.numero) }} claseSelect="h-10 px-2 rounded-xl border border-slate-300 bg-white text-sm w-32 shrink-0 focus:outline-none focus:border-brand-500" claseInput={`${campo} flex-1 min-w-0`} /></div>
           <div><label className="block text-xs font-600 text-ink-700 mb-1">Correo</label><input type="email" value={email} onChange={e => setEmail(e.target.value)} className={campo} placeholder="laura@correo.com" /></div>
           <div className="sm:col-span-2"><label className="block text-xs font-600 text-ink-700 mb-1">Peticiones del cliente</label><input value={peticiones} onChange={e => setPeticiones(e.target.value)} className={campo} placeholder="Alergias, trona, aparcamiento…" /></div>
           <div className="sm:col-span-2"><label className="block text-xs font-600 text-ink-700 mb-1">Notas internas</label><input value={notas} onChange={e => setNotas(e.target.value)} className={campo} /></div>

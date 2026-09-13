@@ -129,6 +129,15 @@ export async function descargarArchivo(mediaId: string, token: string): Promise<
 // haya aprobado. Las plantillas son de la cuenta de WhatsApp Business (WABA),
 // no del número.
 
+// Meta solo entrega los mensajes (y los avisos de plantillas) a las apps que
+// están SUSCRITAS a la cuenta de WhatsApp Business. Poner la dirección del
+// webhook en la app no basta: sin esto, el cliente escribe y no llega nada
+// (pasó el 13-09-2026 con el número de pruebas). Es idempotente.
+export async function suscribirAppALaCuenta(wabaId: string, token: string) {
+  const d = await graph(`${encodeURIComponent(wabaId)}/subscribed_apps`, token, { method: 'POST' })
+  if (!d?.success) throw new ErrorMeta('Meta no ha confirmado la suscripción de la app a la cuenta de WhatsApp Business', null, 200)
+}
+
 // Que la cuenta existe, que el token llega a ella y que el número es suyo
 export async function numeroEsDeLaCuenta(wabaId: string, token: string, phoneNumberId: string) {
   const d = await graph(`${encodeURIComponent(wabaId)}/phone_numbers?fields=id,display_phone_number&limit=100`, token)

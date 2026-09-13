@@ -4,7 +4,7 @@ import { ESTADOS_ACTIVOS, type Cita, type CodigoErrorCita, type EstadoCita, type
 import { cargarAgenda, duracionServicio, grupoDeClase, huecosDelDia, patronOcupacion, servicioPorId, type Agenda } from './disponibilidad'
 import { ID_MESA } from './tipos'
 import { diaEnZona, textoFecha, textoHora } from './tiempo'
-import { PAISES } from '@/lib/paises'
+import { separarTelefono } from '@/lib/paises'
 
 // CREAR, MOVER, CANCELAR Y CAMBIAR DE ESTADO UNA CITA.
 //
@@ -54,18 +54,17 @@ export function normalizarTelefono(valor: string | null | undefined) {
   return limpio.startsWith('+') ? limpio : `+${limpio}`
 }
 
-// Un teléfono tal como lo escribe la gente ("600 992 001", "0034 600...",
-// "+34 600..."): con el país de la sucursal se completa el prefijo. Sin país
-// conocido, solo vale si ya viene internacional.
-export function completarTelefono(valor: string | null | undefined, pais: string | null | undefined): string | null {
+// Un teléfono tal como lo escribe la gente ("+34 600 992 001", "0034 600...").
+// Decidido con Jorge (13-09-2026): el prefijo del país lo pone siempre el
+// cliente; nunca se adivina por el país de la sucursal. Sin prefijo, null.
+export function completarTelefono(valor: string | null | undefined): string | null {
   const crudo = String(valor || '').replace(/[^\d+]/g, '')
   if (!crudo) return null
-  if (crudo.startsWith('+')) return normalizarTelefono(crudo)
-  const digitos = crudo.replace(/\D/g, '')
-  if (digitos.startsWith('00') && digitos.length > 10) return normalizarTelefono(`+${digitos.slice(2)}`)
-  const prefijo = PAISES.find(p => p.codigo === String(pais || '').toUpperCase())?.prefijo
-  if (prefijo && digitos.length >= 7 && digitos.length <= 10) return `${prefijo}${digitos}`
-  if (digitos.length >= 11) return `+${digitos}`
+  if (crudo.startsWith('+')) {
+    const t = normalizarTelefono(crudo)
+    return t && separarTelefono(t) ? t : null
+  }
+  if (crudo.startsWith('00') && crudo.length > 10) return completarTelefono(`+${crudo.slice(2)}`)
   return null
 }
 

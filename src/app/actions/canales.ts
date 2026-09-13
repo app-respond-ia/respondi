@@ -8,7 +8,7 @@ import { getAuthContext } from '@/lib/auth-context'
 import crypto from 'crypto'
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { sinPermiso } from '@/lib/permisos-servidor'
-import { comprobarNumero, numeroEsDeLaCuenta, guardarCredencialesMeta, caducidadDelToken, ErrorMeta } from '@/lib/canales/meta'
+import { comprobarNumero, numeroEsDeLaCuenta, guardarCredencialesMeta, caducidadDelToken, ErrorMeta, suscribirAppALaCuenta } from '@/lib/canales/meta'
 import { sincronizarPlantillas } from '@/lib/canales/plantillas'
 import { comprobarCorreo, guardarContrasenaCorreo, leerContrasenaCorreo, ErrorCorreo, type ConfigCorreo } from '@/lib/canales/correo'
 import { proveedorCorreo, esServidorMicrosoft, esDireccionMicrosoft, AVISO_MICROSOFT } from '@/lib/canales/proveedores-correo'
@@ -251,6 +251,14 @@ export async function conectarWhatsAppMeta(datos: { phoneNumberId: string; acces
     }
   } catch (e: any) {
     return { success: false, error: `Meta no ha aceptado el identificador de la cuenta de WhatsApp Business: ${e?.message}.` }
+  }
+
+  // Que Meta nos mande lo que pase en esa cuenta (mensajes, plantillas). Sin
+  // esto el webhook no recibe nada aunque esté bien puesto en la app.
+  try {
+    await suscribirAppALaCuenta(wabaId, accessToken)
+  } catch (e: any) {
+    return { success: false, error: `Meta no ha dejado suscribir tu app a la cuenta de WhatsApp Business (hace falta el permiso "whatsapp_business_management" en el token): ${e?.message}.` }
   }
 
   // Si el token caduca (el de prueba dura 24 h), Canales lo avisará con la

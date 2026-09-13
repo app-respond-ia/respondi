@@ -149,10 +149,15 @@ escribe el historial y avisa a las automatizaciones (`dispararEventoAgenda`).
   teléfono o el correo es el contacto de Respondi (se crea si no existe) y
   la confirmación sale por la automatización "Cita reservada". Solo se
   enseñan los servicios con "se puede reservar desde el enlace público" y
-  las personas elegibles; los teléfonos sin prefijo se completan con el país
-  de la sucursal (`completarTelefono`); los grupos grandes se mandan a
-  escribir; un campo trampa frena a los robots; el tope de reservas por
-  cliente aplica.
+  las personas elegibles; el teléfono va en dos campos, prefijo del país
+  (lista de todos los países, preseleccionado el de la sucursal) y número,
+  y el prefijo lo pone siempre el cliente (`completarTelefono` ya no adivina
+  nada por el país del negocio; decidido con Jorge el 13-09-2026); no se
+  puede reservar en un día ni una hora ya pasados (el servidor lo rechaza
+  aunque se fuerce desde el navegador) y, si quien reserva está en otra zona
+  horaria, la página avisa de que las horas son las del negocio; los grupos
+  grandes se mandan a escribir; un campo trampa frena a los robots; el tope
+  de reservas por cliente aplica.
   **Gestionar con la llave** (`/reserva/[token]`): la confirmación lleva un
   enlace con `token_gestion` (32 caracteres, único) para ver la reserva,
   cambiarla de día u hora o cancelarla, dentro del plazo del negocio; fuera
@@ -227,8 +232,9 @@ mensajes automáticos no gastan créditos de Respondi (los cobra Meta).
 - `probar-reserva-publica.mjs` (33, sin sesión): enlace inexistente,
   apagado, sin nada reservable, lo que se enseña (no el servicio privado ni
   la persona no elegible), huecos, servicio privado y persona no elegible
-  rechazados, grupo grande, teléfono sin prefijo (sin país no vale; con la
-  sucursal en España se completa a +34), privacidad obligatoria, robot,
+  rechazados, grupo grande, teléfono sin prefijo (no vale), prefijo aparte
+  (+34 y 600 992 009 → +34600992009), prefijo inexistente, hora y día ya
+  pasados (rechazados), privacidad obligatoria, robot,
   reserva con extra y petición (crea el contacto, origen "enlace"), hueco
   ocupado, reserva por correo, tope por cliente, ver / cambiar / cancelar
   con la llave, llave falsa, fuera de plazo, y una mesa de restaurante por
@@ -264,6 +270,21 @@ mensajes automáticos no gastan créditos de Respondi (los cobra Meta).
   huecos, reserva, confirmación, gestionar y cancelar con la llave), y el
   reloj de la base de datos trató un aviso pendiente en 26 s. Sin restos y
   saldo en 7.
+
+## Cambios del 13-09-2026 (tramo 1 del bloque acordado)
+- Prefijo telefónico en campo aparte y obligatorio, con todos los países del
+  mundo (`src/lib/paises.ts`, 243 países ordenados en español;
+  `src/components/ui/CampoTelefono.tsx` para el enlace público, la cita
+  nueva del panel, Contactos, el onboarding y los vendedores). El país de la
+  sucursal solo preselecciona el prefijo.
+- Nada en el pasado desde el enlace público: `getHuecosPublicos` devuelve
+  "Ese día ya ha pasado" para fechas anteriores a hoy en la zona del
+  negocio, y `crearReservaPublica` / `moverReservaPorToken` rechazan una hora
+  anterior al momento actual. El panel sigue pudiendo apuntar horas pasadas
+  (sentar a quien acaba de entrar).
+- Aviso de zona horaria en la página pública cuando la del visitante no es
+  la del negocio (Jorge, en España, veía "horas pasadas" de una sucursal de
+  pruebas en America/Caracas: no eran pasadas, eran de Caracas).
 
 ## Pendiente
 

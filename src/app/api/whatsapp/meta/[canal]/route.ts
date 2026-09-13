@@ -3,7 +3,8 @@ import crypto from 'crypto'
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { registrarError } from '@/lib/errores'
 import { registrarMensajeEntrante } from '@/lib/canales/entrada'
-import { leerCredencialesMeta, firmaValida, descargarArchivo } from '@/lib/canales/meta'
+import { leerCredencialesMeta, firmaValida, descargarArchivo, suscribirAppALaCuenta } from '@/lib/canales/meta'
+import { after } from 'next/server'
 import { aplicarCambioDePlantilla } from '@/lib/canales/plantillas'
 
 export const dynamic = 'force-dynamic'
@@ -46,6 +47,18 @@ export async function GET(req: Request, { params }: Ctx) {
 
   if (canal.estado !== 'activo') {
     await supabaseAdmin.from('channels').update({ estado: 'activo', fecha_conexion: new Date().toISOString(), ultimo_error: null }).eq('id', canal.id)
+  }
+  // Por si el canal se conectó antes de que Respondi suscribiera la app a la
+  // cuenta: se asegura ahora, sin retrasar la respuesta a Meta
+  if (canal.meta_waba_id) {
+    after(async () => {
+      try {
+        const credenciales = await leerCredencialesMeta(canal.id)
+        if (credenciales) await suscribirAppALaCuenta(canal.meta_waba_id!, credenciales.access_token)
+      } catch (e: any) {
+        await registrarError({ origen: 'api_meta', descripcion: 'No se ha podido suscribir la app a la cuenta de WhatsApp Business al verificar el webhook', stacktrace: JSON.stringify({ canal: canal.id, message: e?.message }), tenant_id: canal.tenant_id })
+      }
+    })
   }
   return new NextResponse(reto, { status: 200, headers: { 'Content-Type': 'text/plain' } })
 }

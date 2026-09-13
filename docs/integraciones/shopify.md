@@ -15,11 +15,30 @@ le da permisos de lectura y copia dos cosas en Respondi:
 El token se guarda cifrado en la caja fuerte (Vault), igual que las claves de
 Meta y la contraseña del correo. Nunca vuelve a salir a ninguna pantalla.
 
-Permisos que se piden (solo lectura en la primera fase):
-`read_products`, `read_inventory`, `read_orders`, `read_fulfillments`,
-`read_customers`, `read_shipping`, `read_content` (políticas de la tienda).
-Para los enlaces de compra y los descuentos hacen falta además
-`write_draft_orders` y `write_discounts`.
+Permisos que se piden: `read_products`, `read_inventory`, `read_orders`,
+`read_fulfillments`, `read_customers`, `write_customers` (etiquetar clientes
+desde las automatizaciones; faltaba en la lista hasta el 13-09-2026),
+`read_shipping`, `read_content` (políticas de la tienda). Para los enlaces
+de compra y los descuentos hacen falta además `write_draft_orders` y
+`write_discounts`. Shopify añade solo `read_draft_orders`, `read_discounts` y
+`read_all_orders`.
+
+Los avisos al instante (webhooks) los crea el cliente a mano en Shopify →
+Configuración → Notificaciones → Webhooks: seis sucesos (orders/create,
+orders/paid, orders/fulfilled, orders/cancelled, checkouts/update,
+fulfillments/update), formato JSON, versión 2026-01, todos a la dirección
+`/api/tiendas/shopify/<id de la tienda>` que enseña Respondi al conectar.
+La **clave de firma de los webhooks** (al final de esa misma página, 64
+caracteres) es lo que Respondi guarda como "Clave de firma de los webhooks"
+para comprobar que los avisos son de Shopify. No confundir con la "clave
+secreta de la API" de la app (`shpss_…`), que no sirve para nada aquí:
+Jorge se confundió al configurarla el 13-09-2026 y por eso la pantalla la
+llama ahora por su nombre y trae la guía completa paso a paso (crear la
+app, permisos, instalar, token, webhooks y clave de firma).
+
+Aviso: desde el 1 de enero de 2026 Shopify ya no deja crear "apps
+personalizadas" en tiendas nuevas. Los clientes reales necesitarán una app
+del Dev Dashboard con enlace de instalación (pendiente).
 
 Por qué esta opción y no una app pública en la tienda de apps de Shopify: no
 dependemos de que Shopify nos apruebe nada, no hace falta cuenta de Partner ni

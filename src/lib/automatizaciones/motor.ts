@@ -602,14 +602,14 @@ async function prepararPlantilla(
   ajustes: Record<string, any>,
   textoPlano: string
 ): Promise<any | string> {
-  const { data: plantilla } = await supabaseAdmin
-    .from('whatsapp_templates')
-    .select('id, nombre, idioma, estado, contenido, componentes')
-    .eq('id', plantillaId)
-    .eq('branch_id', ejecucion.branch_id)
-    .maybeSingle()
-  if (!plantilla) return 'La plantilla elegida ya no existe en esta sucursal.'
-  if (plantilla.estado !== 'aprobada') return 'La plantilla elegida no está aprobada por Meta.'
+  // La elegida puede ser cualquier versión de su familia: se manda la que
+  // esté en uso y aprobada por Meta (o la aprobada más reciente)
+  const { resolverPlantilla } = await import('@/lib/canales/plantillas')
+  const plantilla = await resolverPlantilla(plantillaId, ejecucion.branch_id)
+  if (!plantilla) {
+    const { data: elegida } = await supabaseAdmin.from('whatsapp_templates').select('id, estado').eq('id', plantillaId).eq('branch_id', ejecucion.branch_id).maybeSingle()
+    return elegida ? 'La plantilla elegida no está aprobada por Meta.' : 'La plantilla elegida ya no existe en esta sucursal.'
+  }
 
   const { analizarComponentes, rellenar } = await import('@/lib/canales/plantillas-texto')
   const info = analizarComponentes(plantilla.componentes as any[], plantilla.contenido)
@@ -618,15 +618,18 @@ async function prepararPlantilla(
   // botón: solo valen las plantillas que salen solas
   if (!info.automatica) return 'Esa plantilla lleva una foto, un documento o un botón que hay que rellenar a mano: elige una de solo texto.'
 
-  // Los huecos: si es la plantilla prediseñada de esta automatización, cada
-  // uno lleva el dato que dice el catálogo (nombre, pedido, seguimiento...).
-  // Si es una del cliente, por el orden fijo que explica la ayuda del ajuste:
-  // nombre del cliente, número de pedido, total y enlace.
+  // Los huecos: la versión guarda qué dato va en cada uno (las prediseñadas,
+  // también editadas). Si no lo dice y es la prediseñada de esta
+  // automatización, lo dice el catálogo. Si es una del cliente, por el orden
+  // fijo que explica la ayuda del ajuste: nombre del cliente, número de
+  // pedido, total y enlace.
   const limpio = (v: string) => (v || '').replace(/\s+/g, ' ').trim() || '-'
-  const prediseñada = definicion.plantilla && definicion.plantilla.nombre === plantilla.nombre ? definicion.plantilla : null
+  const nombresHuecos: string[] | null = Array.isArray(plantilla.huecos) && plantilla.huecos.length
+    ? plantilla.huecos
+    : definicion.plantilla && definicion.plantilla.nombre === plantilla.familia ? definicion.plantilla.huecos : null
   let parametros: string[]
-  if (prediseñada) {
-    parametros = info.huecos.map((_, i) => limpio(rellenarHuecos(`{{${prediseñada.huecos[i] || 'cliente'}}}`, contexto, ajustes)))
+  if (nombresHuecos) {
+    parametros = info.huecos.map((_, i) => limpio(rellenarHuecos(`{{${nombresHuecos[i] || 'cliente'}}}`, contexto, ajustes)))
   } else {
     const aMano = [
       (contexto.cliente?.nombre || '').trim() || 'cliente',

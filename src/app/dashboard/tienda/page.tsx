@@ -37,6 +37,7 @@ const NOMBRE_PERMISO: Record<string, string> = {
   read_orders: 'ver pedidos',
   read_fulfillments: 'ver envíos',
   read_customers: 'ver clientes',
+  write_customers: 'etiquetar clientes',
   read_shipping: 'ver gastos de envío',
   read_content: 'ver las políticas de la tienda',
   write_draft_orders: 'crear enlaces de compra',
@@ -165,9 +166,9 @@ export default function TiendaPage() {
 
             {tienda!.configuracion?.tiene_secreto_avisos && tienda!.webhook_url && (
               <div className="mt-4 p-4 rounded-xl border border-slate-200 bg-slate-50">
-                <p className="text-sm font-600 text-ink-800">Dirección para los avisos de Shopify</p>
+                <p className="text-sm font-600 text-ink-800">Dirección para los avisos de Shopify (webhooks)</p>
                 <p className="text-xs text-ink-500 mt-1 mb-2">
-                  Pégala en tu Shopify (Configuración → Notificaciones → Webhooks) para los sucesos «Creación de pedido», «Pedido pagado», «Cumplimiento de pedido» y «Cancelación de pedido». Sin esto todo funciona igual, solo que los avisos tardan un poco más.
+                  Pégala en tu Shopify (Configuración → Notificaciones → Webhooks → Crear webhook), formato JSON y versión 2026-01, una vez por cada suceso: {SUCESOS_WEBHOOK.map(([n]) => n).join(', ')}. Sin esto todo funciona igual, solo que los avisos tardan un poco más.
                 </p>
                 <code className="block text-xs bg-white border border-slate-200 rounded-lg px-3 py-2 break-all text-ink-700">{tienda!.webhook_url}</code>
               </div>
@@ -264,6 +265,65 @@ export default function TiendaPage() {
   )
 }
 
+// Todo lo que el cliente tiene que hacer en su Shopify, en orden. La
+// dirección de los webhooks solo existe una vez conectada la tienda, así que
+// la guía la enseña cuando la hay y, si no, explica que aparecerá después.
+const SUCESOS_WEBHOOK = [
+  ['Creación de pedido', 'orders/create'],
+  ['Pago de pedido', 'orders/paid'],
+  ['Preparación de pedido', 'orders/fulfilled'],
+  ['Cancelación de pedido', 'orders/cancelled'],
+  ['Actualización de pago', 'checkouts/update'],
+  ['Actualización de preparación', 'fulfillments/update']
+] as const
+
+function GuiaShopify({ webhookUrl }: { webhookUrl: string | null }) {
+  const paso = 'text-sm text-ink-600 leading-relaxed'
+  return (
+    <div className="bg-slate-50 rounded-xl p-4 space-y-4">
+      <div>
+        <p className="text-sm font-600 text-ink-900 mb-1">1. Crear la aplicación en tu Shopify</p>
+        <ol className={`${paso} space-y-1.5 list-decimal list-inside`}>
+          <li>Entra en tu panel de Shopify → <strong>Configuración</strong> (abajo a la izquierda) → <strong>Aplicaciones y canales de venta</strong>.</li>
+          <li>Pulsa <strong>Desarrollar aplicaciones</strong>. Si es la primera vez, acepta «Permitir el desarrollo de aplicaciones personalizadas».</li>
+          <li>Pulsa <strong>Crear una aplicación</strong>, ponle de nombre «Respondi» y crea.</li>
+        </ol>
+      </div>
+      <div>
+        <p className="text-sm font-600 text-ink-900 mb-1">2. Darle permisos</p>
+        <ol className={`${paso} space-y-1.5 list-decimal list-inside`}>
+          <li>Dentro de la app, pestaña <strong>Configuración</strong> → en «Integración de la API de administrador» pulsa <strong>Configurar</strong>.</li>
+          <li>Marca estos permisos: <strong>read_products, read_inventory, read_orders, read_fulfillments, read_customers, write_customers, read_shipping, read_content, write_draft_orders, write_discounts</strong>. Shopify añadirá solo algunos más (read_draft_orders, read_discounts): déjalos.</li>
+          <li>Pulsa <strong>Guardar</strong>.</li>
+        </ol>
+      </div>
+      <div>
+        <p className="text-sm font-600 text-ink-900 mb-1">3. Instalar y copiar el token</p>
+        <ol className={`${paso} space-y-1.5 list-decimal list-inside`}>
+          <li>Pestaña <strong>Vista general</strong> → <strong>Instalar aplicación</strong> y confirma.</li>
+          <li>En «Token de acceso de la API de administrador» pulsa <strong>Revelar token una vez</strong>, cópialo (empieza por <code className="px-1 rounded bg-slate-200">shpat_</code>) y pégalo aquí arriba. Shopify solo lo enseña una vez: si lo pierdes, hay que desinstalar y volver a instalar la app.</li>
+          <li>Pega también la dirección de tu tienda (la que termina en <code className="px-1 rounded bg-slate-200">.myshopify.com</code>) y pulsa <strong>Conectar</strong>.</li>
+        </ol>
+      </div>
+      <div>
+        <p className="text-sm font-600 text-ink-900 mb-1">4. Avisos al instante (webhooks)</p>
+        <p className={`${paso} mb-1.5`}>Con esto Shopify avisa a Respondi en el momento en que hay un pedido nuevo, pagado, enviado o cancelado. Sin ello también funciona, pero los avisos tardan unos minutos más.</p>
+        <ol className={`${paso} space-y-1.5 list-decimal list-inside`}>
+          <li>En Shopify → <strong>Configuración → Notificaciones → Webhooks</strong> pulsa <strong>Crear webhook</strong>.</li>
+          <li>Crea uno por cada suceso de esta lista, todos con la misma dirección, formato <strong>JSON</strong> y versión de la API <strong>2026-01</strong>: {SUCESOS_WEBHOOK.map(([n]) => n).join(', ')}.</li>
+          <li>
+            {webhookUrl
+              ? <>La dirección es esta: <code className="block mt-1 px-2 py-1.5 rounded-lg bg-white border border-slate-200 text-xs break-all">{webhookUrl}</code></>
+              : <>La dirección te la enseñamos aquí en cuanto conectes la tienda (paso 3).</>}
+          </li>
+          <li>Al final de esa misma página está «Tus webhooks se firmarán con…»: copia esa clave y pégala arriba en «Clave de firma de los webhooks».</li>
+        </ol>
+      </div>
+      <p className="text-xs text-ink-500">Si tu Shopify no te deja crear aplicaciones personalizadas (Shopify lo está retirando para tiendas nuevas), escríbenos y te damos otra forma de conectar.</p>
+    </div>
+  )
+}
+
 function FormularioTienda({ tienda, onCerrar, onConectada }: { tienda: Tienda | null; onCerrar: () => void; onConectada: () => void }) {
   const { showToast } = useToast()
   const [dominio, setDominio] = useState(tienda?.dominio || '')
@@ -332,33 +392,25 @@ function FormularioTienda({ tienda, onCerrar, onConectada }: { tienda: Tienda | 
 
             <div>
               <label htmlFor="tienda-secreto" className="block text-sm font-600 text-ink-800 mb-1.5">
-                Clave secreta de la app <span className="font-400 text-ink-400">(opcional)</span>
+                Clave de firma de los webhooks <span className="font-400 text-ink-400">(opcional)</span>
               </label>
               <input
                 id="tienda-secreto"
                 type="password"
                 value={apiSecret}
                 onChange={e => setApiSecret(e.target.value)}
-                placeholder="Para que Shopify nos avise al instante"
+                placeholder="Para comprobar que los avisos son de Shopify"
                 className={campo}
                 autoComplete="new-password"
               />
-              <p className="text-xs text-ink-400 mt-1">Sin ella todo funciona igual, solo que los avisos de pedidos tardan un poco más.</p>
+              <p className="text-xs text-ink-400 mt-1">Está en Shopify → Configuración → Notificaciones → Webhooks, al final de la página («Tus webhooks se firmarán con…»). No es la clave secreta de la app. Sin ella todo funciona igual, solo que los avisos de pedidos tardan un poco más.</p>
             </div>
 
             <button type="button" onClick={() => setVerGuia(v => !v)} className="text-sm font-600 text-brand-600 hover:text-brand-700 transition">
-              {verGuia ? 'Ocultar' : '¿De dónde saco el token?'}
+              {verGuia ? 'Ocultar la guía' : 'Guía paso a paso: qué hacer en Shopify'}
             </button>
 
-            {verGuia && (
-              <ol className="text-sm text-ink-600 space-y-2 bg-slate-50 rounded-xl p-4 list-decimal list-inside leading-relaxed">
-                <li>En tu Shopify, entra en <strong>Configuración → Aplicaciones y canales de venta</strong>.</li>
-                <li>Pulsa <strong>Desarrollar aplicaciones</strong> y luego <strong>Crear una aplicación</strong>. Ponle de nombre «Respondi».</li>
-                <li>En <strong>Configuración → Admin API</strong>, marca estos permisos: ver productos, stock, pedidos, envíos, clientes, gastos de envío y contenido; y, para vender desde el chat, crear pedidos borrador y descuentos.</li>
-                <li>Guarda y pulsa <strong>Instalar aplicación</strong>.</li>
-                <li>Copia el <strong>token de acceso de la Admin API</strong> (empieza por <code className="px-1 rounded bg-slate-200">shpat_</code>) y pégalo aquí. Shopify solo lo enseña una vez.</li>
-              </ol>
-            )}
+            {verGuia && <GuiaShopify webhookUrl={tienda?.webhook_url || null} />}
           </div>
 
           <div className="flex items-center justify-end gap-3 px-6 py-4 bg-slate-50 border-t border-slate-200 rounded-b-2xl">

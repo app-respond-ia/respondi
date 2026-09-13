@@ -6,6 +6,7 @@ import Loading from '@/components/Loading'
 import { ErrorCarga } from '@/components/ui/ErrorCarga'
 import { useToast } from '@/components/ui/Toast'
 import { getAutomatizaciones, cambiarAutomatizacion, getHistorialAutomatizaciones, enviarPlantillaPredisenada, restablecerReceta, borrarAutomatizacionPropia } from '@/app/actions/automatizaciones'
+import { EditorPlantilla } from '@/components/plantillas/EditorPlantilla'
 import { getMisPermisos } from '@/app/actions/permisos'
 import { CANALES_SALIDA, type Receta } from '@/lib/automatizaciones/tipos'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
@@ -64,6 +65,10 @@ interface Fila {
     motivo_rechazo: string | null
     id: string | null
     en_uso: boolean
+    version: number | null
+    pendiente_nueva: { version: number; contenido: string } | null
+    huecos: string[]
+    ejemplos: string[]
   } | null
 }
 
@@ -357,6 +362,7 @@ function TarjetaAutomatizacion({ fila, abierta, onAbrir, onAlternar, onGuardar, 
   const { showToast } = useToast()
   const [ajustes, setAjustes] = useState<Record<string, any>>(fila.ajustes)
   const [enviandoPlantilla, setEnviandoPlantilla] = useState(false)
+  const [editorPlantilla, setEditorPlantilla] = useState(false)
   const [otraPlantilla, setOtraPlantilla] = useState(false)
   const [editando, setEditando] = useState(false)
   useEffect(() => { setAjustes(fila.ajustes) }, [fila.ajustes])
@@ -532,7 +538,9 @@ function TarjetaAutomatizacion({ fila, abierta, onAbrir, onAlternar, onGuardar, 
                           <span className={`px-2 py-0.5 rounded-full text-[11px] font-600 ${TEXTO_PLANTILLA[fila.plantilla_predisenada.estado]?.color || 'bg-slate-100 text-slate-600'}`}>
                             {TEXTO_PLANTILLA[fila.plantilla_predisenada.estado]?.texto || fila.plantilla_predisenada.estado}
                           </span>
-                          <span className="text-[11px] text-ink-400">Plantilla de {fila.plantilla_predisenada.categoria === 'marketing' ? 'promoción' : 'utilidad'} · escrita por Respondi para que Meta la apruebe</span>
+                          {(fila.plantilla_predisenada.version || 1) > 1 && <span className="px-2 py-0.5 rounded-full text-[11px] font-600 bg-brand-50 text-brand-700">Versión {fila.plantilla_predisenada.version}</span>}
+                          {fila.plantilla_predisenada.pendiente_nueva && <span className="px-2 py-0.5 rounded-full text-[11px] font-600 bg-amber-50 text-amber-700">Versión {fila.plantilla_predisenada.pendiente_nueva.version} en revisión</span>}
+                          <span className="text-[11px] text-ink-400">Plantilla de {fila.plantilla_predisenada.categoria === 'marketing' ? 'promoción' : 'utilidad'} · escrita por Respondi para que Meta la apruebe{(fila.plantilla_predisenada.version || 1) > 1 ? ', editada por ti' : ''}</span>
                         </div>
                         {/* Como la vería el cliente, con datos de ejemplo */}
                         <div className="bg-[#e7ffdb] rounded-2xl rounded-tl-sm px-3 py-2 text-sm text-ink-800 max-w-md shadow-sm">
@@ -546,6 +554,9 @@ function TarjetaAutomatizacion({ fila, abierta, onAbrir, onAlternar, onGuardar, 
                         )}
                         {fila.plantilla_predisenada.estado === 'pendiente' && (
                           <p className="text-xs text-amber-700 mt-2">Meta suele tardar de unos minutos a un día. En cuanto la apruebe, se usará sola.</p>
+                        )}
+                        {fila.plantilla_predisenada.pendiente_nueva && fila.plantilla_predisenada.estado !== 'pendiente' && (
+                          <p className="text-xs text-amber-700 mt-2">Tu versión nueva está en revisión en Meta. Hasta que la apruebe se sigue usando esta.</p>
                         )}
                         <div className="flex items-center gap-3 flex-wrap mt-3">
                           {(fila.plantilla_predisenada.estado === 'no_enviada' || fila.plantilla_predisenada.estado === 'rechazada' || (fila.plantilla_predisenada.estado === 'aprobada' && !fila.plantilla_predisenada.en_uso)) && (
@@ -561,10 +572,32 @@ function TarjetaAutomatizacion({ fila, abierta, onAbrir, onAlternar, onGuardar, 
                           {!canales.includes('whatsapp') && (
                             <span className="text-xs text-amber-700">Necesitas WhatsApp conectado con Meta.</span>
                           )}
+                          {puedeEscribir && canales.includes('whatsapp') && !fila.plantilla_predisenada.pendiente_nueva && fila.plantilla_predisenada.estado !== 'pendiente' && (
+                            <button type="button" onClick={() => setEditorPlantilla(true)} className="text-xs font-600 text-brand-700 hover:text-brand-800 transition">
+                              {fila.plantilla_predisenada.estado === 'no_enviada' ? 'Editar el texto antes de enviarla' : 'Editar el texto'}
+                            </button>
+                          )}
                           <button type="button" onClick={() => setOtraPlantilla(v => !v)} className="text-xs font-600 text-ink-500 hover:text-ink-800 transition">
                             {otraPlantilla ? 'Ocultar' : 'Usar otra plantilla mía'}
                           </button>
                         </div>
+                        {editorPlantilla && (
+                          <EditorPlantilla
+                            modo="predisenada"
+                            titulo={`Plantilla de «${fila.nombre}»`}
+                            inicial={{ nombre: fila.plantilla_predisenada.nombre, categoria: fila.plantilla_predisenada.categoria, idioma: 'es', contenido: fila.plantilla_predisenada.cuerpo, ejemplos: fila.plantilla_predisenada.ejemplos || [], automatizacion: fila.nombre }}
+                            huecosNombres={fila.plantilla_predisenada.huecos || null}
+                            onGuardar={async d => {
+                              const r = await enviarPlantillaPredisenada(fila.clave, { contenido: d.contenido, ejemplos: d.ejemplos })
+                              if (!r.success) return { success: false, error: r.error }
+                              setEditorPlantilla(false)
+                              showToast((r.data as any)?.sigueEnUso ? 'Versión nueva enviada a Meta. Hasta que la aprueben se sigue usando la de ahora.' : 'Plantilla enviada a Meta. Te avisaremos aquí cuando la aprueben', 'success')
+                              onRecargar()
+                              return { success: true }
+                            }}
+                            onCerrar={() => setEditorPlantilla(false)}
+                          />
+                        )}
                         {otraPlantilla && (
                           <select
                             id={`${fila.clave}-${campo.clave}`}

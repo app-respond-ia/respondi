@@ -1,4 +1,6 @@
 'use client'
+import { SelectorPrefijo } from '@/components/ui/CampoTelefono'
+import { separarTelefono } from '@/lib/paises'
 import Loading from '@/components/Loading'
 import { ErrorCarga } from '@/components/ui/ErrorCarga'
 
@@ -175,10 +177,10 @@ export default function ContactosPage() {
     let numero = ''
     
     if (contacto.canal === 'whatsapp') {
-      const match = contacto.identificador_canal.match(/^(\+\d{1,4})(.*)$/)
-      if (match) {
-        prefijo = match[1]
-        numero = match[2]
+      const partes = separarTelefono(contacto.identificador_canal)
+      if (partes) {
+        prefijo = partes.prefijo
+        numero = partes.numero
       } else {
         numero = contacto.identificador_canal.replace(/^\+/, '')
       }
@@ -463,30 +465,11 @@ export default function ContactosPage() {
                     <label className="block text-sm font-500 text-ink-700 mb-1.5">Identificador del contacto</label>
                     {modalFormData.canal === 'whatsapp' ? (
                       <div className="flex gap-2">
-                        <select 
+                        <SelectorPrefijo
                           disabled={!!modalFormData.id}
-                          value={modalFormData.prefijo_whatsapp}
-                          onChange={e => setModalFormData({...modalFormData, prefijo_whatsapp: e.target.value})}
-                          className="w-28 shrink-0 h-12 px-2 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm disabled:bg-slate-50 disabled:opacity-75">
-                          <option value="+34">🇪🇸 +34</option>
-                          <option value="+52">🇲🇽 +52</option>
-                          <option value="+54">🇦🇷 +54</option>
-                          <option value="+57">🇨🇴 +57</option>
-                          <option value="+51">🇵🇪 +51</option>
-                          <option value="+56">🇨🇱 +56</option>
-                          <option value="+598">🇺🇾 +598</option>
-                          <option value="+595">🇵🇾 +595</option>
-                          <option value="+58">🇻🇪 +58</option>
-                          <option value="+593">🇪🇨 +593</option>
-                          <option value="+591">🇧🇴 +591</option>
-                          <option value="+502">🇬🇹 +502</option>
-                          <option value="+503">🇸🇻 +503</option>
-                          <option value="+504">🇭🇳 +504</option>
-                          <option value="+505">🇳🇮 +505</option>
-                          <option value="+506">🇨🇷 +506</option>
-                          <option value="+507">🇵🇦 +507</option>
-                          <option value="+1">🇺🇸 +1</option>
-                        </select>
+                          prefijo={modalFormData.prefijo_whatsapp}
+                          onCambiar={p => setModalFormData({...modalFormData, prefijo_whatsapp: p})}
+                          className="w-36 shrink-0 h-12 px-2 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm disabled:bg-slate-50 disabled:opacity-75" />
                         <input type="text" placeholder="Ej. 414 555 0000" required
                           disabled={!!modalFormData.id}
                           value={modalFormData.numero_whatsapp}

@@ -69,6 +69,55 @@ de Meta (Cloud API, versión 25).
 - **Pruebas**: `probar-whatsapp` (23 comprobaciones) contra un Meta
   simulado (`WHATSAPP_GRAPH_URL`).
 
+## La app tiene que estar suscrita a la cuenta — hecho el 13-09-2026
+Meta solo entrega los mensajes (y los avisos de plantillas) a las apps
+SUSCRITAS a la cuenta de WhatsApp Business; poner la dirección del webhook
+en la app no basta. Pasó con el número de pruebas de Jorge: todo verde y no
+llegaba nada, porque solo estaba suscrita una app interna de Meta. Ahora
+`conectarWhatsAppMeta` llama a `POST /{WABA}/subscribed_apps`
+(`suscribirAppALaCuenta`) y, si Meta no lo acepta, no deja conectar y
+explica que el token necesita `whatsapp_business_management`. La
+verificación del webhook (GET) vuelve a asegurarla en segundo plano, por si
+el canal se conectó antes de este cambio. Comprobación:
+`GET /{WABA}/subscribed_apps` debe listar la app del cliente.
+
+## Versiones e historial de plantillas — hecho el 13-09-2026
+Decidido con Jorge: cada cliente puede editar cualquier plantilla (también
+las prediseñadas), y todas vienen hechas para no tener que editarlas.
+- **Modelo**: una plantilla es una FAMILIA de versiones
+  (`whatsapp_templates.familia`, `version`, `en_uso`, `activar_al_aprobar`,
+  `huecos`, `ejemplos`, `origen`; migración `20260913120000`). Cada versión
+  es una plantilla distinta en Meta (`recordatorio_cita`,
+  `recordatorio_cita_v2`...), porque Meta no deja usar una plantilla editada
+  hasta que la vuelve a aprobar. De cada familia hay una versión en uso
+  (índice único parcial): la que mandan la IA, Chats, la reapertura y las
+  automatizaciones.
+- **Editar** (`editarPlantillaWhatsApp`) crea la versión siguiente, en
+  revisión y con `activar_al_aprobar`; la de siempre sigue en uso. Cuando
+  Meta la aprueba (aviso del webhook o "Actualizar desde Meta"), pasa a
+  usarse sola. Si la rechaza, no cambia nada.
+- **Historial**: en la página de plantillas cada familia enseña su versión
+  en uso y un historial con todas; "Usar esta versión" vuelve a cualquier
+  aprobada al momento; "Volver a enviar" recupera el texto de una borrada o
+  rechazada como versión nueva. Borrar una versión con hermanas la deja como
+  "borrada" (así nunca se repite un número: Meta reserva los nombres
+  borrados); borrar la única versión la quita del todo. Lo que se borra en
+  Meta queda igual como historial al actualizar.
+- **Resolución**: los ajustes guardan el identificador de una versión
+  cualquiera; `resolverPlantilla` / `versionParaEnviar` devuelven la que
+  toca mandar (en uso y aprobada, o la aprobada más reciente). Lo usan el
+  motor de automatizaciones (`prepararPlantilla`), la reapertura y las
+  listas de Chats y del ajuste "Otra plantilla mía" (una por familia).
+- **Prediseñadas**: desde Automatizaciones o desde la página de plantillas
+  se envían tal cual o con "Editar el texto antes". Cada versión guarda qué
+  dato va en cada hueco (`huecos`), así que el cliente puede quitar huecos
+  o cambiar el texto de alrededor, pero no inventar huecos nuevos ({{1}} es
+  siempre el primer dato de la lista). El editor común está en
+  `src/components/plantillas/EditorPlantilla.tsx`.
+- **Pruebas**: `probar-plantillas-versiones` (32) contra el Meta simulado,
+  más `probar-plantillas` (44) y `probar-whatsapp` (25) sin regresiones.
+  Nombres con `_v<número>` al final quedan reservados para las versiones.
+
 ## Token de Meta que caduca — hecho el 11-09-2026
 El token de la pantalla de pruebas de Meta dura 24 h. Al conectar (o cambiar
 claves) se pregunta a Meta cuándo caduca (`debug_token`) y se guarda en

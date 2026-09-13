@@ -11,8 +11,8 @@ import { ejemploRelleno } from '@/lib/automatizaciones/plantillas-predisenadas'
 import { definicionDeFila, esPropia, problemaDeReceta, limpiarReceta, simularReceta, PREFIJO_PROPIA, MAXIMO_PROPIAS_POR_SUCURSAL } from '@/lib/automatizaciones/definiciones'
 import { permisosQueFaltan } from '@/lib/tiendas/shopify'
 import { supabaseAdmin } from '@/utils/supabase/admin'
-import { leerCredencialesMeta, crearPlantillaMeta, borrarPlantillaMeta, ErrorMeta } from '@/lib/canales/meta'
-import { estadoDesdeMeta } from '@/lib/canales/plantillas'
+import { resolverPlantilla, COLUMNAS_PLANTILLA, type FilaPlantilla } from '@/lib/canales/plantillas'
+import { crearVersion, comprobarTexto } from '@/lib/canales/plantillas-versiones'
 
 // Todo lo que necesita la pantalla de Automatizaciones: el catálogo entero
 // (que vive en el código), lo que esta sucursal tiene encendido, y si la
@@ -36,9 +36,10 @@ export async function getAutomatizaciones() {
     // puede escribir a un cliente que lleva más de 24 h sin decir nada
     supabase
       .from('whatsapp_templates')
-      .select('id, nombre, idioma, contenido')
+      .select('id, nombre, familia, version, idioma, contenido, en_uso')
       .eq('branch_id', auth.branch_id)
       .eq('estado', 'aprobada')
+      .not('meta_template_id', 'is', null)
       .order('nombre'),
     // Por dónde puede escribir esta sucursal (para el ajuste "Por dónde escribir")
     supabase
@@ -47,12 +48,14 @@ export async function getAutomatizaciones() {
       .eq('branch_id', auth.branch_id)
       .eq('estado', 'activo')
       .in('tipo', ['whatsapp', 'email']),
-    // Las plantillas prediseñadas que ya se mandaron a Meta, con su estado
+    // Las plantillas prediseñadas que ya se mandaron a Meta (todas sus
+    // versiones), para saber en qué punto está cada una
     supabase
       .from('whatsapp_templates')
-      .select('id, nombre, estado, motivo_rechazo, categoria')
+      .select('id, nombre, familia, version, idioma, estado, motivo_rechazo, categoria, contenido, huecos, ejemplos, en_uso, meta_template_id')
       .eq('branch_id', auth.branch_id)
-      .like('nombre', 'respondi\\_%'),
+      .like('familia', 'respondi\\_%')
+      .order('version', { ascending: false }),
     // Las etiquetas de la sucursal, para el paso "etiquetar" del editor
     supabase
       .from('message_categories')
@@ -61,7 +64,31 @@ export async function getAutomatizaciones() {
       .order('nombre')
   ])
   if (error) return { success: false, error: error.message }
-  const enMeta = new Map((predisenadas || []).map((p: any) => [p.nombre, p]))
+  // De cada familia prediseñada: la versión en uso (o la más reciente), si
+  // hay una nueva esperando a Meta, y todos sus identificadores (los ajustes
+  // pueden guardar cualquiera de ellos)
+  const enMeta = new Map<string, any>()
+  for (const fila of (predisenadas || []) as any[]) {
+    const f = enMeta.get(fila.familia) || { ids: new Set<string>(), principal: null, pendiente: null, aprobada: null }
+    f.ids.add(fila.id)
+    if (fila.en_uso) f.principal = fila
+    if (!f.principal && !f.pendiente && fila.estado === 'pendiente') f.pendiente = fila
+    else if (fila.estado === 'pendiente' && !fila.en_uso && !f.pendiente) f.pendiente = fila
+    if (!f.aprobada && fila.estado === 'aprobada' && fila.meta_template_id) f.aprobada = fila
+    enMeta.set(fila.familia, f)
+  }
+  for (const f of enMeta.values()) {
+    if (!f.principal) f.principal = f.aprobada || f.pendiente || (predisenadas as any[]).find((x: any) => f.ids.has(x.id))
+    if (f.pendiente && f.pendiente.id === f.principal.id) f.pendiente = null
+  }
+  // Para el ajuste "otra plantilla mía": una por familia, la que se enviaría
+  const porFamilia = new Map<string, any>()
+  for (const fila of (plantillas || []) as any[]) {
+    const clave = `${fila.familia}|${fila.idioma}`
+    const actual = porFamilia.get(clave)
+    if (!actual || fila.en_uso || (!actual.en_uso && fila.version > actual.version)) porFamilia.set(clave, fila)
+  }
+  const plantillasParaElegir = [...porFamilia.values()].map(f => ({ id: f.id, nombre: f.familia, idioma: f.idioma, contenido: f.contenido }))
 
   const porClave = new Map((guardadas || []).map((g: any) => [g.clave, g]))
   const permisosTienda: string[] = (tienda?.configuracion as any)?.permisos || []
@@ -75,7 +102,8 @@ export async function getAutomatizaciones() {
     const guardada = porClave.get(base.clave)
     const a = (guardada?.receta ? definicionDeFila(guardada as any) : null) || base
     const ajustes = ajustesConDefectos(a, guardada?.ajustes)
-    const mandada = a.plantilla ? enMeta.get(a.plantilla.nombre) : null
+    const familia = a.plantilla ? enMeta.get(a.plantilla.nombre) : null
+    const mandada = familia?.principal || null
     return {
       clave: a.clave,
       nombre: a.nombre,
@@ -100,12 +128,21 @@ export async function getAutomatizaciones() {
       plantilla_predisenada: a.plantilla ? {
         nombre: a.plantilla.nombre,
         categoria: a.plantilla.categoria,
-        cuerpo: a.plantilla.cuerpo,
-        ejemplo: ejemploRelleno(a.plantilla),
+        // El texto que se usa de verdad: el de la versión en uso si el
+        // cliente la editó; si no, el que viene hecho
+        cuerpo: mandada?.contenido || a.plantilla.cuerpo,
+        huecos: (Array.isArray(mandada?.huecos) ? mandada.huecos : a.plantilla.huecos) as string[],
+        ejemplos: (Array.isArray(mandada?.ejemplos) ? mandada.ejemplos : a.plantilla.ejemplos) as string[],
+        ejemplo: mandada?.contenido
+          ? ejemploRelleno({ ...a.plantilla, cuerpo: mandada.contenido, ejemplos: Array.isArray(mandada.ejemplos) ? mandada.ejemplos : a.plantilla.ejemplos })
+          : ejemploRelleno(a.plantilla),
         estado: mandada ? mandada.estado : 'no_enviada',
         motivo_rechazo: mandada?.motivo_rechazo || null,
         id: mandada?.id || null,
-        en_uso: !!mandada && ajustes.plantilla === mandada.id
+        version: mandada?.version || null,
+        // Hay una versión nueva esperando a que Meta la apruebe
+        pendiente_nueva: familia?.pendiente ? { version: familia.pendiente.version, contenido: familia.pendiente.contenido } : null,
+        en_uso: !!mandada && !!ajustes.plantilla && familia.ids.has(ajustes.plantilla)
       } : null,
       // Qué le impide funcionar ahora mismo
       falta_tienda: a.requiereTienda && !tiendaConectada,
@@ -154,7 +191,7 @@ export async function getAutomatizaciones() {
       automatizaciones: lista,
       maximo_propias: MAXIMO_PROPIAS_POR_SUCURSAL,
       etiquetas: (etiquetas || []).map((e: any) => e.nombre as string),
-      plantillas: plantillas || [],
+      plantillas: plantillasParaElegir,
       canales: Array.from(new Set((canales || []).map((c: any) => c.tipo as string))),
       tienda: tienda ? { dominio: tienda.dominio, nombre: tienda.nombre, estado: tienda.estado } : null
     }
@@ -241,7 +278,8 @@ export async function cambiarAutomatizacion(clave: string, cambios: { activa?: b
             .eq('branch_id', auth.branch_id)
             .maybeSingle()
           if (!plantilla) return { success: false, error: 'Esa plantilla no existe en esta sucursal.' }
-          if (plantilla.estado !== 'aprobada') return { success: false, error: 'Esa plantilla todavía no está aprobada por Meta.' }
+          // Vale si ella o alguna versión de su familia está aprobada
+          if (plantilla.estado !== 'aprobada' && !(await resolverPlantilla(valor, auth.branch_id))) return { success: false, error: 'Esa plantilla todavía no está aprobada por Meta.' }
         }
       } else if (valor !== null && valor !== undefined) {
         valor = String(valor).slice(0, 2000)
@@ -359,9 +397,14 @@ export async function getHistorialAutomatizaciones(limite = 30) {
 // Mandar a Meta la plantilla prediseñada de una automatización, con la
 // cuenta de WhatsApp del cliente, y dejarla elegida en los ajustes: en
 // cuanto Meta la apruebe (nos avisa solo), la automatización la usa sin que
-// el cliente tenga que hacer nada más. El texto no se puede cambiar: está
-// escrito para que Meta lo apruebe.
-export async function enviarPlantillaPredisenada(clave: string) {
+// el cliente tenga que hacer nada más.
+//
+// Con `cambios`, el cliente ha editado el texto antes de enviarla (13-09-2026,
+// decidido con Jorge): si la familia ya existe en Meta se crea una versión
+// nueva (la de siempre sigue en uso hasta que aprueben esta); si no, es la
+// primera versión. Solo puede usar los huecos que la automatización sabe
+// rellenar, en el mismo orden ({{1}} = el primero de la lista, etc.).
+export async function enviarPlantillaPredisenada(clave: string, cambios?: { contenido: string; ejemplos: string[] } | null) {
   const denegado = await sinPermiso('canales')
   if (denegado) return { success: false, error: denegado }
 
@@ -375,7 +418,7 @@ export async function enviarPlantillaPredisenada(clave: string) {
 
   const { data: canal } = await supabase
     .from('channels')
-    .select('id, estado, meta_waba_id')
+    .select('id, tenant_id, branch_id, estado, meta_waba_id')
     .eq('branch_id', auth.branch_id)
     .eq('tipo', 'whatsapp')
     .eq('metodo', 'meta_oficial')
@@ -384,80 +427,59 @@ export async function enviarPlantillaPredisenada(clave: string) {
   if (!canal) return { success: false, error: 'Antes conecta tu WhatsApp con Meta en Canales.' }
   if (!canal.meta_waba_id) return { success: false, error: 'Falta el identificador de tu cuenta de WhatsApp Business. Añádelo en Canales → WhatsApp → Cambiar claves.' }
 
-  // Si ya está en Meta (pendiente o aprobada), no se vuelve a mandar
-  const { data: existente } = await supabase
+  // Lo que ya hay de esta familia en Meta
+  const { data: versionesCrudo } = await supabase
     .from('whatsapp_templates')
-    .select('id, estado, meta_template_id')
+    .select(COLUMNAS_PLANTILLA)
     .eq('channel_id', canal.id)
-    .eq('nombre', p.nombre)
+    .eq('familia', p.nombre)
     .eq('idioma', p.idioma)
-    .maybeSingle()
-  if (existente && ['pendiente', 'aprobada'].includes(existente.estado)) {
-    await dejarElegida(supabase, auth, definicion, existente.id)
-    return { success: true, data: { id: existente.id, estado: existente.estado, repetida: true } }
+    .order('version', { ascending: false })
+  const versiones = (versionesCrudo || []) as FilaPlantilla[]
+  const enUso = versiones.find(v => v.en_uso) || null
+  const viva = versiones.find(v => ['pendiente', 'aprobada'].includes(v.estado)) || null
+
+  // Sin cambios y ya está en Meta (pendiente o aprobada): solo dejarla elegida
+  if (!cambios && viva) {
+    await dejarElegida(supabase, auth, definicion, (enUso && ['pendiente', 'aprobada'].includes(enUso.estado) ? enUso : viva).id)
+    return { success: true, data: { id: viva.id, estado: viva.estado, repetida: true } }
   }
 
-  const credenciales = await leerCredencialesMeta(canal.id).catch((e: any) => e as Error)
-  if (credenciales instanceof Error) return { success: false, error: credenciales.message }
-  if (!credenciales) return { success: false, error: 'El canal de WhatsApp no tiene las claves de Meta guardadas. Revisa la conexión en Canales.' }
-
-  // Una rechazada (o pausada/desactivada) hay que borrarla en Meta antes de
-  // volver a mandarla: Meta no deja dos con el mismo nombre e idioma
-  if (existente?.meta_template_id) {
-    try {
-      await borrarPlantillaMeta(canal.meta_waba_id, credenciales.access_token, p.nombre, existente.meta_template_id)
-    } catch {
-      // Si ya no existía en Meta, mejor: seguimos
-    }
+  const contenido = (cambios?.contenido || p.cuerpo).trim()
+  const ejemplos = cambios ? (cambios.ejemplos || []) : p.ejemplos
+  const t = comprobarTexto(contenido, ejemplos, p.huecos.length)
+  if ('error' in t) return { success: false, error: t.error! }
+  if (cambios && viva && contenido === viva.contenido.trim()) {
+    await dejarElegida(supabase, auth, definicion, viva.id)
+    return { success: true, data: { id: viva.id, estado: viva.estado, repetida: true } }
   }
 
-  let enMeta
-  try {
-    enMeta = await crearPlantillaMeta(canal.meta_waba_id, credenciales.access_token, {
-      nombre: p.nombre,
-      idioma: p.idioma,
-      categoria: p.categoria === 'marketing' ? 'MARKETING' : 'UTILITY',
-      cuerpo: p.cuerpo,
-      ejemplos: p.ejemplos
-    })
-  } catch (e: any) {
-    const detalle = e instanceof ErrorMeta && e.clavesInvalidas ? 'las claves del canal ya no valen (puede que el token haya caducado)' : e?.message
-    return { success: false, error: `Meta no ha aceptado la plantilla: ${detalle}` }
-  }
-
-  const categoria = String(enMeta.category || '').toUpperCase() === 'MARKETING' ? 'marketing' : 'utilidad'
-  const { data: fila, error } = await supabase
-    .from('whatsapp_templates')
-    .upsert({
-      tenant_id: auth.tenant_id,
-      branch_id: auth.branch_id,
-      channel_id: canal.id,
-      nombre: p.nombre,
-      contenido: p.cuerpo,
-      idioma: p.idioma,
-      categoria,
-      estado: estadoDesdeMeta(enMeta.status),
-      componentes: [{ type: 'BODY', text: p.cuerpo }],
-      meta_template_id: enMeta.id,
-      motivo_rechazo: null,
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'channel_id,nombre,idioma' })
-    .select('id, estado')
-    .single()
-  if (error || !fila) return { success: false, error: error?.message || 'No se ha podido guardar la plantilla.' }
-
-  await dejarElegida(supabase, auth, definicion, fila.id)
+  // Meta no deja dos plantillas con el mismo nombre e idioma: una versión
+  // rechazada (o pausada/desactivada) que estorbe se borra allí antes
+  const version = Math.max(0, ...versiones.map(v => Number(v.version) || 0)) + 1
+  const r = await crearVersion(auth, canal, {
+    familia: p.nombre, version, idioma: p.idioma, categoria: p.categoria, contenido, ejemplos: t.ejemplos!,
+    huecos: p.huecos.slice(0, t.huecos!.length), origen: 'predisenada',
+    activarAlAprobar: true,
+    enUso: !enUso || !['pendiente', 'aprobada'].includes(enUso.estado)
+  })
+  if (!r.success) return r
+  const fila = r.plantilla
+  // Si la nueva está en uso desde ya, la elegida es ella; si no, la de siempre
+  await dejarElegida(supabase, auth, definicion, fila.en_uso || !enUso ? fila.id : enUso.id)
 
   await registrarAuditoria({
     tenant_id: auth.tenant_id,
     user_id: auth.user_id,
-    accion: `envió a Meta la plantilla prediseñada "${p.nombre}" de la automatización "${definicion.nombre}"`,
+    accion: cambios
+      ? `editó la plantilla prediseñada "${p.nombre}" de la automatización "${definicion.nombre}" (versión ${version}) y la envió a Meta`
+      : `envió a Meta la plantilla prediseñada "${p.nombre}" de la automatización "${definicion.nombre}"`,
     tabla_afectada: 'whatsapp_templates',
     registro_id: fila.id,
-    valor_nuevo: { nombre: p.nombre, categoria, contenido: p.cuerpo }
+    valor_nuevo: { nombre: fila.nombre, categoria: fila.categoria, contenido }
   })
 
-  return { success: true, data: { id: fila.id, estado: fila.estado } }
+  return { success: true, data: { id: fila.id, estado: fila.estado, version, sigueEnUso: !fila.en_uso } }
 }
 
 // ---------------------------------------------------------------------------

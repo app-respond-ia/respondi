@@ -4,7 +4,7 @@ import { ErrorCarga } from '@/components/ui/ErrorCarga'
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { getCanales, conectarCanal, desconectarCanal, conectarWhatsAppMeta } from '@/app/actions/canales'
+import { getCanales, conectarCanal, desconectarCanal, conectarWhatsAppMeta, conectarPaginaMeta } from '@/app/actions/canales'
 import { getMisPermisos } from '@/app/actions/permisos'
 import { useToast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
@@ -73,6 +73,7 @@ export default function CanalesPage() {
   // Conexión de WhatsApp con Meta: elegir método → pegar claves → datos del aviso
   const [pasoMeta, setPasoMeta] = useState<'metodo' | 'claves' | 'aviso'>('metodo')
   const [phoneNumberId, setPhoneNumberId] = useState('')
+  const [pageId, setPageId] = useState('')
   const [wabaId, setWabaId] = useState('')
   const [accessToken, setAccessToken] = useState('')
   const [appSecret, setAppSecret] = useState('')
@@ -125,6 +126,7 @@ export default function CanalesPage() {
     setConexionConfirmada(false)
     setPasoMeta('metodo')
     setPhoneNumberId('')
+    setPageId('')
     setWabaId('')
     setAccessToken('')
     setAppSecret('')
@@ -175,7 +177,7 @@ export default function CanalesPage() {
 
   const abrirDatosAviso = (canal: Canal) => {
     if (!canal.webhook_url || !canal.verify_token) return
-    setModalTipo('whatsapp')
+    setModalTipo(canal.tipo)
     setDatosAviso({ webhook_url: canal.webhook_url, verify_token: canal.verify_token, numero_visible: canal.numero_visible })
     setPasoMeta('aviso')
     setConexionConfirmada(false)
@@ -185,9 +187,10 @@ export default function CanalesPage() {
 
   const abrirCambiarClaves = (canal: Canal) => {
     if (nivelPermiso !== 'escritura') return
-    setModalTipo('whatsapp')
+    setModalTipo(canal.tipo)
     setModalMetodo('oficial')
     setPhoneNumberId(canal.meta_phone_number_id || '')
+    setPageId(canal.configuracion?.page_id || '')
     setWabaId(canal.meta_waba_id || '')
     setAccessToken('')
     setAppSecret('')
@@ -214,7 +217,28 @@ export default function CanalesPage() {
 
   const handleContinuarRequisitos = () => {
     setMostrarRequisitos(false)
+    // Facebook e Instagram se conectan con las claves de la página del cliente
+    if (modalTipo === 'facebook' || modalTipo === 'instagram') {
+      setPasoMeta('claves')
+      return
+    }
     setConexionConfirmada(true)
+  }
+
+  const handleGuardarClavesPagina = async () => {
+    if (modalTipo !== 'facebook' && modalTipo !== 'instagram') return
+    setModalLoading(true)
+    const res = await conectarPaginaMeta({ tipo: modalTipo, pageId, accessToken, appSecret })
+    setModalLoading(false)
+    if (!res.success || !res.data) {
+      showToast(res.error || 'No se ha podido conectar', 'error')
+      return
+    }
+    setAccessToken('')
+    setAppSecret('')
+    setDatosAviso({ webhook_url: res.data.webhook_url, verify_token: res.data.verify_token, numero_visible: res.data.numero_visible })
+    setPasoMeta('aviso')
+    cargar()
   }
 
   const handleDesconectar = (id: string) => {
@@ -543,7 +567,38 @@ export default function CanalesPage() {
                 </button>
               </div>
 
-              {modalTipo === 'whatsapp' && pasoMeta === 'claves' ? (
+              {(modalTipo === 'facebook' || modalTipo === 'instagram') && pasoMeta === 'claves' ? (
+                <>
+                  <div className="px-6 py-5 space-y-4">
+                    <p className="text-sm text-ink-600">
+                      Copia estos tres datos de tu app de Meta (<a href="https://developers.facebook.com/apps" target="_blank" rel="noopener noreferrer" className="text-brand-600 font-600 hover:underline">developers.facebook.com</a>). Los comprobamos con Meta antes de guardarlos y quedan cifrados: nadie los vuelve a ver.
+                      {modalTipo === 'instagram' && <> Instagram se conecta a través de la página de Facebook a la que está vinculada tu cuenta profesional.</>}
+                    </p>
+                    <div>
+                      <label htmlFor="meta-page-id" className="block text-sm font-600 text-ink-900 mb-1">Identificador de la página de Facebook</label>
+                      <input id="meta-page-id" value={pageId} onChange={e => setPageId(e.target.value)} inputMode="numeric" autoComplete="off" placeholder="Ej. 123456789012345" className="w-full h-11 px-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500" />
+                      <p className="text-xs text-ink-500 mt-1">En tu página de Facebook → Configuración → Información de la página (abajo, «Identificador de la página»). Son solo cifras.</p>
+                    </div>
+                    <div>
+                      <label htmlFor="meta-page-token" className="block text-sm font-600 text-ink-900 mb-1">Token de acceso de la página</label>
+                      <input id="meta-page-token" type="password" value={accessToken} onChange={e => setAccessToken(e.target.value)} autoComplete="off" placeholder="EAA…" className="w-full h-11 px-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500" />
+                      <p className="text-xs text-ink-500 mt-1">Un token de página que no caduque, generado con un usuario del sistema de tu negocio. Te lo explicamos aquí abajo.</p>
+                      <GuiaTokenPagina instagram={modalTipo === 'instagram'} />
+                    </div>
+                    <div>
+                      <label htmlFor="meta-page-secret" className="block text-sm font-600 text-ink-900 mb-1">Clave secreta de la app</label>
+                      <input id="meta-page-secret" type="password" value={appSecret} onChange={e => setAppSecret(e.target.value)} autoComplete="off" placeholder="32 caracteres" className="w-full h-11 px-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500" />
+                      <p className="text-xs text-ink-500 mt-1">En tu app → Configuración de la app → Básica → Clave secreta de la app.</p>
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100">
+                    <button onClick={() => setIsModalOpen(false)} disabled={modalLoading} className="px-5 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition disabled:opacity-50">Cancelar</button>
+                    <button onClick={handleGuardarClavesPagina} disabled={modalLoading || !pageId || !accessToken || !appSecret} className="px-5 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition disabled:opacity-50">
+                      {modalLoading ? 'Comprobando con Meta…' : 'Comprobar y guardar'}
+                    </button>
+                  </div>
+                </>
+              ) : modalTipo === 'whatsapp' && pasoMeta === 'claves' ? (
                 <>
                   <div className="px-6 py-5 space-y-4">
                     <p className="text-sm text-ink-600">
@@ -578,12 +633,18 @@ export default function CanalesPage() {
                     </button>
                   </div>
                 </>
-              ) : modalTipo === 'whatsapp' && pasoMeta === 'aviso' && datosAviso ? (
+              ) : pasoMeta === 'aviso' && datosAviso ? (
                 <>
                   <div className="px-6 py-5 space-y-4">
                     <p className="text-sm text-ink-600">
                       {datosAviso.numero_visible ? <><strong className="text-ink-900">{datosAviso.numero_visible}</strong> está listo. </> : null}
-                      Último paso: en tu app de Meta → WhatsApp → Configuración → <strong>Webhook</strong> → Editar, pega estos dos datos, pulsa «Verificar y guardar» y, en «Campos del webhook», activa <strong>messages</strong> y <strong>message_template_status_update</strong> (este último avisa cuando Meta aprueba o rechaza una plantilla).
+                      {modalTipo === 'whatsapp' ? (
+                        <>Último paso: en tu app de Meta → WhatsApp → Configuración → <strong>Webhook</strong> → Editar, pega estos dos datos, pulsa «Verificar y guardar» y, en «Campos del webhook», activa <strong>messages</strong> y <strong>message_template_status_update</strong> (este último avisa cuando Meta aprueba o rechaza una plantilla).</>
+                      ) : modalTipo === 'instagram' ? (
+                        <>Último paso: en tu app de Meta → <strong>Webhooks</strong>, elige el objeto <strong>Instagram</strong>, pulsa «Suscribirse a este objeto», pega estos dos datos, pulsa «Verificar y guardar» y activa el campo <strong>messages</strong> (y, si quieres, <strong>messaging_postbacks</strong>). Hace falta tener añadido el producto «Instagram» en la app.</>
+                      ) : (
+                        <>Último paso: en tu app de Meta → <strong>Webhooks</strong>, elige el objeto <strong>Page</strong> (Página), pulsa «Suscribirse a este objeto», pega estos dos datos, pulsa «Verificar y guardar» y activa los campos <strong>messages</strong>, <strong>messaging_postbacks</strong>, <strong>message_deliveries</strong> y <strong>message_reads</strong>. Hace falta tener añadido el producto «Messenger» en la app.</>
+                      )}
                     </p>
                     <div>
                       <p className="text-sm font-600 text-ink-900 mb-1">URL de devolución de llamada</p>
@@ -747,6 +808,28 @@ export default function CanalesPage() {
 
 // Cómo crear en Meta un token que no caduca (de "usuario del sistema"). El que
 // da la pantalla de pruebas de Meta dura 24 h.
+// Cómo se consigue un token de página que no caduca (usuario del sistema)
+function GuiaTokenPagina({ instagram }: { instagram: boolean }) {
+  const [abierta, setAbierta] = useState(false)
+  return (
+    <div className="mt-2">
+      <button type="button" onClick={() => setAbierta(v => !v)} className="text-xs font-600 text-brand-600 hover:text-brand-700">
+        {abierta ? 'Ocultar la guía' : '¿Cómo consigo el token de la página?'}
+      </button>
+      {abierta && (
+        <ol className="mt-2 text-xs text-ink-600 space-y-1.5 list-decimal list-inside bg-slate-50 rounded-xl p-3 leading-relaxed">
+          <li>En tu app de Meta, añade los productos <strong>Messenger</strong>{instagram ? ' e ' : ''}{instagram ? <strong>Instagram</strong> : ''} (menú «Añadir producto»).</li>
+          <li>Entra en <a href="https://business.facebook.com/settings" target="_blank" rel="noopener noreferrer" className="text-brand-600 font-600 hover:underline">la configuración de tu negocio en Meta</a> → Usuarios → <strong>Usuarios del sistema</strong> → Agregar (nombre «Respondi», rol administrador).</li>
+          <li>En ese usuario → <strong>Asignar activos</strong>: tu página de Facebook{instagram ? ' y tu cuenta de Instagram' : ''}, con control total; y tu app.</li>
+          <li>Pulsa <strong>Generar token</strong>, elige la app y marca los permisos <strong>pages_messaging</strong>, <strong>pages_manage_metadata</strong> y <strong>pages_read_engagement</strong>{instagram ? <>, <strong>instagram_basic</strong> e <strong>instagram_manage_messages</strong></> : ''}. Caducidad: «Nunca».</li>
+          <li>Copia el token y pégalo aquí. Es un token de usuario del sistema con acceso a la página: vale como token de página.</li>
+          <li>Mientras la app esté en modo desarrollo, solo funciona con cuentas con rol en la app; para clientes de fuera hay que pedir a Meta la revisión de esos permisos.</li>
+        </ol>
+      )}
+    </div>
+  )
+}
+
 function GuiaTokenPermanente() {
   return (
     <details className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-ink-600 group">

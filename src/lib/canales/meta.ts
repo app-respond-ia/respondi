@@ -45,8 +45,13 @@ export function firmaValida(cuerpo: Buffer, cabecera: string | null, appSecret: 
 }
 
 export class ErrorMeta extends Error {
-  constructor(message: string, public codigo: number | null, public estadoHttp: number | null) {
+  constructor(message: string, public codigo: number | null, public estadoHttp: number | null, public subcodigo: number | null = null) {
     super(message)
+  }
+  // Messenger e Instagram: han pasado más de 24 h desde el último mensaje
+  // del cliente (no hay plantillas: no se le puede escribir)
+  get fueraDeVentanaPagina() {
+    return this.codigo === 10 && (this.subcodigo === 2018278 || this.subcodigo === 2534022 || /window/i.test(this.message))
   }
   // Fallos pasajeros que tiene sentido volver a intentar
   get reintentable() {
@@ -81,7 +86,7 @@ async function graph(ruta: string, token: string, init: RequestInit = {}) {
     // qué no acepta una plantilla), se usa esa
     const e = cuerpo?.error || {}
     const texto = e.error_user_msg ? `${e.error_user_title ? `${e.error_user_title}: ` : ''}${e.error_user_msg}` : e.message
-    throw new ErrorMeta(texto || `Meta ha respondido con un error ${r.status}`, e.code ?? null, r.status)
+    throw new ErrorMeta(texto || `Meta ha respondido con un error ${r.status}`, e.code ?? null, r.status, e.error_subcode ?? null)
   }
   return cuerpo
 }
@@ -136,6 +141,84 @@ export async function descargarArchivo(mediaId: string, token: string): Promise<
 export async function suscribirAppALaCuenta(wabaId: string, token: string) {
   const d = await graph(`${encodeURIComponent(wabaId)}/subscribed_apps`, token, { method: 'POST' })
   if (!d?.success) throw new ErrorMeta('Meta no ha confirmado la suscripción de la app a la cuenta de WhatsApp Business', null, 200)
+}
+
+// ---------- Páginas de Facebook (Messenger) e Instagram ----------
+// El cliente conecta su página con un token de página de su propia app. Los
+// mensajes de Messenger llegan por el objeto "page" y los de Instagram por
+// el objeto "instagram"; se contestan con POST /{página o cuenta}/messages.
+
+export interface DatosPagina {
+  id: string
+  nombre: string
+  instagram: { id: string; username: string | null; nombre: string | null } | null
+}
+
+// Que la página existe y el token llega a ella (y si tiene Instagram vinculado)
+export async function comprobarPagina(pageId: string, token: string): Promise<DatosPagina> {
+  const d = await graph(`${encodeURIComponent(pageId)}?fields=id,name,instagram_business_account{id,username,name}`, token)
+  const ig = d?.instagram_business_account
+  return { id: String(d.id), nombre: String(d.name || ''), instagram: ig ? { id: String(ig.id), username: ig.username || null, nombre: ig.name || null } : null }
+}
+
+// Sin esto Meta no manda los mensajes de la página a la app (igual que con
+// la cuenta de WhatsApp Business)
+export async function suscribirAppAPagina(pageId: string, token: string) {
+  const d = await graph(`${encodeURIComponent(pageId)}/subscribed_apps`, token, {
+    method: 'POST',
+    body: JSON.stringify({ subscribed_fields: ['messages', 'messaging_postbacks', 'message_deliveries', 'message_reads'] })
+  })
+  if (!d?.success) throw new ErrorMeta('Meta no ha confirmado la suscripción de la app a la página', null, 200)
+}
+
+// El nombre de quien escribe (Messenger da el nombre; Instagram, usuario y nombre)
+export async function perfilDeContacto(id: string, token: string, tipo: 'facebook' | 'instagram'): Promise<string | null> {
+  try {
+    const d = await graph(`${encodeURIComponent(id)}?fields=${tipo === 'instagram' ? 'name,username' : 'name'}`, token)
+    const nombre = String(d?.name || '').trim()
+    const usuario = String(d?.username || '').trim()
+    return nombre || (usuario ? `@${usuario}` : null)
+  } catch {
+    return null
+  }
+}
+
+// Messenger admite 2000 caracteres por mensaje e Instagram 1000: un texto más
+// largo sale en varios mensajes seguidos. Devuelve el identificador del último.
+export async function enviarTextoPagina(remitenteId: string, token: string, destino: string, texto: string, tipo: 'facebook' | 'instagram'): Promise<string> {
+  const tope = tipo === 'instagram' ? 1000 : 2000
+  const trozos: string[] = []
+  let resto = texto.trim()
+  while (resto.length > tope) {
+    let corte = resto.lastIndexOf('\n', tope)
+    if (corte < tope * 0.5) corte = resto.lastIndexOf(' ', tope)
+    if (corte < tope * 0.5) corte = tope
+    trozos.push(resto.slice(0, corte).trim())
+    resto = resto.slice(corte).trim()
+  }
+  if (resto) trozos.push(resto)
+  let ultimo = ''
+  for (const t of trozos) {
+    const d = await graph(`${encodeURIComponent(remitenteId)}/messages`, token, {
+      method: 'POST',
+      body: JSON.stringify({ recipient: { id: destino }, messaging_type: 'RESPONSE', message: { text: t } })
+    })
+    ultimo = String(d?.message_id || '')
+    if (!ultimo) throw new ErrorMeta('Meta no ha devuelto el identificador del mensaje enviado', null, 200)
+  }
+  return ultimo
+}
+
+// Los archivos de Messenger e Instagram llegan como enlaces temporales
+export async function descargarAdjuntoDePagina(url: string): Promise<{ datos: Buffer; tipo: string }> {
+  let r: Response
+  try {
+    r = await fetch(url, { signal: AbortSignal.timeout(30000) })
+  } catch (e: any) {
+    throw new ErrorMeta(`No se ha podido descargar el archivo (${e?.message})`, null, null)
+  }
+  if (!r.ok) throw new ErrorMeta(`No se ha podido descargar el archivo (${r.status})`, null, r.status)
+  return { datos: Buffer.from(await r.arrayBuffer()), tipo: (r.headers.get('content-type') || 'application/octet-stream').split(';')[0].trim() }
 }
 
 // Que la cuenta existe, que el token llega a ella y que el número es suyo

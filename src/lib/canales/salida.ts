@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { registrarError } from '@/lib/errores'
-import { leerCredencialesMeta, enviarTexto, enviarPlantilla, subirArchivoAMeta, ErrorMeta } from '@/lib/canales/meta'
+import { leerCredencialesMeta, enviarTexto, enviarPlantilla, subirArchivoAMeta, enviarTextoPagina, ErrorMeta } from '@/lib/canales/meta'
 import { enviarCorreo, leerContrasenaCorreo, ErrorCorreo, type ConfigCorreo } from '@/lib/canales/correo'
 
 // Saca hacia el cliente un mensaje ya guardado (de la IA, de un agente o un
@@ -50,7 +50,7 @@ export async function enviarMensajeSaliente(messageId: string): Promise<Resultad
 
   const { data: canal } = await supabaseAdmin
     .from('channels')
-    .select('id, metodo, estado, meta_phone_number_id, configuracion')
+    .select('id, tipo, metodo, estado, meta_phone_number_id, identificador_externo, configuracion')
     .eq('tenant_id', msg.tenant_id)
     .eq('branch_id', conv.branch_id)
     .eq('tipo', conv.canal)
@@ -60,6 +60,7 @@ export async function enviarMensajeSaliente(messageId: string): Promise<Resultad
   if (!canal) return fallar(`No hay ningún canal de ${conv.canal} conectado en esta sucursal.`)
   if (canal.metodo === 'imap_smtp') return enviarPorCorreo(msg, conv, contacto, canal, intentos, fallar)
   if (canal.metodo !== 'meta_oficial') return fallar('Este canal todavía no puede enviar mensajes desde Respondi (solo está disponible la conexión oficial de Meta).')
+  if (canal.tipo === 'facebook' || canal.tipo === 'instagram') return enviarPorPagina(msg, conv, contacto, canal, intentos, fallar)
   if (canal.estado !== 'activo' || !canal.meta_phone_number_id) return fallar('El canal de WhatsApp no está activo. Revisa la conexión en Canales.')
 
   let credenciales
@@ -134,6 +135,50 @@ export async function enviarMensajeSaliente(messageId: string): Promise<Resultad
       origen: 'api_meta',
       descripcion: 'Fallo inesperado al enviar un mensaje por WhatsApp',
       stacktrace: JSON.stringify({ messageId, message: e?.message }),
+      tenant_id: msg.tenant_id
+    })
+    return fallar(e?.message || 'Error inesperado', true)
+  }
+}
+
+// Messenger e Instagram: texto por la página (o la cuenta de Instagram) con
+// el token de página del cliente. Solo dentro de las 24 h siguientes al
+// último mensaje del cliente: fuera, Meta lo rechaza y no hay plantillas.
+async function enviarPorPagina(
+  msg: any, conv: any, contacto: any, canal: any, intentos: number,
+  fallar: (error: string, reintentable?: boolean) => Promise<Resultado>
+): Promise<Resultado> {
+  const nombre = canal.tipo === 'instagram' ? 'Instagram' : 'Facebook'
+  if (canal.estado !== 'activo' || !canal.identificador_externo) return fallar(`El canal de ${nombre} no está activo. Revisa la conexión en Canales.`)
+  if (msg.plantilla?.nombre) return fallar(`Las plantillas son solo de WhatsApp: por ${nombre} se envía texto.`)
+  let credenciales
+  try {
+    credenciales = await leerCredencialesMeta(canal.id)
+  } catch (e: any) {
+    return fallar(e?.message || 'No se han podido leer las claves guardadas.', true)
+  }
+  if (!credenciales) return fallar(`El canal de ${nombre} no tiene las claves de Meta guardadas. Revisa la conexión en Canales.`)
+
+  await apuntar(msg.id, { estado_envio: 'pendiente', intentos_envio: intentos, ultimo_intento_envio: new Date().toISOString() })
+  try {
+    const idExterno = await enviarTextoPagina(canal.identificador_externo, credenciales.access_token, contacto.identificador_canal, msg.contenido, canal.tipo)
+    await apuntar(msg.id, { estado_envio: 'enviado', error_envio: null, identificador_externo: idExterno })
+    return { estado: 'enviado' }
+  } catch (e: any) {
+    if (e instanceof ErrorMeta) {
+      if (e.fueraDeVentanaPagina) {
+        return fallar(`Han pasado más de 24 h desde el último mensaje del cliente: ${nombre} no deja escribirle hasta que vuelva a escribir él.`)
+      }
+      if (e.clavesInvalidas) {
+        await supabaseAdmin.from('channels').update({ estado: 'error', ultimo_error: `Meta ha rechazado las claves: ${e.message}` }).eq('id', canal.id)
+        return fallar('Meta ha rechazado las claves del canal (puede que el token haya caducado). Hay que actualizarlas en Canales.')
+      }
+      return fallar(e.message, e.reintentable)
+    }
+    await registrarError({
+      origen: 'api_meta',
+      descripcion: `Fallo inesperado al enviar un mensaje por ${nombre}`,
+      stacktrace: JSON.stringify({ messageId: msg.id, message: e?.message }),
       tenant_id: msg.tenant_id
     })
     return fallar(e?.message || 'Error inesperado', true)

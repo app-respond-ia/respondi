@@ -1169,16 +1169,20 @@ function ChatsContent() {
                 {ventanaCerrada && (
                   <div className="mb-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2.5">
                     <p className="text-xs text-amber-800 flex-1">
-                      Han pasado más de 24 h desde el último mensaje del cliente: WhatsApp solo deja escribirle con una plantilla aprobada.
+                      {selectedConv?.canal === 'whatsapp'
+                        ? 'Han pasado más de 24 h desde el último mensaje del cliente: WhatsApp solo deja escribirle con una plantilla aprobada.'
+                        : `Han pasado más de 24 h desde el último mensaje del cliente: ${selectedConv?.canal === 'instagram' ? 'Instagram' : 'Facebook'} no deja escribirle hasta que vuelva a escribir él.`}
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => setPlantillaAbierta(true)}
-                      disabled={nivelPermiso !== 'escritura'}
-                      className="shrink-0 px-3 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-xs font-600 transition disabled:opacity-50"
-                    >
-                      Enviar plantilla
-                    </button>
+                    {selectedConv?.canal === 'whatsapp' && (
+                      <button
+                        type="button"
+                        onClick={() => setPlantillaAbierta(true)}
+                        disabled={nivelPermiso !== 'escritura'}
+                        className="shrink-0 px-3 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-xs font-600 transition disabled:opacity-50"
+                      >
+                        Enviar plantilla
+                      </button>
+                    )}
                   </div>
                 )}
                 <form onSubmit={handleEnviar} className="flex items-end gap-2">
@@ -1193,7 +1197,7 @@ function ChatsContent() {
                           handleEnviar(e as unknown as React.FormEvent)
                         }
                       }}
-                      placeholder={ventanaCerrada ? 'Usa una plantilla para escribir a este cliente' : selectedConv?.canal === 'email' ? 'Responder por correo…' : 'Escribe un mensaje...'}
+                      placeholder={ventanaCerrada ? (selectedConv?.canal === 'whatsapp' ? 'Usa una plantilla para escribir a este cliente' : 'Espera a que el cliente vuelva a escribir') : selectedConv?.canal === 'email' ? 'Responder por correo…' : 'Escribe un mensaje...'}
                       disabled={nivelPermiso !== 'escritura' || enviando || ventanaCerrada}
                       className="w-full px-4 py-2.5 rounded-2xl border border-slate-300 bg-white resize-none text-sm placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition max-h-32 disabled:opacity-50 disabled:bg-slate-50"
                     ></textarea>

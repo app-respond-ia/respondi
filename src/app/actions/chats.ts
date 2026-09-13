@@ -448,7 +448,7 @@ export async function getContextoChat(conversationId: string) {
   // cualquiera de sus conversaciones con esta sucursal. Cerrada, solo se le
   // puede escribir con una plantilla aprobada.
   let ventana: { abierta: boolean; cierra: string | null } | null = null
-  if (data.canal === 'whatsapp') {
+  if (data.canal === 'whatsapp' || data.canal === 'facebook' || data.canal === 'instagram') {
     const { data: ultimo } = await supabase
       .from('messages')
       .select('timestamp, conversations!inner(contact_id, branch_id)')

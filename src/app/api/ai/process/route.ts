@@ -174,12 +174,15 @@ export async function POST(req: Request) {
     // plantilla de reapertura, se le manda (sin gastar crédito) y, cuando
     // conteste, la IA le atiende con normalidad. Si no, queda para el equipo,
     // que en Chats verá el botón de enviar plantilla.
-    if (conv.canal === 'whatsapp') {
+    // Messenger e Instagram tienen la misma ventana de 24 h, sin plantillas:
+    // fuera de ella la conversación queda para el equipo hasta que el cliente
+    // vuelva a escribir
+    if (conv.canal === 'whatsapp' || conv.canal === 'facebook' || conv.canal === 'instagram') {
       const { ultimoMensajeDelCliente, ventanaAbierta } = await import('@/lib/canales/ventana')
       const ultimo = await ultimoMensajeDelCliente(conv.contact_id, conv.branch_id)
       if (ultimo && !ventanaAbierta(ultimo)) {
         const { plantillaDeReapertura } = await import('@/lib/canales/plantillas')
-        const reapertura = await plantillaDeReapertura(conv.branch_id, conv.contact_id)
+        const reapertura = conv.canal === 'whatsapp' ? await plantillaDeReapertura(conv.branch_id, conv.contact_id) : null
         if (reapertura) {
           const { data: enviada } = await supabaseAdmin
             .from('messages')

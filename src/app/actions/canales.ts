@@ -8,16 +8,18 @@ import { getAuthContext } from '@/lib/auth-context'
 import crypto from 'crypto'
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { sinPermiso } from '@/lib/permisos-servidor'
-import { comprobarNumero, numeroEsDeLaCuenta, guardarCredencialesMeta, caducidadDelToken, ErrorMeta, suscribirAppALaCuenta } from '@/lib/canales/meta'
+import { comprobarNumero, numeroEsDeLaCuenta, guardarCredencialesMeta, caducidadDelToken, ErrorMeta, suscribirAppALaCuenta, comprobarPagina, suscribirAppAPagina } from '@/lib/canales/meta'
 import { sincronizarPlantillas } from '@/lib/canales/plantillas'
 import { comprobarCorreo, guardarContrasenaCorreo, leerContrasenaCorreo, ErrorCorreo, type ConfigCorreo } from '@/lib/canales/correo'
 import { proveedorCorreo, esServidorMicrosoft, esDireccionMicrosoft, AVISO_MICROSOFT } from '@/lib/canales/proveedores-correo'
 import { promises as dns } from 'dns'
 import { after } from 'next/server'
 
-// Dirección a la que Meta avisa de los mensajes de un canal
-function urlDelAviso(channelId: string) {
-  return `${process.env.NEXT_PUBLIC_SITE_URL || 'https://respondi.vercel.app'}/api/whatsapp/meta/${channelId}`
+// Dirección a la que Meta avisa de los mensajes de un canal (WhatsApp por
+// un lado; Messenger e Instagram por otro, que hablan distinto)
+function urlDelAviso(channelId: string, tipo: string = 'whatsapp') {
+  const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://respondi.vercel.app'
+  return tipo === 'whatsapp' ? `${base}/api/whatsapp/meta/${channelId}` : `${base}/api/meta/${channelId}`
 }
 
 // Los canales que permite el plan son para toda la organización, repartidos
@@ -69,7 +71,7 @@ export async function getCanales() {
     return {
       ...c,
       configuracion: c.configuracion ? configuracion : null,
-      webhook_url: c.metodo === 'meta_oficial' ? urlDelAviso(c.id) : null
+      webhook_url: c.metodo === 'meta_oficial' ? urlDelAviso(c.id, c.tipo) : null
     }
   })
 
@@ -341,6 +343,115 @@ export async function conectarWhatsAppMeta(datos: { phoneNumberId: string; acces
       webhook_url: urlDelAviso(canal.id),
       verify_token: canal.verify_token
     }
+  }
+}
+
+// Conectar la página de Facebook (Messenger) o la cuenta de Instagram del
+// cliente con su propia app de Meta. Pega el identificador de la página, un
+// token de página y la clave secreta de la app; se comprueba con Meta antes
+// de guardar, la app se suscribe a la página, y se le devuelve lo que tiene
+// que pegar en Meta para que avise de los mensajes. Para Instagram hace
+// falta que la cuenta profesional esté vinculada a esa página.
+export async function conectarPaginaMeta(datos: { tipo: 'facebook' | 'instagram'; pageId: string; accessToken: string; appSecret: string }) {
+  const denegado = await sinPermiso('canales')
+  if (denegado) return { success: false, error: denegado }
+
+  const supabase = await createClient()
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+
+  const tipo = datos.tipo === 'instagram' ? 'instagram' : 'facebook'
+  const nombreCanal = tipo === 'instagram' ? 'Instagram' : 'Facebook'
+  const pageId = (datos.pageId || '').trim()
+  const accessToken = (datos.accessToken || '').trim()
+  const appSecret = (datos.appSecret || '').trim()
+  if (!/^\d{5,25}$/.test(pageId)) return { success: false, error: 'El "Identificador de la página" son solo cifras (en tu página de Facebook → Configuración → Información de la página, o en la app de Meta → Messenger → Configuración).' }
+  if (accessToken.length < 30) return { success: false, error: 'El token de la página no parece completo. Cópialo entero desde tu app de Meta.' }
+  if (!/^[0-9a-f]{32}$/i.test(appSecret)) return { success: false, error: 'La clave secreta de la app tiene 32 caracteres (en tu app de Meta → Configuración de la app → Básica → Clave secreta de la app).' }
+
+  const sinHueco = await fueraDelPlan(auth.tenant_id!, auth.branch_id!, tipo)
+  if (sinHueco) return { success: false, error: sinHueco }
+
+  // 1. ¿Son buenos? Se pregunta a Meta por la página con ese token
+  let pagina
+  try {
+    pagina = await comprobarPagina(pageId, accessToken)
+  } catch (e: any) {
+    const detalle = e instanceof ErrorMeta && e.clavesInvalidas ? 'el token no es válido, ha caducado o no es de esta página' : e?.message
+    return { success: false, error: `Meta no ha aceptado estos datos: ${detalle}.` }
+  }
+  if (tipo === 'instagram' && !pagina.instagram) {
+    return { success: false, error: `La página "${pagina.nombre}" no tiene ninguna cuenta profesional de Instagram vinculada. Vincúlala en la configuración de la página (o en la app de Instagram → Configuración → Centro de cuentas) y vuelve a intentarlo.` }
+  }
+  // 2. Que Meta nos mande lo que pase en la página
+  try {
+    await suscribirAppAPagina(pageId, accessToken)
+  } catch (e: any) {
+    return { success: false, error: `Meta no ha dejado suscribir tu app a la página (el token necesita los permisos pages_manage_metadata y pages_messaging${tipo === 'instagram' ? ', instagram_basic e instagram_manage_messages' : ''}): ${e?.message}.` }
+  }
+  const caduca = await caducidadDelToken(accessToken)
+
+  // Lo que identifica el canal en los avisos: la página, o la cuenta de Instagram
+  const identificador = tipo === 'instagram' ? pagina.instagram!.id : pagina.id
+  const { data: yaUsado } = await supabaseAdmin
+    .from('channels')
+    .select('id, tenant_id, branch_id')
+    .eq('tipo', tipo)
+    .eq('identificador_externo', identificador)
+    .neq('estado', 'desconectado')
+    .maybeSingle()
+  if (yaUsado && (yaUsado.tenant_id !== auth.tenant_id || yaUsado.branch_id !== auth.branch_id)) {
+    return { success: false, error: `${tipo === 'instagram' ? 'Esa cuenta de Instagram' : 'Esa página'} ya está conectada en otra sucursal u organización.` }
+  }
+
+  const { data: existente } = await supabase
+    .from('channels')
+    .select('id, estado, verify_token, identificador_externo')
+    .eq('tenant_id', auth.tenant_id)
+    .eq('branch_id', auth.branch_id)
+    .eq('tipo', tipo)
+    .maybeSingle()
+  const sigueActivo = existente?.estado === 'activo' && existente?.identificador_externo === identificador
+  const { data: canal, error } = await supabase
+    .from('channels')
+    .upsert({
+      tenant_id: auth.tenant_id,
+      branch_id: auth.branch_id,
+      tipo,
+      metodo: 'meta_oficial',
+      estado: sigueActivo ? 'activo' : 'pendiente',
+      identificador_externo: identificador,
+      meta_phone_number_id: null,
+      meta_waba_id: null,
+      token_caduca_en: caduca ? caduca.toISOString() : null,
+      numero_visible: tipo === 'instagram' ? (pagina.instagram!.username ? `@${pagina.instagram!.username}` : pagina.instagram!.nombre || pagina.nombre) : pagina.nombre,
+      nombre_verificado: tipo === 'instagram' ? pagina.nombre : null,
+      configuracion: { page_id: pagina.id, page_nombre: pagina.nombre, ...(pagina.instagram ? { instagram_id: pagina.instagram.id, instagram_username: pagina.instagram.username } : {}) },
+      verify_token: existente?.verify_token || crypto.randomBytes(24).toString('hex'),
+      ultimo_error: null
+    }, { onConflict: 'tenant_id, branch_id, tipo' })
+    .select('id, verify_token, estado, numero_visible')
+    .single()
+  if (error || !canal) return { success: false, error: error?.message || 'No se ha podido guardar el canal.' }
+
+  try {
+    await guardarCredencialesMeta(canal.id, { access_token: accessToken, app_secret: appSecret })
+  } catch (e: any) {
+    return { success: false, error: `No se han podido guardar las claves: ${e?.message}` }
+  }
+
+  await registrarAuditoria({
+    tenant_id: auth.tenant_id,
+    user_id: auth.user_id,
+    accion: `conectó ${nombreCanal} con Meta (${canal.numero_visible || identificador})`,
+    tabla_afectada: 'canales',
+    registro_id: canal.id,
+    valor_nuevo: { pagina: pagina.nombre, instagram: pagina.instagram?.username || null }
+  })
+
+  return {
+    success: true,
+    data: { id: canal.id, tipo, estado: canal.estado, numero_visible: canal.numero_visible, webhook_url: urlDelAviso(canal.id, tipo), verify_token: canal.verify_token }
   }
 }
 

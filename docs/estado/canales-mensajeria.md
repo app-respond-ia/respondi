@@ -122,6 +122,48 @@ las prediseñadas), y todas vienen hechas para no tener que editarlas.
   pasa a usarse sola (la 1 deja de estar en uso), Chats ofrece solo la
   versión en uso, y la página de plantillas carga.
 
+## Instagram y Facebook (Messenger) — hecho el 13-09-2026
+Mismo modelo que WhatsApp: cada cliente conecta su página con las claves de
+su propia app de Meta. Instagram entra por la página de Facebook a la que
+está vinculada la cuenta profesional.
+- **Conectar** (Canales → Facebook o Instagram → requisitos → claves,
+  acción `conectarPaginaMeta`): identificador de la página, token de página
+  (guía en pantalla: usuario del sistema con `pages_messaging`,
+  `pages_manage_metadata`, `pages_read_engagement` y, para Instagram,
+  `instagram_basic` e `instagram_manage_messages`) y clave secreta de la app.
+  Se comprueba la página con Meta (`comprobarPagina`: nombre y cuenta de
+  Instagram vinculada), se suscribe la app a la página
+  (`suscribirAppAPagina`) y las claves van al Vault. El canal de Facebook se
+  identifica por la página y el de Instagram por la cuenta de Instagram
+  (`channels.identificador_externo`; `configuracion` guarda `page_id`,
+  `page_nombre`, `instagram_id`, `instagram_username`). Queda "pendiente"
+  hasta que Meta verifica el webhook.
+- **Recibir**: dirección `/api/meta/<id del canal>` (una por canal; la de
+  WhatsApp sigue en `/api/whatsapp/meta/…`). El cliente la pega en su app en
+  Webhooks → objeto **Page** (campos messages, messaging_postbacks,
+  message_deliveries, message_reads) o **Instagram** (messages). Firma
+  `X-Hub-Signature-256` con la clave de la app. Cada canal solo atiende su
+  objeto y su página/cuenta; los ecos (lo que envía la propia página) no se
+  guardan; los avisos repetidos no duplican; el nombre del contacto se pide a
+  Meta (`perfilDeContacto`); las fotos, vídeos, audios y archivos se
+  descargan del enlace temporal y van al almacén privado (si no se puede,
+  el mensaje entra igual diciéndolo); un botón pulsado entra con su texto;
+  entregas y lecturas actualizan `estado_envio`.
+- **Enviar** (`salida.ts` → `enviarPorPagina` → `enviarTextoPagina`): texto
+  por `POST /{página}/messages` (Messenger) o `POST /{cuenta de
+  Instagram}/messages`, con `messaging_type: RESPONSE`. Más de 2000
+  caracteres (1000 en Instagram) sale en varios mensajes. Sin plantillas.
+- **Ventana de 24 h**: igual que WhatsApp pero sin plantillas: la IA no
+  contesta fuera de ella (la conversación queda bloqueada hasta que el
+  cliente vuelva a escribir), Chats bloquea el recuadro y lo explica, y si
+  Meta rechaza un envío por la ventana (código 10, subcódigo 2018278 /
+  2534022) el mensaje queda "fallido" con el motivo.
+- **Pruebas**: `probar-paginas-meta` (26) contra el Meta simulado (páginas,
+  perfiles, suscripción, envíos por página, avisos de Page e Instagram).
+- **Para clientes de fuera**: mientras la app está en modo desarrollo, solo
+  funciona con páginas de cuentas con rol en la app; para clientes reales
+  Meta tiene que revisar los permisos de mensajería (App Review).
+
 ## Token de Meta que caduca — hecho el 11-09-2026
 El token de la pantalla de pruebas de Meta dura 24 h. Al conectar (o cambiar
 claves) se pregunta a Meta cuándo caduca (`debug_token`) y se guarda en

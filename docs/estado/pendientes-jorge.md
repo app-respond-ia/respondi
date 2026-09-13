@@ -85,9 +85,32 @@ saldrán por el mismo sitio. Hace falta un dominio propio.
 - [ ] La clave que hay en Vercel es de ese mismo proyecto (la actual
       funciona; nada que cambiar).
 
-### 5. Instagram y Facebook (para cuando esté construido en Respondi)
+### 5. Instagram y Facebook — el código ya está (13-09-2026)
 - [ ] Convertir la cuenta de Instagram a **cuenta profesional** y
-      vincularla a la página de Facebook. Nada más por ahora.
+      vincularla a la página de Facebook (Instagram → Configuración →
+      Centro de cuentas, o desde la página de Facebook).
+- [ ] En la app de Meta "Respondi Pruebas": Añadir producto → **Messenger**
+      y **Instagram**.
+- [ ] Token de página que no caduque: business.facebook.com/settings →
+      Usuarios del sistema → el usuario "Respondi" (o crear uno) → Asignar
+      activos: la página y la cuenta de Instagram (control total) y la app →
+      Generar token con la app y los permisos `pages_messaging`,
+      `pages_manage_metadata`, `pages_read_engagement`, `instagram_basic`,
+      `instagram_manage_messages`, caducidad "Nunca". Copiarlo.
+- [ ] El identificador de la página: en la página de Facebook →
+      Configuración → Información de la página (abajo).
+- [ ] En Respondi → Canales → Facebook → Conectar: pegar identificador de la
+      página, el token y la clave secreta de la app. Después, en la app de
+      Meta → Webhooks → objeto **Page** → pegar la dirección y el código que
+      da Respondi, verificar, y activar `messages`, `messaging_postbacks`,
+      `message_deliveries`, `message_reads`.
+- [ ] Igual para Instagram: Canales → Instagram → Conectar (misma página,
+      mismo token) y en la app → Webhooks → objeto **Instagram** → pegar la
+      dirección y el código y activar `messages`.
+- [ ] Probar: escribir a la página por Messenger y a la cuenta por Instagram
+      desde otra cuenta con rol en la app (mientras la app esté en modo
+      desarrollo solo funcionan esas). Para clientes reales, pedir a Meta la
+      revisión de esos permisos (App Review).
 
 ### 6. Stripe — el código ya está (13-09-2026)
 - [ ] Comprobar en Vercel que `STRIPE_SECRET_KEY` es la clave **de prueba**

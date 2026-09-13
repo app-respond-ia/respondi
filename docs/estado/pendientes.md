@@ -295,8 +295,10 @@ Después:
       webhook y confirme las claves de prueba
 - [ ] Shopify para clientes reales: app del Dev Dashboard con enlace de
       instalación (las apps personalizadas ya no se crean desde 01-2026)
-- [ ] Canales de Instagram y Facebook (Jorge ya añadió los tres casos de
-      uso en la app de Meta)
+- [x] Canales de Instagram y Facebook (13-09-2026): conectar con las claves
+      de la página, webhook propio, recibir (texto, archivos, botones,
+      lecturas), contestar desde Chats y la IA, ventana de 24 h. Ver
+      `canales-mensajeria.md`. Falta que Jorge lo pruebe con su página
 - [ ] Remitente de los correos de Respondi con el dominio que elija Jorge
 
 ## Invitaciones pendientes — cerrado (10-09-2026)

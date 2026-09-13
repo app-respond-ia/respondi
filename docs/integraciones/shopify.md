@@ -428,6 +428,12 @@ valor). Por correo no hace falta nada de esto.
 - La suite antigua de automatizaciones (`probar-automatizaciones-2.mjs`,
   conexión con token) sigue pasando tras el cambio.
 
+### Verificado en producción (13-09-2026, commit `3fc3c78`)
+Solo lectura, `prod-shopify-app.mjs` (7 OK): la vuelta de Shopify sin
+claves en Vercel redirige al panel con «no está activada» sin apuntar
+error; el webhook de páginas (Facebook/Instagram) rechaza un código falso y
+un aviso sin firma; Tienda online, Canales y Facturación cargan.
+
 ### Pendiente
 - Que Jorge cree la app en el Dev Dashboard y ponga sus claves en Vercel
   (pasos en `docs/estado/pendientes-jorge.md`); después, una instalación real

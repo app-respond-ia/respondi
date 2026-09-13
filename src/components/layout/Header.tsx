@@ -108,10 +108,10 @@ export default function Header({ branches, activeBranchId, onOpenMobile, userIni
               <span>Sin créditos</span>
             ) : (
               <>
-                <span className="sm:hidden">{creditos.saldo.toLocaleString()}</span>
+                <span className="sm:hidden">{creditos.saldo.toLocaleString('es-ES')}</span>
                 <span className="hidden sm:inline">{creditos.max > 0
-                  ? `${creditos.saldo.toLocaleString()} / ${creditos.max.toLocaleString()} créditos`
-                  : `${creditos.saldo.toLocaleString()} créditos`}</span>
+                  ? `${creditos.saldo.toLocaleString('es-ES')} / ${creditos.max.toLocaleString('es-ES')} créditos`
+                  : `${creditos.saldo.toLocaleString('es-ES')} créditos`}</span>
               </>
             )}
           </Link>

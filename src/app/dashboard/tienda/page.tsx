@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { PAGINA } from '@/lib/ui'
 import Link from 'next/link'
 import Loading from '@/components/Loading'
 import { ErrorCarga } from '@/components/ui/ErrorCarga'
@@ -106,7 +107,7 @@ export default function TiendaPage() {
   if (errorCarga) return <ErrorCarga onReintentar={cargar} />
   if (nivelPermiso === 'ninguno') {
     return (
-      <div className="p-6 sm:p-10 max-w-4xl w-full mx-auto">
+      <div className={PAGINA}>
         <p className="text-ink-500">No tienes permiso para ver esta sección.</p>
       </div>
     )
@@ -115,7 +116,7 @@ export default function TiendaPage() {
   const conectada = tienda && tienda.estado !== 'desconectado'
 
   return (
-    <div className="p-6 sm:p-10 max-w-4xl w-full mx-auto pb-20">
+    <div className={PAGINA}>
       <div className="mb-6">
         <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Tienda online</h1>
         <p className="text-ink-500 mt-1">Conecta tu tienda para que la IA hable de tus productos, tu stock y tus pedidos de verdad.</p>

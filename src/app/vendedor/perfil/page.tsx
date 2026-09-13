@@ -1,4 +1,5 @@
 import { getVendedorDashboard } from '@/app/actions/vendedor'
+import { PAGINA_FORMULARIO } from '@/lib/ui'
 import PerfilForm from './PerfilForm'
 import { redirect } from 'next/navigation'
 
@@ -15,7 +16,7 @@ export default async function PerfilPage() {
   const { vendedor, avatarUrl, apodo, color } = res.data
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className={PAGINA_FORMULARIO}>
       <div className="mb-8">
         <h1 className="text-2xl font-700 text-ink-900 font-display">Mi perfil</h1>
         <p className="text-ink-500 mt-1">Gestiona tu información personal y revisa tus condiciones.</p>

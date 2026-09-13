@@ -1,4 +1,5 @@
 import PerfilForm from './PerfilForm'
+import { PAGINA_FORMULARIO } from '@/lib/ui'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 
@@ -21,7 +22,7 @@ export default async function PerfilPage() {
   if (!user) redirect('/login')
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className={PAGINA_FORMULARIO}>
       <div className="mb-8">
         <h1 className="text-2xl font-700 text-ink-900 font-display">Mi perfil</h1>
         <p className="text-ink-500 mt-1">Gestiona tu información personal.</p>

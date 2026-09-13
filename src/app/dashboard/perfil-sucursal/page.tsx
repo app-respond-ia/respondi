@@ -1,5 +1,6 @@
 'use client'
 import Loading from '@/components/Loading'
+import { PAGINA_FORMULARIO } from '@/lib/ui'
 import { ErrorCarga } from '@/components/ui/ErrorCarga'
 import Link from 'next/link'
 
@@ -302,7 +303,7 @@ export default function PerfilSucursalPage() {
   }
 
   return (
-    <div className="p-6 sm:p-10 max-w-4xl mx-auto pb-20">
+    <div className={PAGINA_FORMULARIO}>
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-ink-900 font-display">Perfil de la sucursal</h1>
         <p className="text-ink-500 mt-1">Configura los datos de tu negocio y la personalidad de tu asistente IA.</p>

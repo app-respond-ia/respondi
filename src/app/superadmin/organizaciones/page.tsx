@@ -1,9 +1,9 @@
 'use client'
-import Loading from '@/components/Loading'
+import { Tabla } from '@/components/ui/Tabla'
+import { PAGINA } from '@/lib/ui'
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { getOrganizaciones, actualizarEstadoOrganizacion, entrarComoOrganizacion, getPlanes, cambiarPlanOrganizacion, registrarPagoYRenovar, recargarCreditosIA, getInvitacionesSuperadmin, reenviarInvitacionSuperadmin, cancelarInvitacionSuperadmin, aprobarSolicitudPlan, rechazarSolicitudPlan } from '@/app/actions/superadmin'
 import PanelInvitaciones from '@/components/invitaciones/PanelInvitaciones'
 import { useToast } from '@/components/ui/Toast'
@@ -22,13 +22,19 @@ function nombresDeVendedores(org: any): string {
   return lista.map((x: any) => x?.vendedores?.nombre).filter(Boolean).join(', ')
 }
 
+const ESTADO_ETIQUETA: Record<string, string> = {
+  activo: 'Activa',
+  trial: 'Prueba',
+  vencido: 'Vencida',
+  suspendido: 'Suspendida'
+}
+
+const formatFecha = (d: string | null | undefined) => d ? new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'N/A'
+
 export default function OrganizacionesPage() {
   const [organizaciones, setOrganizaciones] = useState<any[]>([])
   const [invitaciones, setInvitaciones] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [filtro, setFiltro] = useState('Todos')
-  const [search, setSearch] = useState('')
-  const router = useRouter()
   const { showToast } = useToast()
   const [impersonatingId, setImpersonatingId] = useState<string | null>(null)
 
@@ -60,7 +66,7 @@ export default function OrganizacionesPage() {
     loadOrganizaciones()
     loadPlanes()
     loadInvitaciones()
-  }, [filtro])
+  }, [])
 
   // Las invitaciones de cliente (las que envían los vendedores desde su panel)
   // no existen como organización hasta que la persona se registra, así que
@@ -75,21 +81,16 @@ export default function OrganizacionesPage() {
     if (res.success && res.planes) setPlanes(res.planes)
   }
 
+  // Se traen todas de una vez: el filtro por estado lo hacen las pestañas
+  // de la tabla, sin volver al servidor.
   async function loadOrganizaciones() {
     setLoading(true)
-    const { success, organizaciones: data } = await getOrganizaciones(filtro)
+    const { success, organizaciones: data } = await getOrganizaciones('Todos')
     if (success && data) {
       setOrganizaciones(data)
     }
     setLoading(false)
   }
-
-  const organizacionesFiltradas = organizaciones.filter(o => {
-    const nombresVendedores = nombresDeVendedores(o)
-
-    return o.nombre.toLowerCase().includes(search.toLowerCase()) ||
-      nombresVendedores.toLowerCase().includes(search.toLowerCase())
-  })
 
   const openModal = (organizacion: any) => {
     setModalOrganizacion(organizacion)
@@ -235,38 +236,13 @@ export default function OrganizacionesPage() {
     setRecargandoIA(false)
   }
 
+  const nombrePlan = (id: string | null | undefined) => planes.find(p => p.id === id)?.nombre || ''
+
   return (
-    <>
+    <div className={PAGINA}>
       <div className="mb-5">
         <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Organizaciones</h1>
         <p className="text-ink-500 mt-1">Todos los negocios que usan Respondi.</p>
-      </div>
-
-      {/* Buscador + filtros */}
-      <div className="space-y-3 mb-5">
-        <div className="relative">
-          <svg className="w-5 h-5 text-ink-400 absolute left-3.5 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-          <input 
-            type="text" 
-            placeholder="Buscar organización o vendedor..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full h-11 pl-11 pr-4 rounded-xl border border-slate-300 bg-white text-sm placeholder:text-ink-400 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition"
-          />
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="inline-flex p-1 rounded-xl bg-white border border-slate-200 overflow-x-auto">
-            {['Todos', 'Activo', 'Trial', 'Vencido', 'Suspendido'].map(f => (
-              <button 
-                key={f}
-                onClick={() => setFiltro(f)}
-                className={`shrink-0 px-3 py-1.5 rounded-lg text-sm transition ${filtro === f ? 'font-600 bg-brand-600 text-white' : 'font-500 text-ink-500'}`}
-              >
-                {f}
-              </button>
-            ))}
-          </div>
-        </div>
       </div>
 
       {/* Invitaciones de cliente pendientes de registro */}
@@ -286,70 +262,89 @@ export default function OrganizacionesPage() {
       )}
 
       {/* Lista de organizaciones */}
-      <div className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100">
-        {loading ? (
-          <Loading />
-        ) : organizacionesFiltradas.length === 0 ? (
-          <div className="p-8 text-center text-ink-500">No se encontraron organizaciones.</div>
-        ) : (
-          organizacionesFiltradas.map(o => {
-            const statusStyle = getStatusColor(o.estado)
-            const avatarStyle = getAvatarColor(o.estado)
-            const iniciales = o.nombre.substring(0, 2).toUpperCase()
-            
-            return (
-              <div key={o.id} onClick={() => openModal(o)} className="w-full text-left flex items-center gap-3 p-4 hover:bg-slate-50 transition cursor-pointer">
-                <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-600 shrink-0 ${avatarStyle}`}>{iniciales}</div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-600 text-ink-900">{o.nombre}</p>
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-600 ${statusStyle.split(' marker:')[0]}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${statusStyle.split(' marker:')[1]}`}></span> {o.estado}
-                    </span>
+      <Tabla
+        filas={organizaciones}
+        idDe={o => o.id}
+        cargando={loading}
+        nombre={['organización', 'organizaciones']}
+        buscar={{ placeholder: 'Buscar por organización o vendedor…', en: o => `${o.nombre || ''} ${nombresDeVendedores(o)} ${o.plans?.nombre || ''}` }}
+        pestanas={[
+          { id: 'todas', etiqueta: 'Todas' },
+          { id: 'activo', etiqueta: 'Activas', filtro: o => o.estado === 'activo' },
+          { id: 'trial', etiqueta: 'Prueba', filtro: o => o.estado === 'trial' },
+          { id: 'suspendido', etiqueta: 'Suspendidas', filtro: o => o.estado === 'suspendido' },
+          { id: 'vencido', etiqueta: 'Vencidas', filtro: o => o.estado === 'vencido' }
+        ]}
+        ordenInicial={{ clave: 'alta', direccion: 'desc' }}
+        onFilaClick={openModal}
+        columnas={[
+          { clave: 'nombre', titulo: 'Organización', enMovil: 'titulo', valor: o => o.nombre, render: o => (
+            <div className="flex items-center gap-3 min-w-0">
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-600 text-sm shrink-0 ${getAvatarColor(o.estado)}`}>{(o.nombre || '??').substring(0, 2).toUpperCase()}</div>
+              <div className="min-w-0">
+                <p className="font-600 text-ink-900 truncate">{o.nombre}</p>
+                {(o.plan_solicitado_id || o.aviso_creditos) && (
+                  <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
                     {o.plan_solicitado_id && (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-600 bg-amber-100 text-amber-800">Pide plan {planes.find(p => p.id === o.plan_solicitado_id)?.nombre || ''}</span>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-600 bg-amber-100 text-amber-800">Pide plan {nombrePlan(o.plan_solicitado_id)}</span>
                     )}
                     {o.aviso_creditos && (
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-600 ${o.aviso_creditos === 'agotado' ? 'bg-rose-100 text-rose-700' : 'bg-amber-50 text-amber-700'}`}>{o.aviso_creditos === 'agotado' ? 'Sin créditos' : 'Créditos bajos'}</span>
                     )}
                   </div>
-                  <p className="text-sm text-ink-500 mt-0.5 truncate">
-                    Plan {o.plans?.nombre || 'Ninguno'} {o.plan_pendiente_id && planes.find(p => p.id === o.plan_pendiente_id) ? `(→ ${planes.find(p => p.id === o.plan_pendiente_id).nombre})` : ''} · vence el {o.fecha_vencimiento ? new Date(o.fecha_vencimiento).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'N/A'} · vendedor: {nombresDeVendedores(o) || 'Sin vendedor'}
-                    <span className="ml-2 pl-2 border-l border-slate-200">
-                      🏠 {o.sucursales_activas ?? 0} · 👤 {o.usuarios_activos ?? 0}
-                    </span>
-                  </p>
-                </div>
-                
-                {canWrite && (
-                  <button
-                    onClick={(e) => handleImpersonar(e, o.id)}
-                    disabled={impersonatingId === o.id}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-600 bg-brand-50 text-brand-700 hover:bg-brand-100 transition shrink-0 mr-2 disabled:opacity-50"
-                  >
-                    {impersonatingId === o.id ? (
-                      <>
-                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Entrando...
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/></svg>
-                        Entrar como
-                      </>
-                    )}
-                  </button>
                 )}
-                
-                <svg className="w-5 h-5 text-ink-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
               </div>
+            </div>
+          ) },
+          { clave: 'estado', titulo: 'Estado', valor: o => ESTADO_ETIQUETA[o.estado] || o.estado, render: o => {
+            const statusStyle = getStatusColor(o.estado)
+            return (
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-600 whitespace-nowrap ${statusStyle.split(' marker:')[0]}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${statusStyle.split(' marker:')[1]}`}></span> {ESTADO_ETIQUETA[o.estado] || o.estado}
+              </span>
             )
-          })
+          } },
+          { clave: 'plan', titulo: 'Plan', valor: o => o.plans?.nombre || '', render: o => (
+            <span className="text-ink-700 whitespace-nowrap">
+              {o.plans?.nombre || <span className="text-ink-400">Ninguno</span>}
+              {o.plan_pendiente_id && nombrePlan(o.plan_pendiente_id) && <span className="text-brand-600 text-xs ml-1">→ {nombrePlan(o.plan_pendiente_id)}</span>}
+            </span>
+          ) },
+          { clave: 'vence', titulo: 'Vence', valor: o => o.fecha_vencimiento || '', render: o => <span className="text-ink-500 whitespace-nowrap">{formatFecha(o.fecha_vencimiento)}</span> },
+          { clave: 'vendedor', titulo: 'Vendedor', valor: o => nombresDeVendedores(o), render: o => nombresDeVendedores(o) ? <span className="text-ink-700">{nombresDeVendedores(o)}</span> : <span className="text-ink-400">Sin vendedor</span> },
+          { clave: 'sucursales', titulo: 'Sucursales', alinear: 'derecha', valor: o => Number(o.sucursales_activas ?? 0), render: o => <span className="tabular-nums text-ink-700">{o.sucursales_activas ?? 0}</span> },
+          { clave: 'usuarios', titulo: 'Usuarios', alinear: 'derecha', valor: o => Number(o.usuarios_activos ?? 0), render: o => <span className="tabular-nums text-ink-700">{o.usuarios_activos ?? 0}</span> },
+          { clave: 'alta', titulo: 'Alta', valor: o => o.created_at || '', enMovil: 'oculta', render: o => <span className="text-ink-500 whitespace-nowrap">{formatFecha(o.created_at)}</span> }
+        ]}
+        acciones={o => (
+          <>
+            {canWrite && (
+              <button
+                onClick={(e) => handleImpersonar(e, o.id)}
+                disabled={impersonatingId === o.id}
+                className="inline-flex items-center gap-1 px-3 h-8 rounded-lg text-xs font-600 bg-brand-50 text-brand-700 hover:bg-brand-100 transition disabled:opacity-50"
+              >
+                {impersonatingId === o.id ? (
+                  <>
+                    <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Entrando...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/></svg>
+                    Entrar como
+                  </>
+                )}
+              </button>
+            )}
+            <button onClick={() => openModal(o)} className="ml-2 px-3 h-8 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-600 text-ink-700 transition">Ver ficha</button>
+          </>
         )}
-      </div>
+        vacio={<p className="text-ink-500">No se encontraron organizaciones.</p>}
+      />
 
       {/* MODAL DETALLE ORGANIZACIÓN */}
       {modalOrganizacion && (
@@ -631,6 +626,6 @@ export default function OrganizacionesPage() {
         onConfirm={handleConfirmarCambioEstado}
         onClose={() => setConfirmarEstado(null)}
       />
-    </>
+    </div>
   )
 }

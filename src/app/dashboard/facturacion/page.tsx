@@ -1,5 +1,7 @@
 'use client'
 import Loading from '@/components/Loading'
+import { Tabla } from '@/components/ui/Tabla'
+import { PAGINA } from '@/lib/ui'
 import { ErrorCarga } from '@/components/ui/ErrorCarga'
 import { useState, useEffect } from 'react'
 import { getMisPermisos } from '@/app/actions/permisos'
@@ -34,7 +36,7 @@ export default function FacturacionPage() {
   const [metricasCreditos, setMetricasCreditos] = useState<any>(null)
   const [movimientos, setMovimientos] = useState<any[]>([])
   
-  const [filtros, setFiltros] = useState<{ tipo?: 'abono' | 'debito', origen?: string }>({})
+  const [origenFiltro, setOrigenFiltro] = useState('')
   const [planes, setPlanes] = useState<any>(null)
   const [estadoCreditos, setEstadoCreditos] = useState<any>(null)
   const [planPedido, setPlanPedido] = useState<any>(null)
@@ -56,7 +58,7 @@ export default function FacturacionPage() {
     }
   }
 
-  useEffect(() => { cargar().catch(() => setErrorCarga(true)) }, [filtros])
+  useEffect(() => { cargar().catch(() => setErrorCarga(true)) }, [])
 
   const cargar = async () => {
     setLoading(true)
@@ -83,7 +85,7 @@ export default function FacturacionPage() {
       getEstadoCreditos().then(r => { if (r.success) setEstadoCreditos(r.data) }).catch(() => {})
       const [resMetricas, resMov] = await Promise.all([
         getMetricas('mes'), // Reusado de Metricas, nos interesan solo los créditos
-        getMovimientosCreditosCliente(filtros as any)
+        getMovimientosCreditosCliente({} as any)
       ])
       
       if (resMetricas.success && resMetricas.data) {
@@ -111,7 +113,7 @@ export default function FacturacionPage() {
   }
 
   return (
-    <div className="p-6 sm:p-10 max-w-5xl mx-auto pb-20">
+    <div className={PAGINA}>
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-ink-900 font-display">Facturación y créditos</h1>
         <p className="text-ink-500 mt-1">Gestiona tu suscripción, método de pago e historial de consumo de IA.</p>
@@ -232,86 +234,36 @@ export default function FacturacionPage() {
 
       {/* HISTORIAL DE MOVIMIENTOS */}
       <section>
-        <div className="flex items-end justify-between mb-4">
-          <SectionTitle>Historial de movimientos</SectionTitle>
-          <div className="flex gap-2">
-            <select
-              value={filtros.tipo || ''}
-              onChange={(e) => setFiltros(prev => ({ ...prev, tipo: e.target.value as any }))}
-              className="h-9 px-3 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
-            >
-              <option value="">Cualquier tipo</option>
-              <option value="abono">Abonos</option>
-              <option value="debito">Débitos</option>
-            </select>
-            <select
-              value={filtros.origen || ''}
-              onChange={(e) => setFiltros(prev => ({ ...prev, origen: e.target.value }))}
-              className="h-9 px-3 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
-            >
+        <SectionTitle>Historial de movimientos</SectionTitle>
+        <Tabla
+          filas={movimientos.filter((m: any) => !origenFiltro || m.origen === origenFiltro)}
+          idDe={(m: any) => m.id}
+          nombre={['movimiento', 'movimientos']}
+          buscar={{ placeholder: 'Buscar en la descripción…', en: (m: any) => `${m.descripcion || ''} ${m.origen || ''}` }}
+          pestanas={[
+            { id: 'todos', etiqueta: 'Todos' },
+            { id: 'abono', etiqueta: 'Abonos', filtro: (m: any) => m.tipo === 'abono' },
+            { id: 'debito', etiqueta: 'Débitos', filtro: (m: any) => m.tipo === 'debito' }
+          ]}
+          herramientas={
+            <select value={origenFiltro} onChange={e => setOrigenFiltro(e.target.value)} className="h-10 px-3 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:border-brand-500 transition">
               <option value="">Cualquier origen</option>
               <option value="recarga_plan">Renovación de plan</option>
               <option value="recarga_manual">Recarga manual</option>
               <option value="consumo_ia">Consumo IA</option>
             </select>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-          {movimientos.length === 0 ? (
-            <div className="p-10 text-center text-slate-500">No hay movimientos que coincidan con los filtros.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm whitespace-nowrap">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-600">
-                  <tr>
-                    <th className="px-4 py-3 font-medium">Fecha</th>
-                    <th className="px-4 py-3 font-medium">Tipo</th>
-                    <th className="px-4 py-3 font-medium">Origen</th>
-                    <th className="px-4 py-3 font-medium text-right">Cantidad</th>
-                    <th className="px-4 py-3 font-medium text-right">Saldo post-op</th>
-                    <th className="px-4 py-3 font-medium">Descripción</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {movimientos.map((m: any) => (
-                    <tr key={m.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3 text-slate-600">
-                        {new Date(m.timestamp).toLocaleString('es-ES', { 
-                          day: '2-digit', month: '2-digit', year: 'numeric',
-                          hour: '2-digit', minute: '2-digit'
-                        })}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex px-2 py-0.5 rounded-md text-[11px] font-semibold uppercase tracking-wide ${
-                          m.tipo === 'abono' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
-                        }`}>
-                          {m.tipo}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="text-xs font-500 text-slate-600 capitalize bg-slate-100 px-2 py-1 rounded-md">
-                          {m.origen ? m.origen.replace('_', ' ') : '—'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className={`font-semibold ${m.tipo === 'abono' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                          {m.tipo === 'abono' ? '+' : '-'}{m.cantidad.toLocaleString()}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right font-medium text-slate-700">
-                        {m.saldo.toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3 text-slate-500 text-xs truncate max-w-[200px]" title={m.descripcion}>
-                        {m.descripcion || '-'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+          }
+          ordenInicial={{ clave: 'fecha', direccion: 'desc' }}
+          columnas={[
+            { clave: 'fecha', titulo: 'Fecha', enMovil: 'titulo', valor: (m: any) => m.timestamp, render: (m: any) => <span className="text-slate-600 whitespace-nowrap">{new Date(m.timestamp).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span> },
+            { clave: 'tipo', titulo: 'Tipo', valor: (m: any) => m.tipo, render: (m: any) => <span className={`inline-flex px-2 py-0.5 rounded-md text-[11px] font-semibold uppercase tracking-wide ${m.tipo === 'abono' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>{m.tipo}</span> },
+            { clave: 'origen', titulo: 'Origen', valor: (m: any) => m.origen || '', render: (m: any) => <span className="text-xs font-500 text-slate-600 capitalize bg-slate-100 px-2 py-1 rounded-md whitespace-nowrap">{m.origen ? m.origen.replace('_', ' ') : '—'}</span> },
+            { clave: 'cantidad', titulo: 'Cantidad', alinear: 'derecha', valor: (m: any) => (m.tipo === 'abono' ? 1 : -1) * Number(m.cantidad || 0), render: (m: any) => <span className={`font-semibold ${m.tipo === 'abono' ? 'text-emerald-600' : 'text-rose-600'}`}>{m.tipo === 'abono' ? '+' : '-'}{Math.abs(Number(m.cantidad || 0)).toLocaleString()}</span> },
+            { clave: 'saldo', titulo: 'Saldo después', alinear: 'derecha', valor: (m: any) => Number(m.saldo || 0), render: (m: any) => <span className="font-medium text-slate-700">{Number(m.saldo || 0).toLocaleString()}</span> },
+            { clave: 'descripcion', titulo: 'Descripción', valor: (m: any) => m.descripcion || '', clase: 'max-w-xs', render: (m: any) => <span className="text-slate-500 text-xs line-clamp-2" title={m.descripcion}>{m.descripcion || '—'}</span> }
+          ]}
+          vacio={<p className="text-slate-500">No hay movimientos todavía.</p>}
+        />
       </section>
       <ConfirmModal
         isOpen={!!planPedido}

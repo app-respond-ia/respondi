@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { PAGINA } from '@/lib/ui'
 import Link from 'next/link'
 import { 
   getCategoriasTicketsClientes, 
@@ -98,7 +99,7 @@ export default function CategoriasTicketsClientesPage() {
   if (loading) return <Loading />
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className={`${PAGINA} space-y-6`}>
       
       {/* Header */}
       <div className="flex justify-between items-center bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">

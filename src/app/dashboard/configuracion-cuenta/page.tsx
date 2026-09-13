@@ -1,4 +1,5 @@
 import { createClient } from '@/utils/supabase/server'
+import { PAGINA_FORMULARIO } from '@/lib/ui'
 import { redirect } from 'next/navigation'
 import ConfiguracionForm from './ConfiguracionForm'
 
@@ -18,7 +19,7 @@ export default async function ConfiguracionPage() {
   const provider = user.app_metadata?.provider || 'email'
 
   return (
-    <div className="max-w-3xl mx-auto space-y-8 w-full">
+    <div className={`${PAGINA_FORMULARIO} space-y-8`}>
       <div>
         <h1 className="text-2xl font-700 text-ink-900 font-display">Configuración de cuenta</h1>
         <p className="text-ink-500 mt-1">Gestiona las opciones de seguridad de tu cuenta.</p>

@@ -1,5 +1,6 @@
 'use client'
 import Loading from '@/components/Loading'
+import { PAGINA } from '@/lib/ui'
 import { ErrorCarga } from '@/components/ui/ErrorCarga'
 
 import { useState, useEffect } from 'react'
@@ -206,7 +207,7 @@ export default function RolesPage() {
     })
 
   return (
-    <div className="p-6 sm:p-10 max-w-4xl w-full mx-auto pb-20">
+    <div className={PAGINA}>
 
       <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
         <div>

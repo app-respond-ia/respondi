@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { PAGINA } from '@/lib/ui'
 import Link from 'next/link'
 import Loading from '@/components/Loading'
 import { ErrorCarga } from '@/components/ui/ErrorCarga'
@@ -74,7 +75,7 @@ export default function AgendaPage() {
   const puedeEscribir = datos.nivel_permiso === 'escritura'
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto">
+    <div className={PAGINA}>
       <div className="flex flex-wrap items-end justify-between gap-3 mb-5">
         <div>
           <h1 className="font-display font-700 text-2xl text-ink-900">Agenda</h1>

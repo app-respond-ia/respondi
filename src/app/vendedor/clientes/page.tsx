@@ -1,5 +1,6 @@
 'use client'
-import Loading from '@/components/Loading'
+import { Tabla } from '@/components/ui/Tabla'
+import { PAGINA } from '@/lib/ui'
 
 import { useState, useEffect } from 'react'
 import { getVendedorClientes, actualizarClienteSeguimiento, getInvitacionesVendedor, reenviarInvitacionCliente, cancelarInvitacionCliente } from '@/app/actions/vendedor'
@@ -20,7 +21,6 @@ const ESTADO_CONFIG: Record<EstadoSeguimiento, { label: string, badge: string }>
 export default function VendedorClientesPage() {
   const [clientes, setClientes] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [filtroEstado, setFiltroEstado] = useState<string>('')
   const [selectedCliente, setSelectedCliente] = useState<any>(null)
   const [editEstado, setEditEstado] = useState<EstadoSeguimiento>('trial')
   const [editNotas, setEditNotas] = useState('')
@@ -60,14 +60,11 @@ export default function VendedorClientesPage() {
     setSaving(false)
   }
 
-  const clientesFiltrados = filtroEstado
-    ? clientes.filter(c => c.estado_seguimiento === filtroEstado)
-    : clientes
-
-  const formatFecha = (d: string) => new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const formatFecha = (d: string) => d ? new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'
+  const confDe = (c: any) => ESTADO_CONFIG[c.estado_seguimiento as EstadoSeguimiento]
 
   return (
-    <div className="space-y-6">
+    <div className={`${PAGINA} space-y-6`}>
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Mis clientes</h1>
@@ -80,29 +77,11 @@ export default function VendedorClientesPage() {
         </a>
       </div>
 
-      {/* Filtro por estado */}
-      <div className="flex gap-2 flex-wrap">
-        <button onClick={() => setFiltroEstado('')}
-          className={`px-3 py-1.5 rounded-lg text-sm font-500 transition ${!filtroEstado ? 'bg-ink-900 text-white' : 'bg-white border border-slate-200 text-ink-600 hover:bg-slate-50'}`}>
-          Todos ({clientes.length})
-        </button>
-        {ESTADOS.map(e => {
-          const count = clientes.filter(c => c.estado_seguimiento === e).length
-          if (count === 0) return null
-          return (
-            <button key={e} onClick={() => setFiltroEstado(e)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-500 transition ${filtroEstado === e ? 'bg-ink-900 text-white' : 'bg-white border border-slate-200 text-ink-600 hover:bg-slate-50'}`}>
-              {ESTADO_CONFIG[e].label} ({count})
-            </button>
-          )
-        })}
-      </div>
-
       {/* Invitaciones enviadas: estado, embudo y acciones */}
       {invitaciones.length > 0 && (
         <PanelInvitaciones
           titulo="Invitaciones enviadas"
-          descripcion="Aparecerán arriba como clientes en cuanto se registren."
+          descripcion="Aparecerán abajo como clientes en cuanto se registren."
           invitaciones={invitaciones}
           canWrite
           onReenviar={reenviarInvitacionCliente}
@@ -112,39 +91,42 @@ export default function VendedorClientesPage() {
       )}
 
       {/* Lista */}
-      <div className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100">
-        {loading ? (
-          <Loading />
-        ) : clientesFiltrados.length === 0 ? (
-          <div className="p-8 text-center text-ink-500">No hay clientes con este filtro.</div>
-        ) : (
-          clientesFiltrados.map(c => {
-            const org = c.organizaciones
-            const conf = ESTADO_CONFIG[c.estado_seguimiento as EstadoSeguimiento]
-            return (
-              <div key={c.id} className="flex items-center gap-4 p-4">
-                <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-600 text-slate-600 shrink-0">
-                  {org?.nombre?.substring(0, 2).toUpperCase() || '??'}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-600 text-ink-900">{org?.nombre || 'Sin nombre'}</p>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-600 ${conf.badge}`}>{conf.label}</span>
-                  </div>
-                  <p className="text-xs text-ink-400 mt-0.5">
-                    Plan: {org?.plans?.nombre || 'Sin plan'} · Alta: {formatFecha(c.fecha_vinculacion)}
-                  </p>
-                  {c.notas && <p className="text-xs text-ink-500 mt-1 truncate">{c.notas}</p>}
-                </div>
-                <button onClick={() => openModal(c)}
-                  className="p-1.5 rounded-lg text-ink-400 hover:text-ink-700 hover:bg-slate-100 transition shrink-0">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                </button>
+      <Tabla
+        filas={clientes}
+        idDe={c => c.id}
+        cargando={loading}
+        nombre={['cliente', 'clientes']}
+        buscar={{ placeholder: 'Buscar por nombre, plan o nota…', en: c => `${c.organizaciones?.nombre || ''} ${c.organizaciones?.plans?.nombre || ''} ${c.notas || ''}` }}
+        pestanas={[
+          { id: 'todos', etiqueta: 'Todos' },
+          ...ESTADOS.map(e => ({ id: e, etiqueta: ESTADO_CONFIG[e].label, filtro: (c: any) => c.estado_seguimiento === e }))
+        ]}
+        ordenInicial={{ clave: 'alta', direccion: 'desc' }}
+        columnas={[
+          { clave: 'cliente', titulo: 'Cliente', enMovil: 'titulo', valor: c => c.organizaciones?.nombre || '', render: c => (
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center font-600 text-sm text-slate-600 shrink-0">
+                {c.organizaciones?.nombre?.substring(0, 2).toUpperCase() || '??'}
               </div>
-            )
-          })
+              <p className="font-600 text-ink-900 truncate">{c.organizaciones?.nombre || 'Sin nombre'}</p>
+            </div>
+          ) },
+          { clave: 'estado', titulo: 'Estado', valor: c => confDe(c)?.label || c.estado_seguimiento || '', render: c => {
+            const conf = confDe(c)
+            return conf ? <span className={`text-xs px-2 py-0.5 rounded-full font-600 whitespace-nowrap ${conf.badge}`}>{conf.label}</span> : <span className="text-ink-400">—</span>
+          } },
+          { clave: 'plan', titulo: 'Plan', valor: c => c.organizaciones?.plans?.nombre || '', render: c => <span className="text-ink-700">{c.organizaciones?.plans?.nombre || <span className="text-ink-400">Sin plan</span>}</span> },
+          { clave: 'alta', titulo: 'Alta', valor: c => c.fecha_vinculacion || '', render: c => <span className="text-ink-500 whitespace-nowrap">{formatFecha(c.fecha_vinculacion)}</span> },
+          { clave: 'notas', titulo: 'Notas', valor: c => c.notas || '', clase: 'max-w-xs', render: c => <span className="text-ink-500 text-xs line-clamp-2" title={c.notas || ''}>{c.notas || '—'}</span> }
+        ]}
+        acciones={c => (
+          <button onClick={() => openModal(c)}
+            className="px-3 h-8 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-600 text-ink-700 transition">
+            Actualizar seguimiento
+          </button>
         )}
-      </div>
+        vacio={<p className="text-ink-500">No hay clientes con este filtro.</p>}
+      />
 
       {/* Modal editar seguimiento */}
       {selectedCliente && (

@@ -1,5 +1,7 @@
 'use client'
 import Loading from '@/components/Loading'
+import { Tabla } from '@/components/ui/Tabla'
+import { PAGINA } from '@/lib/ui'
 import { ErrorCarga } from '@/components/ui/ErrorCarga'
 
 import { useState, useEffect, useRef } from 'react'
@@ -153,7 +155,7 @@ export default function ConversacionesPage() {
   }
 
   return (
-    <div className="p-6 sm:p-10 max-w-[1600px] mx-auto w-full">
+    <div className={PAGINA}>
       <div className="mb-8">
         <div className="flex items-center gap-3">
           <h1 className="text-3xl font-bold text-ink-900 font-display">Conversaciones</h1>
@@ -268,125 +270,65 @@ export default function ConversacionesPage() {
           <p className="text-slate-500 max-w-sm mx-auto">Tus filtros actuales no muestran resultados.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50/80 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500 font-semibold">
-                  <th className="px-3 py-3 pl-4 font-medium">Contacto</th>
-                  <th className="px-3 py-3 font-medium">Resumen / Etiquetas</th>
-                  <th className="px-3 py-3 font-medium text-center">IA</th>
-                  <th className="px-3 py-3 font-medium text-center">Estado</th>
-                  <th className="px-3 py-3 font-medium">Agente</th>
-                  <th className="px-3 py-3 pr-4 font-medium text-right">Último mensaje</th>
-                </tr>
-              </thead>
-              <tbody className={`divide-y divide-slate-100 transition-opacity duration-200 ${isFetching ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
-                {conversaciones.map((conv) => {
-                  const contact = Array.isArray(conv.contacts) ? conv.contacts[0] : conv.contacts
-                  const casoAsociado = conv.cases && conv.cases.length > 0 ? conv.cases[0] : null
-                  
-                  return (
-                    <tr key={conv.id} onClick={() => router.push(`/dashboard/conversaciones/${conv.id}`)} 
-                      className={`hover:bg-slate-100 transition group cursor-pointer ${
-                        casoAsociado ? (
-                          casoAsociado.estatus === 'pendiente' ? 'border-l-4 border-l-amber-400' :
-                          casoAsociado.estatus === 'atendiendo' ? 'border-l-4 border-l-blue-400' :
-                          'border-l-4 border-l-emerald-400'
-                        ) : 'border-l-4 border-l-transparent'
-                      }`}
-                    >
-                      <td className="px-3 py-3 pl-4">
-                        <div className="flex flex-col gap-2">
-                          <div className="flex items-center gap-3">
-                            <div className="relative">
-                              <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold font-display">
-                                {contact?.nombre?.substring(0,2).toUpperCase() || 'US'}
-                              </div>
-                              <div className="absolute -bottom-1 -right-1 ring-2 ring-white rounded-full">
-                                {getCanalIcon(contact?.canal || conv.canal)}
-                              </div>
-                            </div>
-                            <div>
-                              <p className="font-semibold text-ink-900 group-hover:text-brand-600 transition">{contact?.nombre || 'Desconocido'}</p>
-                              <p className="text-xs text-slate-500">{contact?.identificador_canal}</p>
-                            </div>
-                          </div>
-                          {casoAsociado && (
-                            <div>
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  router.push(`/dashboard/casos/${casoAsociado.id}`);
-                                }}
-                                className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide transition hover:shadow-sm ${
-                                  casoAsociado.estatus === 'pendiente' ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-200' :
-                                  casoAsociado.estatus === 'atendiendo' ? 'bg-blue-100 text-blue-800 hover:bg-blue-200 border border-blue-200' :
-                                  'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border border-emerald-200'
-                                }`}
-                              >
-                                Caso {casoAsociado.estatus}
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-3 py-3 max-w-[180px] 2xl:max-w-[280px]">
-                        <div className="flex flex-col gap-2">
-                          <p className="text-sm text-slate-600 truncate font-medium">
-                            {conv.resumen || <span className="italic opacity-60 font-normal">Sin resumen aún...</span>}
-                          </p>
-
-                          <div className="flex gap-1 flex-wrap">
-                            {conv.conversation_tags && conv.conversation_tags.length > 0 ? (
-                              conv.conversation_tags.map((t:any, i:number) => (
-                                <EtiquetaPill key={i} pequena nombre={t.message_categories?.nombre} color={t.message_categories?.color} />
-                              ))
-                            ) : (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-50 text-slate-400 border border-slate-200 font-medium italic">
-                                Descategorizado
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-3 py-3 text-center">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide ${
-                          conv.ia_pausada ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                        }`}>
-                          {conv.ia_pausada ? 'Pausada' : 'IA Activa'}
-                        </span>
-                      </td>
-                      <td className="px-3 py-3 text-center">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold capitalize ${
-                          conv.estado === 'activa' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-600'
-                        }`}>
-                          {conv.estado === 'activa' ? 'Abierta' : 'Cerrada'}
-                        </span>
-                      </td>
-                      <td className="px-3 py-3">
-                        {casoAsociado?.agente?.nombre ? (
-                          <span className="text-sm text-slate-600 font-medium">{casoAsociado.agente.nombre}</span>
-                        ) : casoAsociado ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ring-1 ring-inset bg-amber-50 text-amber-700 ring-amber-200 whitespace-nowrap">
-                            Sin asignar
-                          </span>
-                        ) : (
-                          <span className="text-sm text-slate-600">-</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-3 pr-4 text-right whitespace-nowrap">
-                        <p className="text-sm font-semibold text-slate-700">
-                          {formatFecha(conv.fecha_ultimo_mensaje || conv.fecha_inicio)}
-                        </p>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <Tabla
+          filas={conversaciones}
+          idDe={(conv: any) => conv.id}
+          nombre={['conversación', 'conversaciones']}
+          cargando={isFetching}
+          onFilaClick={(conv: any) => router.push(`/dashboard/conversaciones/${conv.id}`)}
+          claseFila={(conv: any) => {
+            const caso = conv.cases && conv.cases.length > 0 ? conv.cases[0] : null
+            return caso ? (caso.estatus === 'pendiente' ? 'border-l-4 border-l-amber-400' : caso.estatus === 'atendiendo' ? 'border-l-4 border-l-blue-400' : 'border-l-4 border-l-emerald-400') : 'border-l-4 border-l-transparent'
+          }}
+          columnas={[
+            { clave: 'contacto', titulo: 'Contacto', enMovil: 'titulo', valor: (conv: any) => { const c = Array.isArray(conv.contacts) ? conv.contacts[0] : conv.contacts; return c?.nombre || 'Desconocido' }, render: (conv: any) => {
+              const contact = Array.isArray(conv.contacts) ? conv.contacts[0] : conv.contacts
+              const casoAsociado = conv.cases && conv.cases.length > 0 ? conv.cases[0] : null
+              return (
+                <div className="flex flex-col gap-2 min-w-0">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="relative shrink-0">
+                      <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold font-display">{contact?.nombre?.substring(0, 2).toUpperCase() || 'US'}</div>
+                      <div className="absolute -bottom-1 -right-1 ring-2 ring-white rounded-full">{getCanalIcon(contact?.canal || conv.canal)}</div>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-ink-900 truncate">{contact?.nombre || 'Desconocido'}</p>
+                      <p className="text-xs text-slate-500 truncate">{contact?.identificador_canal}</p>
+                    </div>
+                  </div>
+                  {casoAsociado && (
+                    <div>
+                      <button onClick={e => { e.stopPropagation(); router.push(`/dashboard/casos/${casoAsociado.id}`) }}
+                        className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide transition hover:shadow-sm ${casoAsociado.estatus === 'pendiente' ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-200' : casoAsociado.estatus === 'atendiendo' ? 'bg-blue-100 text-blue-800 hover:bg-blue-200 border border-blue-200' : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border border-emerald-200'}`}>
+                        Caso {casoAsociado.estatus}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )
+            } },
+            { clave: 'resumen', titulo: 'Resumen / Etiquetas', valor: (conv: any) => conv.resumen || '', clase: 'max-w-[180px] 2xl:max-w-[280px]', render: (conv: any) => (
+              <div className="flex flex-col gap-2 min-w-0">
+                <p className="text-sm text-slate-600 truncate font-medium">{conv.resumen || <span className="italic opacity-60 font-normal">Sin resumen aún...</span>}</p>
+                <div className="flex gap-1 flex-wrap">
+                  {conv.conversation_tags && conv.conversation_tags.length > 0
+                    ? conv.conversation_tags.map((t: any, i: number) => <EtiquetaPill key={i} pequena nombre={t.message_categories?.nombre} color={t.message_categories?.color} />)
+                    : <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-50 text-slate-400 border border-slate-200 font-medium italic">Descategorizado</span>}
+                </div>
+              </div>
+            ) },
+            { clave: 'ia', titulo: 'IA', alinear: 'centro', valor: (conv: any) => (conv.ia_pausada ? 'Pausada' : 'IA activa'), render: (conv: any) => <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide ${conv.ia_pausada ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'}`}>{conv.ia_pausada ? 'Pausada' : 'IA Activa'}</span> },
+            { clave: 'estado', titulo: 'Estado', alinear: 'centro', valor: (conv: any) => (conv.estado === 'activa' ? 'Abierta' : 'Cerrada'), render: (conv: any) => <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold capitalize ${conv.estado === 'activa' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-600'}`}>{conv.estado === 'activa' ? 'Abierta' : 'Cerrada'}</span> },
+            { clave: 'agente', titulo: 'Agente', valor: (conv: any) => conv.cases?.[0]?.agente?.nombre || '', render: (conv: any) => {
+              const casoAsociado = conv.cases && conv.cases.length > 0 ? conv.cases[0] : null
+              return casoAsociado?.agente?.nombre
+                ? <span className="text-sm text-slate-600 font-medium">{casoAsociado.agente.nombre}</span>
+                : casoAsociado ? <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ring-1 ring-inset bg-amber-50 text-amber-700 ring-amber-200 whitespace-nowrap">Sin asignar</span>
+                : <span className="text-sm text-slate-600">-</span>
+            } },
+            { clave: 'ultimo', titulo: 'Último mensaje', alinear: 'derecha', valor: (conv: any) => conv.fecha_ultimo_mensaje || conv.fecha_inicio, render: (conv: any) => <span className="text-sm font-semibold text-slate-700 whitespace-nowrap">{formatFecha(conv.fecha_ultimo_mensaje || conv.fecha_inicio)}</span> }
+          ]}
+        />
       )}
       {/* Help Modal */}
       {showHelp && (

@@ -1,5 +1,6 @@
 'use client'
 import Loading from '@/components/Loading'
+import { PAGINA } from '@/lib/ui'
 import { ErrorCarga } from '@/components/ui/ErrorCarga'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
@@ -170,7 +171,7 @@ export default function WhatsappPlantillasPage() {
   }
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 w-full max-w-7xl mx-auto pb-20">
+    <div className={PAGINA}>
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
         <div className="min-w-0">
           <Link href="/dashboard/canales" className="inline-flex items-center gap-2 text-sm text-ink-500 hover:text-brand-600 transition mb-3">

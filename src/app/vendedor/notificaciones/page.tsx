@@ -1,4 +1,5 @@
 import { createClient } from '@/utils/supabase/server'
+import { PAGINA } from '@/lib/ui'
 import { redirect } from 'next/navigation'
 import NotificationsTabs from './NotificationsTabs'
 
@@ -29,7 +30,7 @@ export default async function NotificacionesPage() {
     .eq('user_id', user.id)
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className={`${PAGINA} space-y-6`}>
       <div>
         <h1 className="text-2xl font-700 text-ink-900 font-display">Notificaciones</h1>
         <p className="text-ink-500 mt-1">Revisa tus alertas recientes y ajusta tus preferencias.</p>

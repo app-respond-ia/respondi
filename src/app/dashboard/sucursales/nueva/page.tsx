@@ -1,5 +1,6 @@
 'use client'
 import Loading from '@/components/Loading'
+import { PAGINA_FORMULARIO } from '@/lib/ui'
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -376,7 +377,7 @@ export default function NuevaSucursalPage() {
   // ── PASO CONFIG INICIAL ──────────────────────────────────────
   if (step === 'config') {
     return (
-      <div className="p-6 sm:p-10 max-w-2xl mx-auto pb-20">
+      <div className={PAGINA_FORMULARIO}>
         <div className="mb-8">
           <button onClick={() => router.back()} className="flex items-center gap-2 text-sm text-ink-500 hover:text-ink-700 transition mb-4">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/></svg>
@@ -619,7 +620,7 @@ export default function NuevaSucursalPage() {
   const pct = Math.round(((onbStep - 1) / totalSteps) * 100)
 
   return (
-    <div className="p-6 sm:p-10 max-w-2xl mx-auto pb-20">
+    <div className={PAGINA_FORMULARIO}>
       <div className="mb-6">
         <button onClick={() => onbStep === 1 ? setStep('config') : setOnbStep(onbStep - 1)}
           className="flex items-center gap-2 text-sm text-ink-500 hover:text-ink-700 transition mb-4">

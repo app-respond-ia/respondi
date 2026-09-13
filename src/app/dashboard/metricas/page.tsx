@@ -1,5 +1,6 @@
 'use client'
 import Loading from '@/components/Loading'
+import { PAGINA } from '@/lib/ui'
 
 import { useState, useEffect } from 'react'
 import { getMetricas } from '@/app/actions/metricas'
@@ -102,7 +103,7 @@ export default function MetricasPage() {
   }
 
   return (
-    <div className="p-6 sm:p-10 max-w-6xl w-full mx-auto pb-20">
+    <div className={PAGINA}>
 
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap mb-8">

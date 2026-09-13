@@ -1,5 +1,7 @@
 'use client'
 import { SelectorPrefijo } from '@/components/ui/CampoTelefono'
+import { Tabla } from '@/components/ui/Tabla'
+import { PAGINA } from '@/lib/ui'
 import { separarTelefono } from '@/lib/paises'
 import Loading from '@/components/Loading'
 import { ErrorCarga } from '@/components/ui/ErrorCarga'
@@ -88,7 +90,6 @@ export default function ContactosPage() {
   const [contactos, setContactos] = useState<any[]>([])
   
   // Filtros
-  const [filtroTrato, setFiltroTrato] = useState<'todos' | 'normal' | 'sin_ia' | 'bloqueado'>('todos')
   const [filtroModo, setFiltroModo] = useState<'todos' | ModoContacto>('todos')
   
   const { showToast } = useToast()
@@ -150,13 +151,6 @@ export default function ContactosPage() {
   useEffect(() => {
     cargar().catch(() => setErrorCarga(true))
   }, [])
-
-  // Limpiar filtro modo si se selecciona 'normales'
-  useEffect(() => {
-    if (filtroTrato === 'normal') {
-      setFiltroModo('todos')
-    }
-  }, [filtroTrato])
 
   const openAñadir = () => {
     setModalFormData({
@@ -254,11 +248,8 @@ export default function ContactosPage() {
     setContactoADesbloquear(null)
   }
 
-  const contactosFiltrados = contactos.filter(c => {
-    const pasaTrato = filtroTrato === 'todos' || c.trato === filtroTrato
-    const pasaModo = filtroModo === 'todos' || c.modo === filtroModo
-    return pasaTrato && pasaModo
-  })
+  // El trato lo filtran las pestañas de la tabla; aquí solo el modo
+  const contactosFiltrados = contactos.filter(c => filtroModo === 'todos' || c.modo === filtroModo)
 
   if (errorCarga) return <ErrorCarga />
 
@@ -275,7 +266,7 @@ export default function ContactosPage() {
   }
 
   return (
-    <div className="p-6 sm:p-10 max-w-4xl w-full mx-auto pb-20">
+    <div className={PAGINA}>
 
       {/* Encabezado + acciones */}
       <div className="flex items-start justify-between gap-4 flex-wrap mb-8">
@@ -293,109 +284,61 @@ export default function ContactosPage() {
 
       {/* ====== LISTA DE CONTACTOS GESTIONADOS ====== */}
       <section>
-        <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
-          <h2 className="font-display font-600 text-lg text-ink-900">Contactos gestionados</h2>
-          
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Filtro principal (Trato) */}
-            <select
-              value={filtroTrato}
-              onChange={e => setFiltroTrato(e.target.value as any)}
-              className="h-[32px] px-3 rounded-lg border border-slate-300 bg-white text-xs font-500 text-ink-700 focus:outline-none focus:border-brand-500 transition"
-            >
-              <option value="todos">Todos los tratos</option>
-              <option value="normal">Normales</option>
-              <option value="sin_ia">Sin IA</option>
-              <option value="bloqueado">Bloqueados</option>
+        <Tabla
+          filas={contactosFiltrados}
+          idDe={c => c.id}
+          nombre={['contacto', 'contactos']}
+          buscar={{ placeholder: 'Buscar por teléfono, nombre o nota…', en: c => `${c.identificador_canal} ${c.nombre || ''} ${c.nota || ''}` }}
+          pestanas={[
+            { id: 'todos', etiqueta: 'Todos' },
+            { id: 'bloqueado', etiqueta: 'Bloqueados', filtro: c => c.trato === 'bloqueado' },
+            { id: 'sin_ia', etiqueta: 'Sin IA', filtro: c => c.trato === 'sin_ia' },
+            { id: 'normal', etiqueta: 'Normales', filtro: c => c.trato === 'normal' }
+          ]}
+          herramientas={
+            <select value={filtroModo} onChange={e => setFiltroModo(e.target.value as any)} className="h-10 px-3 rounded-xl border border-slate-300 bg-white text-sm text-ink-700 focus:outline-none focus:border-brand-500 transition">
+              <option value="todos">Cualquier modo</option>
+              <option value="ignorar">Ignorar en silencio</option>
+              <option value="respuesta_automatica">Respuesta automática</option>
+              <option value="derivar">Derivar a un agente</option>
             </select>
-
-            {/* Filtro secundario (Modo) */}
-            {filtroTrato !== 'normal' && (
-              <select
-                value={filtroModo}
-                onChange={e => setFiltroModo(e.target.value as any)}
-                className="h-[32px] px-3 rounded-lg border border-slate-300 bg-white text-xs font-500 text-ink-700 focus:outline-none focus:border-brand-500 transition"
-              >
-                <option value="todos">Cualquier modo</option>
-                <option value="ignorar">Ignorar en silencio</option>
-                <option value="respuesta_automatica">Respuesta automática</option>
-                <option value="derivar">Derivar a un agente</option>
-              </select>
-            )}
-          </div>
-        </div>
-
-        {contactosFiltrados.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
-            <p className="font-semibold text-ink-900 text-lg mb-2">No hay contactos en esta vista.</p>
-            <p className="text-ink-500 text-sm">Cambia el filtro o añade un nuevo trato especial.</p>
-          </div>
-        ) : (
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col divide-y divide-slate-100 relative">
-            {contactosFiltrados.map((contacto) => {
-              const conf = CANAL_CONFIG[contacto.canal as CanalConfigKey]
-              const modoInfo = contacto.modo && contacto.trato !== 'normal' ? MODO_UI_CONFIG[contacto.modo as ModoContacto] : null
-              
+          }
+          ordenInicial={{ clave: 'actualizado', direccion: 'desc' }}
+          columnas={[
+            { clave: 'contacto', titulo: 'Contacto', enMovil: 'titulo', valor: c => c.identificador_canal, render: c => {
+              const conf = CANAL_CONFIG[c.canal as CanalConfigKey]
               return (
-                <div key={contacto.id} className="p-4 sm:p-5 flex items-start gap-4 hover:bg-slate-50 transition-colors bg-white">
-                  
-                  {/* Icono fijo */}
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${conf?.iconBg || 'bg-slate-500'} text-white`}>
-                    {conf?.icon}
-                  </div>
-
-                  {/* Info principal */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <p className="font-600 text-ink-900">{contacto.identificador_canal}</p>
-                      {contacto.nombre && (
-                        <span className="text-sm text-ink-600">({contacto.nombre})</span>
-                      )}
-                      <span className="text-xs text-ink-400 mt-0.5">{conf?.label || contacto.canal}</span>
-                      
-                      {contacto.trato === 'bloqueado' && (
-                        <span className="ml-2 px-2 py-0.5 bg-red-100 text-red-700 text-xs font-600 rounded">Bloqueado</span>
-                      )}
-                      {contacto.trato === 'sin_ia' && (
-                        <span className="ml-2 px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-600 rounded">Sin IA</span>
-                      )}
-                      {contacto.trato === 'normal' && (
-                        <span className="ml-2 px-2 py-0.5 bg-slate-100 text-slate-600 text-xs font-600 rounded">Normal</span>
-                      )}
-                      
-                      {/* Badge de modo */}
-                      {modoInfo && (
-                        <span className={`flex items-center gap-1 px-2 py-0.5 text-xs font-600 rounded ${modoInfo.badgeColor}`}>
-                          {modoInfo.icon}
-                          {modoInfo.label}
-                        </span>
-                      )}
-                    </div>
-                    
-                    <p className="text-sm text-ink-500 mb-2 line-clamp-2">{contacto.nota}</p>
-                    
-                    {/* Pie */}
-                    <p className="text-xs text-ink-400">
-                      Actualizado el {contacto.fecha_actualizacion ? formatDate(contacto.fecha_actualizacion) : 'desconocido'}
-                    </p>
-                  </div>
-
-                  {/* Controles */}
-                  <div className="flex items-center shrink-0 ml-2 gap-2">
-                    <button onClick={() => openEditar(contacto)} disabled={nivelPermiso !== 'escritura'} className="px-3 h-9 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-600 text-ink-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
-                      Editar
-                    </button>
-                    {contacto.trato !== 'normal' && (
-                      <button onClick={() => handleDesbloquear(contacto)} disabled={nivelPermiso !== 'escritura'} className="px-3 h-9 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-600 text-ink-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
-                        Hacer normal
-                      </button>
-                    )}
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${conf?.iconBg || 'bg-slate-500'} text-white`}>{conf?.icon}</div>
+                  <div className="min-w-0">
+                    <p className="font-600 text-ink-900 truncate">{c.identificador_canal}</p>
+                    {c.nombre && <p className="text-xs text-ink-500 truncate">{c.nombre}</p>}
                   </div>
                 </div>
               )
-            })}
-          </div>
-        )}
+            } },
+            { clave: 'canal', titulo: 'Canal', valor: c => CANAL_CONFIG[c.canal as CanalConfigKey]?.label || c.canal },
+            { clave: 'trato', titulo: 'Trato', valor: c => c.trato, render: c => c.trato === 'bloqueado'
+              ? <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs font-600 rounded">Bloqueado</span>
+              : c.trato === 'sin_ia' ? <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-600 rounded">Sin IA</span>
+              : <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs font-600 rounded">Normal</span> },
+            { clave: 'modo', titulo: 'Qué se hace', valor: c => (c.modo && c.trato !== 'normal' ? MODO_UI_CONFIG[c.modo as ModoContacto]?.label : ''), render: c => {
+              const m = c.modo && c.trato !== 'normal' ? MODO_UI_CONFIG[c.modo as ModoContacto] : null
+              return m ? <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-600 rounded ${m.badgeColor}`}>{m.icon}{m.label}</span> : <span className="text-ink-300">—</span>
+            } },
+            { clave: 'nota', titulo: 'Nota', valor: c => c.nota || '', clase: 'max-w-xs', render: c => <span className="text-ink-600 line-clamp-2">{c.nota || '—'}</span> },
+            { clave: 'actualizado', titulo: 'Actualizado', valor: c => c.fecha_actualizacion || '', render: c => <span className="text-ink-500 whitespace-nowrap">{c.fecha_actualizacion ? formatDate(c.fecha_actualizacion) : '—'}</span> }
+          ]}
+          acciones={c => (
+            <>
+              <button onClick={() => openEditar(c)} disabled={nivelPermiso !== 'escritura'} className="px-3 h-8 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-600 text-ink-700 transition disabled:opacity-50 disabled:cursor-not-allowed">Editar</button>
+              {c.trato !== 'normal' && (
+                <button onClick={() => handleDesbloquear(c)} disabled={nivelPermiso !== 'escritura'} className="ml-2 px-3 h-8 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-600 text-ink-700 transition disabled:opacity-50 disabled:cursor-not-allowed">Hacer normal</button>
+              )}
+            </>
+          )}
+          vacio={<div><p className="font-semibold text-ink-900 text-lg mb-2">No hay contactos en esta vista.</p><p className="text-ink-500 text-sm">Cambia el filtro o añade un nuevo trato especial.</p></div>}
+        />
       </section>
 
       {/* =========================================================

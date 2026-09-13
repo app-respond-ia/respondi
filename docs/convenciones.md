@@ -77,3 +77,22 @@ confirmarlo.
 Nunca ejecutar una migración/SQL directamente sin mostrarla antes y
 esperar confirmación explícita — es la base de datos de producción,
 con posibilidad de clientes reales.
+
+## Ancho de las páginas y tablas (13-09-2026, tramo 3)
+Decidido con Jorge: el contenido ocupa el ancho de la pantalla (antes cada
+página ponía su propio `max-w-4xl` y su propio relleno encima del del marco,
+y en escritorio quedaba todo estrecho con mucho margen).
+- El marco (`AdminLayout`, `SuperadminLayout`, layout de vendedor) pone el
+  relleno lateral. Las páginas usan las clases de `src/lib/ui.ts`:
+  `PAGINA` (listas, tablas, paneles: hasta 1600 px), `PAGINA_FORMULARIO`
+  (fichas y formularios: hasta 4xl) o `PAGINA_TEXTO` (lectura larga). Nunca
+  `p-6 sm:p-10 max-w-… mx-auto` a mano.
+- Las listas de datos van con `src/components/ui/Tabla.tsx` (estilo
+  Shopify): buscador, pestañas por estado con recuento, columnas ordenables,
+  selección con acciones en bloque, paginación y tarjetas en el móvil. La
+  página describe columnas (`valor` para ordenar y buscar, `render` para
+  pintar, `enMovil: 'titulo'` para la tarjeta) y filtros propios en
+  `herramientas`. Los botones por fila van en `acciones`.
+- Números y fechas que pinta también el servidor (cabecera, layouts) llevan
+  siempre el idioma fijo (`toLocaleString('es-ES')`): sin él, Node escribe
+  "5,000" y el navegador "5.000" y React avisa de hidratación (error 418).

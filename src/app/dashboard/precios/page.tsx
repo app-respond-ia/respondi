@@ -1,5 +1,7 @@
 'use client'
 import Loading from '@/components/Loading'
+import { Tabla } from '@/components/ui/Tabla'
+import { PAGINA } from '@/lib/ui'
 import { ErrorCarga } from '@/components/ui/ErrorCarga'
 
 import { useState, useEffect } from 'react'
@@ -13,7 +15,6 @@ import { HelpPopover } from '@/components/ui/HelpPopover'
 export default function ListaPreciosPage() {
   const [loading, setLoading] = useState(true)
   const [items, setItems] = useState<any[]>([])
-  const [filtroTipo, setFiltroTipo] = useState<'todos' | 'producto' | 'servicio'>('todos')
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
   const [errorCarga, setErrorCarga] = useState(false)
   
@@ -93,11 +94,6 @@ export default function ListaPreciosPage() {
     cargar().catch(() => setErrorCarga(true))
     cargarCategorias().catch(() => setErrorCarga(true))
   }, [])
-
-  const itemsFiltrados = items.filter(item => {
-    if (filtroTipo === 'todos') return true
-    return item.tipo === filtroTipo
-  })
 
   const openAñadir = () => {
     setModalMode('añadir')
@@ -383,7 +379,7 @@ export default function ListaPreciosPage() {
   }
 
   return (
-    <div className="p-6 sm:p-10 max-w-6xl w-full mx-auto pb-20">
+    <div className={PAGINA}>
 
       {/* Encabezado + acciones */}
       <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
@@ -442,72 +438,39 @@ export default function ListaPreciosPage() {
         </div>
       ) : (
         <>
-          {/* Filtros: tipo */}
-          <div className="flex items-center gap-3 flex-wrap mb-5">
-            <div className="inline-flex p-1 rounded-xl bg-white border border-slate-200">
-              <button onClick={() => setFiltroTipo('todos')} className={`px-4 py-1.5 rounded-lg text-sm transition ${filtroTipo === 'todos' ? 'font-600 bg-brand-600 text-white' : 'font-500 text-ink-500'}`}>Todos</button>
-              <button onClick={() => setFiltroTipo('producto')} className={`px-4 py-1.5 rounded-lg text-sm transition ${filtroTipo === 'producto' ? 'font-600 bg-brand-600 text-white' : 'font-500 text-ink-500'}`}>Productos</button>
-              <button onClick={() => setFiltroTipo('servicio')} className={`px-4 py-1.5 rounded-lg text-sm transition ${filtroTipo === 'servicio' ? 'font-600 bg-brand-600 text-white' : 'font-500 text-ink-500'}`}>Servicios</button>
-            </div>
-          </div>
-
-          {/* ===== TABLA ===== */}
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[700px]">
-                <thead>
-                  <tr className="border-b border-slate-200 text-left text-ink-500">
-                    <th className="font-600 px-5 py-3">Ítem</th>
-                    <th className="font-600 px-5 py-3">Tipo</th>
-                    <th className="font-600 px-5 py-3">Categoría</th>
-                    <th className="font-600 px-5 py-3">Precio</th>
-                    <th className="font-600 px-5 py-3 text-right">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {itemsFiltrados.map(item => (
-                    <tr key={item.id} className="hover:bg-slate-50 transition">
-                      <td className="px-5 py-3.5">
-                        <p className="font-600 text-ink-900">{item.nombre}</p>
-                        {item.descripcion && <p className="text-xs text-ink-400 mt-0.5">{item.descripcion}</p>}
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-500 ${item.tipo === 'producto' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
-                          {item.tipo === 'producto' ? 'Producto' : 'Servicio'}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3.5 text-ink-600 text-sm">
-                        {(() => {
-                          const names = getCategoryName(item.categoria_id)
-                          return names.cat ? (
-                            <span>{names.cat}{names.sub ? ` › ${names.sub}` : ''}</span>
-                          ) : (
-                            <span className="text-ink-300">—</span>
-                          )
-                        })()}
-                      </td>
-                      <td className="px-5 py-3.5 font-600 text-ink-900">
-                        {formatearPrecio(item)}
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <div className="flex items-center justify-end gap-1">
-                          <button onClick={() => openEditar(item)} disabled={nivelPermiso !== 'escritura'} className="p-1.5 rounded-lg text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition disabled:opacity-50 disabled:cursor-not-allowed" aria-label="Editar"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
-                          <button onClick={() => handleDelete(item.id)} disabled={nivelPermiso !== 'escritura'} className="p-1.5 rounded-lg text-ink-400 hover:text-red-500 hover:bg-red-50 transition disabled:opacity-50 disabled:cursor-not-allowed" aria-label="Eliminar"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {itemsFiltrados.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="px-5 py-8 text-center text-ink-500 text-sm">
-                        No hay ítems que coincidan con este filtro.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <Tabla
+            filas={items}
+            idDe={(item: any) => item.id}
+            nombre={['ítem', 'ítems']}
+            buscar={{ placeholder: 'Buscar por nombre, descripción o categoría…', en: (item: any) => { const n = getCategoryName(item.categoria_id); return `${item.nombre || ''} ${item.descripcion || ''} ${n.cat || ''} ${n.sub || ''}` } }}
+            pestanas={[
+              { id: 'todos', etiqueta: 'Todos' },
+              { id: 'producto', etiqueta: 'Productos', filtro: (item: any) => item.tipo === 'producto' },
+              { id: 'servicio', etiqueta: 'Servicios', filtro: (item: any) => item.tipo === 'servicio' }
+            ]}
+            ordenInicial={{ clave: 'nombre', direccion: 'asc' }}
+            columnas={[
+              { clave: 'nombre', titulo: 'Ítem', enMovil: 'titulo', valor: (item: any) => item.nombre, render: (item: any) => (
+                <div className="min-w-0">
+                  <p className="font-600 text-ink-900">{item.nombre}</p>
+                  {item.descripcion && <p className="text-xs text-ink-400 mt-0.5 line-clamp-2">{item.descripcion}</p>}
+                </div>
+              ) },
+              { clave: 'tipo', titulo: 'Tipo', valor: (item: any) => (item.tipo === 'producto' ? 'Producto' : 'Servicio'), render: (item: any) => (
+                <span className={`text-xs px-2 py-0.5 rounded-full font-500 ${item.tipo === 'producto' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>{item.tipo === 'producto' ? 'Producto' : 'Servicio'}</span>
+              ) },
+              { clave: 'categoria', titulo: 'Categoría', valor: (item: any) => { const n = getCategoryName(item.categoria_id); return n.cat ? `${n.cat}${n.sub ? ` › ${n.sub}` : ''}` : '' }, render: (item: any) => { const n = getCategoryName(item.categoria_id); return n.cat ? <span className="text-ink-600">{n.cat}{n.sub ? ` › ${n.sub}` : ''}</span> : <span className="text-ink-300">—</span> } },
+              { clave: 'precio', titulo: 'Precio', alinear: 'derecha', valor: (item: any) => (item.precio === null || item.precio === undefined ? null : Number(item.precio)), render: (item: any) => <span className="font-600 text-ink-900 whitespace-nowrap">{formatearPrecio(item)}</span> },
+              { clave: 'disponible', titulo: 'Disponible', valor: (item: any) => (item.disponible === false ? 'No' : 'Sí'), render: (item: any) => item.disponible === false ? <span className="text-xs px-2 py-0.5 rounded-full font-500 bg-slate-100 text-slate-500">No disponible</span> : <span className="text-xs px-2 py-0.5 rounded-full font-500 bg-emerald-50 text-emerald-700">Disponible</span> }
+            ]}
+            acciones={(item: any) => (
+              <>
+                <button onClick={() => openEditar(item)} disabled={nivelPermiso !== 'escritura'} className="px-3 h-8 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-600 text-ink-700 transition disabled:opacity-50 disabled:cursor-not-allowed">Editar</button>
+                <button onClick={() => handleDelete(item.id)} disabled={nivelPermiso !== 'escritura'} className="ml-2 px-3 h-8 rounded-lg border border-rose-200 bg-white hover:bg-rose-50 text-xs font-600 text-rose-600 transition disabled:opacity-50 disabled:cursor-not-allowed">Eliminar</button>
+              </>
+            )}
+            vacio={<p className="text-ink-500 text-sm">No hay ítems que coincidan con este filtro.</p>}
+          />
         </>
       )}
 

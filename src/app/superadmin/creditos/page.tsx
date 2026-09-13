@@ -1,5 +1,7 @@
 'use client'
 import Loading from '@/components/Loading'
+import { Tabla } from '@/components/ui/Tabla'
+import { PAGINA } from '@/lib/ui'
 import { useState, useEffect, Suspense } from 'react'
 import { getMovimientosCreditos, getResumenCreditos, getOrganizacionesBasico, getSucursalesPorOrganizaciones } from '@/app/actions/superadmin'
 import { useSuperadminPermisos } from '@/components/layout/SuperadminPermisosContext'
@@ -17,11 +19,10 @@ function CreditosContent() {
   const [resumen, setResumen] = useState({ totalConsumido: 0, totalRecargaPlan: 0, totalRecargaManual: 0, saldoTotalPlataforma: 0 })
   const [loading, setLoading] = useState(true)
 
-  // Filtros Multiples
+  // Filtros Multiples (el tipo abono/débito lo llevan las pestañas de la tabla)
   const [filtroTenants, setFiltroTenants] = useState<string[]>(urlTenantId ? [urlTenantId] : [])
   const [filtroSucursales, setFiltroSucursales] = useState<string[]>([])
   const [filtroPais, setFiltroPais] = useState('')
-  const [filtroTipo, setFiltroTipo] = useState('')
   const [filtroOrigen, setFiltroOrigen] = useState('')
   const [filtroDesde, setFiltroDesde] = useState('')
   const [filtroHasta, setFiltroHasta] = useState('')
@@ -54,7 +55,7 @@ function CreditosContent() {
 
   useEffect(() => {
     if (canRead) cargarDatos()
-  }, [filtroTenants, filtroSucursales, filtroPais, filtroTipo, filtroOrigen, filtroDesde, filtroHasta, canRead])
+  }, [filtroTenants, filtroSucursales, filtroPais, filtroOrigen, filtroDesde, filtroHasta, canRead])
 
   const cargarFiltrosBasicos = async () => {
     const resO = await getOrganizacionesBasico()
@@ -69,7 +70,6 @@ function CreditosContent() {
       tenant_ids: filtroTenants.length > 0 ? filtroTenants : undefined,
       branch_ids: filtroSucursales.length > 0 ? filtroSucursales : undefined,
       pais: filtroPais || undefined,
-      tipo: (filtroTipo as 'abono' | 'debito') || undefined,
       origen: (filtroOrigen as 'consumo_ia' | 'recarga_manual' | 'recarga_plan') || undefined,
       fecha_desde: filtroDesde ? new Date(filtroDesde).toISOString() : undefined,
       fecha_hasta: filtroHasta ? new Date(filtroHasta + 'T23:59:59.999Z').toISOString() : undefined,
@@ -112,11 +112,13 @@ function CreditosContent() {
     return 'bg-slate-100 text-slate-600'
   }
 
+  const paisDe = (m: any) => m.sucursales?.pais ? PAISES.find(p => p.codigo === m.sucursales.pais) : null
+
   const optsOrganizaciones = organizaciones.map(o => ({ id: o.id, label: o.nombre }))
   const optsSucursales = sucursalesDisponibles.map(s => ({ id: s.id, label: s.nombre }))
 
   return (
-    <>
+    <div className={PAGINA}>
       <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
         <div>
           <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Movimientos de créditos</h1>
@@ -144,111 +146,72 @@ function CreditosContent() {
         </div>
       </div>
 
-      {/* Filtros */}
-      <div className="flex flex-wrap gap-3 mb-5 items-center">
-        <MultiSelectBuscador 
-          opciones={optsOrganizaciones} 
-          seleccionados={filtroTenants} 
-          onChange={setFiltroTenants} 
-          placeholder="Todas las organizaciones" 
-        />
-        
-        <MultiSelectBuscador 
-          opciones={optsSucursales} 
-          seleccionados={filtroSucursales} 
-          onChange={setFiltroSucursales} 
-          placeholder={filtroTenants.length === 0 ? "Elige una organización primero" : "Todas las sucursales"} 
-          disabled={filtroTenants.length === 0}
-        />
-
-        <select value={filtroPais} onChange={e => setFiltroPais(e.target.value)}
-          className="h-10 px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition sm:w-auto">
-          <option value="">Todos los países</option>
-          {PAISES.map(p => <option key={p.codigo} value={p.codigo}>{p.bandera} {p.nombre}</option>)}
-        </select>
-        
-        <select value={filtroTipo} onChange={e => setFiltroTipo(e.target.value)}
-          className="h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition">
-          <option value="">Todos los tipos</option>
-          <option value="abono">Abonos</option>
-          <option value="debito">Débitos</option>
-        </select>
-
-        <select value={filtroOrigen} onChange={e => setFiltroOrigen(e.target.value)}
-          className="h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition">
-          <option value="">Todos los orígenes</option>
-          <option value="consumo_ia">Consumo IA</option>
-          <option value="recarga_plan">Recarga por Plan</option>
-          <option value="recarga_manual">Recarga Manual</option>
-        </select>
-        
-        <div className="flex items-center gap-2 w-full lg:w-auto">
-          <input type="date" value={filtroDesde} onChange={e => setFiltroDesde(e.target.value)}
-            className="h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm text-ink-600 focus:outline-none focus:border-brand-500 transition w-full" />
-          <span className="text-ink-400">a</span>
-          <input type="date" value={filtroHasta} onChange={e => setFiltroHasta(e.target.value)}
-            className="h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm text-ink-600 focus:outline-none focus:border-brand-500 transition w-full" />
-        </div>
-      </div>
-
       {/* Tabla */}
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-        {loading ? (
-          <Loading />
-        ) : movimientos.length === 0 ? (
-          <div className="p-8 text-center text-ink-500">No hay movimientos con estos filtros.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[1000px]">
-              <thead>
-                <tr className="border-b border-slate-200 text-left text-ink-500">
-                  <th className="font-600 px-5 py-3">Fecha</th>
-                  <th className="font-600 px-5 py-3">Organización</th>
-                  <th className="font-600 px-5 py-3">Sucursal</th>
-                  <th className="font-600 px-5 py-3">País</th>
-                  <th className="font-600 px-5 py-3">Tipo</th>
-                  <th className="font-600 px-5 py-3">Origen</th>
-                  <th className="font-600 px-5 py-3 text-right">Cantidad</th>
-                  <th className="font-600 px-5 py-3 text-right">Saldo</th>
-                  <th className="font-600 px-5 py-3">Descripción</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {movimientos.map(m => {
-                  const paisObj = m.sucursales?.pais ? PAISES.find(p => p.codigo === m.sucursales.pais) : null
-                  
-                  return (
-                    <tr key={m.id} className="hover:bg-slate-50 transition">
-                      <td className="px-5 py-3.5 text-ink-500 whitespace-nowrap">{formatFecha(m.timestamp)}</td>
-                      <td className="px-5 py-3.5 font-500 text-ink-900">{m.organizaciones?.nombre || '—'}</td>
-                      <td className="px-5 py-3.5 text-ink-600">{m.sucursales?.nombre || '—'}</td>
-                      <td className="px-5 py-3.5 text-ink-600">
-                        {paisObj ? <span title={paisObj.nombre}>{paisObj.bandera}</span> : '—'}
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-600 capitalize ${getTipoBadge(m.tipo)}`}>
-                          {m.tipo}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-600 ${getOrigenBadge(m.origen)}`}>
-                          {formatOrigen(m.origen)}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3.5 font-600 text-ink-900 text-right">
-                        {m.tipo === 'abono' ? '+' : '-'}{Math.abs(Number(m.cantidad))}
-                      </td>
-                      <td className="px-5 py-3.5 font-600 text-ink-900 text-right">{m.saldo}</td>
-                      <td className="px-5 py-3.5 text-ink-500 truncate max-w-[200px]" title={m.descripcion}>{m.descripcion || '—'}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </>
+      <Tabla
+        filas={movimientos}
+        idDe={m => m.id}
+        cargando={loading}
+        nombre={['movimiento', 'movimientos']}
+        buscar={{ placeholder: 'Buscar por organización, sucursal o descripción…', en: m => `${m.organizaciones?.nombre || ''} ${m.sucursales?.nombre || ''} ${m.descripcion || ''}` }}
+        pestanas={[
+          { id: 'todos', etiqueta: 'Todos' },
+          { id: 'abono', etiqueta: 'Abonos', filtro: m => m.tipo === 'abono' },
+          { id: 'debito', etiqueta: 'Débitos', filtro: m => m.tipo === 'debito' }
+        ]}
+        herramientas={
+          <>
+            <MultiSelectBuscador 
+              opciones={optsOrganizaciones} 
+              seleccionados={filtroTenants} 
+              onChange={setFiltroTenants} 
+              placeholder="Todas las organizaciones" 
+            />
+            <MultiSelectBuscador 
+              opciones={optsSucursales} 
+              seleccionados={filtroSucursales} 
+              onChange={setFiltroSucursales} 
+              placeholder={filtroTenants.length === 0 ? "Elige una organización primero" : "Todas las sucursales"} 
+              disabled={filtroTenants.length === 0}
+            />
+            <select value={filtroPais} onChange={e => setFiltroPais(e.target.value)} aria-label="País"
+              className="h-10 px-3 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition">
+              <option value="">Todos los países</option>
+              {PAISES.map(p => <option key={p.codigo} value={p.codigo}>{p.bandera} {p.nombre}</option>)}
+            </select>
+            <select value={filtroOrigen} onChange={e => setFiltroOrigen(e.target.value)} aria-label="Origen"
+              className="h-10 px-3 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition">
+              <option value="">Todos los orígenes</option>
+              <option value="consumo_ia">Consumo IA</option>
+              <option value="recarga_plan">Recarga por Plan</option>
+              <option value="recarga_manual">Recarga Manual</option>
+            </select>
+            <div className="flex items-center gap-2">
+              <input type="date" value={filtroDesde} onChange={e => setFiltroDesde(e.target.value)} aria-label="Desde"
+                className="h-10 px-3 rounded-xl border border-slate-300 bg-white text-sm text-ink-600 focus:outline-none focus:border-brand-500 transition" />
+              <span className="text-ink-400">a</span>
+              <input type="date" value={filtroHasta} onChange={e => setFiltroHasta(e.target.value)} aria-label="Hasta"
+                className="h-10 px-3 rounded-xl border border-slate-300 bg-white text-sm text-ink-600 focus:outline-none focus:border-brand-500 transition" />
+            </div>
+          </>
+        }
+        ordenInicial={{ clave: 'fecha', direccion: 'desc' }}
+        columnas={[
+          { clave: 'fecha', titulo: 'Fecha', valor: m => m.timestamp || '', render: m => <span className="text-ink-500 whitespace-nowrap">{formatFecha(m.timestamp)}</span> },
+          { clave: 'organizacion', titulo: 'Organización', enMovil: 'titulo', valor: m => m.organizaciones?.nombre || '', render: m => <span className="font-500 text-ink-900">{m.organizaciones?.nombre || '—'}</span> },
+          { clave: 'sucursal', titulo: 'Sucursal', valor: m => m.sucursales?.nombre || '', render: m => <span className="text-ink-600">{m.sucursales?.nombre || '—'}</span> },
+          { clave: 'pais', titulo: 'País', valor: m => paisDe(m)?.nombre || '', render: m => {
+            const paisObj = paisDe(m)
+            return paisObj ? <span title={paisObj.nombre}>{paisObj.bandera}</span> : <span className="text-ink-400">—</span>
+          } },
+          { clave: 'tipo', titulo: 'Tipo', valor: m => m.tipo, render: m => <span className={`text-xs px-2 py-0.5 rounded-full font-600 capitalize ${getTipoBadge(m.tipo)}`}>{m.tipo}</span> },
+          { clave: 'origen', titulo: 'Origen', valor: m => formatOrigen(m.origen), render: m => <span className={`text-xs px-2 py-0.5 rounded-full font-600 whitespace-nowrap ${getOrigenBadge(m.origen)}`}>{formatOrigen(m.origen)}</span> },
+          { clave: 'cantidad', titulo: 'Cantidad', alinear: 'derecha', valor: m => (m.tipo === 'abono' ? 1 : -1) * Math.abs(Number(m.cantidad || 0)), render: m => <span className="font-600 text-ink-900 tabular-nums">{m.tipo === 'abono' ? '+' : '-'}{Math.abs(Number(m.cantidad))}</span> },
+          { clave: 'saldo', titulo: 'Saldo', alinear: 'derecha', valor: m => Number(m.saldo || 0), render: m => <span className="font-600 text-ink-900 tabular-nums">{m.saldo}</span> },
+          { clave: 'descripcion', titulo: 'Descripción', valor: m => m.descripcion || '', clase: 'max-w-xs', render: m => <span className="text-ink-500 text-xs line-clamp-2" title={m.descripcion}>{m.descripcion || '—'}</span> }
+        ]}
+        vacio={<p className="text-ink-500">No hay movimientos con estos filtros.</p>}
+      />
+    </div>
   )
 }
 

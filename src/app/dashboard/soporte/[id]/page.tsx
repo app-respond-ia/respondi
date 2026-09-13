@@ -144,7 +144,7 @@ export default function TicketDetalleClientePage() {
   if (!ticket) return null
 
   return (
-    <div className="max-w-5xl mx-auto flex flex-col lg:flex-row gap-6 h-[calc(100vh-8rem)]">
+    <div className="w-full max-w-[1600px] mx-auto flex flex-col lg:flex-row gap-6 h-[calc(100vh-8rem)]">
       
       {/* Panel principal: Chat */}
       <div className="flex-1 flex flex-col space-y-4">

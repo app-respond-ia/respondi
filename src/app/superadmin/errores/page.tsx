@@ -1,5 +1,6 @@
 'use client'
-import Loading from '@/components/Loading'
+import { Tabla } from '@/components/ui/Tabla'
+import { PAGINA } from '@/lib/ui'
 
 import { useState, useEffect } from 'react'
 import { getErrores, resolverError } from '@/app/actions/superadmin'
@@ -7,14 +8,22 @@ import { useSuperadminPermisos } from '@/components/layout/SuperadminPermisosCon
 
 import { useToast } from '@/components/ui/Toast'
 
+const ORIGEN_ETIQUETA: Record<string, string> = {
+  n8n: 'n8n',
+  api_meta: 'API Meta',
+  llm: 'LLM',
+  base_datos: 'Base de datos',
+  cron: 'Cron jobs'
+}
+
 export default function ErroresPage() {
   const [errores, setErrores] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const { showToast } = useToast()
   
-  // Filtros
-  const [filtroEstado, setFiltroEstado] = useState<'todos' | 'sin_resolver' | 'resuelto'>('sin_resolver')
+  // Filtros (el estado resuelto/sin resolver lo llevan las pestañas de la tabla)
   const [filtroOrigen, setFiltroOrigen] = useState('Todos')
+  const [resolviendoId, setResolviendoId] = useState<string | null>(null)
   
   const [modalData, setModalData] = useState<any>(null)
 
@@ -23,17 +32,17 @@ export default function ErroresPage() {
 
   useEffect(() => {
     loadErrores()
-  }, [filtroEstado])
+  }, [])
 
+  // El servidor devuelve como mucho 100 por consulta, así que se piden los
+  // dos estados por separado: si se pidieran todos juntos, un aluvión de
+  // resueltos podría tapar errores sin resolver más antiguos.
   async function loadErrores() {
     setLoading(true)
-    const backendFiltro = filtroEstado === 'todos' ? undefined : filtroEstado
-    const { success, errores: data, error } = await getErrores(backendFiltro)
-    if (success && data) {
-      setErrores(data)
-    } else if (error) {
-      showToast(error, 'error')
-    }
+    const [sinResolver, resueltos] = await Promise.all([getErrores('sin_resolver'), getErrores('resuelto')])
+    const error = sinResolver.error || resueltos.error
+    if (error) showToast(error, 'error')
+    setErrores([...(sinResolver.errores || []), ...(resueltos.errores || [])])
     setLoading(false)
   }
 
@@ -52,18 +61,21 @@ export default function ErroresPage() {
     document.body.style.overflow = ''
   }
 
-  const markResolved = async () => {
-    if (modalData) {
-      const res = await resolverError(modalData.id)
-      if (res && res.success) {
-        showToast('Error marcado como resuelto ✓', 'success')
-        closeModal()
-        loadErrores()
-      } else {
-        showToast(res?.error || 'Error al actualizar', 'error')
-      }
+  const resolver = async (errorData: any) => {
+    if (!errorData) return
+    setResolviendoId(errorData.id)
+    const res = await resolverError(errorData.id)
+    setResolviendoId(null)
+    if (res && res.success) {
+      showToast('Error marcado como resuelto ✓', 'success')
+      if (modalData?.id === errorData.id) closeModal()
+      loadErrores()
+    } else {
+      showToast(res?.error || 'Error al actualizar', 'error')
     }
   }
+
+  const markResolved = () => resolver(modalData)
 
   const getOrigenIcon = (origen: string) => {
     switch (origen) {
@@ -75,23 +87,31 @@ export default function ErroresPage() {
     }
   }
 
+  const formatFecha = (d: string) => d ? new Date(d).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
+
   return (
-    <>
+    <div className={PAGINA}>
       <div className="mb-5">
         <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Errores del sistema</h1>
         <p className="text-ink-500 mt-1">Monitorización de fallos técnicos en la plataforma.</p>
       </div>
 
-      {/* Filtros */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-5">
-        <div className="inline-flex p-1 rounded-xl bg-white border border-slate-200 overflow-x-auto shrink-0">
-          <button onClick={() => setFiltroEstado('sin_resolver')} className={`px-4 py-2 rounded-lg text-sm transition ${filtroEstado === 'sin_resolver' ? 'font-600 bg-red-50 text-red-700' : 'font-500 text-ink-500 hover:text-ink-900'}`}>Sin resolver</button>
-          <button onClick={() => setFiltroEstado('resuelto')} className={`px-4 py-2 rounded-lg text-sm transition ${filtroEstado === 'resuelto' ? 'font-600 bg-ink-100 text-ink-900' : 'font-500 text-ink-500 hover:text-ink-900'}`}>Resueltos</button>
-          <button onClick={() => setFiltroEstado('todos')} className={`px-4 py-2 rounded-lg text-sm transition ${filtroEstado === 'todos' ? 'font-600 bg-ink-100 text-ink-900' : 'font-500 text-ink-500 hover:text-ink-900'}`}>Todos</button>
-        </div>
-
-        <div className="relative shrink-0">
-          <select value={filtroOrigen} onChange={e => setFiltroOrigen(e.target.value)} className="h-11 pl-4 pr-10 rounded-xl border border-slate-200 bg-white text-sm font-500 text-ink-700 focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 appearance-none">
+      {/* Lista */}
+      <Tabla
+        filas={erroresFiltrados}
+        idDe={e => e.id}
+        cargando={loading}
+        nombre={['error', 'errores']}
+        buscar={{ placeholder: 'Buscar por descripción u organización…', en: e => `${e.descripcion || ''} ${e.organizaciones?.nombre || ''} ${ORIGEN_ETIQUETA[e.origen] || e.origen || ''}` }}
+        pestanas={[
+          { id: 'sin_resolver', etiqueta: 'Sin resolver', filtro: e => !e.resuelto },
+          { id: 'resuelto', etiqueta: 'Resueltos', filtro: e => !!e.resuelto },
+          { id: 'todos', etiqueta: 'Todos' }
+        ]}
+        pestanaInicial="sin_resolver"
+        herramientas={
+          <select value={filtroOrigen} onChange={e => setFiltroOrigen(e.target.value)} aria-label="Origen"
+            className="h-10 px-3 rounded-xl border border-slate-300 bg-white text-sm text-ink-700 focus:outline-none focus:border-brand-500 transition">
             <option value="Todos">Todos los orígenes</option>
             <option value="n8n">n8n</option>
             <option value="api_meta">API Meta</option>
@@ -99,57 +119,48 @@ export default function ErroresPage() {
             <option value="base_datos">Base de datos</option>
             <option value="cron">Cron jobs</option>
           </select>
-          <svg className="w-5 h-5 text-ink-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 9l4-4 4 4m0 6l-4 4-4-4"/></svg>
-        </div>
-      </div>
-
-      {/* Lista */}
-      <div className="space-y-3">
-        {loading ? (
-          <Loading />
-        ) : erroresFiltrados.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-ink-500 flex flex-col items-center">
+        }
+        ordenInicial={{ clave: 'fecha', direccion: 'desc' }}
+        onFilaClick={openModal}
+        columnas={[
+          { clave: 'descripcion', titulo: 'Error', enMovil: 'titulo', valor: e => e.descripcion || '', clase: 'max-w-md', render: e => (
+            <div className="flex items-center gap-3 min-w-0">
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${e.resuelto ? 'bg-slate-100' : 'bg-red-50'}`}>
+                {getOrigenIcon(e.origen)}
+              </div>
+              <p className={`font-600 line-clamp-2 ${e.resuelto ? 'text-ink-600' : 'text-ink-900'}`} title={e.descripcion}>{e.descripcion}</p>
+            </div>
+          ) },
+          { clave: 'origen', titulo: 'Origen', valor: e => ORIGEN_ETIQUETA[e.origen] || e.origen || '', render: e => <span className="text-xs font-500 text-ink-500 bg-slate-100 px-2 py-0.5 rounded whitespace-nowrap">{e.origen}</span> },
+          { clave: 'organizacion', titulo: 'Organización', valor: e => e.organizaciones?.nombre || '', render: e => e.organizaciones?.nombre ? <span className="text-ink-700">{e.organizaciones.nombre}</span> : <span className="text-ink-400">—</span> },
+          { clave: 'fecha', titulo: 'Fecha', valor: e => e.timestamp || '', render: e => <span className="text-ink-500 whitespace-nowrap text-xs">{formatFecha(e.timestamp)}</span> },
+          { clave: 'estado', titulo: 'Estado', valor: e => (e.resuelto ? 'Resuelto' : 'Requiere atención'), render: e => (
+            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-700 uppercase tracking-wider whitespace-nowrap ${e.resuelto ? 'bg-slate-100 text-slate-500' : 'bg-red-100 text-red-700'}`}>
+              {e.resuelto ? 'Resuelto' : 'Requiere atención'}
+            </span>
+          ) }
+        ]}
+        acciones={e => (
+          <>
+            <button onClick={() => openModal(e)} className="px-3 h-8 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-600 text-ink-700 transition">Detalle</button>
+            {canWrite && !e.resuelto && (
+              <button onClick={() => resolver(e)} disabled={resolviendoId === e.id}
+                className="ml-2 px-3 h-8 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-600 transition disabled:opacity-50">
+                {resolviendoId === e.id ? 'Un momento…' : 'Marcar resuelto'}
+              </button>
+            )}
+          </>
+        )}
+        vacio={
+          <div className="flex flex-col items-center text-ink-500">
             <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mb-4 text-ink-300">
               <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             </div>
             <p className="font-600 text-ink-900 text-lg">Todo en orden</p>
             <p>No se han encontrado errores con estos filtros.</p>
           </div>
-        ) : (
-          erroresFiltrados.map(e => {
-            const isResolved = e.resuelto
-            return (
-              <div key={e.id} onClick={() => openModal(e)} className={`bg-white rounded-2xl border p-4 cursor-pointer hover:shadow-md transition ${isResolved ? 'border-slate-200 opacity-60' : 'border-red-200 shadow-sm'}`}>
-                <div className="flex items-start gap-4">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isResolved ? 'bg-slate-100' : 'bg-red-50'}`}>
-                    {getOrigenIcon(e.origen)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-700 uppercase tracking-wider ${isResolved ? 'bg-slate-100 text-slate-500' : 'bg-red-100 text-red-700'}`}>
-                            {isResolved ? 'Resuelto' : 'Requiere atención'}
-                          </span>
-                          <span className="text-xs font-500 text-ink-500 bg-slate-100 px-2 py-0.5 rounded">{e.origen}</span>
-                          <span className="text-xs text-ink-400">{new Date(e.timestamp).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-                        </div>
-                        <p className={`font-600 truncate ${isResolved ? 'text-ink-700' : 'text-ink-900'}`}>{e.descripcion}</p>
-                        {e.organizaciones?.nombre && (
-                          <p className="text-sm text-ink-500 mt-1">Organización: <span className="font-500">{e.organizaciones.nombre}</span></p>
-                        )}
-                      </div>
-                      <button className="shrink-0 p-1.5 text-ink-400 hover:text-ink-700 hover:bg-slate-100 rounded-lg transition" title="Ver detalle">
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )
-          })
-        )}
-      </div>
+        }
+      />
 
       {/* MODAL DETALLE */}
       {modalData && (
@@ -211,6 +222,6 @@ export default function ErroresPage() {
           </div>
         </div>
       )}
-    </>
+    </div>
   )
 }

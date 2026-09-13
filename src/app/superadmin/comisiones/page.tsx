@@ -1,5 +1,6 @@
 'use client'
-import Loading from '@/components/Loading'
+import { Tabla } from '@/components/ui/Tabla'
+import { PAGINA } from '@/lib/ui'
 
 import { useState, useEffect } from 'react'
 import { getComisiones, getVendedores, aprobarComision, marcarComisionPagada, crearComisionManual, getOrganizacionesBasico } from '@/app/actions/superadmin'
@@ -13,9 +14,8 @@ export default function ComisionesPage() {
   const [loading, setLoading] = useState(true)
   const { showToast } = useToast()
 
-  // Filtros
+  // Filtros (el estado lo llevan las pestañas de la tabla)
   const [filtroVendedor, setFiltroVendedor] = useState('')
-  const [filtroEstado, setFiltroEstado] = useState('')
   const [filtroTipo, setFiltroTipo] = useState('')
 
   // Modal pago
@@ -39,14 +39,13 @@ export default function ComisionesPage() {
   const { hasPermission } = useSuperadminPermisos()
   const canWrite = hasPermission('comisiones', 'escritura')
 
-  useEffect(() => { cargar() }, [filtroVendedor, filtroEstado, filtroTipo])
+  useEffect(() => { cargar() }, [filtroVendedor, filtroTipo])
 
   const cargar = async () => {
     setLoading(true)
     const [resC, resV, resO] = await Promise.all([
       getComisiones({
         vendedor_id: filtroVendedor || undefined,
-        estado: filtroEstado || undefined,
         tipo: filtroTipo || undefined
       }),
       getVendedores(),
@@ -117,6 +116,8 @@ export default function ComisionesPage() {
     return 'bg-cyan-100 text-cyan-700'
   }
 
+  const etiquetaTipo = (tipo: string) => tipo === 'conversion' ? 'Conversión' : tipo === 'manual' ? 'Manual' : 'MRR'
+
   const totalPendiente = comisiones.filter(c => c.estado === 'pendiente').reduce((acc, c) => acc + Number(c.importe), 0)
   const totalAprobado = comisiones.filter(c => c.estado === 'aprobada').reduce((acc, c) => acc + Number(c.importe), 0)
   const totalPagado = comisiones.filter(c => c.estado === 'pagada').reduce((acc, c) => acc + Number(c.importe), 0)
@@ -124,7 +125,7 @@ export default function ComisionesPage() {
   const formularioValido = formCrear.vendedor_id && formCrear.organizacion_id && formCrear.importe > 0
 
   return (
-    <>
+    <div className={PAGINA}>
       <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
         <div>
           <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Comisiones</h1>
@@ -154,92 +155,65 @@ export default function ComisionesPage() {
         </div>
       </div>
 
-      {/* Filtros */}
-      <div className="flex flex-wrap gap-3 mb-5">
-        <select value={filtroVendedor} onChange={e => setFiltroVendedor(e.target.value)}
-          className="h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition">
-          <option value="">Todos los vendedores</option>
-          {vendedores.map(v => <option key={v.id} value={v.id}>{v.nombre}</option>)}
-        </select>
-        <select value={filtroEstado} onChange={e => setFiltroEstado(e.target.value)}
-          className="h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition">
-          <option value="">Todos los estados</option>
-          <option value="pendiente">Pendiente</option>
-          <option value="aprobada">Aprobada</option>
-          <option value="pagada">Pagada</option>
-        </select>
-        <select value={filtroTipo} onChange={e => setFiltroTipo(e.target.value)}
-          className="h-10 px-3 rounded-lg border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition">
-          <option value="">Todos los tipos</option>
-          <option value="conversion">Conversión</option>
-          <option value="mrr_mensual">MRR mensual</option>
-          <option value="manual">Manual</option>
-        </select>
-      </div>
-
       {/* Tabla */}
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-        {loading ? (
-          <Loading />
-        ) : comisiones.length === 0 ? (
-          <div className="p-8 text-center text-ink-500">No hay comisiones con estos filtros.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[700px]">
-              <thead>
-                <tr className="border-b border-slate-200 text-left text-ink-500">
-                  <th className="font-600 px-5 py-3">Vendedor</th>
-                  <th className="font-600 px-5 py-3">Cliente</th>
-                  <th className="font-600 px-5 py-3">Tipo</th>
-                  <th className="font-600 px-5 py-3">Importe</th>
-                  <th className="font-600 px-5 py-3">Estado</th>
-                  <th className="font-600 px-5 py-3">Fecha</th>
-                  <th className="font-600 px-5 py-3 text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {comisiones.map(c => (
-                  <tr key={c.id} className="hover:bg-slate-50 transition">
-                    <td className="px-5 py-3.5 font-500 text-ink-900">{c.vendedores?.nombre || '—'}</td>
-                    <td className="px-5 py-3.5 text-ink-600">{c.organizaciones?.nombre || '—'}</td>
-                    <td className="px-5 py-3.5">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-600 ${getTipoBadge(c.tipo)}`}>
-                        {c.tipo === 'conversion' ? 'Conversión' : c.tipo === 'manual' ? 'Manual' : 'MRR'}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3.5 font-600 text-ink-900">{Number(c.importe).toFixed(2)} {c.moneda}</td>
-                    <td className="px-5 py-3.5">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-600 capitalize ${getEstadoBadge(c.estado)}`}>
-                        {c.estado}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3.5 text-ink-500">{formatFecha(c.fecha_generacion)}</td>
-                    <td className="px-5 py-3.5 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {canWrite && c.estado === 'pendiente' && (
-                          <button onClick={() => handleAprobar(c.id)}
-                            className="px-3 h-8 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-600 transition">
-                            Aprobar
-                          </button>
-                        )}
-                        {canWrite && c.estado === 'aprobada' && (
-                          <button onClick={() => { setModalPago(c); setNotasPago('') }}
-                            className="px-3 h-8 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-600 transition">
-                            Marcar pagada
-                          </button>
-                        )}
-                        {c.estado === 'pagada' && (
-                          <span className="text-xs text-ink-400">{formatFecha(c.fecha_pago)}</span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      <Tabla
+        filas={comisiones}
+        idDe={c => c.id}
+        cargando={loading}
+        nombre={['comisión', 'comisiones']}
+        buscar={{ placeholder: 'Buscar por vendedor o cliente…', en: c => `${c.vendedores?.nombre || ''} ${c.organizaciones?.nombre || ''}` }}
+        pestanas={[
+          { id: 'todas', etiqueta: 'Todas' },
+          { id: 'pendiente', etiqueta: 'Pendientes', filtro: c => c.estado === 'pendiente' },
+          { id: 'aprobada', etiqueta: 'Aprobadas', filtro: c => c.estado === 'aprobada' },
+          { id: 'pagada', etiqueta: 'Pagadas', filtro: c => c.estado === 'pagada' }
+        ]}
+        herramientas={
+          <>
+            <select value={filtroVendedor} onChange={e => setFiltroVendedor(e.target.value)} aria-label="Vendedor"
+              className="h-10 px-3 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition">
+              <option value="">Todos los vendedores</option>
+              {vendedores.map(v => <option key={v.id} value={v.id}>{v.nombre}</option>)}
+            </select>
+            <select value={filtroTipo} onChange={e => setFiltroTipo(e.target.value)} aria-label="Tipo"
+              className="h-10 px-3 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-brand-500 transition">
+              <option value="">Todos los tipos</option>
+              <option value="conversion">Conversión</option>
+              <option value="mrr_mensual">MRR mensual</option>
+              <option value="manual">Manual</option>
+            </select>
+          </>
+        }
+        ordenInicial={{ clave: 'fecha', direccion: 'desc' }}
+        columnas={[
+          { clave: 'vendedor', titulo: 'Vendedor', enMovil: 'titulo', valor: c => c.vendedores?.nombre || '', render: c => <span className="font-500 text-ink-900">{c.vendedores?.nombre || '—'}</span> },
+          { clave: 'cliente', titulo: 'Cliente', valor: c => c.organizaciones?.nombre || '', render: c => <span className="text-ink-600">{c.organizaciones?.nombre || '—'}</span> },
+          { clave: 'tipo', titulo: 'Tipo', valor: c => etiquetaTipo(c.tipo), render: c => <span className={`text-xs px-2 py-0.5 rounded-full font-600 ${getTipoBadge(c.tipo)}`}>{etiquetaTipo(c.tipo)}</span> },
+          { clave: 'importe', titulo: 'Importe', alinear: 'derecha', valor: c => Number(c.importe || 0), render: c => <span className="font-600 text-ink-900 whitespace-nowrap tabular-nums">{Number(c.importe).toFixed(2)} {c.moneda}</span> },
+          { clave: 'estado', titulo: 'Estado', valor: c => c.estado, render: c => <span className={`text-xs px-2 py-0.5 rounded-full font-600 capitalize ${getEstadoBadge(c.estado)}`}>{c.estado}</span> },
+          { clave: 'fecha', titulo: 'Fecha', valor: c => c.fecha_generacion || '', render: c => <span className="text-ink-500 whitespace-nowrap">{formatFecha(c.fecha_generacion)}</span> }
+        ]}
+        acciones={c => (
+          <>
+            {canWrite && c.estado === 'pendiente' && (
+              <button onClick={() => handleAprobar(c.id)}
+                className="px-3 h-8 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-600 transition">
+                Aprobar
+              </button>
+            )}
+            {canWrite && c.estado === 'aprobada' && (
+              <button onClick={() => { setModalPago(c); setNotasPago('') }}
+                className="px-3 h-8 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-600 transition">
+                Marcar pagada
+              </button>
+            )}
+            {c.estado === 'pagada' && (
+              <span className="text-xs text-ink-400">Pagada el {formatFecha(c.fecha_pago)}</span>
+            )}
+          </>
         )}
-      </div>
+        vacio={<p className="text-ink-500">No hay comisiones con estos filtros.</p>}
+      />
 
       {/* MODAL: Marcar como pagada */}
       {modalPago && (
@@ -368,6 +342,6 @@ export default function ComisionesPage() {
           </div>
         </div>
       )}
-    </>
+    </div>
   )
 }

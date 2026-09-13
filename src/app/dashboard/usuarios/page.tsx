@@ -1,5 +1,7 @@
 'use client'
 import Loading from '@/components/Loading'
+import { Tabla } from '@/components/ui/Tabla'
+import { PAGINA } from '@/lib/ui'
 import { ErrorCarga } from '@/components/ui/ErrorCarga'
 
 import { useState, useEffect } from 'react'
@@ -28,9 +30,7 @@ export default function UsuariosPage() {
   const { showToast } = useToast()
   const [nivelPermiso, setNivelPermiso] = useState<'ninguno' | 'lectura' | 'escritura' | null>(null)
   const [errorCarga, setErrorCarga] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
   const [filterRol, setFilterRol] = useState<string>('todos')
-  const [filterEstado, setFilterEstado] = useState<string>('todos')
   const [filterSucursal, setFilterSucursal] = useState<string>('todos')
 
   // Invitar Modal
@@ -233,18 +233,10 @@ export default function UsuariosPage() {
 
   const filteredUsuarios = usuarios
     .filter(u => {
-      // Búsqueda por texto
-      const textMatch = (u.nombre && u.nombre.toLowerCase().includes(searchQuery.toLowerCase())) ||
-                        (u.email && u.email.toLowerCase().includes(searchQuery.toLowerCase()))
-      
-      // Filtro de rol
+      // La búsqueda y el estado los lleva la tabla (buscador y pestañas)
+      const textMatch = true
       const rolMatch = filterRol === 'todos' || u.rol_personalizado_id === filterRol
-      
-      // Filtro de estado
-      let estadoMatch = true
-      if (filterEstado === 'activo') estadoMatch = u.invitacion_aceptada && u.activo
-      if (filterEstado === 'pendiente') estadoMatch = !u.invitacion_aceptada
-      if (filterEstado === 'desactivado') estadoMatch = u.invitacion_aceptada && !u.activo
+      const estadoMatch = true
 
       // Filtro de sucursal
       let sucursalMatch = true
@@ -269,7 +261,7 @@ export default function UsuariosPage() {
     })
 
   return (
-    <div className="p-6 sm:p-10 max-w-4xl w-full mx-auto pb-20">
+    <div className={PAGINA}>
       {/* Encabezado */}
       <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
         <div>
@@ -319,142 +311,72 @@ export default function UsuariosPage() {
         )}
       </div>
 
-      {/* Filtros */}
-      <div className="mb-6 flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-          </div>
-          <input
-            type="text"
-            placeholder="Buscar por nombre o email..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 h-11 border border-slate-200 rounded-xl bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-shadow"
-          />
-        </div>
-
-        <div className="flex gap-3 overflow-x-auto pb-1 sm:pb-0 hide-scrollbar">
-          <select
-            value={filterRol}
-            onChange={(e) => setFilterRol(e.target.value)}
-            className="h-11 px-3 border border-slate-200 rounded-xl bg-white text-sm text-ink-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-shadow shrink-0 min-w-[140px]"
-          >
-            <option value="todos">Todos los roles</option>
-            {roles.map(r => (
-              <option key={r.id} value={r.id}>{r.nombre}</option>
-            ))}
-          </select>
-
-          <select
-            value={filterEstado}
-            onChange={(e) => setFilterEstado(e.target.value)}
-            className="h-11 px-3 border border-slate-200 rounded-xl bg-white text-sm text-ink-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-shadow shrink-0 min-w-[140px]"
-          >
-            <option value="todos">Cualquier estado</option>
-            <option value="activo">Activo</option>
-            <option value="pendiente">Invitación pendiente</option>
-            <option value="desactivado">Desactivado</option>
-          </select>
-
-          <select
-            value={filterSucursal}
-            onChange={(e) => setFilterSucursal(e.target.value)}
-            className="h-11 px-3 border border-slate-200 rounded-xl bg-white text-sm text-ink-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-shadow shrink-0 min-w-[140px]"
-          >
-            <option value="todos">Todas las sucursales</option>
-            {sucursales.map(s => (
-              <option key={s.id} value={s.id}>{s.nombre}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Lista de usuarios */}
-      {filteredUsuarios.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-500">
-          No se encontraron usuarios que coincidan con la búsqueda.
-        </div>
-      ) : (
-      <div className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100">
-        {filteredUsuarios.map(user => {
-          const isCurrent = user.id === currentUserId
-          const isPending = !user.invitacion_aceptada
-          const isDisabled = !user.activo
-          const userBranchNames = Array.isArray(user.user_branches) && user.user_branches.length > 0
-            ? user.user_branches
-                .map((ub: any) => sucursales.find((s: any) => s.id === ub.branch_id)?.nombre)
-                .filter(Boolean).join(', ')
-            : 'Sin sucursal asignada'
-          const canEdit = user.rol !== 'super_admin'
-
-          return (
-            <div key={user.id} className={`flex items-center gap-3 p-4 ${isDisabled ? 'opacity-50' : ''}`}>
-              
-              <div className={`w-11 h-11 rounded-full flex items-center justify-center font-600 shrink-0 ${getAvatarClass(user)}`}>
-                {isPending ? (
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                ) : (
-                  getInitials(user)
-                )}
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <p className="font-600 text-ink-900">
-                    {isPending ? 'Pendiente' : (user.nombre || 'Usuario')}
-                  </p>
-                  
-                  {isCurrent && (
-                    <span className="text-[10px] font-700 uppercase tracking-wide px-1.5 py-0.5 rounded bg-brand-100 text-brand-700">Tú</span>
-                  )}
-                  {isPending && !isCurrent && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-700 uppercase tracking-wide">
-                      <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/></svg>
-                      Invitación enviada
-                    </span>
-                  )}
+      <Tabla
+        filas={filteredUsuarios}
+        idDe={u => u.id}
+        nombre={['usuario', 'usuarios']}
+        buscar={{ placeholder: 'Buscar por nombre o correo…', en: u => `${u.nombre || ''} ${u.email || ''}` }}
+        pestanas={[
+          { id: 'todos', etiqueta: 'Todos' },
+          { id: 'activo', etiqueta: 'Activos', filtro: u => !!u.invitacion_aceptada && !!u.activo },
+          { id: 'pendiente', etiqueta: 'Invitación pendiente', filtro: u => !u.invitacion_aceptada },
+          { id: 'desactivado', etiqueta: 'Desactivados', filtro: u => !!u.invitacion_aceptada && !u.activo }
+        ]}
+        herramientas={
+          <>
+            <select value={filterRol} onChange={e => setFilterRol(e.target.value)} className="h-10 px-3 border border-slate-300 rounded-xl bg-white text-sm text-ink-700 focus:outline-none focus:border-brand-500 transition">
+              <option value="todos">Todos los roles</option>
+              {roles.map(r => <option key={r.id} value={r.id}>{r.nombre}</option>)}
+            </select>
+            <select value={filterSucursal} onChange={e => setFilterSucursal(e.target.value)} className="h-10 px-3 border border-slate-300 rounded-xl bg-white text-sm text-ink-700 focus:outline-none focus:border-brand-500 transition">
+              <option value="todos">Todas las sucursales</option>
+              {sucursales.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+            </select>
+          </>
+        }
+        columnas={[
+          { clave: 'usuario', titulo: 'Usuario', enMovil: 'titulo', valor: u => (u.invitacion_aceptada ? (u.nombre || u.email || '') : `zzz ${u.email || ''}`), render: u => {
+            const isCurrent = u.id === currentUserId
+            const isPending = !u.invitacion_aceptada
+            return (
+              <div className={`flex items-center gap-3 min-w-0 ${!u.activo ? 'opacity-60' : ''}`}>
+                <div className={`w-9 h-9 rounded-full flex items-center justify-center font-600 shrink-0 text-sm ${getAvatarClass(u)}`}>
+                  {isPending ? <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg> : getInitials(u)}
                 </div>
-                <p className="text-sm text-ink-500 truncate">
-                  {user.email}
-                  {user.fecha_creacion && (
-                    <span className="text-ink-400 ml-2">
-                      · Añadido el {new Date(user.fecha_creacion).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </span>
-                  )}
-                </p>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-600 text-ink-900 truncate">{isPending ? 'Pendiente' : (u.nombre || 'Usuario')}</p>
+                    {isCurrent && <span className="text-[10px] font-700 uppercase tracking-wide px-1.5 py-0.5 rounded bg-brand-100 text-brand-700">Tú</span>}
+                  </div>
+                  <p className="text-xs text-ink-500 truncate md:hidden">{u.email}</p>
+                </div>
               </div>
-
-              <div className="hidden sm:flex flex-col items-end gap-1">
-                {isDisabled ? (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-500 text-xs font-600">
-                    Desactivado
-                  </span>
-                ) : (
-                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-600 ${getRoleBadgeClass(user.rol === 'tenant_user' || user.rol === 'super_admin')}`}>
-                    {getRoleIcon(user.rol === 'tenant_user' || user.rol === 'super_admin')}
-                    {getRoleLabel(user.rol === 'tenant_user' || user.rol === 'super_admin')}
-                  </span>
-                )}
-                <span className="text-xs text-ink-400">{userBranchNames}</span>
-              </div>
-
-              <button 
-                onClick={() => canEdit && nivelPermiso === 'escritura' ? handleOpenEdit(user) : undefined}
-                disabled={!canEdit || nivelPermiso !== 'escritura'}
-                className={`p-1.5 rounded-lg transition ${canEdit ? 'text-ink-400 hover:text-ink-700 hover:bg-slate-100' : 'text-ink-300 cursor-not-allowed'}`}
-                aria-label={canEdit ? "Más opciones" : "No puedes editar este usuario"}
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/></svg>
-              </button>
-            </div>
+            )
+          } },
+          { clave: 'email', titulo: 'Correo', valor: u => u.email || '', enMovil: 'oculta', render: u => <span className="text-ink-600 break-all">{u.email}</span> },
+          { clave: 'rol', titulo: 'Rol', valor: u => roles.find(r => r.id === u.rol_personalizado_id)?.nombre || getRoleLabel(u.rol === 'tenant_user' || u.rol === 'super_admin'), render: u => (
+            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-600 ${getRoleBadgeClass(u.rol === 'tenant_user' || u.rol === 'super_admin')}`}>
+              {getRoleIcon(u.rol === 'tenant_user' || u.rol === 'super_admin')}
+              {roles.find(r => r.id === u.rol_personalizado_id)?.nombre || getRoleLabel(u.rol === 'tenant_user' || u.rol === 'super_admin')}
+            </span>
+          ) },
+          { clave: 'sucursales', titulo: 'Sucursales', valor: u => (Array.isArray(u.user_branches) && u.user_branches.length > 0 ? u.user_branches.map((ub: any) => sucursales.find((s: any) => s.id === ub.branch_id)?.nombre).filter(Boolean).join(', ') : 'Sin sucursal asignada'), render: u => <span className="text-ink-600">{Array.isArray(u.user_branches) && u.user_branches.length > 0 ? u.user_branches.map((ub: any) => sucursales.find((s: any) => s.id === ub.branch_id)?.nombre).filter(Boolean).join(', ') : <span className="text-ink-400">Sin sucursal asignada</span>}</span> },
+          { clave: 'estado', titulo: 'Estado', valor: u => (!u.invitacion_aceptada ? 'Invitación enviada' : u.activo ? 'Activo' : 'Desactivado'), render: u => !u.invitacion_aceptada
+            ? <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[11px] font-600">Invitación enviada</span>
+            : u.activo ? <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[11px] font-600">Activo</span>
+            : <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[11px] font-600">Desactivado</span> },
+          { clave: 'alta', titulo: 'Añadido', valor: u => u.fecha_creacion || '', render: u => <span className="text-ink-500 whitespace-nowrap">{u.fecha_creacion ? new Date(u.fecha_creacion).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</span> }
+        ]}
+        acciones={u => {
+          const canEdit = u.rol !== 'super_admin'
+          return (
+            <button onClick={() => canEdit && nivelPermiso === 'escritura' ? handleOpenEdit(u) : undefined} disabled={!canEdit || nivelPermiso !== 'escritura'} className="px-3 h-8 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-600 text-ink-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+              {canEdit ? 'Editar' : 'Superadmin'}
+            </button>
           )
-        })}
-      </div>
-      )}
-      <div className="mt-3 px-1 text-xs text-ink-500 sm:hidden">
-        Pulsa el menú de un usuario para editar o desactivar.
-      </div>
+        }}
+        vacio={<p className="text-slate-500">No se encontraron usuarios que coincidan con la búsqueda.</p>}
+      />
 
       {/* =========================================================
            POPUP · Invitar usuario

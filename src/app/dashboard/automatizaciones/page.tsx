@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { PAGINA } from '@/lib/ui'
 import Link from 'next/link'
 import Loading from '@/components/Loading'
 import { ErrorCarga } from '@/components/ui/ErrorCarga'
@@ -199,7 +200,7 @@ export default function AutomatizacionesPage() {
   if (errorCarga) return <ErrorCarga onReintentar={cargar} />
   if (nivelPermiso === 'ninguno') {
     return (
-      <div className="p-6 sm:p-10 max-w-4xl w-full mx-auto">
+      <div className={PAGINA}>
         <p className="text-ink-500">No tienes permiso para ver esta sección.</p>
       </div>
     )

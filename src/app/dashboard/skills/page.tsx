@@ -1,5 +1,6 @@
 'use client'
 import Loading from '@/components/Loading'
+import { PAGINA } from '@/lib/ui'
 import { ErrorCarga } from '@/components/ui/ErrorCarga'
 
 import { useState, useEffect } from 'react'
@@ -73,7 +74,7 @@ export default function SkillsPage() {
   }
 
   return (
-    <div className="p-6 sm:p-10 max-w-4xl w-full mx-auto pb-20">
+    <div className={PAGINA}>
 
       <div className="mb-6">
         <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Skills de IA</h1>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { PAGINA } from '@/lib/ui'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { 
@@ -157,7 +158,7 @@ export default function PoliticasPage() {
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className={PAGINA}>
       <div className="mb-8">
         <Link
           href="/dashboard/perfil-sucursal"

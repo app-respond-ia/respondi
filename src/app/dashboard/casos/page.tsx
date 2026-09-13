@@ -1,5 +1,7 @@
 'use client'
 import Loading from '@/components/Loading'
+import { Tabla } from '@/components/ui/Tabla'
+import { PAGINA } from '@/lib/ui'
 import { ErrorCarga } from '@/components/ui/ErrorCarga'
 
 import { useState, useEffect, useRef } from 'react'
@@ -200,7 +202,7 @@ export default function CasosPage() {
   }
 
   return (
-    <div className="p-6 sm:p-10 max-w-[1600px] mx-auto w-full">
+    <div className={PAGINA}>
       <div className="mb-8">
         <div className="flex items-center gap-3">
           <h1 className="text-3xl font-bold text-ink-900 font-display">Casos</h1>
@@ -335,92 +337,50 @@ export default function CasosPage() {
           <p className="text-slate-500 max-w-sm mx-auto">Tus filtros actuales no muestran resultados o todo está bajo control.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50/80 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500 font-semibold">
-                  <th className="px-3 py-3 pl-4 font-medium">Contacto</th>
-                  <th className="px-3 py-3 font-medium">Caso</th>
-                  <th className="px-3 py-3 font-medium">Descripción</th>
-                  <th className="px-3 py-3 font-medium">Prioridad</th>
-                  <th className="px-3 py-3 font-medium">Estado</th>
-                  <th className="px-3 py-3 font-medium">Agente</th>
-                  <th className="px-3 py-3 font-medium text-right">Tiempo</th>
-                  <th className="px-3 py-3 pr-4 font-medium text-right">SLA</th>
-                </tr>
-              </thead>
-              <tbody className={`divide-y divide-slate-100 transition-opacity duration-200 ${isFetching ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
-                {casos.map(caso => (
-                  <tr key={caso.id} onClick={() => router.push(`/dashboard/casos/${caso.id}`)} className="hover:bg-slate-100 transition group cursor-pointer">
-                    <td className="px-3 py-3 pl-4">
-                      <div className="flex items-center gap-3">
-                        <div className="relative">
-                          <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold font-display">
-                            {caso.contacts?.nombre?.substring(0,2).toUpperCase() || 'US'}
-                          </div>
-                          <div className="absolute -bottom-1 -right-1 ring-2 ring-white rounded-full">
-                            {getCanalIcon(caso.contacts?.canal || 'whatsapp')}
-                          </div>
-                        </div>
-                        <div>
-                          <p className="font-semibold text-ink-900 group-hover:text-brand-600 transition">{caso.contacts?.nombre || 'Desconocido'}</p>
-                          <p className="text-xs text-slate-500">{caso.contacts?.identificador_canal}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-3 py-3">
-                      <span className="text-brand-600 font-medium group-hover:underline">
-                        #{caso.id.substring(0,8).toUpperCase()}
-                      </span>
-                      <div className="flex gap-1 mt-1 flex-wrap">
-                        {caso.conversations?.conversation_tags?.map((t:any, i:number) => (
-                          <EtiquetaPill key={i} pequena nombre={t.message_categories?.nombre} color={t.message_categories?.color} />
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-3 py-3 max-w-[180px] 2xl:max-w-[240px] truncate text-slate-600 text-sm">
-                      {caso.descripcion || 'Sin descripción...'}
-                    </td>
-                    <td className="px-3 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ring-1 ring-inset ${getPrioridadStyle(caso.prioridad)}`}>
-                        {caso.prioridad ? caso.prioridad.charAt(0).toUpperCase() + caso.prioridad.slice(1).toLowerCase() : 'Normal'}
-                      </span>
-                    </td>
-                    <td className="px-3 py-3">
-                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${getEstatusStyle(caso.estatus)}`}>
-                        {caso.estatus}
-                      </span>
-                    </td>
-                    <td className="px-3 py-3">
-                      {caso.agente?.nombre ? (
-                        <span className="text-sm text-slate-600 font-medium">{caso.agente.nombre}</span>
-                      ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ring-1 ring-inset bg-amber-50 text-amber-700 ring-amber-200 whitespace-nowrap">
-                          Sin asignar
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-3 text-right whitespace-nowrap">
-                      <p className="text-sm font-medium text-slate-700">{getTimeAgo(caso.fecha_apertura)}</p>
-                    </td>
-                    <td className="px-3 py-3 pr-4 text-right whitespace-nowrap">
-                      {(() => {
-                        const sla = getSlaStatus(caso.fecha_sla_asignado, caso.fecha_apertura, caso.sla_horas, caso.estatus)
-                        if (!sla) return <span className="text-slate-400 text-sm">-</span>
-                        return (
-                          <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-semibold ${sla.color}`}>
-                            {sla.text}
-                          </span>
-                        )
-                      })()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <Tabla
+          filas={casos}
+          idDe={(caso: any) => caso.id}
+          nombre={['caso', 'casos']}
+          cargando={isFetching}
+          onFilaClick={(caso: any) => router.push(`/dashboard/casos/${caso.id}`)}
+          columnas={[
+            { clave: 'contacto', titulo: 'Contacto', enMovil: 'titulo', valor: (caso: any) => caso.contacts?.nombre || 'Desconocido', render: (caso: any) => (
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="relative shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold font-display">{caso.contacts?.nombre?.substring(0, 2).toUpperCase() || 'US'}</div>
+                  <div className="absolute -bottom-1 -right-1 ring-2 ring-white rounded-full">{getCanalIcon(caso.contacts?.canal || 'whatsapp')}</div>
+                </div>
+                <div className="min-w-0">
+                  <p className="font-semibold text-ink-900 truncate">{caso.contacts?.nombre || 'Desconocido'}</p>
+                  <p className="text-xs text-slate-500 truncate">{caso.contacts?.identificador_canal}</p>
+                </div>
+              </div>
+            ) },
+            { clave: 'caso', titulo: 'Caso', valor: (caso: any) => caso.id.substring(0, 8).toUpperCase(), render: (caso: any) => (
+              <div>
+                <span className="text-brand-600 font-medium">#{caso.id.substring(0, 8).toUpperCase()}</span>
+                <div className="flex gap-1 mt-1 flex-wrap">
+                  {caso.conversations?.conversation_tags?.map((t: any, i: number) => (
+                    <EtiquetaPill key={i} pequena nombre={t.message_categories?.nombre} color={t.message_categories?.color} />
+                  ))}
+                </div>
+              </div>
+            ) },
+            { clave: 'descripcion', titulo: 'Descripción', valor: (caso: any) => caso.descripcion || '', clase: 'max-w-[180px] 2xl:max-w-[240px]', render: (caso: any) => <span className="block truncate text-slate-600">{caso.descripcion || 'Sin descripción...'}</span> },
+            { clave: 'prioridad', titulo: 'Prioridad', valor: (caso: any) => caso.prioridad || 'normal', render: (caso: any) => (
+              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ring-1 ring-inset ${getPrioridadStyle(caso.prioridad)}`}>{caso.prioridad ? caso.prioridad.charAt(0).toUpperCase() + caso.prioridad.slice(1).toLowerCase() : 'Normal'}</span>
+            ) },
+            { clave: 'estado', titulo: 'Estado', valor: (caso: any) => caso.estatus, render: (caso: any) => <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${getEstatusStyle(caso.estatus)}`}>{caso.estatus}</span> },
+            { clave: 'agente', titulo: 'Agente', valor: (caso: any) => caso.agente?.nombre || '', render: (caso: any) => caso.agente?.nombre
+              ? <span className="text-sm text-slate-600 font-medium">{caso.agente.nombre}</span>
+              : <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ring-1 ring-inset bg-amber-50 text-amber-700 ring-amber-200 whitespace-nowrap">Sin asignar</span> },
+            { clave: 'tiempo', titulo: 'Tiempo', alinear: 'derecha', valor: (caso: any) => caso.fecha_apertura, render: (caso: any) => <span className="text-sm font-medium text-slate-700 whitespace-nowrap">{getTimeAgo(caso.fecha_apertura)}</span> },
+            { clave: 'sla', titulo: 'SLA', alinear: 'derecha', valor: (caso: any) => getSlaStatus(caso.fecha_sla_asignado, caso.fecha_apertura, caso.sla_horas, caso.estatus)?.text || '', render: (caso: any) => {
+              const sla = getSlaStatus(caso.fecha_sla_asignado, caso.fecha_apertura, caso.sla_horas, caso.estatus)
+              return sla ? <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-semibold ${sla.color}`}>{sla.text}</span> : <span className="text-slate-400 text-sm">-</span>
+            } }
+          ]}
+        />
       )}
       {/* Help Modal */}
       {showHelp && (

@@ -1,4 +1,5 @@
 import { createClient } from '@/utils/supabase/server'
+import { PAGINA } from '@/lib/ui'
 import { redirect } from 'next/navigation'
 import SuperadminNotificationsTabs from './SuperadminNotificationsTabs'
 
@@ -40,7 +41,7 @@ export default async function SuperadminNotificacionesPage() {
     .eq('user_id', user.id)
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className={`${PAGINA} space-y-6`}>
       <div>
         <h1 className="text-2xl font-700 text-ink-900 font-display">Notificaciones de Sistema</h1>
         <p className="text-ink-500 mt-1">Revisa las alertas globales y ajusta tus preferencias de superadministrador.</p>

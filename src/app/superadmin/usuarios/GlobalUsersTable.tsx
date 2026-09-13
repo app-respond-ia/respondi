@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
-import Loading from '@/components/Loading'
+import { Tabla } from '@/components/ui/Tabla'
+import { PAGINA } from '@/lib/ui'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { useToast } from '@/components/ui/Toast'
 import { useSuperadminPermisos } from '@/components/layout/SuperadminPermisosContext'
@@ -21,12 +22,11 @@ export default function GlobalUsersTable({ defaultFiltro }: { defaultFiltro: str
 
   const [loading, setLoading] = useState(true)
   const [users, setUsers] = useState<any[]>([])
-  const [filtro, setFiltro] = useState(defaultFiltro)
-  const [busqueda, setBusqueda] = useState('')
+  const [filtro] = useState(defaultFiltro)
   const [superadminRoles, setSuperadminRoles] = useState<any[]>([])
 
-  // Advanced filters (only used for Clientes)
-  const [estadoFiltro, setEstadoFiltro] = useState('todos')
+  // Filtros avanzados (solo para Clientes). La búsqueda por nombre/correo y
+  // el estado activo/inactivo los lleva la propia tabla, sin ir al servidor.
   const [tenantFiltro, setTenantFiltro] = useState('')
   const [planFiltro, setPlanFiltro] = useState('')
   const [fechaDesde, setFechaDesde] = useState('')
@@ -68,11 +68,8 @@ export default function GlobalUsersTable({ defaultFiltro }: { defaultFiltro: str
   }
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      cargarUsuarios()
-    }, 400)
-    return () => clearTimeout(timer)
-  }, [filtro, busqueda, estadoFiltro, tenantFiltro, planFiltro, fechaDesde, fechaHasta, rolEmpresaFiltro])
+    cargarUsuarios()
+  }, [filtro, tenantFiltro, planFiltro, fechaDesde, fechaHasta, rolEmpresaFiltro])
 
   const cargarRoles = async () => {
     const res = await getSuperadminRoles()
@@ -83,8 +80,8 @@ export default function GlobalUsersTable({ defaultFiltro }: { defaultFiltro: str
 
   const cargarUsuarios = async () => {
     setLoading(true)
-    const res = await getTodosLosUsuarios(filtro, busqueda, {
-      estado: estadoFiltro,
+    const res = await getTodosLosUsuarios(filtro, '', {
+      estado: 'todos',
       tenant_id: tenantFiltro,
       plan_id: planFiltro,
       fecha_desde: fechaDesde,
@@ -139,6 +136,8 @@ export default function GlobalUsersTable({ defaultFiltro }: { defaultFiltro: str
     })
   }
 
+  // Nota: la conversión entre cliente y vendedor se ha deshabilitado por
+  // decisión de producto; la función se conserva por si se reactiva.
   const handleChangeRole = (user: any, targetRole: 'tenant_user' | 'vendedor') => {
     if (!canWrite) return
     let desc = `El usuario pasará a ser ${targetRole}. `
@@ -165,6 +164,7 @@ export default function GlobalUsersTable({ defaultFiltro }: { defaultFiltro: str
       }
     })
   }
+  void handleChangeRole
 
   const handleDegradarSuperadmin = (user: any) => {
     if (!canWrite) return
@@ -200,8 +200,14 @@ export default function GlobalUsersTable({ defaultFiltro }: { defaultFiltro: str
     setSavingNivel(false)
   }
 
+  const rolDe = (u: any) => Array.isArray(u.superadmin_roles) ? u.superadmin_roles[0] : u.superadmin_roles
+  const orgDe = (u: any) => Array.isArray(u.organizaciones) ? u.organizaciones[0] : u.organizaciones
+  const tipoDe = (u: any) => u.rol === 'super_admin' ? 'Superadmin' : u.rol === 'vendedor' ? 'Vendedor' : 'Cliente'
+
+  const claseSelect = 'h-10 px-3 rounded-xl border border-slate-300 bg-white text-sm text-ink-700 focus:outline-none focus:border-brand-500 transition'
+
   return (
-    <div className="p-6 sm:p-10 max-w-7xl w-full mx-auto pb-20">
+    <div className={PAGINA}>
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">
@@ -211,214 +217,125 @@ export default function GlobalUsersTable({ defaultFiltro }: { defaultFiltro: str
         </div>
       </div>
 
-      {defaultFiltro === 'Clientes' && (
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm mb-6 p-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div>
-              <label className="block text-xs font-600 text-ink-500 mb-1.5 uppercase tracking-wide">Estado</label>
-              <select value={estadoFiltro} onChange={e => setEstadoFiltro(e.target.value)} className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-brand-500 transition text-sm">
-                <option value="todos">Todos</option>
-                <option value="activo">Activos</option>
-                <option value="inactivo">Inactivos</option>
-              </select>
+      <Tabla
+        filas={users}
+        idDe={u => u.id}
+        cargando={loading}
+        nombre={['usuario', 'usuarios']}
+        buscar={{ placeholder: 'Buscar por nombre o correo…', en: u => `${u.nombre || ''} ${u.email || ''} ${orgDe(u)?.nombre || ''}` }}
+        pestanas={[
+          { id: 'todos', etiqueta: 'Todos' },
+          { id: 'activo', etiqueta: 'Activos', filtro: u => !!u.activo },
+          { id: 'inactivo', etiqueta: 'Inactivos', filtro: u => !u.activo }
+        ]}
+        herramientas={defaultFiltro === 'Clientes' ? (
+          <>
+            <select value={tenantFiltro} onChange={e => setTenantFiltro(e.target.value)} aria-label="Organización" className={claseSelect}>
+              <option value="">Cualquier organización</option>
+              {organizaciones.map(o => (
+                <option key={o.id} value={o.id}>{o.nombre}</option>
+              ))}
+            </select>
+            <select value={planFiltro} onChange={e => setPlanFiltro(e.target.value)} aria-label="Plan" className={claseSelect}>
+              <option value="">Cualquier plan</option>
+              {planes.map(p => (
+                <option key={p.id} value={p.id}>{p.nombre}</option>
+              ))}
+            </select>
+            <select value={rolEmpresaFiltro} onChange={e => setRolEmpresaFiltro(e.target.value)} aria-label="Rol en empresa" className={claseSelect}>
+              <option value="todos">Todos los roles</option>
+              <option value="propietario">Propietarios</option>
+              <option value="resto">Resto de roles</option>
+            </select>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-ink-500">Alta</span>
+              <input type="date" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)} aria-label="Alta desde" className={claseSelect} />
+              <span className="text-ink-400 text-sm">–</span>
+              <input type="date" value={fechaHasta} onChange={e => setFechaHasta(e.target.value)} aria-label="Alta hasta" className={claseSelect} />
             </div>
-            
-            <div>
-              <label className="block text-xs font-600 text-ink-500 mb-1.5 uppercase tracking-wide">Organización</label>
-              <select value={tenantFiltro} onChange={e => setTenantFiltro(e.target.value)} className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-brand-500 transition text-sm">
-                <option value="">Cualquiera</option>
-                {organizaciones.map(o => (
-                  <option key={o.id} value={o.id}>{o.nombre}</option>
-                ))}
-              </select>
+          </>
+        ) : undefined}
+        ordenInicial={{ clave: 'alta', direccion: 'desc' }}
+        columnas={[
+          { clave: 'usuario', titulo: 'Usuario', enMovil: 'titulo', valor: u => u.nombre || u.email || '', render: u => (
+            <div className="min-w-0">
+              <p className="font-600 text-ink-900 truncate">{u.nombre || 'Sin nombre'}</p>
+              <p className="text-xs text-ink-500 truncate">{u.email}</p>
             </div>
-
-            <div>
-              <label className="block text-xs font-600 text-ink-500 mb-1.5 uppercase tracking-wide">Plan</label>
-              <select value={planFiltro} onChange={e => setPlanFiltro(e.target.value)} className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-brand-500 transition text-sm">
-                <option value="">Cualquiera</option>
-                {planes.map(p => (
-                  <option key={p.id} value={p.id}>{p.nombre}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-600 text-ink-500 mb-1.5 uppercase tracking-wide">Alta (Desde - Hasta)</label>
-              <div className="flex gap-2">
-                <input type="date" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)} className="w-1/2 h-10 px-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-brand-500 transition text-xs" />
-                <input type="date" value={fechaHasta} onChange={e => setFechaHasta(e.target.value)} className="w-1/2 h-10 px-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-brand-500 transition text-xs" />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-600 text-ink-500 mb-1.5 uppercase tracking-wide">Rol en empresa</label>
-              <select value={rolEmpresaFiltro} onChange={e => setRolEmpresaFiltro(e.target.value)} className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-brand-500 transition text-sm">
-                <option value="todos">Todos</option>
-                <option value="propietario">Propietarios</option>
-                <option value="resto">Resto de roles</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-        <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row gap-4">
-          <div className="flex-1 max-w-sm relative">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-            <input 
-              type="text" 
-              placeholder="Buscar por nombre o email..." 
-              value={busqueda}
-              onChange={e => setBusqueda(e.target.value)}
-              className="w-full h-10 pl-9 pr-4 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition text-sm"
-            />
-          </div>
-        </div>
-
-        <div className="overflow-x-auto min-h-[400px]">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-100 text-xs uppercase tracking-wider font-600 text-ink-500">
-                <th className="p-4 whitespace-nowrap">Usuario</th>
-                <th className="p-4 whitespace-nowrap">Tipo</th>
-                <th className="p-4 whitespace-nowrap">Organización / Nivel</th>
-                <th className="p-4 whitespace-nowrap">Alta</th>
-                <th className="p-4 whitespace-nowrap text-center">Estado</th>
-                <th className="p-4 whitespace-nowrap text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-sm">
-              {loading && users.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="p-8 text-center"><Loading /></td>
-                </tr>
-              ) : users.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="p-8 text-center text-ink-500">No se encontraron usuarios.</td>
-                </tr>
+          ) },
+          { clave: 'tipo', titulo: 'Tipo', valor: u => tipoDe(u), render: u => u.rol === 'super_admin' ? (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-purple-50 text-purple-700 text-xs font-600 border border-purple-100">Superadmin</span>
+          ) : u.rol === 'vendedor' ? (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 text-xs font-600 border border-emerald-100">Vendedor</span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 text-xs font-600 border border-blue-100">Cliente</span>
+          ) },
+          { clave: 'organizacion', titulo: 'Organización / Nivel', valor: u => (u.rol === 'super_admin' ? `Nivel ${rolDe(u)?.nivel ?? 5} ${rolDe(u)?.nombre || 'Rol base'}` : orgDe(u)?.nombre || ''), render: u => {
+            const superadminRole = rolDe(u)
+            const orgData = orgDe(u)
+            if (u.rol === 'super_admin') {
+              return (
+                <div className="flex flex-col">
+                  <span className="text-xs font-600 text-purple-700">Nivel {superadminRole?.nivel ?? 5}</span>
+                  <span className="text-xs text-ink-500 truncate">{superadminRole?.nombre || 'Rol base'}</span>
+                </div>
+              )
+            }
+            return u.tenant_id ? (
+              <Link href={`/superadmin/organizaciones`} onClick={e => e.stopPropagation()} className="text-brand-600 hover:underline text-sm truncate block max-w-[200px]">
+                {orgData?.nombre || 'Organización Desconocida'}
+              </Link>
+            ) : (
+              <span className="text-xs text-ink-400">Sin organización</span>
+            )
+          } },
+          { clave: 'alta', titulo: 'Alta', valor: u => u.fecha_creacion || '', render: u => <span className="text-ink-500 text-xs whitespace-nowrap">{u.fecha_creacion ? new Date(u.fecha_creacion).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</span> },
+          { clave: 'estado', titulo: 'Estado', alinear: 'centro', valor: u => (u.activo ? 'Activo' : 'Inactivo'), render: u => (
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-600 ${u.activo ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+              {u.activo ? 'Activo' : 'Inactivo'}
+            </span>
+          ) }
+        ]}
+        acciones={canWrite ? (u => (
+          <div className="inline-flex items-center gap-1">
+            <button
+              onClick={() => handleToggleActivo(u)}
+              className="p-1.5 text-ink-400 hover:text-ink-900 hover:bg-slate-100 rounded-lg transition"
+              title={u.activo ? 'Desactivar cuenta' : 'Activar cuenta'}
+              aria-label={u.activo ? 'Desactivar cuenta' : 'Activar cuenta'}
+            >
+              {u.activo ? (
+                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
               ) : (
-                users.map(u => {
-                  const superadminRole = Array.isArray(u.superadmin_roles) ? u.superadmin_roles[0] : u.superadmin_roles;
-                  const orgData = Array.isArray(u.organizaciones) ? u.organizaciones[0] : u.organizaciones;
-                  
-                  return (
-                  <tr key={u.id} className="hover:bg-slate-50/50 transition">
-                    <td className="p-4 min-w-[200px]">
-                      <p className="font-600 text-ink-900">{u.nombre || 'Sin nombre'}</p>
-                      <p className="text-xs text-ink-500">{u.email}</p>
-                    </td>
-                    <td className="p-4 whitespace-nowrap">
-                      {u.rol === 'super_admin' ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-purple-50 text-purple-700 text-xs font-600 border border-purple-100">
-                          Superadmin
-                        </span>
-                      ) : u.rol === 'vendedor' ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 text-xs font-600 border border-emerald-100">
-                          Vendedor
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 text-xs font-600 border border-blue-100">
-                          Cliente
-                        </span>
-                      )}
-                    </td>
-                    <td className="p-4 min-w-[180px]">
-                      {u.rol === 'super_admin' ? (
-                        <div className="flex flex-col">
-                          <span className="text-xs font-600 text-purple-700">Nivel {superadminRole?.nivel ?? 5}</span>
-                          <span className="text-xs text-ink-500 truncate">{superadminRole?.nombre || 'Rol base'}</span>
-                        </div>
-                      ) : (
-                        u.tenant_id ? (
-                          <Link href={`/superadmin/organizaciones`} className="text-brand-600 hover:underline text-sm truncate block max-w-[200px]">
-                            {orgData?.nombre || 'Organización Desconocida'}
-                          </Link>
-                        ) : (
-                          <span className="text-xs text-ink-400">Sin organización</span>
-                        )
-                      )}
-                    </td>
-                    <td className="p-4 text-ink-500 text-xs whitespace-nowrap">
-                      {new Date(u.fecha_creacion).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}
-                    </td>
-                    <td className="p-4 text-center">
-                      <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full ${u.activo ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
-                        {u.activo ? (
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
-                        ) : (
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                        )}
-                      </span>
-                    </td>
-                    <td className="p-4 text-right relative">
-                      {canWrite && (
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => handleToggleActivo(u)}
-                            className="p-1.5 text-ink-400 hover:text-ink-900 hover:bg-slate-100 rounded-lg transition"
-                            title={u.activo ? 'Desactivar cuenta' : 'Activar cuenta'}
-                          >
-                            {u.activo ? (
-                               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
-                            ) : (
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
-                            )}
-                          </button>
-                          
-                          <button
-                            onClick={() => handleSendResetPassword(u)}
-                            className="p-1.5 text-ink-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition"
-                            title="Enviar email de reseteo"
-                          >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                          </button>
-
-                          <div className="relative inline-block text-left group/dropdown">
-                            <button className="p-1.5 text-ink-400 hover:text-ink-900 hover:bg-slate-100 rounded-lg transition">
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/></svg>
-                            </button>
-                            <div className="hidden group-hover/dropdown:block absolute right-0 mt-0 w-48 bg-white border border-slate-100 shadow-xl rounded-xl py-1 z-50">
-                              {u.rol !== 'super_admin' ? (
-                                <>
-                                  {/* u.rol !== 'vendedor' && (
-                                    <button onClick={() => handleChangeRole(u, 'vendedor')} className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 transition">
-                                      Convertir a Vendedor
-                                    </button>
-                                  ) */}
-                                  {/* u.rol !== 'tenant_user' && (
-                                    <button onClick={() => handleChangeRole(u, 'tenant_user')} className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 transition">
-                                      Convertir a Cliente
-                                    </button>
-                                  ) */}
-                                  {/* Nota: La conversión entre cliente y vendedor se ha deshabilitado por decisión de producto. */}
-                                  <div className="w-full text-left px-4 py-2 text-xs text-slate-400 italic bg-slate-50 border-b border-slate-100">
-                                    Cambio de rol deshabilitado. Si necesitas cambiarlo, elimina y recrea la cuenta.
-                                  </div>
-                                </>
-                              ) : (
-                                <>
-                                  <button onClick={() => { setSelectedUserForNivel(u); setSelectedRoleId(u.superadmin_rol_id || ''); setModalNivelOpen(true); }} className="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 transition">
-                                    Modificar Nivel
-                                  </button>
-                                  <button onClick={() => handleDegradarSuperadmin(u)} className="w-full text-left px-4 py-2 text-sm text-rose-600 hover:bg-rose-50 transition">
-                                    Quitar Superadmin
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                )})
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
               )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+            </button>
+            <button
+              onClick={() => handleSendResetPassword(u)}
+              className="p-1.5 text-ink-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition"
+              title="Enviar email de reseteo"
+              aria-label="Enviar email de reseteo"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+            </button>
+            {u.rol === 'super_admin' ? (
+              <>
+                <button onClick={() => { setSelectedUserForNivel(u); setSelectedRoleId(u.superadmin_rol_id || ''); setModalNivelOpen(true); }} className="ml-1 px-3 h-8 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-600 text-ink-700 transition whitespace-nowrap">
+                  Modificar nivel
+                </button>
+                <button onClick={() => handleDegradarSuperadmin(u)} className="px-3 h-8 rounded-lg border border-rose-200 bg-white hover:bg-rose-50 text-xs font-600 text-rose-600 transition whitespace-nowrap">
+                  Quitar superadmin
+                </button>
+              </>
+            ) : (
+              <button disabled title="Cambio de rol deshabilitado. Si necesitas cambiarlo, elimina y recrea la cuenta." className="ml-1 px-3 h-8 rounded-lg border border-slate-200 bg-slate-50 text-xs font-600 text-slate-400 cursor-not-allowed whitespace-nowrap">
+                Cambiar rol
+              </button>
+            )}
+          </div>
+        )) : undefined}
+        vacio={<p className="text-ink-500">No se encontraron usuarios.</p>}
+      />
 
       <ConfirmModal
         isOpen={confirmProps.isOpen}

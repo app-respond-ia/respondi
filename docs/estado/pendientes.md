@@ -268,11 +268,24 @@ Tramo 2, créditos y planes — hecho (13-09-2026), ver
 - [x] Cambio de plan como solicitud: el cliente pide, el superadmin aprueba
       o rechaza desde Organizaciones y el cliente recibe aviso. Al conectar
       Stripe, sustituirlo por el cobro
-Tramo 3, pantallas:
-- [ ] Revisar todas las páginas: contenido a todo el ancho en escritorio,
-      móvil y tablet perfectos, posición de botones
-- [ ] Tablas estilo Shopify con toda su funcionalidad (búsqueda, pestañas
-      por estado, orden, acciones en bloque, paginación, tarjetas en móvil)
+Tramo 3, pantallas — hecho (13-09-2026), ver `docs/convenciones.md`
+("Ancho de las páginas y tablas"):
+- [x] Contenido a todo el ancho: las 35 páginas del panel, superadmin y
+      vendedor usan `PAGINA` / `PAGINA_FORMULARIO` (`src/lib/ui.ts`) sin
+      relleno doble; el marco de superadmin y el de vendedor suben a 1600 px
+- [x] Tablas estilo Shopify (`src/components/ui/Tabla.tsx`: buscador,
+      pestañas con recuento, orden por columna, selección y acciones en
+      bloque, paginación, tarjetas en móvil) en Contactos, Usuarios,
+      Facturación (movimientos), Registro de actividad, Lista de precios,
+      Casos, Conversaciones, y en superadmin Organizaciones, Créditos,
+      Comisiones, Tickets, Tickets de clientes, Vendedores, Errores y
+      Usuarios globales, más Comisiones y Clientes del vendedor
+- [x] Revisión de las 48 páginas en móvil (390), tablet (820) y escritorio
+      (1366) con `revisar-anchos`: ninguna se sale del ancho; el único fallo
+      era el aviso de hidratación 418 de la cabecera (número con formato de
+      Node frente al del navegador), corregido con idioma fijo
+- [ ] Skills y Roles de superadmin siguen como tarjetas de configuración (no
+      son listas de datos)
 Después:
 - [ ] Shopify para clientes reales: app del Dev Dashboard con enlace de
       instalación (las apps personalizadas ya no se crean desde 01-2026)

@@ -8,7 +8,8 @@ import { getUsuarios, invitarUsuario, actualizarUsuario } from '@/app/actions/us
 import { getRolesPersonalizados } from '@/app/actions/roles'
 import { getCanales } from '@/app/actions/canales'
 import { getDatosPerfilSucursal, savePerfilSucursal } from '@/app/actions/perfil'
-import { getSucursales } from '@/app/actions/sucursales'
+import { createClient } from '@/utils/supabase/server'
+import { getAuthContext } from '@/lib/auth-context'
 import type { HorarioDia } from '@/lib/horarios'
 
 // LAS HERRAMIENTAS DEL ASISTENTE DEL PANEL (14-09-2026).
@@ -559,17 +560,18 @@ export const HERRAMIENTAS: Herramienta[] = [
       email: S, nombre: S,
       rol: { ...S, description: 'Nombre del rol. Si no sabes cuáles hay, mira antes con ver_usuarios.' }
     }, ['email', 'rol']),
-    resumen: async (a) => `Invitar a ${texto(a.email, 120)}${a.nombre ? ` (${texto(a.nombre, 60)})` : ''} con el rol "${texto(a.rol, 60)}". Recibirá un correo para entrar.`,
+    resumen: async (a) => `Invitar a ${texto(a.email, 120)}${a.nombre ? ` (${texto(a.nombre, 60)})` : ''} con el rol "${texto(a.rol, 60)}", en esta sucursal. Recibirá un correo para entrar.`,
     ejecutar: async (a) => {
       const roles: any = await getRolesPersonalizados()
       if (!roles.success) return mal(roles.error || 'No se han podido leer los roles.')
       const { fila, error } = buscarPorNombre(roles.data || [], a.rol)
       if (!fila) return mal(error!)
-      const sucursales: any = await getSucursales()
-      const branchIds = (sucursales?.data || []).map((s: any) => s.id)
-      if (!branchIds.length) return mal('No encuentro ninguna sucursal a la que darle acceso.')
+      // Solo a la sucursal en la que se está trabajando. Dar acceso a todas
+      // desde un chat es demasiado: el resto se añade a mano en Usuarios.
+      const auth = await getAuthContext(await createClient())
+      if (auth.error || !auth.branch_id) return mal('No encuentro la sucursal en la que estás.')
       return resultado(
-        await invitarUsuario({ email: texto(a.email, 160).toLowerCase(), nombre: texto(a.nombre, 80) || null, branch_ids: branchIds, rol_personalizado_id: fila.id }),
+        await invitarUsuario({ email: texto(a.email, 160).toLowerCase(), nombre: texto(a.nombre, 80) || null, branch_ids: [auth.branch_id], rol_personalizado_id: fila.id }),
         `Invitación enviada a ${texto(a.email, 160)}.`)
     }
   },

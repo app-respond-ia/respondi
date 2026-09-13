@@ -151,9 +151,20 @@ si pedir ayuda gastara créditos, usar Respondi saldría caro justo cuando el
 cliente está atascado.
 
 Probado con un OpenAI simulado (`openai-simulado.mjs`, el SDK respeta
-`OPENAI_BASE_URL`): `probar-asistente.mjs`, 29 comprobaciones, 0 fallos.
+`OPENAI_BASE_URL`): `probar-asistente.mjs`, 44 comprobaciones, 0 fallos.
 Cubre que mirar lee datos de verdad, que cambiar no toca nada antes de
 confirmar, que al confirmar se ejecuta y queda bien en la auditoría, que
 confirmar dos veces no duplica, descartar, borrar con aviso, fallos con
 motivo claro, varias propuestas a la vez, caducidad, propuestas inventadas y
-que el saldo de créditos no se mueve.
+que el saldo de créditos no se mueve. Y una pasada por las demás familias de
+herramientas: lista de precios (crear, cambiar precio y quitar), horarios
+(la semana entera, y que se para si no llegan los siete días),
+automatizaciones (encender por nombre, y que una de tienda sin tienda
+conectada se niega diciendo por qué), agenda (añadir y quitar una persona) e
+invitaciones (con un rol que no existe no se invita a nadie).
+
+Una cosa que pilló esa segunda pasada: `invitar_usuario` daba acceso a todas
+las sucursales y además leía mal la respuesta de `getSucursales` (devuelve
+`{ sucursales: [...] }`, no una lista), así que habría fallado siempre. Ahora
+invita solo a la sucursal en la que se está trabajando, que además es lo
+prudente: el resto se añade a mano en Usuarios.

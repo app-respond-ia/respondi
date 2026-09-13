@@ -83,6 +83,23 @@ app del Dev Dashboard). Sin ellas la pantalla no enseña la instalación con un
 clic y todo sigue como en la opción A. Redirect URL a poner en la app:
 `https://respondi.vercel.app/api/tiendas/shopify/oauth/callback`.
 
+**Distribución: corregido el 14-09-2026.** El 13-09 se apuntó aquí «custom
+distribution» y estaba mal para el caso real. Shopify tiene dos formas:
+- **Custom distribution**: se instala en UNA tienda (o en las de una misma
+  organización Plus) con un enlace, y no pasa revisión. Vale para probar en
+  la tienda de pruebas de Jorge, y nada más.
+- **Public distribution**: instalaciones ilimitadas, y es lo que hace falta
+  para clientes reales. Las públicas pasan la **revisión de Shopify** aunque
+  sean «unlisted» (no salen en la búsqueda de su tienda de apps, se instalan
+  con enlace). Además hay que pedir el acceso a **datos protegidos de
+  clientes**, porque se leen nombres, correos y teléfonos de los pedidos.
+  Eso pide dominio propio, política de privacidad y correo de soporte.
+
+El código es idéntico en los dos casos: solo cambia el ajuste de distribución
+de la app y si hay que pasar revisión.
+Fuentes: shopify.dev/docs/apps/launch/distribution y
+shopify.dev/docs/apps/launch/distribution/select-distribution-method.
+
 Por qué esta opción y no una app pública en la tienda de apps de Shopify: no
 dependemos de que Shopify nos apruebe nada, no hace falta cuenta de Partner ni
 el permiso especial de "datos personales protegidos" (lo autoriza el propio

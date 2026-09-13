@@ -10,6 +10,7 @@ import { setImpersonatedTenantId, clearImpersonatedTenantId } from '@/lib/impers
 import { enviarEmailInvitacion } from '@/lib/email'
 import { registrarError } from '@/lib/errores'
 import { estadoInvitacion, emailValido, normalizarEmail, posibleErrata } from '@/lib/invitaciones'
+import { stripeConfigurado, asegurarPrecioDelPlan } from '@/lib/stripe'
 
 // Helper de auth para asegurar que la action solo la ejecuta un super admin
 export async function requireSuperAdmin() {
@@ -259,7 +260,7 @@ export async function getOrganizaciones(filtro?: string) {
   let query = supabaseAdmin
     .from('organizaciones')
     .select(`
-      id, nombre, estado, plan_id, plan_pendiente_id, plan_solicitado_id, plan_solicitado_en, aviso_creditos, fecha_vencimiento, id_vendedor, created_at,
+      id, nombre, estado, plan_id, plan_pendiente_id, aviso_creditos, fecha_vencimiento, id_vendedor, created_at, stripe_subscription_id, stripe_estado, stripe_periodo_fin, stripe_cancelar_al_final,
       plans!plan_id (nombre),
       vendedor_clientes ( vendedores (nombre) )
     `)
@@ -347,10 +348,15 @@ export async function cambiarPlanOrganizacion(organizacionId: string, nuevoPlanI
   }
   const { supabase, userId } = auth
 
-  const { data: org } = await supabase.from('organizaciones').select('plan_id, plans!plan_id(precio_usd)').eq('id', organizacionId).single()
+  const { data: org } = await supabase.from('organizaciones').select('plan_id, stripe_subscription_id, stripe_estado, plans!plan_id(precio_usd)').eq('id', organizacionId).single()
   const { data: nuevoPlan } = await supabase.from('plans').select('nombre, precio_usd').eq('id', nuevoPlanId).single()
 
   if (!org || !nuevoPlan) return { success: false, error: 'Organización o plan no encontrados' }
+  // Con Stripe cobrando, el plan lo cambia el propio cliente desde Facturación
+  // (y Stripe cobra la diferencia); cambiarlo aquí dejaría de cuadrar con lo cobrado
+  if (org.stripe_subscription_id && org.stripe_estado !== 'cancelada') {
+    return { success: false, error: 'Esta organización paga por Stripe: el plan se cambia desde su Facturación (y se cobra en Stripe). Para regalar créditos usa la recarga manual.' }
+  }
 
   const precioActual = org.plans ? Number((org.plans as any).precio_usd) : 0
   const nuevoPrecio = Number(nuevoPlan.precio_usd)
@@ -392,73 +398,30 @@ export async function cambiarPlanOrganizacion(organizacionId: string, nuevoPlanI
   return { success: true }
 }
 
-// La petición de plan que hizo el cliente desde Facturación (hasta que
-// Stripe cobre solo): aprobar aplica el plan con la misma regla de siempre
-// (subida inmediata, bajada en la renovación); rechazar la quita y avisa.
-async function ticketDeSolicitud(organizacionId: string) {
-  const { data } = await supabaseAdmin
-    .from('client_tickets')
-    .select('id')
-    .eq('tenant_id', organizacionId)
-    .like('asunto', 'Cambio de plan%')
-    .not('estatus', 'in', '(resuelto,cerrado)')
-    .order('fecha_apertura', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  return data?.id || null
-}
-
-export async function aprobarSolicitudPlan(organizacionId: string) {
+// Sincronizar los planes con Stripe: crea (o pone al día) el producto y el
+// precio de cada plan de pago. Se pulsa desde /superadmin/planes; también
+// se hace solo la primera vez que un cliente va a pagar un plan.
+export async function sincronizarPlanesConStripe() {
   const auth = await requireSuperAdmin()
-  if (!superadminHasPermission(auth, 'organizaciones', 'escritura')) {
+  if (!superadminHasPermission(auth, 'planes', 'escritura')) {
     return { success: false, error: 'No tienes permiso para esta acción' }
   }
-  const { data: org } = await supabaseAdmin.from('organizaciones').select('plan_solicitado_id, nombre').eq('id', organizacionId).maybeSingle()
-  if (!org?.plan_solicitado_id) return { success: false, error: 'Esta organización no tiene ninguna solicitud pendiente.' }
-  const r = await cambiarPlanOrganizacion(organizacionId, org.plan_solicitado_id)
-  if (!r.success) return r
-  await supabaseAdmin.from('organizaciones').update({ plan_solicitado_id: null, plan_solicitado_en: null }).eq('id', organizacionId)
-  const ticket = await ticketDeSolicitud(organizacionId)
-  if (ticket) await supabaseAdmin.from('client_tickets').update({ estatus: 'resuelto', fecha_cierre: new Date().toISOString() }).eq('id', ticket)
-  await registrarAuditoria({
-    tenant_id: organizacionId,
-    user_id: auth.userId,
-    accion: 'aprobó la solicitud de cambio de plan',
-    tabla_afectada: 'organizaciones',
-    registro_id: organizacionId,
-    valor_nuevo: { plan_id: org.plan_solicitado_id }
-  })
-  revalidatePath('/superadmin/organizaciones')
-  return { success: true }
-}
-
-export async function rechazarSolicitudPlan(organizacionId: string, motivo?: string) {
-  const auth = await requireSuperAdmin()
-  if (!superadminHasPermission(auth, 'organizaciones', 'escritura')) {
-    return { success: false, error: 'No tienes permiso para esta acción' }
+  if (!stripeConfigurado()) return { success: false, error: 'Stripe no está configurado en el servidor (falta STRIPE_SECRET_KEY).' }
+  const { data: planes, error } = await supabaseAdmin.from('plans').select('id, nombre, precio_usd, stripe_product_id, stripe_price_id, personalizado, dias_trial, activo').order('precio_usd')
+  if (error) return { success: false, error: error.message }
+  const resultado: { plan: string; precio?: string; error?: string }[] = []
+  for (const p of planes || []) {
+    if (!(Number(p.precio_usd) > 0)) { resultado.push({ plan: p.nombre, error: 'sin precio (no se cobra)' }); continue }
+    try {
+      const precio = await asegurarPrecioDelPlan(p as any)
+      resultado.push({ plan: p.nombre, precio })
+    } catch (e: any) {
+      resultado.push({ plan: p.nombre, error: e?.message })
+    }
   }
-  const { data: org } = await supabaseAdmin.from('organizaciones').select('plan_solicitado_id, nombre, plans:plan_solicitado_id(nombre)').eq('id', organizacionId).maybeSingle()
-  if (!org?.plan_solicitado_id) return { success: false, error: 'Esta organización no tiene ninguna solicitud pendiente.' }
-  const nombrePlan = (Array.isArray(org.plans) ? org.plans[0] : org.plans)?.nombre || 'solicitado'
-  await supabaseAdmin.from('organizaciones').update({ plan_solicitado_id: null, plan_solicitado_en: null }).eq('id', organizacionId)
-  const texto = String(motivo || '').trim().slice(0, 300)
-  await notificarAAdminsDeOrganizacion(supabaseAdmin, organizacionId, {
-    tipo: 'cambio_plan_aplicado',
-    titulo: 'Cambio de plan no aplicado',
-    cuerpo: `Tu petición de pasar al plan ${nombrePlan} no se ha aplicado.${texto ? ` Motivo: ${texto}` : ''} Puedes escribirnos en Soporte.`,
-    url: '/dashboard/facturacion#planes'
-  })
-  await registrarAuditoria({
-    tenant_id: organizacionId,
-    user_id: auth.userId,
-    accion: `rechazó la solicitud de cambio al plan ${nombrePlan}`,
-    tabla_afectada: 'organizaciones',
-    registro_id: organizacionId,
-    valor_anterior: { plan_solicitado_id: org.plan_solicitado_id },
-    valor_nuevo: { motivo: texto || null }
-  })
-  revalidatePath('/superadmin/organizaciones')
-  return { success: true }
+  await registrarAuditoria({ tenant_id: null as any, user_id: auth.userId, accion: 'sincronizó los planes con Stripe', tabla_afectada: 'plans', registro_id: null as any, valor_nuevo: { resultado } })
+  revalidatePath('/superadmin/planes')
+  return { success: true, resultado }
 }
 
 // B3) registrarPagoYRenovar
@@ -469,8 +432,11 @@ export async function registrarPagoYRenovar(organizacionId: string, importe: num
   }
   const { supabase, userId } = auth
 
-  const { data: org } = await supabase.from('organizaciones').select('fecha_vencimiento, plan_pendiente_id, plan_id, estado').eq('id', organizacionId).single()
+  const { data: org } = await supabase.from('organizaciones').select('fecha_vencimiento, plan_pendiente_id, plan_id, estado, stripe_subscription_id, stripe_estado').eq('id', organizacionId).single()
   if (!org) return { success: false, error: 'Organización no encontrada' }
+  if (org.stripe_subscription_id && org.stripe_estado !== 'cancelada') {
+    return { success: false, error: 'Esta organización paga por Stripe: los cobros y renovaciones llegan solos. Aquí solo se registran pagos fuera de Stripe (transferencia, efectivo…).' }
+  }
 
   let baseDate = new Date()
   if (org.fecha_vencimiento) {

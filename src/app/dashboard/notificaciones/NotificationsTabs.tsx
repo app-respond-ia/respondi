@@ -29,6 +29,7 @@ const TIPOS_NOTIFICACIONES = [
   { id: 'creditos_bajos', label: 'Créditos bajos', desc: 'Cuando te queda el 20 % de los créditos de IA y cuando se agotan (también te llega por correo).' },
   { id: 'cambio_plan_aplicado', label: 'Cambios de plan', desc: 'Cuando tu organización cambia de plan de suscripción.' },
   { id: 'pago_confirmado', label: 'Pagos confirmados', desc: 'Cuando se confirma la renovación o pago de tu suscripción.' },
+  { id: 'pago_fallido', label: 'Cobros fallidos', desc: 'Cuando Stripe no ha podido cobrar tu suscripción.' },
   { id: 'cuenta_suspendida', label: 'Cuenta suspendida', desc: 'Cuando se suspende el acceso a tu cuenta.' },
   { id: 'cuenta_reactivada', label: 'Cuenta reactivada', desc: 'Cuando se restaura el acceso a tu cuenta.' },
 ]

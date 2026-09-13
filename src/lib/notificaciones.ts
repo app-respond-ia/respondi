@@ -26,6 +26,7 @@ export type NotificacionTipo =
   | 'cuenta_suspendida'
   | 'cuenta_reactivada'
   | 'cliente_cambio_plan'
+  | 'pago_fallido'
 
 interface NotificacionData {
   userId: string

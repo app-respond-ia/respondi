@@ -265,9 +265,9 @@ Tramo 2, créditos y planes — hecho (13-09-2026), ver
 - [x] Sin compra de créditos adicionales: quitado del formulario y las
       tarjetas de planes (el superadmin sigue pudiendo regalar créditos)
 - [x] Planes a medida desde superadmin, para una o varias organizaciones
-- [x] Cambio de plan como solicitud: el cliente pide, el superadmin aprueba
-      o rechaza desde Organizaciones y el cliente recibe aviso. Al conectar
-      Stripe, sustituirlo por el cobro
+- [x] Cambio de plan: Jorge no quiso el paso provisional de aprobación; el
+      mismo día se conectó Stripe (ver abajo) y el cliente paga y cambia de
+      plan solo
 Tramo 3, pantallas — hecho (13-09-2026), ver `docs/convenciones.md`
 ("Ancho de las páginas y tablas"):
 - [x] Contenido a todo el ancho: las 35 páginas del panel, superadmin y
@@ -289,11 +289,14 @@ Tramo 3, pantallas — hecho (13-09-2026), ver `docs/convenciones.md`
 - [ ] Skills y Roles de superadmin siguen como tarjetas de configuración (no
       son listas de datos)
 Después:
+- [x] Stripe (13-09-2026): Checkout, cambio de plan en la suscripción,
+      webhook que activa el plan y recarga créditos, portal, sincronización
+      de planes. Ver `creditos-facturacion.md`. Falta que Jorge pegue el
+      webhook y confirme las claves de prueba
 - [ ] Shopify para clientes reales: app del Dev Dashboard con enlace de
       instalación (las apps personalizadas ya no se crean desde 01-2026)
 - [ ] Canales de Instagram y Facebook (Jorge ya añadió los tres casos de
       uso en la app de Meta)
-- [ ] Stripe: conectar los pagos y dar a Jorge la dirección del webhook
 - [ ] Remitente de los correos de Respondi con el dominio que elija Jorge
 
 ## Invitaciones pendientes — cerrado (10-09-2026)

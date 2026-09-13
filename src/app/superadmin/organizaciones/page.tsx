@@ -4,7 +4,7 @@ import { PAGINA } from '@/lib/ui'
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { getOrganizaciones, actualizarEstadoOrganizacion, entrarComoOrganizacion, getPlanes, cambiarPlanOrganizacion, registrarPagoYRenovar, recargarCreditosIA, getInvitacionesSuperadmin, reenviarInvitacionSuperadmin, cancelarInvitacionSuperadmin, aprobarSolicitudPlan, rechazarSolicitudPlan } from '@/app/actions/superadmin'
+import { getOrganizaciones, actualizarEstadoOrganizacion, entrarComoOrganizacion, getPlanes, cambiarPlanOrganizacion, registrarPagoYRenovar, recargarCreditosIA, getInvitacionesSuperadmin, reenviarInvitacionSuperadmin, cancelarInvitacionSuperadmin } from '@/app/actions/superadmin'
 import PanelInvitaciones from '@/components/invitaciones/PanelInvitaciones'
 import { useToast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
@@ -54,9 +54,6 @@ export default function OrganizacionesPage() {
   const [recargandoIA, setRecargandoIA] = useState(false)
 
   const [confirmarEstado, setConfirmarEstado] = useState<{org: any, nuevoEstado: string} | null>(null)
-  const [resolviendoSolicitud, setResolviendoSolicitud] = useState(false)
-  const [rechazoSolicitud, setRechazoSolicitud] = useState<any>(null)
-  const [motivoRechazo, setMotivoRechazo] = useState('')
   const [changingEstado, setChangingEstado] = useState(false)
 
   const { hasPermission } = useSuperadminPermisos()
@@ -151,24 +148,6 @@ export default function OrganizacionesPage() {
     } else {
       setImpersonatingId(null)
       showToast(res.error || 'Error al intentar impersonar la organización', 'error')
-    }
-  }
-
-  const resolverSolicitud = async (org: any, aprobar: boolean) => {
-    setResolviendoSolicitud(true)
-    const res = aprobar ? await aprobarSolicitudPlan(org.id) : await rechazarSolicitudPlan(org.id, motivoRechazo)
-    setResolviendoSolicitud(false)
-    if (res.success) {
-      showToast(aprobar ? 'Plan aplicado y cliente avisado' : 'Solicitud rechazada y cliente avisado', 'success')
-      setRechazoSolicitud(null)
-      setMotivoRechazo('')
-      const pendiente = planes.find(p => p.id === org.plan_solicitado_id)
-      if (modalOrganizacion?.id === org.id) {
-        setModalOrganizacion({ ...modalOrganizacion, plan_solicitado_id: null, plan_solicitado_en: null, ...(aprobar && pendiente ? { plan_id: pendiente.id, plans: { nombre: pendiente.nombre } } : {}) })
-      }
-      loadOrganizaciones()
-    } else {
-      showToast(res.error || 'No se ha podido resolver la solicitud', 'error')
     }
   }
 
@@ -283,10 +262,12 @@ export default function OrganizacionesPage() {
               <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-600 text-sm shrink-0 ${getAvatarColor(o.estado)}`}>{(o.nombre || '??').substring(0, 2).toUpperCase()}</div>
               <div className="min-w-0">
                 <p className="font-600 text-ink-900 truncate">{o.nombre}</p>
-                {(o.plan_solicitado_id || o.aviso_creditos) && (
+                {(o.stripe_subscription_id || o.aviso_creditos) && (
                   <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                    {o.plan_solicitado_id && (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-600 bg-amber-100 text-amber-800">Pide plan {nombrePlan(o.plan_solicitado_id)}</span>
+                    {o.stripe_subscription_id && (
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-600 ${o.stripe_estado === 'impagada' ? 'bg-rose-100 text-rose-700' : o.stripe_cancelar_al_final ? 'bg-amber-100 text-amber-800' : 'bg-indigo-50 text-indigo-700'}`}>
+                        {o.stripe_estado === 'impagada' ? 'Stripe · cobro fallido' : o.stripe_cancelar_al_final ? 'Stripe · baja al final' : 'Stripe'}
+                      </span>
                     )}
                     {o.aviso_creditos && (
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-600 ${o.aviso_creditos === 'agotado' ? 'bg-rose-100 text-rose-700' : 'bg-amber-50 text-amber-700'}`}>{o.aviso_creditos === 'agotado' ? 'Sin créditos' : 'Créditos bajos'}</span>
@@ -384,25 +365,16 @@ export default function OrganizacionesPage() {
                   <div className="flex justify-between gap-2"><dt className="text-ink-500">Vendedor</dt><dd className="text-ink-900 font-500 text-right">{nombresDeVendedores(modalOrganizacion) || 'Sin vendedor'}</dd></div>
                 </dl>
 
-                {/* Solicitud de cambio de plan del cliente (hasta que Stripe cobre solo) */}
-                {modalOrganizacion.plan_solicitado_id && (
-                  <div className="p-3 rounded-xl border border-amber-200 bg-amber-50">
-                    <p className="text-sm font-600 text-amber-900">Pide pasar al plan {planes.find(p => p.id === modalOrganizacion.plan_solicitado_id)?.nombre || ''}</p>
-                    <p className="text-xs text-amber-800 mt-0.5">Desde Facturación{modalOrganizacion.plan_solicitado_en ? `, el ${new Date(modalOrganizacion.plan_solicitado_en).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}` : ''}. Al aprobar, una subida se aplica ya y una bajada en la renovación; el cliente recibe aviso en los dos casos.</p>
-                    {rechazoSolicitud?.id === modalOrganizacion.id ? (
-                      <div className="mt-2 space-y-2">
-                        <input value={motivoRechazo} onChange={e => setMotivoRechazo(e.target.value)} placeholder="Motivo (opcional, lo verá el cliente)" className="w-full h-10 px-3 rounded-lg border border-amber-300 bg-white text-sm focus:outline-none focus:border-brand-500" />
-                        <div className="grid grid-cols-2 gap-2">
-                          <button disabled={resolviendoSolicitud} onClick={() => resolverSolicitud(modalOrganizacion, false)} className="h-10 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white text-sm font-600 transition">{resolviendoSolicitud ? 'Rechazando…' : 'Confirmar rechazo'}</button>
-                          <button disabled={resolviendoSolicitud} onClick={() => { setRechazoSolicitud(null); setMotivoRechazo('') }} className="h-10 rounded-xl border border-slate-300 bg-white text-sm font-600 text-ink-700 transition">Cancelar</button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-2 gap-2 mt-2">
-                        <button disabled={!canWrite || resolviendoSolicitud} onClick={() => resolverSolicitud(modalOrganizacion, true)} className="h-10 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-sm font-600 transition">{resolviendoSolicitud ? 'Aplicando…' : 'Aprobar'}</button>
-                        <button disabled={!canWrite || resolviendoSolicitud} onClick={() => setRechazoSolicitud(modalOrganizacion)} className="h-10 rounded-xl border border-rose-200 bg-white hover:bg-rose-50 disabled:opacity-50 text-sm font-600 text-rose-600 transition">Rechazar</button>
-                      </div>
-                    )}
+                {/* Suscripción por Stripe: cobra, renueva y cambia de plan sola */}
+                {modalOrganizacion.stripe_subscription_id && (
+                  <div className={`p-3 rounded-xl border ${modalOrganizacion.stripe_estado === 'impagada' ? 'border-rose-200 bg-rose-50' : 'border-indigo-200 bg-indigo-50'}`}>
+                    <p className={`text-sm font-600 ${modalOrganizacion.stripe_estado === 'impagada' ? 'text-rose-900' : 'text-indigo-900'}`}>
+                      {modalOrganizacion.stripe_estado === 'impagada' ? 'Stripe: el último cobro ha fallado' : modalOrganizacion.stripe_cancelar_al_final ? 'Stripe: se da de baja al terminar el periodo' : 'Paga por Stripe'}
+                    </p>
+                    <p className={`text-xs mt-0.5 ${modalOrganizacion.stripe_estado === 'impagada' ? 'text-rose-800' : 'text-indigo-800'}`}>
+                      {modalOrganizacion.stripe_periodo_fin ? `Periodo pagado hasta el ${new Date(modalOrganizacion.stripe_periodo_fin).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}. ` : ''}
+                      Los cobros, las renovaciones y los cambios de plan los hace el cliente desde su Facturación y llegan solos. Aquí solo quedan la recarga manual de créditos y suspender la cuenta.
+                    </p>
                   </div>
                 )}
 
@@ -412,7 +384,7 @@ export default function OrganizacionesPage() {
                   <button onClick={() => {
                     setModalPago(modalOrganizacion)
                     setPagoForm({ importe: '', moneda: 'USD', notas: '' })
-                  }} disabled={!canWrite} className="w-full flex items-center justify-center gap-2 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white text-sm font-600 transition">
+                  }} disabled={!canWrite || (!!modalOrganizacion.stripe_subscription_id && modalOrganizacion.stripe_estado !== 'cancelada')} title={modalOrganizacion.stripe_subscription_id ? 'Paga por Stripe: los cobros llegan solos' : undefined} className="w-full flex items-center justify-center gap-2 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white text-sm font-600 transition">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     Registrar pago y renovar
                   </button>
@@ -424,7 +396,7 @@ export default function OrganizacionesPage() {
                     Recarga manual de créditos IA
                   </button>
                   <div className="grid grid-cols-2 gap-2">
-                    <button disabled={!canWrite} onClick={() => {
+                    <button disabled={!canWrite || (!!modalOrganizacion.stripe_subscription_id && modalOrganizacion.stripe_estado !== 'cancelada')} title={modalOrganizacion.stripe_subscription_id ? 'Paga por Stripe: el plan lo cambia el cliente desde Facturación' : undefined} onClick={() => {
                       setModalPlan(modalOrganizacion)
                       setPlanSeleccionado(modalOrganizacion.plan_id || '')
                     }} className="h-10 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-50 text-sm font-600 text-ink-700 transition">Cambiar plan</button>

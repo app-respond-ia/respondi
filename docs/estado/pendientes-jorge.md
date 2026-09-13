@@ -89,9 +89,25 @@ saldrán por el mismo sitio. Hace falta un dominio propio.
 - [ ] Convertir la cuenta de Instagram a **cuenta profesional** y
       vincularla a la página de Facebook. Nada más por ahora.
 
-### 6. Stripe — cuando Claude conecte los pagos
-- [ ] Pegar en Stripe → Developers → Webhooks la dirección que dé Claude
-      y copiar la clave de firma del webhook a Vercel.
+### 6. Stripe — el código ya está (13-09-2026)
+- [ ] Comprobar en Vercel que `STRIPE_SECRET_KEY` es la clave **de prueba**
+      (`sk_test_…`) mientras probamos. Con una clave real se crearían
+      productos y cobros de verdad.
+- [ ] En Stripe (modo prueba) → Developers → Webhooks → **Add endpoint**:
+      dirección `https://respondi.vercel.app/api/stripe/webhook`, y marcar
+      estos sucesos: `checkout.session.completed`, `invoice.paid`,
+      `invoice.payment_failed`, `customer.subscription.created`,
+      `customer.subscription.updated`, `customer.subscription.deleted`.
+- [ ] Copiar la **clave de firma** del webhook (`whsec_…`) y ponerla en Vercel
+      como `STRIPE_WEBHOOK_SECRET` (producción). Volver a desplegar.
+- [ ] En Stripe → Settings → Billing → Customer portal: activar el portal y
+      permitir actualizar el método de pago y cancelar la suscripción.
+- [ ] Probar: en Superadmin → Planes pulsar «Sincronizar con Stripe»; luego,
+      con la organización de pruebas, Facturación → «Elegir y pagar» con la
+      tarjeta de prueba 4242 4242 4242 4242. El plan se activa solo y los
+      créditos se recargan.
+- [ ] Cuando se pase a cobrar de verdad: cambiar las claves por las reales
+      (`sk_live_…`) y crear el webhook también en modo real.
 
 ### 7. Para salir de pruebas con clientes reales (más adelante)
 - Meta: cada cliente necesita verificar su empresa en Meta y añadir un

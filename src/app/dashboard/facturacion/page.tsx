@@ -6,7 +6,7 @@ import { ErrorCarga } from '@/components/ui/ErrorCarga'
 import { useState, useEffect } from 'react'
 import { getMisPermisos } from '@/app/actions/permisos'
 import { getMetricas, getMovimientosCreditosCliente } from '@/app/actions/metricas'
-import { getPlanesDisponibles, solicitarCambioPlan, getEstadoCreditos } from '@/app/actions/planes'
+import { getPlanesDisponibles, iniciarPagoPlan, abrirPortalPago, getEstadoCreditos } from '@/app/actions/planes'
 import { CLASES_NIVEL, textoNivel } from '@/lib/creditos-nivel'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { useToast } from '@/components/ui/Toast'
@@ -43,20 +43,43 @@ export default function FacturacionPage() {
   const [pidiendo, setPidiendo] = useState(false)
   const { showToast } = useToast()
 
-  const pedirPlan = async () => {
-    if (!planPedido) return
+  const [abriendoPortal, setAbriendoPortal] = useState(false)
+
+  // Elegir un plan: sin suscripción va a la página de pago de Stripe; con
+  // suscripción, cambia el plan (subida ya, bajada en la renovación)
+  const elegirPlan = async (plan: any) => {
     setPidiendo(true)
-    const r = await solicitarCambioPlan(planPedido.id).catch(() => ({ success: false, error: 'No se ha podido enviar. Revisa la conexión.' }))
+    const r = await iniciarPagoPlan(plan.id).catch(() => ({ success: false, error: 'No se ha podido conectar. Revisa la conexión.' }))
+    if (r.success && (r as any).url) {
+      window.location.href = (r as any).url
+      return
+    }
     setPidiendo(false)
+    setPlanPedido(null)
     if (r.success) {
-      showToast('Petición enviada. El equipo de Respondi la aprobará en breve y te avisaremos aquí.', 'success')
-      setPlanPedido(null)
+      showToast((r as any).cuando === 'ahora' ? `Ya tienes el plan ${plan.nombre}. Stripe te cobra la parte proporcional.` : `Pasarás al plan ${plan.nombre} en la próxima renovación.`, 'success')
       const p = await getPlanesDisponibles().catch(() => null)
       if (p?.success) setPlanes(p.data)
     } else {
-      showToast((r as any).error || 'No se ha podido enviar la petición', 'error')
+      showToast((r as any).error || 'No se ha podido preparar el pago', 'error')
     }
   }
+
+  const gestionarPago = async () => {
+    setAbriendoPortal(true)
+    const r = await abrirPortalPago().catch(() => ({ success: false, error: 'No se ha podido conectar. Revisa la conexión.' }))
+    if (r.success && (r as any).url) { window.location.href = (r as any).url; return }
+    setAbriendoPortal(false)
+    showToast((r as any).error || 'No se ha podido abrir la gestión del pago', 'error')
+  }
+
+  // Al volver de Stripe
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get('pago')
+    if (q === 'ok') showToast('Pago recibido. Tu plan se activa en unos segundos.', 'success')
+    if (q === 'cancelado') showToast('No se ha hecho ningún cobro.', 'info')
+    if (q) window.history.replaceState({}, '', window.location.pathname)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { cargar().catch(() => setErrorCarga(true)) }, [])
 
@@ -119,25 +142,37 @@ export default function FacturacionPage() {
         <p className="text-ink-500 mt-1">Gestiona tu suscripción, método de pago e historial de consumo de IA.</p>
       </div>
 
-      {/* PLANES: hasta que Stripe esté conectado, el cambio lo hace el equipo
-          de Respondi a partir de la petición del cliente */}
+      {/* PLANES: se pagan y se cambian con Stripe */}
       <section id="planes" className="mb-10 scroll-mt-6">
         <SectionTitle>Tu plan</SectionTitle>
         {!planes ? (
           <div className="bg-white rounded-2xl border border-slate-200 p-6 text-sm text-ink-500">Cargando planes…</div>
         ) : (
           <>
-            {(planes.planSolicitadoId || planes.peticionAbierta) && (
-              <div className="mb-4 rounded-xl bg-brand-50 border border-brand-100 px-4 py-3 text-sm text-brand-900">
-                Has pedido pasar al plan <strong>{planes.planes.find((p: any) => p.id === planes.planSolicitadoId)?.nombre || planes.peticionAbierta?.asunto?.replace(/^Cambio de plan:\s*/, '') || ''}</strong>. El equipo de Respondi lo aprobará en breve y te avisaremos por la campana.
-                {planes.peticionAbierta && <> Si quieres añadir algo, escríbenos en <Link href={`/dashboard/soporte/${planes.peticionAbierta.id}`} className="font-600 underline underline-offset-2">Soporte</Link>.</>}
+            {planes.suscripcion && (
+              <div className={`mb-4 rounded-2xl border px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3 ${planes.suscripcion.estado === 'impagada' ? 'bg-rose-50 border-rose-200' : 'bg-white border-slate-200'}`}>
+                <div className="flex-1 min-w-0">
+                  <p className="font-600 text-ink-900">
+                    {planes.suscripcion.estado === 'impagada' ? 'No hemos podido cobrar tu suscripción' : planes.suscripcion.cancelarAlFinal ? 'Suscripción con baja programada' : `Suscripción activa: plan ${planes.planes.find((p: any) => p.id === planes.planActualId)?.nombre || ''}`}
+                  </p>
+                  <p className="text-sm text-ink-500 mt-0.5">
+                    {planes.suscripcion.estado === 'impagada'
+                      ? 'Revisa la tarjeta en «Gestionar pago». Stripe lo volverá a intentar; si no se cobra, la IA dejará de atender al terminar el periodo pagado.'
+                      : planes.suscripcion.cancelarAlFinal
+                        ? `Sigue activa hasta el ${planes.suscripcion.periodoFin ? new Date(planes.suscripcion.periodoFin).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'final del periodo'}. Puedes reactivarla desde «Gestionar pago».`
+                        : `Próximo cobro el ${planes.suscripcion.periodoFin ? new Date(planes.suscripcion.periodoFin).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}. Tarjeta, facturas y baja, en «Gestionar pago».`}
+                    {planes.planPendienteId && ` En la próxima renovación pasarás al plan ${planes.planes.find((p: any) => p.id === planes.planPendienteId)?.nombre || ''}.`}
+                  </p>
+                </div>
+                <button onClick={gestionarPago} disabled={abriendoPortal || nivelPermiso !== 'escritura'} className="shrink-0 h-10 px-4 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition disabled:opacity-50">
+                  {abriendoPortal ? 'Abriendo…' : 'Gestionar pago'}
+                </button>
               </div>
             )}
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {planes.planes.map((p: any) => {
                 const esActual = p.id === planes.planActualId && !planes.enPrueba
                 const esPendiente = p.id === planes.planPendienteId
-                const esSolicitado = p.id === planes.planSolicitadoId
                 return (
                   <div key={p.id} className={`rounded-2xl border p-5 flex flex-col ${esActual ? 'border-brand-400 bg-brand-50/40' : p.a_medida ? 'border-purple-300 bg-purple-50/30' : 'border-slate-200 bg-white'}`}>
                     <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
@@ -146,7 +181,6 @@ export default function FacturacionPage() {
                         {p.a_medida && <span className="text-[11px] font-600 px-2 py-0.5 rounded-full bg-purple-100 text-purple-800">A medida para ti</span>}
                         {esActual && <span className="text-[11px] font-600 px-2 py-0.5 rounded-full bg-brand-600 text-white">Tu plan</span>}
                         {esPendiente && <span className="text-[11px] font-600 px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">En la próxima renovación</span>}
-                        {esSolicitado && <span className="text-[11px] font-600 px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">Pendiente de aprobación</span>}
                       </div>
                     </div>
                     <p className="text-ink-900 mb-3"><span className="font-display font-700 text-2xl">{Number(p.precio_usd).toLocaleString('es-ES')} $</span><span className="text-ink-500"> /mes</span></p>
@@ -157,13 +191,13 @@ export default function FacturacionPage() {
                       <li>{p.sucursales_max === null || p.sucursales_max >= 999 ? 'Sucursales ilimitadas' : `${p.sucursales_max} ${p.sucursales_max === 1 ? 'sucursal' : 'sucursales'}`}</li>
                       <li>{p.usuarios_max === null || p.usuarios_max >= 999 ? 'Usuarios ilimitados' : `${p.usuarios_max} ${p.usuarios_max === 1 ? 'usuario' : 'usuarios'}`}</li>
                     </ul>
-                    {!esActual && (
+                    {!esActual && !esPendiente && (
                       <button
-                        onClick={() => setPlanPedido(p)}
-                        disabled={nivelPermiso !== 'escritura' || !!planes.peticionAbierta || !!planes.planSolicitadoId}
+                        onClick={() => (planes.suscripcion ? setPlanPedido(p) : elegirPlan(p))}
+                        disabled={nivelPermiso !== 'escritura' || pidiendo || !planes.pagoDisponible}
                         className="h-10 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {planes.enPrueba ? 'Elegir este plan' : 'Cambiar a este plan'}
+                        {pidiendo ? 'Un momento…' : planes.suscripcion ? 'Cambiar a este plan' : 'Elegir y pagar'}
                       </button>
                     )}
                   </div>
@@ -171,7 +205,11 @@ export default function FacturacionPage() {
               })}
             </div>
             <p className="text-xs text-ink-500 mt-3">
-              {planes.enPrueba ? 'Estás en la prueba gratuita. ' : ''}El pago con tarjeta estará disponible pronto; mientras tanto, al elegir un plan el equipo de Respondi lo aprueba y te avisamos. No se venden créditos sueltos: si necesitas más respuestas de IA, el camino es un plan mayor.
+              {planes.enPrueba ? 'Estás en la prueba gratuita. ' : ''}
+              {planes.pagoDisponible
+                ? 'El pago es mensual con tarjeta, por Stripe. Subir de plan se aplica al momento (Stripe cobra la parte proporcional); bajar, en la siguiente renovación. '
+                : 'El pago con tarjeta se está activando; si tienes prisa, escríbenos en Soporte. '}
+              No se venden créditos sueltos: si necesitas más respuestas de IA, el camino es un plan mayor.
             </p>
           </>
         )}
@@ -268,10 +306,12 @@ export default function FacturacionPage() {
       <ConfirmModal
         isOpen={!!planPedido}
         onClose={() => !pidiendo && setPlanPedido(null)}
-        onConfirm={pedirPlan}
-        title={`Plan ${planPedido?.nombre || ''}`}
-        message="Enviaremos tu petición al equipo de Respondi, que te escribirá por Soporte para completar el cambio."
-        confirmText="Enviar petición"
+        onConfirm={() => planPedido && elegirPlan(planPedido)}
+        title={`Cambiar al plan ${planPedido?.nombre || ''}`}
+        message={planPedido && planes && Number(planPedido.precio_usd) >= Number(planes.planes.find((p: any) => p.id === planes.planActualId)?.precio_usd || 0)
+          ? `El cambio se aplica ahora mismo y Stripe cobra la parte proporcional hasta tu próxima renovación. A partir de entonces, ${Number(planPedido.precio_usd).toLocaleString('es-ES')} $ al mes.`
+          : `Es un plan más barato: sigues con el actual hasta la próxima renovación y entonces pasas al plan ${planPedido?.nombre || ''} (${planPedido ? Number(planPedido.precio_usd).toLocaleString('es-ES') : ''} $ al mes).`}
+        confirmText="Confirmar cambio"
         cancelText="Cancelar"
         type="info"
         isLoading={pidiendo}

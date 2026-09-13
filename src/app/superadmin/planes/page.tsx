@@ -2,7 +2,7 @@
 import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
-import { getPlanes, actualizarPlan, crearPlan, eliminarPlan, getOrganizacionesBasico } from '@/app/actions/superadmin'
+import { getPlanes, actualizarPlan, crearPlan, eliminarPlan, getOrganizacionesBasico, sincronizarPlanesConStripe } from '@/app/actions/superadmin'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { useToast } from '@/components/ui/Toast'
 import { useSuperadminPermisos } from '@/components/layout/SuperadminPermisosContext'
@@ -15,6 +15,7 @@ export default function PlanesPage() {
   
   const [confirmarBorrar, setConfirmarBorrar] = useState<any>(null)
   const [saving, setSaving] = useState(false)
+  const [sincronizando, setSincronizando] = useState(false)
   const { showToast } = useToast()
 
   const { hasPermission } = useSuperadminPermisos()
@@ -96,10 +97,13 @@ export default function PlanesPage() {
     
     setSaving(true)
     let res;
+    // El precio de Stripe lo gestiona Respondi, no el formulario
+    const { stripe_price_id: _precioStripe, ...datos } = formData
+    void _precioStripe
     if (modalData && modalData.id) {
-      res = await actualizarPlan(modalData.id, formData)
+      res = await actualizarPlan(modalData.id, datos)
     } else {
-      res = await crearPlan(formData)
+      res = await crearPlan(datos)
     }
     setSaving(false)
 
@@ -109,6 +113,20 @@ export default function PlanesPage() {
       loadPlanes()
     } else {
       showToast(res.error || 'Error al guardar.', 'error')
+    }
+  }
+
+  const sincronizarStripe = async () => {
+    setSincronizando(true)
+    const res = await sincronizarPlanesConStripe().catch(() => ({ success: false, error: 'No se ha podido conectar. Revisa la conexión.' }))
+    setSincronizando(false)
+    if (res.success) {
+      const r = (res as any).resultado || []
+      const fallos = r.filter((x: any) => x.error && !/sin precio/.test(x.error))
+      showToast(fallos.length ? `Stripe al día, pero con fallos: ${fallos.map((x: any) => `${x.plan}: ${x.error}`).join(' · ')}` : 'Productos y precios al día en Stripe', fallos.length ? 'error' : 'success')
+      loadPlanes()
+    } else {
+      showToast((res as any).error || 'No se ha podido sincronizar con Stripe', 'error')
     }
   }
 
@@ -146,10 +164,15 @@ export default function PlanesPage() {
           <p className="text-ink-500 mt-1">Configura los límites de cada nivel de suscripción.</p>
         </div>
         {canWrite && (
+          <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={sincronizarStripe} disabled={sincronizando} title="Crea o actualiza el producto y el precio de cada plan en Stripe" className="inline-flex items-center gap-2 px-4 h-11 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-sm font-600 text-ink-700 transition disabled:opacity-50">
+            {sincronizando ? 'Sincronizando…' : 'Sincronizar con Stripe'}
+          </button>
           <button onClick={() => openModal(null)} className="inline-flex items-center gap-2 px-4 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 shadow-lg shadow-brand-600/30 transition">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
             Nuevo plan
           </button>
+          </div>
         )}
       </div>
 
@@ -214,6 +237,7 @@ export default function PlanesPage() {
                     <p className="text-xs text-ink-500 mb-1">Costo adicional:</p>
                     <p className="text-xs text-ink-700">${p.precio_sucursal_extra} por sucursal extra</p>
                     <p className="text-[11px] text-ink-400 mt-1">Sin créditos sueltos: para más respuestas de IA, un plan mayor.</p>
+                    <p className={`text-[11px] mt-1 ${p.stripe_price_id ? 'text-indigo-600' : 'text-amber-600'}`}>{p.stripe_price_id ? 'Stripe: precio listo' : Number(p.precio_usd) > 0 ? 'Stripe: sin precio (pulsa «Sincronizar con Stripe»)' : 'Stripe: no se cobra'}</p>
                   </div>
                 </div>
 
@@ -296,9 +320,9 @@ export default function PlanesPage() {
                     )}
                   </div>
                   <div className="mt-4">
-                    <label className="block text-xs font-500 text-ink-600 mb-1.5">ID de precio de Stripe</label>
-                    <input type="text" value={formData.stripe_price_id} onChange={e => setFormData({...formData, stripe_price_id: e.target.value})} className="w-full h-10 px-3 rounded-lg border border-slate-300 text-sm font-mono focus:border-brand-500 focus:ring-2 focus:ring-brand-100" placeholder="price_..." />
-                    <p className="text-[11px] text-ink-500 mt-1.5 leading-relaxed">Se configura manualmente en el Dashboard de Stripe (Products → Precios). Déjalo vacío hasta tener la cuenta de Stripe activa.</p>
+                    <p className="block text-xs font-500 text-ink-600 mb-1.5">Stripe</p>
+                    <p className="text-sm text-ink-700 font-mono break-all">{formData.stripe_price_id || <span className="font-sans text-ink-400">Sin precio en Stripe todavía</span>}</p>
+                    <p className="text-[11px] text-ink-500 mt-1.5 leading-relaxed">El producto y el precio los crea Respondi en Stripe con «Sincronizar con Stripe» (o solos, la primera vez que un cliente paga este plan). Si cambias el precio, se crea un precio nuevo en Stripe y el antiguo se archiva; las suscripciones ya en marcha siguen con el suyo hasta que el cliente cambie de plan.</p>
                   </div>
                 </div>
 

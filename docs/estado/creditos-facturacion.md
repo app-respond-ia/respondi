@@ -141,16 +141,50 @@ desde `/superadmin/planes` marcando "Plan a medida" y eligiendo las
 organizaciones; en Organizaciones → Cambiar plan aparecen todos con la marca
 "a medida".
 
-## Cambio de plan como solicitud (13-09-2026, hasta Stripe)
-`solicitarCambioPlan` apunta `organizaciones.plan_solicitado_id` /
-`plan_solicitado_en`, abre el ticket de siempre y avisa a los superadmins
-(`cliente_cambio_plan`). En `/superadmin/organizaciones` la fila lleva la
-insignia "Pide plan X" y en su ficha hay **Aprobar** (aplica el plan con la
-regla de siempre: subida inmediata, bajada en la renovación; cierra el ticket
-y avisa al cliente) y **Rechazar** (con motivo opcional, avisa al cliente).
-Facturación enseña el plan pedido como "Pendiente de aprobación" y bloquea
-otra petición mientras tanto. Cuando Stripe esté conectado, este flujo se
-sustituye por el cobro.
+## Stripe: cobro real de los planes (13-09-2026)
+Decidido con Jorge: sin paso provisional de aprobación. El flujo de
+"solicitud que aprueba el superadmin" (que duró unas horas) se quitó; las
+columnas `plan_solicitado_id` / `plan_solicitado_en` siguen en la tabla sin
+uso.
+- **Catálogo**: los productos y precios de Stripe los crea Respondi a partir
+  de `plans` (`asegurarPrecioDelPlan` en `src/lib/stripe.ts`; guarda
+  `plans.stripe_product_id` y `stripe_price_id`). Botón «Sincronizar con
+  Stripe» en `/superadmin/planes`; también se hace solo la primera vez que un
+  cliente paga un plan. Si cambia el importe, se crea un precio nuevo y el
+  viejo se archiva. El campo del precio ya no se edita a mano.
+- **Pagar** (`iniciarPagoPlan`, Facturación → «Elegir y pagar»): se crea el
+  cliente de Stripe con `metadata.tenant_id` y se abre Stripe Checkout en
+  modo suscripción mensual (vuelve a `/dashboard/facturacion?pago=ok|cancelado`).
+- **Cambiar de plan con suscripción** (`cambiarPlanEnStripe`): subida →
+  se cambia el precio de la suscripción con prorrateo y el plan al momento;
+  bajada → `plan_pendiente_id` y se aplica al renovar (en `invoice.paid`,
+  cambiando el precio sin prorrateo). Misma regla que tenía el superadmin.
+- **Webhook** `/api/stripe/webhook` (firma con `STRIPE_WEBHOOK_SECRET`; cada
+  aviso se apunta en `stripe_eventos` y no se aplica dos veces):
+  `checkout.session.completed` enlaza la suscripción; `invoice.paid` activa
+  el plan (estado activo, fin de prueba, `fecha_vencimiento` = fin del
+  periodo, `forma_pago` tdc), recarga los créditos del plan (`abonar_credito_ia`,
+  reset o sumar según `acumula_creditos`) y avisa (`pago_confirmado`);
+  `invoice.payment_failed` marca `stripe_estado = impagada` y avisa
+  (`pago_fallido`, nuevo tipo); `customer.subscription.updated` sincroniza
+  estado, fin de periodo y baja programada; `customer.subscription.deleted`
+  deja la suscripción cancelada (la cuenta sigue hasta `fecha_vencimiento`
+  y pasa a vencida si ya ha llegado) y avisa.
+- **Portal** (`abrirPortalPago`): tarjeta, facturas y baja, en el portal de
+  Stripe.
+- **Superadmin**: con suscripción de Stripe, «Cambiar plan» y «Registrar
+  pago y renovar» quedan bloqueados (los cobros llegan solos); siguen la
+  recarga manual de créditos y suspender. La fila y la ficha enseñan
+  «Stripe», «cobro fallido» o «baja al final».
+- **Variables**: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` (en Vercel).
+  `STRIPE_API_URL` solo en las pruebas, para el Stripe simulado. Sin clave,
+  Facturación lo dice y no deja pagar.
+- **Pruebas**: `probar-stripe` (scratchpad) contra `stripe-simulado.mjs`, que
+  responde como la API de Stripe y firma los avisos con la clave de prueba.
+- **Pendiente de Jorge**: confirmar que las claves de Vercel son de modo
+  prueba, pegar la dirección del webhook en Stripe con los seis sucesos y
+  poner su clave de firma en `STRIPE_WEBHOOK_SECRET` (ver
+  `pendientes-jorge.md`).
 
 ## Verificado en producción (13-09-2026, commit del tramo 2)
 - `probar-creditos-planes` contra respondi.vercel.app (17/17): verde al 80 %,

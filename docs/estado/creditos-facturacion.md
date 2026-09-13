@@ -181,6 +181,12 @@ uso.
   Facturación lo dice y no deja pagar.
 - **Pruebas**: `probar-stripe` (scratchpad) contra `stripe-simulado.mjs`, que
   responde como la API de Stripe y firma los avisos con la clave de prueba.
+- **Verificado en producción** (13-09-2026, tras el despliegue, solo
+  lectura): Facturación carga, las acciones nuevas están, `STRIPE_SECRET_KEY`
+  existe en Vercel y el webhook rechaza avisos sin firma con 400 ("Falta
+  STRIPE_WEBHOOK_SECRET": esa variable aún no está). No se creó nada en la
+  cuenta de Stripe de Jorge: la primera sincronización la hace él desde
+  Superadmin → Planes cuando confirme que las claves son de prueba.
 - **Pendiente de Jorge**: confirmar que las claves de Vercel son de modo
   prueba, pegar la dirección del webhook en Stripe con los seis sucesos y
   poner su clave de firma en `STRIPE_WEBHOOK_SECRET` (ver

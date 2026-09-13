@@ -152,6 +152,27 @@ Facturación enseña el plan pedido como "Pendiente de aprobación" y bloquea
 otra petición mientras tanto. Cuando Stripe esté conectado, este flujo se
 sustituye por el cobro.
 
+## Verificado en producción (13-09-2026, commit del tramo 2)
+- `probar-creditos-planes` contra respondi.vercel.app (17/17): verde al 80 %,
+  amarillo al 30 %, aviso al 20 % (campana al propietario con enlace a
+  Facturación, aviso a superadmin, marca "bajo"), sin repetir al volver a
+  mirar ni al bajar al 8 % (rojo), segundo aviso al agotarse, marca que se
+  limpia sola al recargar y vuelve a avisar si vuelve a bajar; el correo se
+  intenta y Resend lo rechaza sin dominio propio (queda en `error_logs`);
+  plan a medida visible solo para su organización y marcado; solicitud de
+  plan apuntada, con ticket y aviso a superadmin; no se puede pedir un plan a
+  medida ajeno ni una segunda solicitud.
+- Captura en navegador real (`prod-creditos-escritorio.png`): cabecera
+  "7 / 5000 créditos" en rojo, Facturación con "7 / 5000" en rojo y el aviso
+  "Quedan muy pocos créditos", nota de que no se venden créditos sueltos.
+- Aprobar / Rechazar desde Organizaciones no se ha podido ejecutar en las
+  pruebas automáticas (exigen sesión de superadmin y la de pruebas es solo
+  de lectura): reutiliza `cambiarPlanOrganizacion`, que ya estaba probado.
+  Queda para que Jorge lo pruebe con su cuenta.
+- La captura en móvil de Facturación destapó que la página se sale del ancho
+  de la pantalla (la tabla de movimientos no tiene desplazamiento propio):
+  va en el tramo 3 (revisión de páginas).
+
 ## Pendiente
 `plans.precio_sucursal_extra` existe en el formulario de planes pero no se
 usa en ningún flujo de cobro real.

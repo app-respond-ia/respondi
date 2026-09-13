@@ -1,6 +1,19 @@
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { createClient } from '@/utils/supabase/server'
 import { resolveBranchId } from '@/lib/active-branch'
+
+// Cuando un cambio lo ejecuta el asistente de IA, en el registro tiene que
+// verse las dos cosas: que lo hizo la IA y qué usuario se lo pidió. Como las
+// herramientas del asistente llaman a las MISMAS acciones del panel (que ya
+// registran auditoría por su cuenta), la marca viaja por el contexto de la
+// llamada en vez de tener que añadir un parámetro a cada acción.
+const contextoAsistente = new AsyncLocalStorage<{ activo: boolean }>()
+
+// Ejecuta algo marcando todo lo que audite por dentro como hecho por la IA.
+export function comoAsistente<T>(fn: () => Promise<T>): Promise<T> {
+  return contextoAsistente.run({ activo: true }, fn)
+}
 
 interface RegistrarAuditoriaParams {
   tenant_id: string | null
@@ -69,7 +82,8 @@ export async function registrarAuditoria(params: RegistrarAuditoriaParams) {
       registro_id: params.registro_id || null,
       valor_anterior: params.valor_anterior ?? null,
       valor_nuevo: params.valor_nuevo ?? null,
-      branch_id: branchId
+      branch_id: branchId,
+      por_asistente: contextoAsistente.getStore()?.activo === true
     })
   } catch (err) {
     // La auditoría nunca debe romper la acción principal si falla.

@@ -101,7 +101,7 @@ export default function AuditLogPage() {
       return [
         fecha.toLocaleDateString('es-ES'),
         fecha.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
-        item.users?.nombre || item.users?.email || 'Sistema',
+        `${item.users?.nombre || item.users?.email || 'Sistema'}${item.por_asistente ? ' (por el asistente de IA)' : ''}`,
         item.accion,
         item.tabla_afectada || 'Sistema'
       ].map(escaparCSV).join(',')
@@ -223,7 +223,7 @@ export default function AuditLogPage() {
         filas={entradasFiltradas}
         idDe={e => e.id}
         nombre={['cambio', 'cambios']}
-        buscar={{ placeholder: 'Buscar en el registro…', en: e => `${e.accion || ''} ${e.users?.nombre || ''} ${e.users?.email || ''} ${e.tabla_afectada || ''}` }}
+        buscar={{ placeholder: 'Buscar en el registro…', en: e => `${e.accion || ''} ${e.users?.nombre || ''} ${e.users?.email || ''} ${e.tabla_afectada || ''} ${e.por_asistente ? 'asistente de ia' : ''}` }}
         herramientas={
           <>
             <select value={filtroUser} onChange={e => setFiltroUser(e.target.value)} className="h-10 px-3 rounded-xl border border-slate-300 bg-white text-sm text-ink-700 focus:outline-none focus:border-brand-500 transition">
@@ -254,10 +254,19 @@ export default function AuditLogPage() {
         ordenInicial={{ clave: 'cuando', direccion: 'desc' }}
         columnas={[
           { clave: 'cuando', titulo: 'Cuándo', valor: e => e.timestamp, render: e => <span className="text-ink-500 whitespace-nowrap">{new Date(e.timestamp).toLocaleString('es-ES', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span> },
-          { clave: 'quien', titulo: 'Quién', valor: e => e.users?.nombre || e.users?.email || 'Sistema', render: e => (
+          { clave: 'quien', titulo: 'Quién', valor: e => `${e.users?.nombre || e.users?.email || 'Sistema'}${e.por_asistente ? ' (asistente)' : ''}`, render: e => (
             <div className="flex items-center gap-2 min-w-0">
               <div className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center text-slate-700 text-[10px] font-600 shrink-0">{getInitials(e.users)}</div>
-              <span className="font-600 text-ink-900 truncate">{e.users?.nombre || e.users?.email || 'Sistema'}</span>
+              <div className="min-w-0">
+                <span className="block font-600 text-ink-900 truncate">{e.users?.nombre || e.users?.email || 'Sistema'}</span>
+                {/* Lo ejecutó la IA, pero se lo pidió la persona de arriba */}
+                {e.por_asistente && (
+                  <span className="inline-flex items-center gap-1 mt-0.5 text-[10px] font-600 px-1.5 py-0.5 rounded bg-brand-50 text-brand-700 border border-brand-100 whitespace-nowrap">
+                    <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    Asistente de IA
+                  </span>
+                )}
+              </div>
             </div>
           ) },
           { clave: 'que', titulo: 'Qué cambió', enMovil: 'titulo', valor: e => e.accion, render: e => (

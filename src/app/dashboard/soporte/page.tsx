@@ -8,6 +8,8 @@ import { useToast } from '@/components/ui/Toast'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
+import Asistente from './Asistente'
+import { PAGINA } from '@/lib/ui'
 
 export default function DashboardSoportePage() {
   const [tickets, setTickets] = useState<any[]>([])
@@ -21,6 +23,9 @@ export default function DashboardSoportePage() {
 
   const [filtroBusqueda, setFiltroBusqueda] = useState('')
   const [filtroEstatus, setFiltroEstatus] = useState('')
+  // El asistente resuelve casi todo al momento; el ticket queda para cuando
+  // hace falta una persona de nuestro equipo.
+  const [pestana, setPestana] = useState<'asistente' | 'tickets'>('asistente')
 
   const cargarTickets = async () => {
     setLoading(true)
@@ -84,21 +89,41 @@ export default function DashboardSoportePage() {
   })
 
   return (
-    <div className="space-y-6">
+    <div className={`${PAGINA} space-y-6`}>
       <div className="flex justify-between items-start gap-4 flex-wrap">
         <div>
           <h1 className="font-display font-700 text-2xl sm:text-3xl text-ink-900">Ayuda y soporte</h1>
-          <p className="text-ink-500 mt-1">Contacta con nuestro equipo para resolver tus dudas o reportar incidencias.</p>
+          <p className="text-ink-500 mt-1">Pregúntale al asistente: resuelve dudas y hace cambios por ti. Si hace falta una persona, abre un ticket.</p>
         </div>
-        <button 
-          onClick={() => setIsModalOpen(true)}
-          className="h-11 px-5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-600 text-sm transition shadow-sm hover:shadow flex items-center gap-2 shrink-0"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
-          Nuevo ticket
-        </button>
+        {pestana === 'tickets' && (
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="h-11 px-5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-600 text-sm transition shadow-sm hover:shadow flex items-center gap-2 shrink-0"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
+            Nuevo ticket
+          </button>
+        )}
       </div>
 
+      <div className="flex gap-1 border-b border-slate-200">
+        {([['asistente', 'Asistente'], ['tickets', 'Mis tickets']] as const).map(([clave, nombre]) => (
+          <button
+            key={clave}
+            onClick={() => setPestana(clave)}
+            className={`px-4 py-2.5 text-sm font-600 border-b-2 -mb-px transition ${pestana === clave ? 'border-brand-500 text-brand-600' : 'border-transparent text-ink-500 hover:text-ink-800'}`}
+          >
+            {nombre}
+            {clave === 'tickets' && tickets.length > 0 && (
+              <span className="ml-1.5 text-[11px] px-1.5 py-0.5 rounded-full bg-slate-100 text-ink-500">{tickets.length}</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {pestana === 'asistente' && <Asistente />}
+
+      <div className={pestana === 'tickets' ? 'space-y-6' : 'hidden'}>
       <div className="flex flex-wrap gap-3 items-center">
         <div className="relative flex-1 min-w-[200px]">
           <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -166,6 +191,8 @@ export default function DashboardSoportePage() {
             ))}
           </div>
         )}
+      </div>
+
       </div>
 
       {isModalOpen && (

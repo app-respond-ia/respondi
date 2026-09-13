@@ -3,6 +3,14 @@ import { Resend } from 'resend'
 // Fallback para evitar que el build de Next.js casque si falta la variable de entorno
 const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_key')
 
+// Desde dónde salen los correos de Respondi. Hasta que Jorge verifique su
+// dominio en Resend y ponga RESEND_FROM en Vercel, sale por el remitente de
+// pruebas de Resend, que solo entrega al dueño de la cuenta.
+function remitente() {
+  const r = (process.env.RESEND_FROM || '').trim()
+  return r || 'Respondi <onboarding@resend.dev>'
+}
+
 export async function enviarEmailInvitacion(params: {
   email: string
   actionLink: string
@@ -19,7 +27,7 @@ export async function enviarEmailInvitacion(params: {
   const rolLabel = roleLabels[params.rol] || 'Colaborador'
 
   return await resend.emails.send({
-    from: 'Respondi <onboarding@resend.dev>',
+    from: remitente(),
     to: params.email,
     subject: 'Has sido invitado a Respondi',
     html: `
@@ -34,8 +42,7 @@ export async function enviarEmailInvitacion(params: {
 }
 
 // Aviso a los propietarios de una organización cuando quedan pocos créditos
-// (20 %) o se han agotado. Hasta que haya dominio propio en Resend sale
-// desde su remitente de pruebas, que solo entrega al dueño de la cuenta.
+// (20 %) o se han agotado.
 export async function enviarEmailCreditos(params: { para: string[]; organizacion: string; saldo: number; max: number; agotado: boolean }) {
   const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://respondi.vercel.app'
   const asunto = params.agotado
@@ -45,7 +52,7 @@ export async function enviarEmailCreditos(params: { para: string[]; organizacion
     ? 'La IA ha dejado de contestar a tus clientes porque no quedan créditos. Amplía tu plan para que siga atendiendo.'
     : `Te quedan <strong>${params.saldo.toLocaleString('es-ES')}</strong> de ${params.max.toLocaleString('es-ES')} créditos. Cuando se agoten, la IA dejará de contestar a tus clientes.`
   return await resend.emails.send({
-    from: 'Respondi <onboarding@resend.dev>',
+    from: remitente(),
     to: params.para,
     subject: asunto,
     html: `

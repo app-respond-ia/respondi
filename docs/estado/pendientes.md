@@ -293,13 +293,18 @@ Después:
       webhook que activa el plan y recarga créditos, portal, sincronización
       de planes. Ver `creditos-facturacion.md`. Falta que Jorge pegue el
       webhook y confirme las claves de prueba
-- [ ] Shopify para clientes reales: app del Dev Dashboard con enlace de
-      instalación (las apps personalizadas ya no se crean desde 01-2026)
+- [x] Shopify para clientes reales (13-09-2026): app del Dev Dashboard con
+      instalación de un clic (OAuth, state firmado, webhooks registrados por
+      Respondi). Ver `docs/integraciones/shopify.md`, opción B. Falta que
+      Jorge cree la app y ponga `SHOPIFY_CLIENT_ID`/`SECRET` en Vercel
 - [x] Canales de Instagram y Facebook (13-09-2026): conectar con las claves
       de la página, webhook propio, recibir (texto, archivos, botones,
       lecturas), contestar desde Chats y la IA, ventana de 24 h. Ver
       `canales-mensajeria.md`. Falta que Jorge lo pruebe con su página
-- [ ] Remitente de los correos de Respondi con el dominio que elija Jorge
+- [x] Remitente de los correos de Respondi (13-09-2026): sale de la variable
+      `RESEND_FROM` (por ejemplo `Respondi <avisos@respondi.com>`); sin ella,
+      el remitente de pruebas de Resend. Falta que Jorge verifique su dominio
+      en Resend y ponga la variable en Vercel
 
 ## Invitaciones pendientes — cerrado (10-09-2026)
 Todo el bloque está hecho: `PanelInvitaciones` compartido en

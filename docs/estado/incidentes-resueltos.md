@@ -1003,3 +1003,36 @@ contestó. Desde este día lo hace `conectarWhatsAppMeta` (y la verificación
 del webhook lo repite en segundo plano). Regla: si un canal Meta está
 "activo" y `ultima_actividad` sigue nulo después de escribirle, mirar primero
 `subscribed_apps`.
+
+## Las baterías de pruebas borraron el WhatsApp, la tienda y la reserva reales de Jorge (13-09-2026)
+La sucursal de pruebas es también la sucursal real de Jorge: ahí conectó su
+número de WhatsApp de Meta (13-09 a las 13:39 UTC), su tienda
+`respondi-pruebas.myshopify.com` (12:22) y reservó con la IA un corte de
+pelo con Carlos (15:52). Las baterías limpiaban "todo lo de la sucursal":
+`probar-whatsapp` (17:59) borró el canal de WhatsApp y sus claves de la
+caja fuerte; `probar-reserva-publica` y `probar-agenda` (18:03) borraron la
+reserva (la agenda y Carlos se repusieron a mano, la reserva no); y
+`probar-shopify-app` (21:39) borró la tienda y su token. Además, como solo
+cabe un canal de WhatsApp y una tienda por sucursal, conectar el número o
+la tienda simulados **pisa la fila real** (upsert por sucursal) antes de
+borrarla.
+
+Lo que no se recupera: las claves (token de Meta y clave secreta de la app,
+token de Shopify) — Jorge tiene que volver a pegarlas. Lo que se puede
+reponer con los mismos identificadores (para que el webhook de Meta y los
+seis webhooks de Shopify sigan apuntando bien): la fila del canal
+(`fc79bd42-0fc4-4886-971b-4a9f256d2c4c`, verify token
+`9c6462b9b838f9f751921b8a8475a291eb5c5ea116cd4116`), la fila de la tienda
+(`0730c447-c792-4cdc-a6c0-e74191a6b10e`) y la reserva (lunes 14-09-2026
+11:00 America/Caracas, servicio "pelo", Carlos, contacto Jorgito,
+conversación `017d8794-b5b0-4de9-a5fa-a5961cf38f76`). Pendiente de que Jorge
+diga cómo quiere reponerlo (ver `pendientes-jorge.md`, punto 0).
+
+Arreglo para que no se repita: `salvaguarda.mjs` (scratchpad) hace copia de
+canales (con claves), tienda (con claves), eventos, agenda completa y
+automatizaciones antes de cada batería y lo repone todo al final con los
+mismos ids; las limpiezas solo borran lo simulado (dominio
+`pasteleria-de-prueba.myshopify.com`, número simulado, páginas
+`5000000000000xx`). A medio plazo lo sano es una **sucursal solo para
+pruebas** dentro de la organización de pruebas, para que nada real conviva
+con las baterías.

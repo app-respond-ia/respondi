@@ -7,7 +7,7 @@ import Loading from '@/components/Loading'
 import { ErrorCarga } from '@/components/ui/ErrorCarga'
 import { useToast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
-import { getTienda, conectarTienda, probarTienda, desconectarTienda } from '@/app/actions/tiendas'
+import { getTienda, conectarTienda, probarTienda, desconectarTienda, iniciarInstalacionShopify, getInstalacionShopify } from '@/app/actions/tiendas'
 import { getMisPermisos } from '@/app/actions/permisos'
 
 // Conectar la tienda online del negocio (Shopify). El cliente crea una "app
@@ -54,12 +54,14 @@ export default function TiendaPage() {
   const [formularioAbierto, setFormularioAbierto] = useState(false)
   const [confirmarDesconectar, setConfirmarDesconectar] = useState(false)
   const [probando, setProbando] = useState(false)
+  const [instalable, setInstalable] = useState(false)
 
   const puedeEscribir = nivelPermiso === 'escritura'
 
   async function cargar() {
     setErrorCarga(false)
-    const [r, permisos] = await Promise.all([getTienda(), getMisPermisos()])
+    const [r, permisos, inst] = await Promise.all([getTienda(), getMisPermisos(), getInstalacionShopify().catch(() => ({ success: false }))])
+    if ((inst as any)?.success) setInstalable(!!(inst as any).data?.disponible)
     if (permisos.success) {
       const nivel = (permisos as any).esAdmin
         ? 'escritura'
@@ -76,6 +78,15 @@ export default function TiendaPage() {
   }
 
   useEffect(() => { cargar() }, [])
+
+  // Al volver de Shopify tras instalar la app
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search)
+    const instalada = q.get('instalada')
+    if (instalada === '1') showToast(q.get('avisos') === 'parcial' ? 'Tienda conectada. Algunos avisos no se han podido registrar: revisa la tarjeta de la tienda.' : 'Tienda conectada: la app de Respondi ya está instalada y los avisos registrados.', 'success')
+    if (instalada === '0') showToast(q.get('motivo') || 'No se ha podido instalar la app.', 'error')
+    if (instalada) window.history.replaceState({}, '', window.location.pathname)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleProbar() {
     if (!tienda) return
@@ -165,7 +176,19 @@ export default function TiendaPage() {
               </div>
             )}
 
-            {tienda!.configuracion?.tiene_secreto_avisos && tienda!.webhook_url && (
+            {tienda!.configuracion?.instalada_por_app && (
+              <div className={`mt-4 p-4 rounded-xl border ${tienda!.configuracion?.webhooks_registrados === false ? 'border-amber-200 bg-amber-50' : 'border-emerald-200 bg-emerald-50'}`}>
+                <p className={`text-sm font-600 ${tienda!.configuracion?.webhooks_registrados === false ? 'text-amber-900' : 'text-emerald-900'}`}>
+                  {tienda!.configuracion?.webhooks_registrados === false ? 'Instalada con la app de Respondi, pero faltan avisos por registrar' : 'Instalada con la app de Respondi'}
+                </p>
+                <p className={`text-xs mt-1 ${tienda!.configuracion?.webhooks_registrados === false ? 'text-amber-800' : 'text-emerald-800'}`}>
+                  {tienda!.configuracion?.webhooks_registrados === false
+                    ? `No se han podido registrar: ${(tienda!.configuracion?.webhooks_fallidos || []).join(' · ')}. Vuelve a instalar la app desde «Cambiar datos» o escríbenos.`
+                    : 'Los avisos de pedidos (creación, pago, envío, cancelación, carritos) ya están registrados en tu Shopify: no tienes que configurar nada.'}
+                </p>
+              </div>
+            )}
+            {!tienda!.configuracion?.instalada_por_app && tienda!.configuracion?.tiene_secreto_avisos && tienda!.webhook_url && (
               <div className="mt-4 p-4 rounded-xl border border-slate-200 bg-slate-50">
                 <p className="text-sm font-600 text-ink-800">Dirección para los avisos de Shopify (webhooks)</p>
                 <p className="text-xs text-ink-500 mt-1 mb-2">
@@ -247,6 +270,7 @@ export default function TiendaPage() {
 
       {formularioAbierto && (
         <FormularioTienda
+          instalable={instalable}
           tienda={conectada ? tienda : null}
           onCerrar={() => setFormularioAbierto(false)}
           onConectada={() => { setFormularioAbierto(false); cargar() }}
@@ -325,13 +349,24 @@ function GuiaShopify({ webhookUrl }: { webhookUrl: string | null }) {
   )
 }
 
-function FormularioTienda({ tienda, onCerrar, onConectada }: { tienda: Tienda | null; onCerrar: () => void; onConectada: () => void }) {
+function FormularioTienda({ tienda, instalable, onCerrar, onConectada }: { tienda: Tienda | null; instalable: boolean; onCerrar: () => void; onConectada: () => void }) {
   const { showToast } = useToast()
   const [dominio, setDominio] = useState(tienda?.dominio || '')
   const [token, setToken] = useState('')
   const [apiSecret, setApiSecret] = useState('')
   const [guardando, setGuardando] = useState(false)
+  const [instalando, setInstalando] = useState(false)
+  // Con la app de Respondi disponible, el token queda como camino secundario
+  const [conToken, setConToken] = useState(!instalable || !!tienda?.configuracion?.tiene_secreto_avisos && !tienda?.configuracion?.instalada_por_app)
   const [verGuia, setVerGuia] = useState(!tienda)
+
+  async function instalar() {
+    setInstalando(true)
+    const r = await iniciarInstalacionShopify(dominio).catch(() => ({ success: false, error: 'No se ha podido conectar. Revisa la conexión.' }))
+    if (r.success && (r as any).url) { window.location.href = (r as any).url; return }
+    setInstalando(false)
+    showToast((r as any).error || 'No se ha podido preparar la instalación', 'error')
+  }
 
   async function guardar(e: React.FormEvent) {
     e.preventDefault()
@@ -339,11 +374,11 @@ function FormularioTienda({ tienda, onCerrar, onConectada }: { tienda: Tienda | 
     const r = await conectarTienda({ dominio, token, apiSecret })
     setGuardando(false)
     if (r.success) {
-      const faltan = (r.data as any)?.faltan_permisos || []
+      const faltan = (r as any).data?.faltan_permisos || []
       showToast(
         faltan.length
           ? `Tienda conectada, pero faltan permisos: ${faltan.map((p: string) => NOMBRE_PERMISO[p] || p).join(', ')}`
-          : `Tienda conectada: ${(r.data as any).nombre}`,
+          : `Tienda conectada: ${(r as any).data?.nombre}`,
         faltan.length ? 'info' : 'success'
       )
       onConectada()
@@ -359,7 +394,7 @@ function FormularioTienda({ tienda, onCerrar, onConectada }: { tienda: Tienda | 
         <form onSubmit={guardar}>
           <div className="px-6 pt-6 pb-2">
             <h2 className="font-display font-700 text-xl text-ink-900">{tienda ? 'Cambiar los datos de la tienda' : 'Conectar tu tienda de Shopify'}</h2>
-            <p className="text-sm text-ink-500 mt-1">Necesitas dos cosas de tu Shopify: la dirección de tu tienda y un token.</p>
+            <p className="text-sm text-ink-500 mt-1">{instalable ? 'Escribe la dirección de tu tienda y autoriza la app de Respondi en Shopify. Los avisos se configuran solos.' : 'Necesitas dos cosas de tu Shopify: la dirección de tu tienda y un token.'}</p>
           </div>
 
           <div className="px-6 py-4 space-y-4">
@@ -375,6 +410,21 @@ function FormularioTienda({ tienda, onCerrar, onConectada }: { tienda: Tienda | 
               />
               <p className="text-xs text-ink-400 mt-1">Vale también con pegar la dirección del panel de Shopify.</p>
             </div>
+
+            {instalable && (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
+                <p className="text-sm font-600 text-emerald-900">Instalar la app de Respondi <span className="text-[10px] font-600 uppercase tracking-wide bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded ml-1">Recomendado</span></p>
+                <p className="text-xs text-emerald-800 mt-1 mb-3">Shopify te pedirá permiso una sola vez y volverás aquí con la tienda conectada y los avisos registrados. Sin tokens ni webhooks a mano.</p>
+                <button type="button" onClick={instalar} disabled={instalando || !dominio.trim()} className="h-11 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-600 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                  {instalando ? 'Abriendo Shopify…' : 'Ir a Shopify e instalar'}
+                </button>
+                <button type="button" onClick={() => setConToken(v => !v)} className="block mt-3 text-xs font-600 text-ink-500 hover:text-ink-800">
+                  {conToken ? 'Ocultar la conexión con token' : '¿Tienes una app personalizada con token? Conectar con el token'}
+                </button>
+              </div>
+            )}
+
+            <div className={conToken ? 'space-y-4' : 'hidden'}>
 
             <div>
               <label htmlFor="tienda-token" className="block text-sm font-600 text-ink-800 mb-1.5">
@@ -412,13 +462,16 @@ function FormularioTienda({ tienda, onCerrar, onConectada }: { tienda: Tienda | 
             </button>
 
             {verGuia && <GuiaShopify webhookUrl={tienda?.webhook_url || null} />}
+            </div>
           </div>
 
           <div className="flex items-center justify-end gap-3 px-6 py-4 bg-slate-50 border-t border-slate-200 rounded-b-2xl">
             <button type="button" onClick={onCerrar} className="px-4 h-11 rounded-xl text-sm font-600 text-ink-700 hover:bg-slate-200 transition">Cancelar</button>
-            <button type="submit" disabled={guardando} className="px-5 h-11 rounded-xl bg-brand-600 text-white text-sm font-600 transition hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed">
-              {guardando ? 'Comprobando…' : tienda ? 'Guardar' : 'Conectar'}
-            </button>
+            {conToken && (
+              <button type="submit" disabled={guardando} className="px-5 h-11 rounded-xl bg-brand-600 text-white text-sm font-600 transition hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                {guardando ? 'Comprobando…' : tienda ? 'Guardar' : 'Conectar con el token'}
+              </button>
+            )}
           </div>
         </form>
       </div>

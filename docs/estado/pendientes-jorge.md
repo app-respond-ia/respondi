@@ -18,6 +18,34 @@ dominios). Estado a 13-09-2026. Cuando cierres un punto, márcalo aquí.
 
 ## Por hacer
 
+### 0. URGENTE — reponer lo que borraron las pruebas (13-09-2026)
+Las baterías de pruebas automáticas borraron tres cosas reales de tu
+sucursal de pruebas (lo cuento en `incidentes-resueltos.md`): el canal de
+WhatsApp con sus claves, la tienda de Shopify con su token y la reserva que
+hiciste con la IA. Las claves no se pueden recuperar; el resto sí. Claude
+puede reponer las filas con los **mismos identificadores** (así el webhook
+de Meta y los seis webhooks de Shopify siguen apuntando bien) en cuanto le
+digas «repón lo borrado». Después te toca a ti:
+- [ ] **WhatsApp**: Canales → tarjeta WhatsApp → «Cambiar claves» → pegar
+      otra vez el identificador del número, el de la cuenta de WhatsApp
+      Business, el token (el permanente que generaste) y la clave secreta de
+      la app. No hay que tocar nada en Meta: la dirección del webhook y el
+      código de verificación son los mismos.
+      Si prefieres conectar sin que Claude reponga nada, también funciona,
+      pero saldrán una dirección de webhook y un código nuevos y habrá que
+      pegarlos en la app de Meta.
+- [ ] **Shopify**: lo más sencillo es hacer el punto 7 (la app de Respondi)
+      y conectar con un clic; los avisos se registran solos. Si quieres
+      volver a conectar con la app personalizada, el token ya no se puede
+      ver: en Shopify → Apps → Desarrollar apps → la app → desinstalar y
+      volver a instalar te da un token nuevo, y lo pegas en Tienda online
+      con la clave de firma de los webhooks.
+- [ ] **Reserva**: Claude la vuelve a crear (lunes 14-09 a las 11:00, corte
+      de pelo con Carlos, a nombre de Jorgito) o la haces tú desde la agenda.
+- [ ] Decidir si creamos una **sucursal solo para pruebas** dentro de tu
+      organización, para que tus datos reales no convivan con las baterías.
+      Es lo recomendable antes de meter clientes.
+
 ### 1. Whaticket — preguntar a su soporte
 Su API solo envía mensajes; no hay forma documentada de que avisen a
 Respondi de los que entran. Hasta que contesten, en Canales sigue como
@@ -71,7 +99,11 @@ saldrán por el mismo sitio. Hace falta un dominio propio.
       (SPF, DKIM y retorno) donde se compró el dominio → Verify.
 - [ ] Vercel → Settings → Environment Variables: comprobar que existe
       `RESEND_API_KEY` en producción.
-- [ ] Decirle el dominio a Claude: cambia el remitente en el código.
+- [ ] Vercel → Settings → Environment Variables → añadir `RESEND_FROM` con
+      el remitente en ese dominio, por ejemplo `Respondi <avisos@tudominio.com>`
+      (el dominio tiene que ser el verificado en Resend). Volver a desplegar.
+      Sin la variable, los correos siguen saliendo por el remitente de
+      pruebas de Resend.
 - [ ] Supabase → Authentication → SMTP Settings: poner el SMTP de Resend
       para los correos de registro y de "olvidé mi contraseña" (el
       remitente por defecto de Supabase tiene un límite de unos pocos
@@ -132,9 +164,43 @@ saldrán por el mismo sitio. Hace falta un dominio propio.
 - [ ] Cuando se pase a cobrar de verdad: cambiar las claves por las reales
       (`sk_live_…`) y crear el webhook también en modo real.
 
-### 7. Para salir de pruebas con clientes reales (más adelante)
+### 7. Shopify — la app de Respondi (el código ya está, 13-09-2026)
+Con esto los clientes conectan su tienda con un clic, sin tokens ni
+webhooks a mano (las apps personalizadas ya no se pueden crear desde el
+1 de enero de 2026). Hace falta una sola app, creada una vez:
+- [ ] Entrar en https://dev.shopify.com (Dev Dashboard) con la cuenta con la
+      que creaste la tienda de pruebas. Si pide crear una organización de
+      desarrollo, crearla (es gratis).
+- [ ] **Create app** → nombre «Respondi» → crear desde cero (no desde la
+      CLI) .
+- [ ] En **Versions / Configuration** de la app:
+      - App URL: `https://respondi.vercel.app`
+      - Allowed redirection URL(s):
+        `https://respondi.vercel.app/api/tiendas/shopify/oauth/callback`
+      - Distribución: **Custom distribution** (para instalar en tiendas
+        concretas, sin tienda de apps). Si en su momento se quiere la tienda
+        de apps, se cambia entonces.
+      - Access scopes: `read_products, read_inventory, read_orders,
+        read_fulfillments, read_customers, write_customers, read_shipping,
+        read_content, write_draft_orders, write_discounts`
+      - Guardar / **Release** la versión.
+- [ ] En la app → **Settings** (o "Client credentials"): copiar el
+      **Client ID** y el **Client secret**.
+- [ ] Vercel → Settings → Environment Variables (producción): añadir
+      `SHOPIFY_CLIENT_ID` y `SHOPIFY_CLIENT_SECRET` con esos dos valores.
+      Volver a desplegar.
+- [ ] Probar: en Respondi (sucursal de pruebas) → Tienda online → «Cambiar
+      datos» → escribir `respondi-pruebas.myshopify.com` → «Ir a Shopify e
+      instalar» → aceptar → debe volver a Respondi con «Tienda conectada» y
+      la tarjeta en verde «Instalada con la app de Respondi». Los seis avisos
+      se registran solos (se pueden ver en Shopify → Configuración →
+      Notificaciones → Webhooks).
+- [ ] Después, en la tienda de pruebas se puede desinstalar la app
+      personalizada antigua (ya no hace falta).
+
+### 8. Para salir de pruebas con clientes reales (más adelante)
 - Meta: cada cliente necesita verificar su empresa en Meta y añadir un
   número real (el número de pruebas solo escribe a 5 móviles).
-- Shopify: desde el 1 de enero de 2026 los comerciantes ya no pueden crear
-  "apps personalizadas": los clientes reales necesitarán una app del Dev
-  Dashboard con enlace de instalación (pendiente en el código).
+- Shopify: con la app de Respondi (punto 7) cada cliente instala con un
+  clic. Si algún día se quiere aparecer en la tienda de apps de Shopify,
+  habrá que pasar su revisión.

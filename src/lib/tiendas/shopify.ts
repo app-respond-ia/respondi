@@ -276,3 +276,109 @@ export function permisosQueFaltan(permisos: string[], necesarios: string[]) {
   if (!permisos.length) return [] // no se pudieron leer: no inventamos avisos
   return necesarios.filter(p => !permisos.includes(p))
 }
+
+// ---------------------------------------------------------------------------
+// La app de Respondi en Shopify (Dev Dashboard) — 13-09-2026
+// ---------------------------------------------------------------------------
+// Desde el 1 de enero de 2026 los comerciantes ya no pueden crear "apps
+// personalizadas" en su Shopify, así que la forma normal de conectar es
+// instalar la app de Respondi: el cliente escribe su tienda, Shopify le pide
+// permiso y nos devuelve un código que cambiamos por el token. Los avisos
+// (webhooks) los registra Respondi sola. Hace falta que Jorge cree la app en
+// el Dev Dashboard y ponga su clave y su secreto en Vercel
+// (SHOPIFY_CLIENT_ID y SHOPIFY_CLIENT_SECRET). Sin ellos, queda la app
+// personalizada con token para las tiendas que aún la tengan.
+import crypto from 'crypto'
+
+export function instalacionDisponible() {
+  return !!process.env.SHOPIFY_CLIENT_ID && !!process.env.SHOPIFY_CLIENT_SECRET
+}
+
+function claveApp() {
+  const id = process.env.SHOPIFY_CLIENT_ID, secreto = process.env.SHOPIFY_CLIENT_SECRET
+  if (!id || !secreto) throw new ErrorShopify('La app de Respondi en Shopify no está configurada (faltan SHOPIFY_CLIENT_ID y SHOPIFY_CLIENT_SECRET).')
+  return { id, secreto }
+}
+
+export function urlDeRetorno() {
+  return `${(process.env.NEXT_PUBLIC_SITE_URL || 'https://respondi.vercel.app').replace(/\/$/, '')}/api/tiendas/shopify/oauth/callback`
+}
+
+// El "state" que va y vuelve de Shopify: quién pide la instalación, firmado
+// para que nadie pueda colgar una tienda ajena en una cuenta que no es suya
+export function firmarEstadoInstalacion(datos: { tenant_id: string; branch_id: string; user_id: string; dominio: string }) {
+  const { secreto } = claveApp()
+  const carga = Buffer.from(JSON.stringify({ ...datos, exp: Date.now() + 30 * 60 * 1000, n: crypto.randomBytes(8).toString('hex') })).toString('base64url')
+  const firma = crypto.createHmac('sha256', secreto).update(carga).digest('base64url')
+  return `${carga}.${firma}`
+}
+
+export function leerEstadoInstalacion(estado: string | null): { tenant_id: string; branch_id: string; user_id: string; dominio: string } | null {
+  if (!estado) return null
+  const { secreto } = claveApp()
+  const [carga, firma] = String(estado).split('.')
+  if (!carga || !firma) return null
+  const esperada = crypto.createHmac('sha256', secreto).update(carga).digest('base64url')
+  if (firma.length !== esperada.length || !crypto.timingSafeEqual(Buffer.from(firma), Buffer.from(esperada))) return null
+  try {
+    const d = JSON.parse(Buffer.from(carga, 'base64url').toString('utf8'))
+    if (!d.exp || d.exp < Date.now()) return null
+    return { tenant_id: d.tenant_id, branch_id: d.branch_id, user_id: d.user_id, dominio: d.dominio }
+  } catch {
+    return null
+  }
+}
+
+// Adónde mandar al cliente para que autorice la app
+export function urlDeAutorizacion(dominio: string, estado: string) {
+  const { id } = claveApp()
+  const p = new URLSearchParams({ client_id: id, scope: PERMISOS_RECOMENDADOS.join(','), redirect_uri: urlDeRetorno(), state: estado })
+  return `https://${dominio}/admin/oauth/authorize?${p.toString()}`
+}
+
+// Shopify firma la vuelta con el secreto de la app: sin comprobarlo,
+// cualquiera podría inventarse una vuelta
+export function vueltaFirmada(parametros: URLSearchParams) {
+  const { secreto } = claveApp()
+  const hmac = parametros.get('hmac') || ''
+  const mensaje = [...parametros.entries()].filter(([k]) => k !== 'hmac' && k !== 'signature').sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}=${v}`).join('&')
+  const esperada = crypto.createHmac('sha256', secreto).update(mensaje).digest('hex')
+  return hmac.length === esperada.length && /^[0-9a-f]+$/i.test(hmac) && crypto.timingSafeEqual(Buffer.from(hmac, 'hex'), Buffer.from(esperada, 'hex'))
+}
+
+// El código de la vuelta se cambia por el token de la tienda
+export async function canjearCodigo(dominio: string, codigo: string): Promise<{ access_token: string; scope: string[] }> {
+  const { id, secreto } = claveApp()
+  const simulada = process.env.SHOPIFY_API_URL
+  const direccion = simulada ? `${simulada.replace(/\/$/, '')}/${dominio}/admin/oauth/access_token` : `https://${dominio}/admin/oauth/access_token`
+  let r: Response
+  try {
+    r = await fetch(direccion, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client_id: id, client_secret: secreto, code: codigo }), signal: AbortSignal.timeout(20000) })
+  } catch (e: any) {
+    throw new ErrorShopify(`No se ha podido hablar con Shopify (${e?.message})`, null, null)
+  }
+  const cuerpo: any = await r.json().catch(() => ({}))
+  if (!r.ok || !cuerpo?.access_token) throw new ErrorShopify(`Shopify no ha aceptado el código de instalación (${r.status}${cuerpo?.error_description ? `: ${cuerpo.error_description}` : ''})`, null, r.status)
+  return { access_token: String(cuerpo.access_token), scope: String(cuerpo.scope || '').split(',').map(x => x.trim()).filter(Boolean) }
+}
+
+// Los avisos de la tienda, registrados por Respondi (una app puede; una app
+// personalizada, no). Devuelve los que no se han podido crear.
+export const SUCESOS_WEBHOOK_SHOPIFY = ['ORDERS_CREATE', 'ORDERS_PAID', 'ORDERS_FULFILLED', 'ORDERS_CANCELLED', 'CHECKOUTS_UPDATE', 'FULFILLMENTS_UPDATE'] as const
+
+export async function registrarWebhooksDeTienda(dominio: string, token: string, callbackUrl: string): Promise<string[]> {
+  const fallos: string[] = []
+  for (const topic of SUCESOS_WEBHOOK_SHOPIFY) {
+    try {
+      const d = await consultarShopify<any>(dominio, token, `mutation crear($topic: WebhookSubscriptionTopic!, $webhookSubscription: WebhookSubscriptionInput!) {
+        webhookSubscriptionCreate(topic: $topic, webhookSubscription: $webhookSubscription) { webhookSubscription { id } userErrors { field message } }
+      }`, { topic, webhookSubscription: { callbackUrl, format: 'JSON' } })
+      const errores = (d?.webhookSubscriptionCreate?.userErrors || []).map((e: any) => String(e.message))
+      // Uno que ya existía no es un fallo
+      if (errores.length && !errores.some((m: string) => /already|taken|exists/i.test(m))) fallos.push(`${topic}: ${errores.join('; ')}`)
+    } catch (e: any) {
+      fallos.push(`${topic}: ${e?.message}`)
+    }
+  }
+  return fallos
+}

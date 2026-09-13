@@ -37,8 +37,51 @@ llama ahora por su nombre y trae la guía completa paso a paso (crear la
 app, permisos, instalar, token, webhooks y clave de firma).
 
 Aviso: desde el 1 de enero de 2026 Shopify ya no deja crear "apps
-personalizadas" en tiendas nuevas. Los clientes reales necesitarán una app
-del Dev Dashboard con enlace de instalación (pendiente).
+personalizadas" en tiendas nuevas. Para los clientes reales está la opción B.
+
+## Cómo se conecta (opción B: la app de Respondi, un clic) — 13-09-2026
+Una sola app de Respondi creada en el **Dev Dashboard de Shopify**
+(dev.shopify.com, sin pasar por la tienda de apps ni pedir aprobación).
+El cliente escribe la dirección de su tienda en Tienda online → «Ir a
+Shopify e instalar», Shopify le pide permiso una vez y vuelve a Respondi
+con la tienda conectada y los avisos registrados. Sin tokens ni webhooks a
+mano.
+
+Cómo funciona por dentro:
+- `iniciarInstalacionShopify(dominio)` (acción con sesión): comprueba que la
+  tienda no esté ya en otra sucursal u organización, firma un **state** con
+  quién pide la instalación (organización, sucursal, usuario, dominio,
+  caduca a los 30 min; HMAC con el secreto de la app) y devuelve la dirección
+  `https://<tienda>/admin/oauth/authorize?client_id&scope&redirect_uri&state`.
+  Los `scope` son los permisos recomendados (los mismos de la opción A).
+- La vuelta llega a `/api/tiendas/shopify/oauth/callback` (sin sesión: quién
+  es el cliente viene en el state). Se comprueba la firma `hmac` de Shopify
+  (todos los parámetros menos `hmac`, ordenados, `k=v` unidos con `&`,
+  HMAC-SHA256 con el secreto de la app), que el state sea nuestro y no haya
+  caducado, que la tienda que responde sea la pedida, y se cambia el `code`
+  por el token (`POST /admin/oauth/access_token`).
+- Con el token se pasa por `guardarTiendaConectada` (`src/lib/tiendas/conectar.ts`,
+  compartido con la opción A): entra en la tienda, comprueba los permisos
+  mínimos, guarda la tienda (activa) y el token en la caja fuerte. Como
+  **clave de firma de los avisos guarda el secreto de la app**: los webhooks
+  de una app van firmados con él.
+- Después registra ella misma los seis webhooks (`webhookSubscriptionCreate`,
+  formato JSON, a `/api/tiendas/shopify/<id>`); uno que ya existiera no
+  cuenta como fallo. En `configuracion` quedan `instalada_por_app`,
+  `webhooks_registrados` y, si alguno falló, `webhooks_fallidos` (la tarjeta
+  lo enseña en ámbar y se puede repetir la instalación).
+- Vuelve al panel con `?instalada=1` (o `0&motivo=…`): la pantalla lo
+  convierte en un toast y limpia la dirección. Si faltan las claves de la app
+  en Vercel, la vuelta contesta «todavía no está activada» sin apuntar error.
+- Con la app instalada, la tarjeta de la tienda no enseña las instrucciones
+  de webhooks a mano (no hacen falta). La conexión con token sigue como
+  camino secundario, plegado, para las tiendas que aún tengan una app
+  personalizada.
+
+Variables en Vercel: `SHOPIFY_CLIENT_ID` y `SHOPIFY_CLIENT_SECRET` (las de la
+app del Dev Dashboard). Sin ellas la pantalla no enseña la instalación con un
+clic y todo sigue como en la opción A. Redirect URL a poner en la app:
+`https://respondi.vercel.app/api/tiendas/shopify/oauth/callback`.
 
 Por qué esta opción y no una app pública en la tienda de apps de Shopify: no
 dependemos de que Shopify nos apruebe nada, no hace falta cuenta de Partner ni
@@ -363,10 +406,33 @@ valor). Por correo no hace falta nada de esto.
   producción; los crons de producción se prueban así, dejando trabajo
   pendiente, no llamándolos a mano.
 
+### App de Respondi en Shopify (13-09-2026)
+- Opción B completa: `src/lib/tiendas/shopify.ts` (estado firmado, dirección
+  de autorización, comprobación de la vuelta, canje del código, registro de
+  webhooks), `src/lib/tiendas/conectar.ts` (guardar la tienda, compartido
+  con el token), `src/app/actions/tiendas.ts` (`iniciarInstalacionShopify`,
+  `getInstalacionShopify`), `src/app/api/tiendas/shopify/oauth/callback/route.ts`
+  y la pantalla Tienda online.
+- Pruebas `probar-shopify-app.mjs` (29 comprobaciones, 0 fallos, contra el
+  Shopify simulado con `SHOPIFY_CLIENT_ID`/`SECRET` de prueba): dirección de
+  autorización con clave, permisos y vuelta; state con quién pide, caducidad
+  y firma; vueltas que no valen (firma falsa, firma con otro secreto, state
+  inventado, state firmado con otro secreto, state caducado, tienda distinta,
+  código rechazado: nada se guarda); instalación buena (tienda activa,
+  `instalada_por_app`, token y secreto en la caja fuerte, seis webhooks a la
+  dirección de Respondi, auditoría a nombre del usuario, la pantalla carga);
+  un aviso firmado con otro secreto se rechaza (403) y con el de la app entra
+  como evento; repetir la instalación no duplica tienda ni avisos; si el
+  cliente no acepta los permisos imprescindibles no se instala y la tienda
+  anterior sigue activa; desconectar borra el token.
+- La suite antigua de automatizaciones (`probar-automatizaciones-2.mjs`,
+  conexión con token) sigue pasando tras el cambio.
+
 ### Pendiente
-- Registrar los webhooks desde la app no es posible en apps personalizadas:
-  se queda a mano y explicado en la pantalla.
-- Pasada de verificación contra una tienda de desarrollo real (Jorge crea
-  la cuenta de Partner). Ahí se confirma la versión de la API (`2026-01`).
+- Que Jorge cree la app en el Dev Dashboard y ponga sus claves en Vercel
+  (pasos en `docs/estado/pendientes-jorge.md`); después, una instalación real
+  en la tienda de pruebas. Ahí se confirma la versión de la API (`2026-01`).
+- Registrar los webhooks desde una app **personalizada** no es posible: en
+  ese camino se queda a mano y explicado en la pantalla.
 - El mapa visual (cajas y flechas): la misma receta que ya edita el editor
   de lista; solo cambia la piel.

@@ -4,6 +4,7 @@ import { ESTADOS_ACTIVOS, type Cita, type CodigoErrorCita, type EstadoCita, type
 import { cargarAgenda, duracionServicio, grupoDeClase, huecosDelDia, patronOcupacion, servicioPorId, type Agenda } from './disponibilidad'
 import { ID_MESA } from './tipos'
 import { diaEnZona, textoFecha, textoHora } from './tiempo'
+import { PAISES } from '@/lib/paises'
 
 // CREAR, MOVER, CANCELAR Y CAMBIAR DE ESTADO UNA CITA.
 //
@@ -51,6 +52,21 @@ export function normalizarTelefono(valor: string | null | undefined) {
   const limpio = String(valor).replace(/[^\d+]/g, '')
   if (limpio.replace(/\D/g, '').length < 8) return null
   return limpio.startsWith('+') ? limpio : `+${limpio}`
+}
+
+// Un teléfono tal como lo escribe la gente ("600 992 001", "0034 600...",
+// "+34 600..."): con el país de la sucursal se completa el prefijo. Sin país
+// conocido, solo vale si ya viene internacional.
+export function completarTelefono(valor: string | null | undefined, pais: string | null | undefined): string | null {
+  const crudo = String(valor || '').replace(/[^\d+]/g, '')
+  if (!crudo) return null
+  if (crudo.startsWith('+')) return normalizarTelefono(crudo)
+  const digitos = crudo.replace(/\D/g, '')
+  if (digitos.startsWith('00') && digitos.length > 10) return normalizarTelefono(`+${digitos.slice(2)}`)
+  const prefijo = PAISES.find(p => p.codigo === String(pais || '').toUpperCase())?.prefijo
+  if (prefijo && digitos.length >= 7 && digitos.length <= 10) return `${prefijo}${digitos}`
+  if (digitos.length >= 11) return `+${digitos}`
+  return null
 }
 
 // El contacto de Respondi para este teléfono o correo (se crea si no existe:

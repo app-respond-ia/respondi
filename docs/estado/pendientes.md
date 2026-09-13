@@ -232,7 +232,8 @@ momento; en todos los planes; el cliente no se registra. Detalle en
 - [x] Tramo 2 (13-09-2026): modo restaurante (mesas por comensales y zona,
       mesas que se juntan, turnos, duración por comensales, aforo por turno,
       cortesía que libera la mesa, sentar sin reserva, vista de sala)
-- [ ] Tramo 3: enlace público de reserva y confirmaciones
+- [x] Tramo 3 (13-09-2026): enlace público de reserva (respondi.vercel.app/r/…,
+      con QR) y página de cada reserva con su llave para cambiar o cancelar
 - [ ] Google Calendar (proyecto de Google de Jorge), más adelante
 
 ## Invitaciones pendientes — cerrado (10-09-2026)

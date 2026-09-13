@@ -8,7 +8,7 @@ import { registrarAuditoria } from '@/lib/auditoria'
 import { registrarError } from '@/lib/errores'
 import { getMisPermisos } from '@/app/actions/permisos'
 import { cargarAgenda, huecosDelDia, bloqueosEntre, servicioPorId } from '@/lib/agenda/disponibilidad'
-import { crearCita, moverCita, cancelarCita, cambiarEstadoCita, buscarOCrearContacto, normalizarTelefono } from '@/lib/agenda/citas'
+import { crearCita, moverCita, cancelarCita, cambiarEstadoCita, buscarOCrearContacto, completarTelefono } from '@/lib/agenda/citas'
 import { AJUSTES_POR_DEFECTO, PASOS_AGENDA, RECURSOS_MAXIMO, TIPOS_RECURSO, type AjustesAgenda, type EstadoCita, type HorarioRecurso } from '@/lib/agenda/tipos'
 import { leerFecha } from '@/lib/agenda/tiempo'
 
@@ -314,9 +314,10 @@ export async function crearCitaPanel(d: DatosCitaPanel) {
   const auth = await sesion()
   if ('error' in auth) return { success: false, error: auth.error }
 
-  const telefono = normalizarTelefono(d.telefono)
+  const { data: sucursal } = await supabaseAdmin.from('sucursales').select('pais').eq('id', auth.branch_id).maybeSingle()
+  const telefono = completarTelefono(d.telefono, sucursal?.pais)
   const email = String(d.email || '').trim().toLowerCase() || null
-  if (d.telefono && !telefono) return { success: false, error: 'El teléfono no parece correcto (con prefijo, por ejemplo +34...).' }
+  if (String(d.telefono || '').trim() && !telefono) return { success: false, error: 'El teléfono no parece correcto (con prefijo, por ejemplo +34...).' }
   if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { success: false, error: 'El correo no parece correcto.' }
   let contacto: { id: string } | null = null
   if (telefono) contacto = await buscarOCrearContacto(auth.tenant_id, 'whatsapp', telefono, d.nombre)

@@ -9,7 +9,8 @@ también un restaurante con mesas y turnos), en tres tramos seguidos:
 2. **Modo restaurante**: mesas con capacidad, combinaciones, turnos,
    duración por comensales, aforo por turno, cortesía, sin reserva (hecho
    el 13-09-2026).
-3. **Enlace público de reserva** (web, Instagram, QR) y confirmaciones.
+3. **Enlace público de reserva** (web, Instagram, QR) y gestión con
+   llave (hecho el 13-09-2026).
 
 Decisiones de Jorge: la IA confirma directamente lo que cabe en las reglas y
 lo raro va a una persona (el negocio puede poner "confirmación a mano");
@@ -138,7 +139,25 @@ escribe el historial y avisa a las automatizaciones (`dispararEventoAgenda`).
   venido / mover / cancelar e historial, bloqueos, recursos con horario
   propio y servicios que hacen, ajustes. Permiso nuevo: sección **Agenda**
   (lectura / escritura) en Roles.
-- **El enlace público**: tramo 3.
+- **El enlace público** (`src/app/r/[enlace]`, acciones sin sesión en
+  `src/app/actions/reservas-publicas.ts`): respondi.vercel.app/r/su-enlace.
+  El negocio elige el trozo de dirección y lo enciende en Ajustes (con botón
+  de copiar y código QR). Tres pasos en el móvil: qué (servicio, o mesa con
+  personas y zona; profesional si se puede elegir; extras), cuándo (siete
+  días a la vista, cualquier otro día, huecos por mañana / tarde / noche) y
+  quién (nombre, WhatsApp o correo, peticiones, privacidad). Sin cuenta: el
+  teléfono o el correo es el contacto de Respondi (se crea si no existe) y
+  la confirmación sale por la automatización "Cita reservada". Solo se
+  enseñan los servicios con "se puede reservar desde el enlace público" y
+  las personas elegibles; los teléfonos sin prefijo se completan con el país
+  de la sucursal (`completarTelefono`); los grupos grandes se mandan a
+  escribir; un campo trampa frena a los robots; el tope de reservas por
+  cliente aplica.
+  **Gestionar con la llave** (`/reserva/[token]`): la confirmación lleva un
+  enlace con `token_gestion` (32 caracteres, único) para ver la reserva,
+  cambiarla de día u hora o cancelarla, dentro del plazo del negocio; fuera
+  de plazo la página lo dice y remite a escribir. Las acciones del enlace
+  pasan por el mismo `citas.ts` que la IA y el panel.
 
 ## Automatizaciones nuevas (categoría "Citas y reservas", 8)
 
@@ -205,6 +224,20 @@ mensajes automáticos no gastan créditos de Respondi (los cobra Meta).
 - `captura-restaurante.mjs` (9, navegador real): sala por zonas y turno,
   nueva reserva con zona, sentar sin reserva, mesas que se juntan, ajustes
   con turnos, móvil.
+- `probar-reserva-publica.mjs` (33, sin sesión): enlace inexistente,
+  apagado, sin nada reservable, lo que se enseña (no el servicio privado ni
+  la persona no elegible), huecos, servicio privado y persona no elegible
+  rechazados, grupo grande, teléfono sin prefijo (sin país no vale; con la
+  sucursal en España se completa a +34), privacidad obligatoria, robot,
+  reserva con extra y petición (crea el contacto, origen "enlace"), hueco
+  ocupado, reserva por correo, tope por cliente, ver / cambiar / cancelar
+  con la llave, llave falsa, fuera de plazo, y una mesa de restaurante por
+  el enlace. Las dos acciones que solo usa el servidor (`getReservaPublica`,
+  `getReservaPorToken`) se comprueban por el HTML de la página: no tienen
+  identificador de acción público.
+- `captura-reserva-publica.mjs` (9, navegador real): la sección del enlace
+  en Ajustes con QR, y la página pública desde un móvil sin sesión: pasos,
+  huecos, reserva, confirmación, gestionar y cancelar con la llave.
 - Ojo al lanzar pruebas: nunca dos a la vez. Todas limpian el mismo
   inquilino de pruebas y se pisan (pasó el 13-09-2026 con la mecánica del
   restaurante en segundo plano y la de la IA delante).
@@ -219,8 +252,13 @@ mensajes automáticos no gastan créditos de Respondi (los cobra Meta).
   errores de JavaScript), y el reloj de la base de datos trató un aviso
   pendiente en 16 s (`prod-latido`). Sin restos y saldo del inquilino de
   pruebas en 7.
+- **Tramo 2 (13-09-2026, commit `6acf53a`)**: `prod-automatizaciones` 9/9,
+  `captura-restaurante` con `PROD=1` 9/9 (sala por zonas y turno, nueva
+  reserva, sentar sin reserva, mesas que se juntan, ajustes, móvil). El
+  reloj de la base de datos no recogió el aviso pendiente en los 100 s de
+  la primera comprobación (los cuelgues de 60 s del cron, conocidos); en la
+  segunda lo trató en 14 s. Sin restos y saldo en 7.
 
 ## Pendiente
 
-- Tramo 3 (enlace público).
 - Google Calendar (necesita un proyecto de Google creado por Jorge).

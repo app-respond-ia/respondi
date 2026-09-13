@@ -899,6 +899,35 @@ function Ajustes({ datos, puedeEscribir, recargar }: { datos: Datos; puedeEscrib
       )}
 
       <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+        <p className="text-sm font-600 text-ink-900">Enlace público de reservas</p>
+        <p className="text-xs text-ink-500">Para tu web, la bio de Instagram o un código QR en el mostrador. El cliente reserva sin registrarse: deja su WhatsApp o su correo y recibe la confirmación con un enlace para cambiar o cancelar.</p>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <div className="flex-1 flex items-center rounded-xl border border-slate-300 bg-white overflow-hidden">
+            <span className="px-3 text-sm text-ink-400 whitespace-nowrap">{typeof window !== 'undefined' ? window.location.host : ''}/r/</span>
+            <input value={f.enlace_publico || ''} onChange={e => setF({ ...f, enlace_publico: e.target.value })} className="flex-1 h-11 px-1 text-sm focus:outline-none" placeholder="mi-negocio" disabled={!puedeEscribir} />
+          </div>
+          <label className="flex items-center gap-2 text-sm text-ink-700 cursor-pointer h-11 px-1">
+            <input type="checkbox" checked={!!f.enlace_activo} disabled={!puedeEscribir} onChange={e => setF({ ...f, enlace_activo: e.target.checked })} className="w-4 h-4" /> Enlace activo
+          </label>
+        </div>
+        {datos.ajustes.enlace_publico && (
+          <div className="flex flex-col sm:flex-row gap-4 items-start pt-2">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-ink-500 mb-1">Tu enlace{!datos.ajustes.enlace_activo ? ' (ahora mismo apagado)' : ''}:</p>
+              <a href={`/r/${datos.ajustes.enlace_publico}`} target="_blank" rel="noreferrer" className="text-sm font-600 text-brand-600 break-all">{typeof window !== 'undefined' ? window.location.origin : ''}/r/{datos.ajustes.enlace_publico}</a>
+              <div className="flex gap-2 mt-2">
+                <button type="button" onClick={() => { try { navigator.clipboard.writeText(`${window.location.origin}/r/${datos.ajustes.enlace_publico}`); showToast('Enlace copiado', 'success') } catch { showToast('No se ha podido copiar', 'error') } }} className={botonSecundario}>Copiar enlace</button>
+                <a href={`https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(`${typeof window !== 'undefined' ? window.location.origin : ''}/r/${datos.ajustes.enlace_publico}`)}`} target="_blank" rel="noreferrer" className={botonSecundario + ' inline-flex items-center'}>Descargar QR</a>
+              </div>
+              <p className="text-[11px] text-ink-400 mt-2">Solo se reservan por aquí los servicios con "se puede reservar desde el enlace público" y, en restaurantes, las mesas.</p>
+            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img alt="Código QR del enlace de reservas" width={120} height={120} className="rounded-lg border border-slate-200 shrink-0" src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(`${typeof window !== 'undefined' ? window.location.origin : 'https://respondi.vercel.app'}/r/${datos.ajustes.enlace_publico}`)}`} />
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
         <p className="text-sm font-600 text-ink-900">Lo que la IA debe saber al reservar</p>
         <textarea value={f.instrucciones_ia || ''} onChange={e => setF({ ...f, instrucciones_ia: e.target.value })} rows={3} className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:border-brand-500" placeholder="Por ejemplo: los tintes solo por la mañana; los sábados no se reservan clases; pregunta si tiene alergias." disabled={!puedeEscribir} />
       </div>

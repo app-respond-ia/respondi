@@ -25,7 +25,7 @@ export interface Agenda {
   vinculosPorRecurso: Map<string, Set<string>>
   // Restaurante: mesas que se pueden juntar
   combinaciones: Combinacion[]
-  negocio: { nombre: string; direccion: string | null; moneda: string }
+  negocio: { nombre: string; direccion: string | null; moneda: string; pais: string | null }
 }
 
 export interface Tramo { desde: Date; hasta: Date }
@@ -75,7 +75,7 @@ export function ajustesDeFila(f: any, branchId: string, tenantId: string): Ajust
 export async function cargarAgenda(branchId: string): Promise<Agenda | null> {
   const { data: sucursal } = await supabaseAdmin
     .from('sucursales')
-    .select('id, tenant_id, nombre, direccion, timezone, moneda')
+    .select('id, tenant_id, nombre, direccion, timezone, moneda, pais')
     .eq('id', branchId)
     .maybeSingle()
   if (!sucursal) return null
@@ -116,7 +116,7 @@ export async function cargarAgenda(branchId: string): Promise<Agenda | null> {
     vinculos: mapaVinculos,
     vinculosPorRecurso: porRecursoVinculos,
     combinaciones: (combinaciones || []) as Combinacion[],
-    negocio: { nombre: sucursal.nombre, direccion: sucursal.direccion || null, moneda: sucursal.moneda || 'EUR' }
+    negocio: { nombre: sucursal.nombre, direccion: sucursal.direccion || null, moneda: sucursal.moneda || 'EUR', pais: sucursal.pais || null }
   }
 }
 

@@ -163,7 +163,18 @@ automatizaciones (encender por nombre, y que una de tienda sin tienda
 conectada se niega diciendo por qué), agenda (añadir y quitar una persona) e
 invitaciones (con un rol que no existe no se invita a nadie).
 
-Una cosa que pilló esa segunda pasada: `invitar_usuario` daba acceso a todas
+### Verificado en producción (14-09-2026, commit `524699f`)
+Las pruebas locales van contra un OpenAI simulado, así que en producción se
+comprobó lo único que aquellas no pueden: que el **modelo de verdad**
+entiende las herramientas y se porta como toca (`prod-asistente.mjs`, 9 de 9).
+Preguntándole «¿cuántas etiquetas tengo?» contestó «Tienes 1 etiqueta
+configurada», o sea que llamó a la herramienta y leyó los datos reales. Al
+pedirle crear una etiqueta contestó «He preparado la etiqueta … Confírmala
+cuando quieras», **sin** decir que estaba hecha y **sin** crearla. Al
+confirmar se creó y quedó en el registro marcada como hecha por la IA con su
+usuario. El saldo de créditos no se movió.
+
+Una cosa que pilló la segunda pasada de pruebas: `invitar_usuario` daba acceso a todas
 las sucursales y además leía mal la respuesta de `getSucursales` (devuelve
 `{ sucursales: [...] }`, no una lista), así que habría fallado siempre. Ahora
 invita solo a la sucursal en la que se está trabajando, que además es lo

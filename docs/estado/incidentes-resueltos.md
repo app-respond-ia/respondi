@@ -1066,6 +1066,12 @@ llamando a la IA. Medido en local: 463 ms con una conversación que
 desbloquear, 99 ms sin nada (antes, 60 000 ms). `probar-bloqueos.mjs`,
 6 comprobaciones.
 
+Verificado en producción (14-09-2026): en las 6 horas anteriores al arreglo,
+18 llamadas colgadas de 76 (una de cada cuatro). Después, 7 de 7 limpias.
+La muestra de después es corta, pero coincide con lo medido en local y con
+una causa identificada, así que se da por bueno; si volviera a aparecer una
+colgada, mirar primero si alguien ha vuelto a meter un `after()` con espera.
+
 Regla que deja: en Vercel, **nunca esperar dentro de `after()` a algo que
 tarde**, y menos a una llamada HTTP a la propia app. Si hay trabajo que
 encadenar, se deja marcado en la base de datos y lo recoge el cron que ya

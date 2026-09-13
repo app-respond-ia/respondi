@@ -28,10 +28,15 @@ solo la lista viva).
       - Notificación de comisiones: sin revisar, Jorge la da por buena
 - [x] **Las respuestas no salían hacia WhatsApp** — resuelto (11-09-2026):
       WhatsApp directo con Meta, sin n8n. Ver `canales-mensajeria.md`
-- [ ] **Probar con un número de verdad**: crear la app de prueba de Meta
-      (número de prueba gratis, hasta 5 móviles) y conectarla en Canales
+- [x] **Probar con un número de verdad** — hecho (13-09-2026): app de
+      prueba de Meta conectada en Canales y conversación completa probada
+      desde el móvil de Jorge (horario, servicios, huecos y reserva). Fallo
+      encontrado: la app no estaba suscrita a la cuenta de WhatsApp Business
+      (`subscribed_apps`) y Meta no mandaba nada; se suscribió a mano. Queda
+      pendiente que Respondi lo haga sola al conectar (ver más abajo)
 - [ ] Whaticket: preguntar a su soporte si pueden avisar a Respondi de los
-      mensajes que entran (su API documentada solo envía)
+      mensajes que entran (su API documentada solo envía). Lo hace Jorge:
+      ver `docs/estado/pendientes-jorge.md`
 - [x] Plantillas de WhatsApp — hecho (11-09-2026): se crean y se mandan a
       Meta, se traen de Meta con su estado, y se envían desde Chats pasadas
       las 24 h. Ver `canales-mensajeria.md`
@@ -172,19 +177,21 @@ pantallas, en ordenador y en móvil). En producción: `prod-correo` (10),
 y `probar-invitacion` (9).
 
 ## Lo que necesita algo de Jorge (nada de esto puede hacerlo Claude solo)
-- [ ] **Stripe**: crear la cuenta (modo prueba vale) y pasar las claves. El
-      código de suscripción está a medias esperándolas; sin cuenta no se puede
-      ni escribir con sentido (faltan los precios y los identificadores) ni
-      probar. Es lo único que bloquea cobrar
-- [ ] **Dominio en Resend**: hoy la cuenta solo envía a
-      `app.respond.ia@gmail.com`, así que ninguna invitación llega a nadie de
-      fuera. Hace falta decidir el dominio y pegar 3 registros DNS
+La lista detallada, con los pasos de cada servicio, está en
+`docs/estado/pendientes-jorge.md` (13-09-2026). Resumen:
+- [x] **Stripe**: claves en Vercel (13-09-2026). Falta el webhook cuando se
+      conecte en el código
+- [x] **Meta**: app de prueba conectada y probada con el móvil de Jorge
+      (13-09-2026). La verificación de empresa queda para clientes reales
+- [ ] **Whaticket**: escribir a su soporte (texto listo en el archivo)
+- [ ] **Buzón de pruebas** (Gmail con contraseña de aplicación) para el
+      canal de email
+- [ ] **Dominio en Resend**: hoy la cuenta solo envía al dueño de la cuenta,
+      así que ninguna invitación llega a nadie de fuera. Decidir dominio,
+      pegar 3 registros DNS y poner el SMTP de Resend en Supabase
+- [ ] **OpenAI**: recarga automática y límites
 - [ ] **Vercel a Pro** antes de cobrar (el plan gratis es solo uso personal)
 - [ ] **Supabase a Pro** para la protección de contraseñas filtradas
-- [ ] **Papeleo de Meta** (verificación de Atsura) y número de WhatsApp de
-      prueba para probar con un móvil de verdad
-- [ ] **Whaticket**: escribir a su soporte preguntando si pueden avisar a
-      Respondi de los mensajes entrantes. Si no pueden, se quita de la pantalla
 - [ ] **Outlook / Microsoft 365 en el correo**: registrar una app en Microsoft
       (Azure) para su inicio de sesión
 
@@ -235,6 +242,45 @@ momento; en todos los planes; el cliente no se registra. Detalle en
 - [x] Tramo 3 (13-09-2026): enlace público de reserva (respondi.vercel.app/r/…,
       con QR) y página de cada reserva con su llave para cambiar o cancelar
 - [ ] Google Calendar (proyecto de Google de Jorge), más adelante
+
+## Prioridad 6 — Bloque acordado el 13-09-2026 (orden decidido con Jorge)
+Tramo 1, lo rápido:
+- [ ] Prefijo telefónico siempre obligatorio y en un campo aparte (página
+      pública de reserva y formularios de Respondi), con todos los países
+      del mundo ordenados. El país de la sucursal es independiente del
+      teléfono del cliente
+- [ ] Página pública de reserva: no dejar reservar en un día ni una hora ya
+      pasados
+- [ ] Plantillas de WhatsApp editables por cada cliente, con versiones e
+      historial: usar una aprobada mientras otra está en revisión, volver a
+      una versión anterior; todas vienen prediseñadas
+- [ ] Al conectar WhatsApp por Meta, suscribir la app a la cuenta de
+      WhatsApp Business (`subscribed_apps`) y comprobarlo: hoy no se hace y
+      Meta no entrega nada (pasó el 13-09-2026)
+- [ ] Tienda online: guía completa para el cliente con todos los pasos de
+      Shopify; renombrar "Clave secreta de la app" (es la clave de firma de
+      los webhooks); añadir `write_customers` a la lista de permisos
+Tramo 2, créditos y planes:
+- [ ] Créditos en la cabecera con color (verde >30 %, amarillo 10–30 %,
+      rojo <10 % o agotados); aviso al 20 % y al 0 por campana y correo
+- [ ] Quitar la compra de créditos adicionales (solo subir de plan; el
+      superadmin puede regalar créditos)
+- [ ] Planes a medida desde superadmin, para una o varias organizaciones
+      concretas
+- [ ] Cambio de plan como solicitud que aprueba el superadmin hasta que
+      Stripe esté conectado; después, ponerlo bien con Stripe
+Tramo 3, pantallas:
+- [ ] Revisar todas las páginas: contenido a todo el ancho en escritorio,
+      móvil y tablet perfectos, posición de botones
+- [ ] Tablas estilo Shopify con toda su funcionalidad (búsqueda, pestañas
+      por estado, orden, acciones en bloque, paginación, tarjetas en móvil)
+Después:
+- [ ] Shopify para clientes reales: app del Dev Dashboard con enlace de
+      instalación (las apps personalizadas ya no se crean desde 01-2026)
+- [ ] Canales de Instagram y Facebook (Jorge ya añadió los tres casos de
+      uso en la app de Meta)
+- [ ] Stripe: conectar los pagos y dar a Jorge la dirección del webhook
+- [ ] Remitente de los correos de Respondi con el dominio que elija Jorge
 
 ## Invitaciones pendientes — cerrado (10-09-2026)
 Todo el bloque está hecho: `PanelInvitaciones` compartido en

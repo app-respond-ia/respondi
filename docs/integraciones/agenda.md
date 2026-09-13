@@ -258,6 +258,12 @@ mensajes automáticos no gastan créditos de Respondi (los cobra Meta).
   reloj de la base de datos no recogió el aviso pendiente en los 100 s de
   la primera comprobación (los cuelgues de 60 s del cron, conocidos); en la
   segunda lo trató en 14 s. Sin restos y saldo en 7.
+- **Tramo 3 (13-09-2026, commit `f7bf356`)**: `prod-automatizaciones` 9/9,
+  `captura-reserva-publica` con `PROD=1` 9/9 (la sección del enlace con QR
+  en Ajustes y, desde un móvil sin sesión, respondi.vercel.app/r/…: pasos,
+  huecos, reserva, confirmación, gestionar y cancelar con la llave), y el
+  reloj de la base de datos trató un aviso pendiente en 26 s. Sin restos y
+  saldo en 7.
 
 ## Pendiente
 

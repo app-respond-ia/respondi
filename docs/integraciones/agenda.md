@@ -286,6 +286,23 @@ mensajes automáticos no gastan créditos de Respondi (los cobra Meta).
   la del negocio (Jorge, en España, veía "horas pasadas" de una sucursal de
   pruebas en America/Caracas: no eran pasadas, eran de Caracas).
 
+### Verificado en producción (13-09-2026, commit `9f02896`)
+- `prod-restaurar-jorge` (5/5): la página pública de la sucursal de pruebas
+  (`/r/pruebas`) carga, descarga la lista completa de países y el campo de
+  prefijo, y el servidor pasa "hoy" en la zona del negocio y el prefijo
+  preseleccionado.
+- `captura-publica-prod` con navegador real en móvil (4/4): el calendario
+  no deja antes de hoy (America/Caracas), desde España avisa de que las
+  horas son las del negocio, el prefijo va aparte con 243 países y España
+  preseleccionada; captura `prod-publica-paso3.png`.
+- Ojo con la sucursal de pruebas: las baterías (`probar-agenda`,
+  `probar-reserva-publica`) borran citas, recursos y ajustes de la agenda
+  de esa sucursal, así que se llevaron la reserva real de Jorge y el
+  recurso "Carlos". Se dejó la agenda activa con enlace `pruebas` y Carlos
+  recreado; el servicio "pelo" de Jorge hace fallar dos comprobaciones de
+  esas baterías (cuentan 4 servicios en vez de 3 y ven algo reservable), no
+  es un fallo del código.
+
 ## Pendiente
 
 - Google Calendar (necesita un proyecto de Google creado por Jorge).

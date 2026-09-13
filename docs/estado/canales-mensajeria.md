@@ -117,6 +117,10 @@ las prediseñadas), y todas vienen hechas para no tener que editarlas.
 - **Pruebas**: `probar-plantillas-versiones` (32) contra el Meta simulado,
   más `probar-plantillas` (44) y `probar-whatsapp` (25) sin regresiones.
   Nombres con `_v<número>` al final quedan reservados para las versiones.
+- **Verificado en producción** (13-09-2026, commit `9f02896`,
+  `prod-plantillas` 9/9): el aviso firmado de Meta aprueba una versión 2 y
+  pasa a usarse sola (la 1 deja de estar en uso), Chats ofrece solo la
+  versión en uso, y la página de plantillas carga.
 
 ## Token de Meta que caduca — hecho el 11-09-2026
 El token de la pantalla de pruebas de Meta dura 24 h. Al conectar (o cambiar

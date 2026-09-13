@@ -284,6 +284,8 @@ Tramo 3, pantallas — hecho (13-09-2026), ver `docs/convenciones.md`
       (1366) con `revisar-anchos`: ninguna se sale del ancho; el único fallo
       era el aviso de hidratación 418 de la cabecera (número con formato de
       Node frente al del navegador), corregido con idioma fijo
+- [x] Verificado en producción (13-09-2026, tras el despliegue): la misma
+      revisión contra respondi.vercel.app, 144 pantallas, 0 con problemas
 - [ ] Skills y Roles de superadmin siguen como tarjetas de configuración (no
       son listas de datos)
 Después:

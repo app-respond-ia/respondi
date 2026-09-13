@@ -26,7 +26,7 @@ const TIPOS_NOTIFICACIONES = [
   { id: 'ticket_nuevo_cliente', label: 'Nuevos tickets', desc: 'Cuando se abre un nuevo ticket de soporte de tus clientes.' },
   { id: 'respuesta_cliente', label: 'Respuestas de clientes', desc: 'Cuando un cliente responde a un ticket de soporte.' },
   { id: 'trial_por_vencer', label: 'Trial por vencer', desc: 'Cuando tu período de prueba está a punto de finalizar.' },
-  { id: 'creditos_bajos', label: 'Créditos bajos', desc: 'Cuando tus créditos de IA están por agotarse.' },
+  { id: 'creditos_bajos', label: 'Créditos bajos', desc: 'Cuando te queda el 20 % de los créditos de IA y cuando se agotan (también te llega por correo).' },
   { id: 'cambio_plan_aplicado', label: 'Cambios de plan', desc: 'Cuando tu organización cambia de plan de suscripción.' },
   { id: 'pago_confirmado', label: 'Pagos confirmados', desc: 'Cuando se confirma la renovación o pago de tu suscripción.' },
   { id: 'cuenta_suspendida', label: 'Cuenta suspendida', desc: 'Cuando se suspende el acceso a tu cuenta.' },

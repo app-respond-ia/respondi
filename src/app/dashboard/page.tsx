@@ -4,6 +4,8 @@ import Link from 'next/link'
 
 import { useState, useEffect } from 'react'
 import { getDashboardData } from '@/app/actions/dashboard'
+import { getEstadoCreditos } from '@/app/actions/planes'
+import { CLASES_NIVEL, textoNivel } from '@/lib/creditos-nivel'
 import { traducirError } from '@/lib/traducirError'
 
 export default function DashboardPage() {
@@ -12,7 +14,12 @@ export default function DashboardPage() {
   const [filtroSucursalDB, setFiltroSucursalDB] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<any>(null)
+  const [estadoCreditos, setEstadoCreditos] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    getEstadoCreditos().then(r => { if (r.success) setEstadoCreditos(r.data) }).catch(() => {})
+  }, [])
 
   useEffect(() => {
     const cargar = async () => {
@@ -272,15 +279,18 @@ export default function DashboardPage() {
       </div>
 
       {/* Consumo de cuota */}
-      <div className="rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 text-white p-5">
+      <div className={`rounded-2xl p-5 border ${estadoCreditos && estadoCreditos.nivel !== 'verde' ? `${CLASES_NIVEL[estadoCreditos.nivel as keyof typeof CLASES_NIVEL].fondo} border-transparent` : 'bg-gradient-to-r from-slate-900 to-slate-800 text-white border-transparent'}`}>
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
-            <p className="text-sm text-slate-400 mb-1">Créditos disponibles</p>
-            <p className="font-display font-700 text-3xl">{creditos_disponibles.toLocaleString()}</p>
-            <p className="text-sm text-slate-400 mt-1">Cada mensaje respondido por la IA consume 1 crédito.</p>
+            <p className={`text-sm mb-1 ${estadoCreditos && estadoCreditos.nivel !== 'verde' ? 'opacity-80' : 'text-slate-400'}`}>Créditos disponibles</p>
+            <div className="flex items-center gap-2">
+              {estadoCreditos && <span className={`w-3 h-3 rounded-full ${CLASES_NIVEL[estadoCreditos.nivel as keyof typeof CLASES_NIVEL].punto}`}></span>}
+              <p className="font-display font-700 text-3xl">{creditos_disponibles.toLocaleString()}{estadoCreditos?.max > 0 ? <span className="text-base font-500 opacity-70"> / {estadoCreditos.max.toLocaleString()}</span> : null}</p>
+            </div>
+            <p className={`text-sm mt-1 ${estadoCreditos && estadoCreditos.nivel !== 'verde' ? 'font-600' : 'text-slate-400'}`}>{estadoCreditos && textoNivel(estadoCreditos.nivel) ? textoNivel(estadoCreditos.nivel) : 'Cada mensaje respondido por la IA consume 1 crédito.'}</p>
           </div>
           <div className="text-right">
-            <p className="text-xs text-slate-500 mb-1">¿Necesitas más?</p>
+            <p className={`text-xs mb-1 ${estadoCreditos && estadoCreditos.nivel !== 'verde' ? 'opacity-80' : 'text-slate-500'}`}>¿Necesitas más?</p>
             <Link href="/dashboard/facturacion#planes" className="inline-flex items-center px-4 h-9 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 transition">
               Ampliar plan
             </Link>

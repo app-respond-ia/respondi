@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { estadoCreditos } from '@/lib/creditos'
 import { createClient } from '@/utils/supabase/server'
 import AdminLayout from '@/components/layout/AdminLayout'
 import { getMisPermisos } from '@/app/actions/permisos'
@@ -65,18 +66,11 @@ export default async function DashboardLayout({
   // Permisos, tiendas del selector, tienda activa y créditos no dependen unos
   // de otros: se piden a la vez (antes iban uno detrás de otro y cada página
   // del panel tardaba más en empezar a pintarse).
+  // La misma cuenta que Facturación y el inicio (src/lib/creditos.ts)
   const creditosDeLaOrganizacion = async () => {
     if (!userData?.tenant_id) return null
-    const [{ data: org }, { data: quotas }] = await Promise.all([
-      supabase.from('organizaciones').select('trial_activo, plans!plan_id(creditos_diarios_trial, creditos_mensuales)').eq('id', userData.tenant_id).single(),
-      supabase.from('message_quotas').select('saldo').eq('tenant_id', userData.tenant_id).order('timestamp', { ascending: false }).limit(1).maybeSingle()
-    ])
-    if (!org) return null
-    const plan = Array.isArray(org.plans) ? org.plans[0] : org.plans
-    // En la prueba, lo que se dio al empezar; si no, lo que da el plan al mes.
-    // Si el plan no lo dice, se enseña solo el saldo (antes salía "7 / 0")
-    const max = org.trial_activo ? plan?.creditos_diarios_trial : plan?.creditos_mensuales
-    return { saldo: quotas?.saldo || 0, max: max || 0 }
+    const estado = await estadoCreditos(userData.tenant_id)
+    return estado ? { saldo: estado.saldo, max: estado.max } : null
   }
 
   // La lista del selector sale de la misma regla que decide a qué tiendas se

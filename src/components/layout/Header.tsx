@@ -1,4 +1,6 @@
 'use client'
+import Link from 'next/link'
+import { nivelCreditos, CLASES_NIVEL } from '@/lib/creditos-nivel'
 
 import { useState, useRef, useEffect } from 'react'
 import { setActiveBranch } from '@/app/actions/branch'
@@ -26,20 +28,13 @@ export default function Header({ branches, activeBranchId, onOpenMobile, userIni
 
   let creditosClasses = ''
   let dotClasses = ''
+  let nivelCred: ReturnType<typeof nivelCreditos>['nivel'] = 'verde'
   if (creditos) {
-    // Sin tope conocido (el plan no dice cuántos da), el color depende solo de
-    // si queda saldo; antes salía en rojo con saldo de sobra
-    const pct = creditos.max > 0 ? (creditos.saldo / creditos.max) * 100 : (creditos.saldo > 0 ? 100 : 0)
-    if (pct > 20) {
-      creditosClasses = 'bg-slate-100 text-ink-700'
-      dotClasses = 'bg-emerald-500'
-    } else if (pct > 5) {
-      creditosClasses = 'bg-amber-50 text-amber-700'
-      dotClasses = 'bg-amber-500'
-    } else {
-      creditosClasses = 'bg-rose-50 text-rose-700'
-      dotClasses = 'bg-rose-500'
-    }
+    // Verde por encima del 30 % del plan, amarillo del 10 al 30 %, rojo por
+    // debajo del 10 % o sin créditos (decidido con Jorge, 13-09-2026)
+    nivelCred = nivelCreditos(creditos.saldo, creditos.max).nivel
+    creditosClasses = CLASES_NIVEL[nivelCred].fondo
+    dotClasses = CLASES_NIVEL[nivelCred].punto
   }
 
   const activeBranch = branches.find((b) => b.id === activeBranchId) || branches[0]
@@ -103,12 +98,23 @@ export default function Header({ branches, activeBranchId, onOpenMobile, userIni
         </div>
 
         {creditos && (
-          <div className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-500 ml-1 ${creditosClasses}`}>
+          <Link
+            href="/dashboard/facturacion"
+            title={nivelCred === 'agotado' ? 'Sin créditos: la IA ha dejado de contestar' : nivelCred === 'verde' ? 'Créditos de IA que te quedan' : 'Quedan pocos créditos de IA'}
+            className={`flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg text-sm font-500 ml-1 whitespace-nowrap transition hover:opacity-90 ${creditosClasses}`}
+          >
             <span className={`w-2 h-2 rounded-full ${dotClasses}`}></span>
-            {creditos.max > 0
-              ? `${creditos.saldo.toLocaleString()} / ${creditos.max.toLocaleString()} créditos`
-              : `${creditos.saldo.toLocaleString()} créditos`}
-          </div>
+            {nivelCred === 'agotado' ? (
+              <span>Sin créditos</span>
+            ) : (
+              <>
+                <span className="sm:hidden">{creditos.saldo.toLocaleString()}</span>
+                <span className="hidden sm:inline">{creditos.max > 0
+                  ? `${creditos.saldo.toLocaleString()} / ${creditos.max.toLocaleString()} créditos`
+                  : `${creditos.saldo.toLocaleString()} créditos`}</span>
+              </>
+            )}
+          </Link>
         )}
 
         <div className="flex-1"></div>

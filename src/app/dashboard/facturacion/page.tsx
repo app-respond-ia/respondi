@@ -4,7 +4,8 @@ import { ErrorCarga } from '@/components/ui/ErrorCarga'
 import { useState, useEffect } from 'react'
 import { getMisPermisos } from '@/app/actions/permisos'
 import { getMetricas, getMovimientosCreditosCliente } from '@/app/actions/metricas'
-import { getPlanesDisponibles, solicitarCambioPlan } from '@/app/actions/planes'
+import { getPlanesDisponibles, solicitarCambioPlan, getEstadoCreditos } from '@/app/actions/planes'
+import { CLASES_NIVEL, textoNivel } from '@/lib/creditos-nivel'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { useToast } from '@/components/ui/Toast'
 import Link from 'next/link'
@@ -35,6 +36,7 @@ export default function FacturacionPage() {
   
   const [filtros, setFiltros] = useState<{ tipo?: 'abono' | 'debito', origen?: string }>({})
   const [planes, setPlanes] = useState<any>(null)
+  const [estadoCreditos, setEstadoCreditos] = useState<any>(null)
   const [planPedido, setPlanPedido] = useState<any>(null)
   const [pidiendo, setPidiendo] = useState(false)
   const { showToast } = useToast()
@@ -45,7 +47,7 @@ export default function FacturacionPage() {
     const r = await solicitarCambioPlan(planPedido.id).catch(() => ({ success: false, error: 'No se ha podido enviar. Revisa la conexión.' }))
     setPidiendo(false)
     if (r.success) {
-      showToast('Petición enviada. El equipo de Respondi te contestará en Soporte para completar el cambio.', 'success')
+      showToast('Petición enviada. El equipo de Respondi la aprobará en breve y te avisaremos aquí.', 'success')
       setPlanPedido(null)
       const p = await getPlanesDisponibles().catch(() => null)
       if (p?.success) setPlanes(p.data)
@@ -78,6 +80,7 @@ export default function FacturacionPage() {
     // 2. Si tiene permiso (cualquier nivel), cargamos los datos
     if (pNivel !== 'ninguno') {
       getPlanesDisponibles().then(r => { if (r.success) setPlanes(r.data) }).catch(() => {})
+      getEstadoCreditos().then(r => { if (r.success) setEstadoCreditos(r.data) }).catch(() => {})
       const [resMetricas, resMov] = await Promise.all([
         getMetricas('mes'), // Reusado de Metricas, nos interesan solo los créditos
         getMovimientosCreditosCliente(filtros as any)
@@ -122,22 +125,27 @@ export default function FacturacionPage() {
           <div className="bg-white rounded-2xl border border-slate-200 p-6 text-sm text-ink-500">Cargando planes…</div>
         ) : (
           <>
-            {planes.peticionAbierta && (
+            {(planes.planSolicitadoId || planes.peticionAbierta) && (
               <div className="mb-4 rounded-xl bg-brand-50 border border-brand-100 px-4 py-3 text-sm text-brand-900">
-                Has pedido un cambio de plan («{planes.peticionAbierta.asunto}»). El equipo de Respondi te contestará en{' '}
-                <Link href={`/dashboard/soporte/${planes.peticionAbierta.id}`} className="font-600 underline underline-offset-2">Soporte</Link>.
+                Has pedido pasar al plan <strong>{planes.planes.find((p: any) => p.id === planes.planSolicitadoId)?.nombre || planes.peticionAbierta?.asunto?.replace(/^Cambio de plan:\s*/, '') || ''}</strong>. El equipo de Respondi lo aprobará en breve y te avisaremos por la campana.
+                {planes.peticionAbierta && <> Si quieres añadir algo, escríbenos en <Link href={`/dashboard/soporte/${planes.peticionAbierta.id}`} className="font-600 underline underline-offset-2">Soporte</Link>.</>}
               </div>
             )}
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {planes.planes.map((p: any) => {
                 const esActual = p.id === planes.planActualId && !planes.enPrueba
                 const esPendiente = p.id === planes.planPendienteId
+                const esSolicitado = p.id === planes.planSolicitadoId
                 return (
-                  <div key={p.id} className={`rounded-2xl border p-5 flex flex-col ${esActual ? 'border-brand-400 bg-brand-50/40' : 'border-slate-200 bg-white'}`}>
-                    <div className="flex items-center justify-between gap-2 mb-1">
+                  <div key={p.id} className={`rounded-2xl border p-5 flex flex-col ${esActual ? 'border-brand-400 bg-brand-50/40' : p.a_medida ? 'border-purple-300 bg-purple-50/30' : 'border-slate-200 bg-white'}`}>
+                    <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
                       <p className="font-display font-700 text-lg text-ink-900">{p.nombre}</p>
-                      {esActual && <span className="text-[11px] font-600 px-2 py-0.5 rounded-full bg-brand-600 text-white">Tu plan</span>}
-                      {esPendiente && <span className="text-[11px] font-600 px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">En la próxima renovación</span>}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {p.a_medida && <span className="text-[11px] font-600 px-2 py-0.5 rounded-full bg-purple-100 text-purple-800">A medida para ti</span>}
+                        {esActual && <span className="text-[11px] font-600 px-2 py-0.5 rounded-full bg-brand-600 text-white">Tu plan</span>}
+                        {esPendiente && <span className="text-[11px] font-600 px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">En la próxima renovación</span>}
+                        {esSolicitado && <span className="text-[11px] font-600 px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">Pendiente de aprobación</span>}
+                      </div>
                     </div>
                     <p className="text-ink-900 mb-3"><span className="font-display font-700 text-2xl">{Number(p.precio_usd).toLocaleString('es-ES')} $</span><span className="text-ink-500"> /mes</span></p>
                     <ul className="text-sm text-ink-600 space-y-1 mb-5 flex-1">
@@ -150,7 +158,7 @@ export default function FacturacionPage() {
                     {!esActual && (
                       <button
                         onClick={() => setPlanPedido(p)}
-                        disabled={nivelPermiso !== 'escritura' || !!planes.peticionAbierta}
+                        disabled={nivelPermiso !== 'escritura' || !!planes.peticionAbierta || !!planes.planSolicitadoId}
                         className="h-10 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {planes.enPrueba ? 'Elegir este plan' : 'Cambiar a este plan'}
@@ -161,7 +169,7 @@ export default function FacturacionPage() {
               })}
             </div>
             <p className="text-xs text-ink-500 mt-3">
-              {planes.enPrueba ? 'Estás en la prueba gratuita. ' : ''}El pago con tarjeta estará disponible pronto; mientras tanto, al elegir un plan el equipo de Respondi te escribe por Soporte para completar el cambio.
+              {planes.enPrueba ? 'Estás en la prueba gratuita. ' : ''}El pago con tarjeta estará disponible pronto; mientras tanto, al elegir un plan el equipo de Respondi lo aprueba y te avisamos. No se venden créditos sueltos: si necesitas más respuestas de IA, el camino es un plan mayor.
             </p>
           </>
         )}
@@ -172,13 +180,19 @@ export default function FacturacionPage() {
         <section className="mb-10">
           <SectionTitle>Resumen de uso</SectionTitle>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-            <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-5 text-white shadow-sm">
-              <p className="text-sm text-slate-400 mb-1">Disponibles</p>
-              <p className="font-display font-700 text-3xl">{metricasCreditos.disponibles.toLocaleString()}</p>
-              {metricasCreditos.diasRestantes !== null && (
-                <p className="text-xs text-slate-400 mt-2">
+            <div className={`rounded-2xl p-5 shadow-sm border ${estadoCreditos ? `${CLASES_NIVEL[estadoCreditos.nivel as keyof typeof CLASES_NIVEL].fondo} border-transparent` : 'bg-gradient-to-br from-slate-900 to-slate-800 text-white border-transparent'}`}>
+              <p className={`text-sm mb-1 ${estadoCreditos ? 'opacity-80' : 'text-slate-400'}`}>Disponibles</p>
+              <div className="flex items-center gap-2">
+                {estadoCreditos && <span className={`w-3 h-3 rounded-full ${CLASES_NIVEL[estadoCreditos.nivel as keyof typeof CLASES_NIVEL].punto}`}></span>}
+                <p className="font-display font-700 text-3xl">{metricasCreditos.disponibles.toLocaleString()}{estadoCreditos?.max > 0 ? <span className="text-base font-500 opacity-70"> / {estadoCreditos.max.toLocaleString()}</span> : null}</p>
+              </div>
+              {metricasCreditos.diasRestantes !== null && estadoCreditos?.nivel !== 'agotado' && (
+                <p className={`text-xs mt-2 ${estadoCreditos ? 'opacity-80' : 'text-slate-400'}`}>
                   ~{metricasCreditos.diasRestantes} días al ritmo actual
                 </p>
+              )}
+              {estadoCreditos && textoNivel(estadoCreditos.nivel) && (
+                <p className="text-xs mt-2 font-600">{textoNivel(estadoCreditos.nivel)} <a href="#planes" className="underline underline-offset-2">Ver planes</a></p>
               )}
             </div>
             <StatCard
@@ -202,7 +216,7 @@ export default function FacturacionPage() {
             </div>
             <div className="h-4 rounded-full bg-slate-100 overflow-hidden">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-brand-500 to-brand-600 transition-all duration-700"
+                className={`h-full rounded-full transition-all duration-700 ${estadoCreditos ? CLASES_NIVEL[estadoCreditos.nivel as keyof typeof CLASES_NIVEL].barra : 'bg-gradient-to-r from-brand-500 to-brand-600'}`}
                 style={{
                   width: `${Math.min(Math.round((metricasCreditos.consumidos / Math.max(metricasCreditos.disponibles + metricasCreditos.consumidos, 1)) * 100), 100)}%`
                 }}

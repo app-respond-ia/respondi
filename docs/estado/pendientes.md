@@ -257,15 +257,17 @@ Tramo 1, lo rápido — hecho (13-09-2026):
       (`subscribed_apps`); sin eso Meta no entrega nada
 - [x] Tienda online: guía completa de Shopify, "Clave de firma de los
       webhooks" con su nombre real y `write_customers` en permisos y guía
-Tramo 2, créditos y planes:
-- [ ] Créditos en la cabecera con color (verde >30 %, amarillo 10–30 %,
-      rojo <10 % o agotados); aviso al 20 % y al 0 por campana y correo
-- [ ] Quitar la compra de créditos adicionales (solo subir de plan; el
-      superadmin puede regalar créditos)
-- [ ] Planes a medida desde superadmin, para una o varias organizaciones
-      concretas
-- [ ] Cambio de plan como solicitud que aprueba el superadmin hasta que
-      Stripe esté conectado; después, ponerlo bien con Stripe
+Tramo 2, créditos y planes — hecho (13-09-2026), ver
+`creditos-facturacion.md`:
+- [x] Créditos en la cabecera (también en móvil), inicio y Facturación con
+      color (verde >30 %, amarillo 10–30 %, rojo <10 %, "Sin créditos" a 0);
+      aviso al 20 % y al 0 por campana (cliente y superadmin) y correo
+- [x] Sin compra de créditos adicionales: quitado del formulario y las
+      tarjetas de planes (el superadmin sigue pudiendo regalar créditos)
+- [x] Planes a medida desde superadmin, para una o varias organizaciones
+- [x] Cambio de plan como solicitud: el cliente pide, el superadmin aprueba
+      o rechaza desde Organizaciones y el cliente recibe aviso. Al conectar
+      Stripe, sustituirlo por el cobro
 Tramo 3, pantallas:
 - [ ] Revisar todas las páginas: contenido a todo el ancho en escritorio,
       móvil y tablet perfectos, posición de botones

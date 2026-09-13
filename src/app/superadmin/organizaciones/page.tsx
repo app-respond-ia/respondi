@@ -4,7 +4,7 @@ import Loading from '@/components/Loading'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { getOrganizaciones, actualizarEstadoOrganizacion, entrarComoOrganizacion, getPlanes, cambiarPlanOrganizacion, registrarPagoYRenovar, recargarCreditosIA, getInvitacionesSuperadmin, reenviarInvitacionSuperadmin, cancelarInvitacionSuperadmin } from '@/app/actions/superadmin'
+import { getOrganizaciones, actualizarEstadoOrganizacion, entrarComoOrganizacion, getPlanes, cambiarPlanOrganizacion, registrarPagoYRenovar, recargarCreditosIA, getInvitacionesSuperadmin, reenviarInvitacionSuperadmin, cancelarInvitacionSuperadmin, aprobarSolicitudPlan, rechazarSolicitudPlan } from '@/app/actions/superadmin'
 import PanelInvitaciones from '@/components/invitaciones/PanelInvitaciones'
 import { useToast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
@@ -48,6 +48,9 @@ export default function OrganizacionesPage() {
   const [recargandoIA, setRecargandoIA] = useState(false)
 
   const [confirmarEstado, setConfirmarEstado] = useState<{org: any, nuevoEstado: string} | null>(null)
+  const [resolviendoSolicitud, setResolviendoSolicitud] = useState(false)
+  const [rechazoSolicitud, setRechazoSolicitud] = useState<any>(null)
+  const [motivoRechazo, setMotivoRechazo] = useState('')
   const [changingEstado, setChangingEstado] = useState(false)
 
   const { hasPermission } = useSuperadminPermisos()
@@ -147,6 +150,24 @@ export default function OrganizacionesPage() {
     } else {
       setImpersonatingId(null)
       showToast(res.error || 'Error al intentar impersonar la organización', 'error')
+    }
+  }
+
+  const resolverSolicitud = async (org: any, aprobar: boolean) => {
+    setResolviendoSolicitud(true)
+    const res = aprobar ? await aprobarSolicitudPlan(org.id) : await rechazarSolicitudPlan(org.id, motivoRechazo)
+    setResolviendoSolicitud(false)
+    if (res.success) {
+      showToast(aprobar ? 'Plan aplicado y cliente avisado' : 'Solicitud rechazada y cliente avisado', 'success')
+      setRechazoSolicitud(null)
+      setMotivoRechazo('')
+      const pendiente = planes.find(p => p.id === org.plan_solicitado_id)
+      if (modalOrganizacion?.id === org.id) {
+        setModalOrganizacion({ ...modalOrganizacion, plan_solicitado_id: null, plan_solicitado_en: null, ...(aprobar && pendiente ? { plan_id: pendiente.id, plans: { nombre: pendiente.nombre } } : {}) })
+      }
+      loadOrganizaciones()
+    } else {
+      showToast(res.error || 'No se ha podido resolver la solicitud', 'error')
     }
   }
 
@@ -285,6 +306,12 @@ export default function OrganizacionesPage() {
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-600 ${statusStyle.split(' marker:')[0]}`}>
                       <span className={`w-1.5 h-1.5 rounded-full ${statusStyle.split(' marker:')[1]}`}></span> {o.estado}
                     </span>
+                    {o.plan_solicitado_id && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-600 bg-amber-100 text-amber-800">Pide plan {planes.find(p => p.id === o.plan_solicitado_id)?.nombre || ''}</span>
+                    )}
+                    {o.aviso_creditos && (
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-600 ${o.aviso_creditos === 'agotado' ? 'bg-rose-100 text-rose-700' : 'bg-amber-50 text-amber-700'}`}>{o.aviso_creditos === 'agotado' ? 'Sin créditos' : 'Créditos bajos'}</span>
+                    )}
                   </div>
                   <p className="text-sm text-ink-500 mt-0.5 truncate">
                     Plan {o.plans?.nombre || 'Ninguno'} {o.plan_pendiente_id && planes.find(p => p.id === o.plan_pendiente_id) ? `(→ ${planes.find(p => p.id === o.plan_pendiente_id).nombre})` : ''} · vence el {o.fecha_vencimiento ? new Date(o.fecha_vencimiento).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'N/A'} · vendedor: {nombresDeVendedores(o) || 'Sin vendedor'}
@@ -361,6 +388,28 @@ export default function OrganizacionesPage() {
                   <div className="flex justify-between gap-2"><dt className="text-ink-500">Alta</dt><dd className="text-ink-900 font-500 text-right">{new Date(modalOrganizacion.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}</dd></div>
                   <div className="flex justify-between gap-2"><dt className="text-ink-500">Vendedor</dt><dd className="text-ink-900 font-500 text-right">{nombresDeVendedores(modalOrganizacion) || 'Sin vendedor'}</dd></div>
                 </dl>
+
+                {/* Solicitud de cambio de plan del cliente (hasta que Stripe cobre solo) */}
+                {modalOrganizacion.plan_solicitado_id && (
+                  <div className="p-3 rounded-xl border border-amber-200 bg-amber-50">
+                    <p className="text-sm font-600 text-amber-900">Pide pasar al plan {planes.find(p => p.id === modalOrganizacion.plan_solicitado_id)?.nombre || ''}</p>
+                    <p className="text-xs text-amber-800 mt-0.5">Desde Facturación{modalOrganizacion.plan_solicitado_en ? `, el ${new Date(modalOrganizacion.plan_solicitado_en).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}` : ''}. Al aprobar, una subida se aplica ya y una bajada en la renovación; el cliente recibe aviso en los dos casos.</p>
+                    {rechazoSolicitud?.id === modalOrganizacion.id ? (
+                      <div className="mt-2 space-y-2">
+                        <input value={motivoRechazo} onChange={e => setMotivoRechazo(e.target.value)} placeholder="Motivo (opcional, lo verá el cliente)" className="w-full h-10 px-3 rounded-lg border border-amber-300 bg-white text-sm focus:outline-none focus:border-brand-500" />
+                        <div className="grid grid-cols-2 gap-2">
+                          <button disabled={resolviendoSolicitud} onClick={() => resolverSolicitud(modalOrganizacion, false)} className="h-10 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white text-sm font-600 transition">{resolviendoSolicitud ? 'Rechazando…' : 'Confirmar rechazo'}</button>
+                          <button disabled={resolviendoSolicitud} onClick={() => { setRechazoSolicitud(null); setMotivoRechazo('') }} className="h-10 rounded-xl border border-slate-300 bg-white text-sm font-600 text-ink-700 transition">Cancelar</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2 mt-2">
+                        <button disabled={!canWrite || resolviendoSolicitud} onClick={() => resolverSolicitud(modalOrganizacion, true)} className="h-10 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-sm font-600 transition">{resolviendoSolicitud ? 'Aplicando…' : 'Aprobar'}</button>
+                        <button disabled={!canWrite || resolviendoSolicitud} onClick={() => setRechazoSolicitud(modalOrganizacion)} className="h-10 rounded-xl border border-rose-200 bg-white hover:bg-rose-50 disabled:opacity-50 text-sm font-600 text-rose-600 transition">Rechazar</button>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Acciones de gestión */}
                 <div className="pt-2 border-t border-slate-100 space-y-2">
@@ -474,7 +523,7 @@ export default function OrganizacionesPage() {
                   >
                     <option value="">Selecciona un plan</option>
                     {planes.map(p => (
-                      <option key={p.id} value={p.id}>{p.nombre} (${p.precio_usd})</option>
+                      <option key={p.id} value={p.id}>{p.nombre} (${p.precio_usd}){p.personalizado ? ' · a medida' : ''}{p.activo === false ? ' · inactivo' : ''}</option>
                     ))}
                   </select>
                 </div>

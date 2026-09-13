@@ -259,7 +259,7 @@ export async function getOrganizaciones(filtro?: string) {
   let query = supabaseAdmin
     .from('organizaciones')
     .select(`
-      id, nombre, estado, plan_id, plan_pendiente_id, fecha_vencimiento, id_vendedor, created_at,
+      id, nombre, estado, plan_id, plan_pendiente_id, plan_solicitado_id, plan_solicitado_en, aviso_creditos, fecha_vencimiento, id_vendedor, created_at,
       plans!plan_id (nombre),
       vendedor_clientes ( vendedores (nombre) )
     `)
@@ -388,6 +388,75 @@ export async function cambiarPlanOrganizacion(organizacionId: string, nuevoPlanI
     })
   }
 
+  revalidatePath('/superadmin/organizaciones')
+  return { success: true }
+}
+
+// La petición de plan que hizo el cliente desde Facturación (hasta que
+// Stripe cobre solo): aprobar aplica el plan con la misma regla de siempre
+// (subida inmediata, bajada en la renovación); rechazar la quita y avisa.
+async function ticketDeSolicitud(organizacionId: string) {
+  const { data } = await supabaseAdmin
+    .from('client_tickets')
+    .select('id')
+    .eq('tenant_id', organizacionId)
+    .like('asunto', 'Cambio de plan%')
+    .not('estatus', 'in', '(resuelto,cerrado)')
+    .order('fecha_apertura', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  return data?.id || null
+}
+
+export async function aprobarSolicitudPlan(organizacionId: string) {
+  const auth = await requireSuperAdmin()
+  if (!superadminHasPermission(auth, 'organizaciones', 'escritura')) {
+    return { success: false, error: 'No tienes permiso para esta acción' }
+  }
+  const { data: org } = await supabaseAdmin.from('organizaciones').select('plan_solicitado_id, nombre').eq('id', organizacionId).maybeSingle()
+  if (!org?.plan_solicitado_id) return { success: false, error: 'Esta organización no tiene ninguna solicitud pendiente.' }
+  const r = await cambiarPlanOrganizacion(organizacionId, org.plan_solicitado_id)
+  if (!r.success) return r
+  await supabaseAdmin.from('organizaciones').update({ plan_solicitado_id: null, plan_solicitado_en: null }).eq('id', organizacionId)
+  const ticket = await ticketDeSolicitud(organizacionId)
+  if (ticket) await supabaseAdmin.from('client_tickets').update({ estatus: 'resuelto', fecha_cierre: new Date().toISOString() }).eq('id', ticket)
+  await registrarAuditoria({
+    tenant_id: organizacionId,
+    user_id: auth.userId,
+    accion: 'aprobó la solicitud de cambio de plan',
+    tabla_afectada: 'organizaciones',
+    registro_id: organizacionId,
+    valor_nuevo: { plan_id: org.plan_solicitado_id }
+  })
+  revalidatePath('/superadmin/organizaciones')
+  return { success: true }
+}
+
+export async function rechazarSolicitudPlan(organizacionId: string, motivo?: string) {
+  const auth = await requireSuperAdmin()
+  if (!superadminHasPermission(auth, 'organizaciones', 'escritura')) {
+    return { success: false, error: 'No tienes permiso para esta acción' }
+  }
+  const { data: org } = await supabaseAdmin.from('organizaciones').select('plan_solicitado_id, nombre, plans:plan_solicitado_id(nombre)').eq('id', organizacionId).maybeSingle()
+  if (!org?.plan_solicitado_id) return { success: false, error: 'Esta organización no tiene ninguna solicitud pendiente.' }
+  const nombrePlan = (Array.isArray(org.plans) ? org.plans[0] : org.plans)?.nombre || 'solicitado'
+  await supabaseAdmin.from('organizaciones').update({ plan_solicitado_id: null, plan_solicitado_en: null }).eq('id', organizacionId)
+  const texto = String(motivo || '').trim().slice(0, 300)
+  await notificarAAdminsDeOrganizacion(supabaseAdmin, organizacionId, {
+    tipo: 'cambio_plan_aplicado',
+    titulo: 'Cambio de plan no aplicado',
+    cuerpo: `Tu petición de pasar al plan ${nombrePlan} no se ha aplicado.${texto ? ` Motivo: ${texto}` : ''} Puedes escribirnos en Soporte.`,
+    url: '/dashboard/facturacion#planes'
+  })
+  await registrarAuditoria({
+    tenant_id: organizacionId,
+    user_id: auth.userId,
+    accion: `rechazó la solicitud de cambio al plan ${nombrePlan}`,
+    tabla_afectada: 'organizaciones',
+    registro_id: organizacionId,
+    valor_anterior: { plan_solicitado_id: org.plan_solicitado_id },
+    valor_nuevo: { motivo: texto || null }
+  })
   revalidatePath('/superadmin/organizaciones')
   return { success: true }
 }

@@ -28,9 +28,9 @@ const TIPOS_NOTIFICACIONES = [
   { id: 'organizacion_por_vencer', label: 'Organizaciones por vencer', desc: 'Alertas sobre organizaciones cuyo trial o plan vence pronto (se procesa a diario).' },
   { id: 'nueva_organizacion', label: 'Nuevas organizaciones', desc: 'Cuando un vendedor crea una nueva cuenta (trial) para un cliente.' },
   { id: 'comision_pendiente', label: 'Nuevas comisiones pendientes', desc: 'Cuando se registra una comisión manual que requiere revisión.' },
-  { id: 'creditos_cliente_bajos', label: 'Clientes con créditos bajos', desc: 'Cuando un cliente está por agotar sus créditos de IA.' },
+  { id: 'creditos_cliente_bajos', label: 'Clientes con créditos bajos', desc: 'Cuando a un cliente le queda el 20 % de sus créditos de IA o se le agotan.' },
   { id: 'caso_estancado', label: 'Casos estancados', desc: 'Cuando un ticket de soporte lleva más de 24h sin actividad.' },
-  { id: 'cliente_cambio_plan', label: 'Cambios de plan', desc: 'Cuando un cliente realiza un upgrade o downgrade.' },
+  { id: 'cliente_cambio_plan', label: 'Solicitudes de plan', desc: 'Cuando un cliente pide cambiar de plan desde Facturación (se aprueba o rechaza en Organizaciones).' },
   { id: 'cliente_solicita_cancelar', label: 'Solicitudes de cancelación', desc: 'Cuando un cliente pide dar de baja su servicio.' },
 ]
 

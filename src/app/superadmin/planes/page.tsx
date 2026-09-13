@@ -2,13 +2,14 @@
 import Loading from '@/components/Loading'
 
 import { useState, useEffect } from 'react'
-import { getPlanes, actualizarPlan, crearPlan, eliminarPlan } from '@/app/actions/superadmin'
+import { getPlanes, actualizarPlan, crearPlan, eliminarPlan, getOrganizacionesBasico } from '@/app/actions/superadmin'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { useToast } from '@/components/ui/Toast'
 import { useSuperadminPermisos } from '@/components/layout/SuperadminPermisosContext'
 
 export default function PlanesPage() {
   const [planes, setPlanes] = useState<any[]>([])
+  const [organizaciones, setOrganizaciones] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [modalData, setModalData] = useState<any>(null)
   
@@ -21,10 +22,12 @@ export default function PlanesPage() {
 
   const defaultFormData = {
     nombre: '', precio_usd: 0, creditos_mensuales: 1000, canales_max: 1, sucursales_max: 1, 
-    usuarios_max: 1, precio_credito_adicional: 0.005, precio_sucursal_extra: 15, 
-    dias_retencion_mensajes: 30, dias_trial: 14, creditos_diarios_trial: 0, modelo_ia: 'gpt-4o-mini',
+    usuarios_max: 1, precio_sucursal_extra: 15, 
+    dias_retencion_mensajes: 30, dias_trial: 0, creditos_diarios_trial: 0, modelo_ia: 'gpt-4o-mini',
     precio_input_usd_millon: 0.20, precio_output_usd_millon: 1.20,
-    activo: false, acumula_creditos: false, stripe_price_id: ''
+    activo: false, acumula_creditos: false, stripe_price_id: '',
+    // Plan a medida: solo lo ven (y pueden pedir) las organizaciones de la lista
+    personalizado: false, organizaciones_ids: [] as string[]
   }
   
   const [formData, setFormData] = useState({ ...defaultFormData })
@@ -35,10 +38,12 @@ export default function PlanesPage() {
 
   async function loadPlanes() {
     setLoading(true)
-    const { success, planes: data } = await getPlanes()
+    const [{ success, planes: data }, orgs] = await Promise.all([getPlanes(), getOrganizacionesBasico().catch(() => ({ success: false, organizaciones: [] }))])
     if (success && data) setPlanes(data)
+    if ((orgs as any)?.success) setOrganizaciones((orgs as any).organizaciones || [])
     setLoading(false)
   }
+  const nombreOrg = (id: string) => organizaciones.find(o => o.id === id)?.nombre || 'organización'
 
   const openModal = (plan: any) => {
     if (plan) {
@@ -49,7 +54,6 @@ export default function PlanesPage() {
         canales_max: plan.canales_max || 0,
         sucursales_max: plan.sucursales_max || 0,
         usuarios_max: plan.usuarios_max || 0,
-        precio_credito_adicional: plan.precio_credito_adicional || 0,
         precio_sucursal_extra: plan.precio_sucursal_extra || 0,
         dias_retencion_mensajes: plan.dias_retencion_mensajes || 30,
         dias_trial: plan.dias_trial ?? 14,
@@ -59,7 +63,9 @@ export default function PlanesPage() {
         precio_output_usd_millon: plan.precio_output_usd_millon ?? 1.20,
         activo: plan.activo ?? true,
         acumula_creditos: plan.acumula_creditos ?? false,
-        stripe_price_id: plan.stripe_price_id || ''
+        stripe_price_id: plan.stripe_price_id || '',
+        personalizado: !!plan.personalizado,
+        organizaciones_ids: Array.isArray(plan.organizaciones_ids) ? plan.organizaciones_ids : []
       })
       setModalData(plan)
     } else {
@@ -81,6 +87,10 @@ export default function PlanesPage() {
     }
     if (formData.precio_usd !== undefined && formData.precio_usd < 0) {
       showToast('El precio no puede ser negativo.', 'error')
+      return
+    }
+    if (formData.personalizado && !formData.organizaciones_ids.length) {
+      showToast('Un plan a medida necesita al menos una organización.', 'error')
       return
     }
     
@@ -160,6 +170,11 @@ export default function PlanesPage() {
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <h3 className={`font-display font-700 text-xl ${isPro ? 'text-white' : 'text-ink-900'}`}>{p.nombre}</h3>
+                      {p.personalizado && (
+                        <p className={`text-[11px] font-600 mt-1 ${isPro ? 'text-brand-100' : 'text-purple-700'}`} title={(p.organizaciones_ids || []).map(nombreOrg).join(', ')}>
+                          A medida · {(p.organizaciones_ids || []).length === 1 ? nombreOrg(p.organizaciones_ids[0]) : `${(p.organizaciones_ids || []).length} organizaciones`}
+                        </p>
+                      )}
                       <button disabled={!canWrite} onClick={() => handleToggleActivo(p)} className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-600 uppercase tracking-wider transition border disabled:opacity-50 disabled:cursor-not-allowed ${p.activo ? (isPro ? 'bg-white/20 text-white border-white/30 hover:bg-white/30' : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100') : (isPro ? 'bg-red-500/20 text-red-100 border-red-500/30 hover:bg-red-500/40' : 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100')}`}>
                         {p.activo ? 'Activo' : 'Inactivo'}
                       </button>
@@ -197,8 +212,8 @@ export default function PlanesPage() {
                   </ul>
                   <div className="mt-6 pt-5 border-t border-slate-100">
                     <p className="text-xs text-ink-500 mb-1">Costo adicional:</p>
-                    <p className="text-xs text-ink-700">${p.precio_credito_adicional} por cada crédito extra</p>
                     <p className="text-xs text-ink-700">${p.precio_sucursal_extra} por sucursal extra</p>
+                    <p className="text-[11px] text-ink-400 mt-1">Sin créditos sueltos: para más respuestas de IA, un plan mayor.</p>
                   </div>
                 </div>
 
@@ -255,6 +270,30 @@ export default function PlanesPage() {
                         <span className="text-sm font-500 text-ink-700">Acumular créditos no usados al renovar (por defecto, se resetean cada mes)</span>
                       </label>
                     </div>
+                  </div>
+                  <div className="mt-4 p-3 rounded-xl border border-purple-200 bg-purple-50/40">
+                    <label className="flex items-start gap-2 cursor-pointer">
+                      <input type="checkbox" checked={formData.personalizado} onChange={e => setFormData({...formData, personalizado: e.target.checked})} className="mt-0.5 w-4 h-4 rounded text-brand-600 focus:ring-brand-500 border-slate-300" />
+                      <span>
+                        <span className="block text-sm font-600 text-ink-900">Plan a medida (solo para organizaciones concretas)</span>
+                        <span className="block text-xs text-ink-500">No aparece en la lista pública de planes: solo lo ven y lo pueden pedir las organizaciones que marques.</span>
+                      </span>
+                    </label>
+                    {formData.personalizado && (
+                      <div className="mt-3 max-h-40 overflow-y-auto rounded-lg border border-slate-200 bg-white divide-y divide-slate-100">
+                        {organizaciones.length === 0 && <p className="text-xs text-ink-400 p-3">No hay organizaciones activas.</p>}
+                        {organizaciones.map(o => {
+                          const marcada = formData.organizaciones_ids.includes(o.id)
+                          return (
+                            <label key={o.id} className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-slate-50">
+                              <input type="checkbox" checked={marcada} onChange={e => setFormData({...formData, organizaciones_ids: e.target.checked ? [...formData.organizaciones_ids, o.id] : formData.organizaciones_ids.filter(x => x !== o.id)})} className="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 border-slate-300" />
+                              <span className="text-ink-800">{o.nombre}</span>
+                              <span className="text-[11px] text-ink-400 ml-auto">{o.estado}</span>
+                            </label>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
                   <div className="mt-4">
                     <label className="block text-xs font-500 text-ink-600 mb-1.5">ID de precio de Stripe</label>
@@ -352,11 +391,8 @@ export default function PlanesPage() {
                 {/* Bloque Extras */}
                 <div>
                   <h3 className="text-sm font-600 text-ink-900 mb-3 uppercase tracking-wide">Costos extra</h3>
+                  <p className="text-[11px] text-ink-400 mb-3">No se venden créditos sueltos (decidido el 13-09-2026): si un cliente necesita más respuestas de IA, sube de plan o se le hace un plan a medida. Los créditos de regalo se dan desde Organizaciones → Recarga manual.</p>
                   <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-500 text-ink-600 mb-1.5">Precio x Crédito adicional ($)</label>
-                      <input type="number" step="0.001" value={formData.precio_credito_adicional} onChange={e => setFormData({...formData, precio_credito_adicional: parseFloat(e.target.value)})} className="w-full h-10 px-3 rounded-lg border border-slate-300 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-100" />
-                    </div>
                     <div>
                       <label className="block text-xs font-500 text-ink-600 mb-1.5">Precio x Sucursal extra ($)</label>
                       <input type="number" step="0.01" value={formData.precio_sucursal_extra} onChange={e => setFormData({...formData, precio_sucursal_extra: parseFloat(e.target.value)})} className="w-full h-10 px-3 rounded-lg border border-slate-300 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-100" />

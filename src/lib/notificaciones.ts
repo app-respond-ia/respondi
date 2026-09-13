@@ -25,6 +25,7 @@ export type NotificacionTipo =
   | 'cliente_solicita_cancelar'
   | 'cuenta_suspendida'
   | 'cuenta_reactivada'
+  | 'cliente_cambio_plan'
 
 interface NotificacionData {
   userId: string

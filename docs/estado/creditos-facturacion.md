@@ -101,11 +101,60 @@ Existían dos caminos de alta con comportamiento distinto en créditos
 — ver `docs/estado/incidentes-resueltos.md` (RPC `crear_cuenta_completa`
 como solución unificada).
 
-## Sin uso real todavía
-`plans.precio_credito_adicional` y `plans.precio_sucursal_extra`
-existen en el formulario de planes pero no se usan en ningún flujo de
-cobro real — pendientes de cuando se diseñe el cobro de excedentes
-sobre los límites del plan.
+## Colores y avisos de créditos (13-09-2026, decidido con Jorge)
+- **Color** (`src/lib/creditos-nivel.ts`, igual en cabecera, inicio y
+  Facturación): verde por encima del 30 % de lo que da el plan (en la
+  prueba, los créditos de la prueba; después, los del mes), amarillo entre
+  el 10 % y el 30 %, rojo por debajo del 10 %, y "Sin créditos" cuando el
+  saldo es 0. La cabecera lo enseña también en el móvil (solo el número) y
+  lleva a Facturación.
+- **Avisos** (`src/lib/creditos.ts`, `revisarAvisosCreditos`): al llegar al
+  20 % y al agotarse, una sola vez cada uno: campana a los propietarios de
+  la organización (`creditos_bajos`), campana a los superadmins
+  (`creditos_cliente_bajos`) y correo a los propietarios
+  (`enviarEmailCreditos`, por Resend: hasta que haya dominio propio solo
+  entrega al dueño de la cuenta de Resend y el fallo queda en `error_logs`).
+  La marca `organizaciones.aviso_creditos` ('bajo' | 'agotado') evita
+  repetir y se limpia sola cuando el saldo vuelve a subir. Se revisa justo
+  después de cada crédito gastado (`/api/ai/process`, con `after`), al
+  rechazar por falta de saldo, y al abrir Facturación o el inicio
+  (`getEstadoCreditos`).
+- El aviso diario de pg_cron (`check_clientes_por_vencer_y_creditos`) estaba
+  roto —usaba `organizaciones.umbral_alerta_creditos` y
+  `message_quotas.created_at`, que no existen— y se ha dejado solo con el
+  aviso de vencimiento (migración `20260913170000`).
+
+## Sin créditos sueltos (13-09-2026)
+Decidido con Jorge: no se venden créditos adicionales al plan; si un cliente
+necesita más respuestas, sube de plan o se le hace un plan a medida. El campo
+"Precio x Crédito adicional" ha desaparecido del formulario y de las tarjetas
+de `/superadmin/planes` (la columna `plans.precio_credito_adicional` sigue en
+la tabla, sin uso). Los créditos de regalo siguen dándose desde
+Organizaciones → Recarga manual. `plans.precio_sucursal_extra` sigue sin
+flujo de cobro.
+
+## Planes a medida (13-09-2026)
+`plans.personalizado` + `plans.organizaciones_ids` (uuid[]). Un plan a medida
+no sale en la lista pública: solo lo ven y lo pueden pedir las organizaciones
+de su lista (`getPlanesDisponibles` lo filtra y lo marca `a_medida`). Se crea
+desde `/superadmin/planes` marcando "Plan a medida" y eligiendo las
+organizaciones; en Organizaciones → Cambiar plan aparecen todos con la marca
+"a medida".
+
+## Cambio de plan como solicitud (13-09-2026, hasta Stripe)
+`solicitarCambioPlan` apunta `organizaciones.plan_solicitado_id` /
+`plan_solicitado_en`, abre el ticket de siempre y avisa a los superadmins
+(`cliente_cambio_plan`). En `/superadmin/organizaciones` la fila lleva la
+insignia "Pide plan X" y en su ficha hay **Aprobar** (aplica el plan con la
+regla de siempre: subida inmediata, bajada en la renovación; cierra el ticket
+y avisa al cliente) y **Rechazar** (con motivo opcional, avisa al cliente).
+Facturación enseña el plan pedido como "Pendiente de aprobación" y bloquea
+otra petición mientras tanto. Cuando Stripe esté conectado, este flujo se
+sustituye por el cobro.
+
+## Pendiente
+`plans.precio_sucursal_extra` existe en el formulario de planes pero no se
+usa en ningún flujo de cobro real.
 
 ## Bloqueado / aplazado
 Bloque 2.1 (traducir errores crudos de Postgres a mensajes

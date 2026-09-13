@@ -1,7 +1,8 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import crypto from 'crypto'
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { notificarAAdminsDeOrganizacion } from '@/lib/notificaciones'
+import { revisarAvisosCreditos } from '@/lib/creditos'
 
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
@@ -218,6 +219,8 @@ export async function POST(req: Request) {
     const saldo = quota?.saldo || 0
 
     if (saldo <= 0) {
+      // Aviso de "agotados" (una sola vez) a los propietarios y a Respondi
+      after(() => revisarAvisosCreditos(conv.tenant_id))
       const msg = profile?.msg_cuota_agotada || 'En este momento nuestros agentes están experimentando demoras. Te atenderemos lo antes posible.'
       await avisoAutomatico(msg)
       await crearCasoDesdeSistema(conversationId, conv.tenant_id, conv.branch_id, conv.contact_id, 'Cuota de mensajes agotada. Requiere atención manual.')
@@ -278,6 +281,8 @@ export async function POST(req: Request) {
       p_branch_id: conv.branch_id,
       p_origen: 'consumo_ia'
     })
+    // ¿Ha llegado al 20 % o se ha agotado? Se avisa sin retrasar la respuesta
+    after(() => revisarAvisosCreditos(conv.tenant_id))
     await liberarCandado()
     return NextResponse.json({ status: 'Exito (Proceso IA finalizado)' })
 

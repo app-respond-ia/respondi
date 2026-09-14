@@ -1076,3 +1076,21 @@ Regla que deja: en Vercel, **nunca esperar dentro de `after()` a algo que
 tarde**, y menos a una llamada HTTP a la propia app. Si hay trabajo que
 encadenar, se deja marcado en la base de datos y lo recoge el cron que ya
 pasa por ahí.
+
+## Una plantilla rechazada por Meta no se podía volver a enviar (resuelto, 14-09-2026)
+
+Síntoma: en la batería de automatizaciones, tras un aviso de Meta
+`REJECTED` sobre la plantilla en uso de una familia (p. ej. `pedido_enviado`),
+volver a enviarla desde el panel fallaba con
+`duplicate key value violates unique constraint "whatsapp_templates_en_uso_unica"`.
+
+Causa: el índice único parcial solo admite **una** versión `en_uso` por
+canal, familia e idioma. `enviarPlantillaPredisenada` creaba la versión
+nueva ya `en_uso` (lo correcto, porque la anterior está rechazada y no
+sirve), pero nadie quitaba la marca a la rechazada, así que chocaban.
+
+Arreglo: `crearVersion` (`src/lib/canales/plantillas-versiones.ts`), cuando
+la versión nueva entra en uso desde ya, quita antes `en_uso` a cualquier
+otra versión de esa familia. Vale para todos los que llaman a
+`crearVersion`, no solo para las prediseñadas. `probar-motor-automatizaciones`
+73/73, `probar-plantillas-versiones` 32/32, `probar-plantillas` 44/44.

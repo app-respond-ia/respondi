@@ -439,10 +439,19 @@ de lo que más ahorra o desbloquea.
       nombres, y sin nombres el modelo no puede elegir. Lo que queda por
       mirar son las definiciones de las herramientas, que son el bloque
       grande y fijo (y que ya se cachea).
-- [ ] **Arreglar la ficha de la sucursal de pruebas**: dice «Cafetería de
-      barrio» y el único servicio es un corte de pelo. Esa contradicción hace
-      que la IA falle 1 de cada 4 veces al preguntar el precio. Es de Jorge,
-      pero conviene, porque falsea las pruebas.
+- [x] **La sucursal de pruebas rehecha** (14-09-2026): ahora es Peluquería
+      Nova, coherente y completa (`rehacer-negocio.mjs`). Ver `motor-ia.md`,
+      «La batería completa del motor».
+
+### Esperando una decisión de Jorge (nuevas, 14-09-2026)
+- [ ] **La skill «Hacer presupuestos» está oculta para clientes**
+      (`visible_cliente=false` en Superadmin → Skills). Ningún cliente puede
+      encenderla desde su panel. Mi consejo: hacerla visible y activa por
+      defecto; cualquier negocio con lista de precios la quiere.
+- [ ] **Una etiqueta por conversación.** La conversación se etiqueta con la
+      primera intención y no se vuelve a etiquetar aunque cambie de tema
+      (pide cita y luego cancela → queda «Reserva»). Es como está diseñado;
+      si se quiere una etiqueta por tema, hay que decidirlo.
 - [ ] **Sembrar automatizaciones y etiquetas** al crear una organización, para
       que el cliente no empiece con las pantallas vacías (no está decidido,
       es una idea).

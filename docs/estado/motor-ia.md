@@ -306,3 +306,192 @@ WhatsApp (ogg opus) y montada igual que lo hace la app (un `File` con tipo
 
 La mitad de precio y el doble de rápido, con la misma transcripción palabra
 por palabra. Fuente de precios: la página de precios de OpenAI de 2026.
+
+## La batería completa del motor y el negocio de pruebas (14-09-2026)
+
+Jorge: «quiero que pruebes todo literalmente, que rehagas el negocio con
+todo lo que necesites y arreglar cada pequeña cosa; todo a prueba de fuego».
+
+### El negocio de pruebas ahora es coherente: Peluquería Nova
+La sucursal de pruebas era una «Cafetería de barrio» que vendía cortes de
+pelo. Esa contradicción hacía fallar a la IA y falseaba las pruebas.
+`rehacer-negocio.mjs` (scratchpad) la convierte, **por las mismas acciones
+del panel que usa Jorge**, en una peluquería de Madrid con todo lo que hay
+que probar:
+- Ficha: Peluquería Nova, Fuencarral 42, Europe/Madrid, EUR, tono cercano,
+  horario L-V 9-14 y 16-20, sábado 9-14, domingo cerrado. La IA contesta
+  siempre (`siempre_activa`) para que las pruebas no dependan de la hora; el
+  caso «fuera de horario» se prueba aparte cambiándolo.
+- Precios: 9 servicios reservables con distintas duraciones (corte 15 €/30
+  min, tinte 45 €/90 min con 30 de espera, mechas 60 €/120, corte infantil,
+  barba, lavado, keratina, un «desde 35» y un «a consultar») y 5 productos,
+  uno de ellos oculto a la IA (`visible_ia=false`) para comprobar que no lo
+  ofrece. El servicio «pelo» de la reserva de Jorge se renombra a «Corte de
+  pelo» conservando su id.
+- Agenda: activa, 2 h de antelación, cancelar hasta 24 h antes, grupos desde
+  4. Tres profesionales: Carlos (horario de la sucursal, hace todo), Ana
+  (martes a sábado 10-19, color y peluquería, sin barba) y Luis (solo
+  mañanas, barbería). Ana está **bloqueada en la agenda** esta semana además
+  de la novedad que lo dice: la novedad sola no quita huecos.
+- 6 etiquetas + «Otros» de respaldo; 6 reglas de escalado con prioridades
+  (reclamación alta, reacción alérgica urgente, factura baja, grupo media);
+  5 políticas procesadas (cancelación 24 h y 50 %, pagos, devoluciones 14
+  días, mascotas, garantía del color 7 días); 2 novedades (Ana de vacaciones,
+  10 % en color); las 8 skills encendidas.
+- Se conserva todo lo de Jorge: canal de WhatsApp, tienda, Jorgito con su
+  conversación y su reserva.
+
+La skill **«Hacer presupuestos» está oculta para clientes** en Superadmin
+(`visible_cliente=false`), así que ningún cliente puede encenderla desde su
+panel. Para la sucursal de pruebas se dio de alta a mano. Decisión pendiente
+de Jorge: hacerla visible (cualquier negocio con lista de precios la quiere).
+
+### La batería: `probar-negocio-completo.mjs`
+Habla con el motor como un cliente de verdad, con el OpenAI real, y comprueba
+**efectos** (filas en la base), no palabras: que la cita exista y sea de ese
+día y esa hora, que el caso se abra con su prioridad, que la etiqueta sea la
+que toca, que la IA quede pausada, que el saldo no se mueva cuando no debe.
+42 escenarios en diez grupos: precios y catálogo, presupuestos, horario y
+ubicación, agenda (pedir, ver, mover y cancelar en una sola conversación;
+profesional que no hace ese servicio; antelación; día cerrado; grupo grande;
+corte infantil solo con Carlos), escalado (persona, reclamación, reacción
+alérgica, factura, PDF), políticas, novedades, idioma (inglés, francés) y
+trato (nota del contacto «de usted»), memoria (hilo de la conversación y
+conversaciones cerradas anteriores), adjuntos (nota de voz real, foto), y las
+reglas del sistema (sin créditos, pausa por agente y escribir como agente,
+fuera de horario y desbloqueo, contacto sin IA, ventana de 24 h).
+
+Los mensajes se meten directamente y se llama al motor local; las respuestas
+salen por el canal real de Jorge pero contra el Meta simulado
+(`META_SIMULADO_ACEPTA_CUALQUIER_TOKEN=1`), así que nunca llegan a Meta ni a
+un móvil, y su canal no se toca. Cada conversación nace con el candado
+`ia_procesando_desde` puesto para que el reloj de producción no la conteste.
+
+### Lo que salió y se arregló en el motor
+Primera pasada: 57 bien, 17 mal. Tras separar fallos reales, pruebas mal
+escritas y variación del modelo, en el motor se cambió:
+- **La dirección no le llegaba a la IA.** A «¿dónde estáis?» contestaba «en
+  el centro de Madrid» (lo único que decía la descripción). Ahora el prompt
+  lleva nombre y dirección de la sucursal.
+- **Negaba servicios sin mirar el catálogo** («¿hacéis manicura?» → «no»).
+  Red de seguridad: si la respuesta niega algo y no consultó el catálogo, se
+  le obliga a consultarlo y contestar de nuevo.
+- **Buscar por categoría.** «Servicios de color» traía el tinte y no las
+  mechas (la palabra no salía en su nombre). Si lo buscado es el nombre de
+  una categoría, entran todos los de esa categoría.
+- **Las novedades del día se las callaba** a veces (con «10 % en tintes»
+  activo, al precio del tinte no lo mencionaba). Instrucción más fuerte y red
+  de seguridad: si un aviso de hoy afecta a lo que pregunta y no lo menciona,
+  se reescribe la respuesta incluyéndolo.
+- **«¿Me cobráis si cancelo?» lo trataba como cancelar.** Miraba la agenda,
+  veía que no había cita y contestaba «no tienes ninguna cita» sin decir
+  nunca la norma de las 24 h. Dos cosas: la red de la agenda ya no actúa
+  ante una pregunta de condiciones, y una red de políticas fuerza la consulta
+  y reescribe la respuesta con plazos y cifras exactos.
+- **Un daño o reacción tras un servicio no escalaba.** A «me pica la cabeza
+  y tengo rojeces desde el tinte» contestaba «consulta con un profesional».
+  La revisión de escalado salta ahora también cuando el cliente describe un
+  daño (no solo cuando pide una persona), y la instrucción prohíbe consejos
+  médicos.
+- **Un grupo grande abría caso pero la IA seguía contestando.** Ahora la
+  agenda pausa la IA al abrir caso, igual que `escalar_humano`.
+- **Un PDF: decía «una persona lo revisará» sin avisar a nadie.** El caso de
+  un archivo que la IA no puede leer se abre en código, con la regla
+  «documento no procesable» si existe, y se pausa la IA.
+- **«Voy a proceder a reprogramarla… un momento» sin hacerlo.** La revisión
+  de agenda tiene ahora dos pasos con herramientas (mirar huecos y luego
+  cambiar), y «proceder», «reprogramar» y «un segundo» cuentan como promesa
+  sin hacer.
+- **Los modelos baratos copian mal los identificadores de las citas** y luego
+  «no la encuentran» para cancelar o mover. Si el cliente solo tiene una
+  cita, la herramienta la usa aunque el id venga mal.
+- **«Por la tarde» es desde las 15:00**, en el filtro de huecos, en la
+  instrucción y en la prueba (antes 14:00 en el código y sin definir en el
+  prompt).
+- **El registro de herramientas usadas** (`ai_logs.contexto_snapshot.usadas`)
+  solo apuntaba la primera pasada: las redes de seguridad y la agenda no
+  aparecían. Ahora recoge todas.
+- Al derivar, «una persona del equipo», no «un humano» ni «he escalado».
+
+Y en la pasada de estabilidad (cada escenario dos y tres veces), lo que solo
+sale una de cada tres o cuatro veces:
+- **«¿Me la puedes cambiar a la última hora que tengas?» → «¿te gustaría que
+  lo confirmara?»** sin cambiarla. Esa frase no dice «cita» ni «reserva» y
+  la red de agenda no entraba. Ahora basta con que pida la acción (cambiar,
+  mover, pasar a, adelantar, retrasar, aplazar, cancelar), con o sin tilde.
+  La batería exige que la cambie en la misma respuesta.
+- **Una promoción que no se decía.** La red de novedades creía que «10 % en
+  tintes y mechas» ya estaba dicha porque «más» se reducía a la raíz «m» y
+  «mechas» «empezaba por» ella. Las raíces de menos de 3 letras ya no valen,
+  y las palabras que usó el propio cliente («tinte») no cuentan como prueba
+  de que se mencionó el aviso. De paso, la ñ se conserva al comparar
+  («uñas» se convertía en «unas», palabra vacía, y no se buscaba).
+- **«¿Cuánto cuesta un corte?» acababa en «dime día y hora» sin precio.**
+  La red del presupuesto forzaba `hacer_presupuesto` en cualquier «cuánto
+  cuesta», y una vez la respuesta decía «para proceder con la reserva…», que
+  la red de agenda tomaba por una promesa y reescribía sin el precio. Ahora
+  el presupuesto solo se fuerza si pide un total o el precio de varias cosas
+  (dos llamadas menos por pregunta de precio), «proceder» y «reprogramar»
+  solo cuentan como promesa en primera persona, y la reescritura tiene que
+  conservar lo que ya decía.
+- **Un cambio de hora que acabó en cancelación.** Con `cancelar_cita` y
+  `cambiar_cita` a mano en la revisión de agenda, a «cámbiamela a la última
+  hora» el modelo una vez la canceló y el cliente se quedó sin cita. Ahora,
+  si pide cambiar, `cancelar_cita` ni se le ofrece (y al revés si pide
+  cancelar), y las instrucciones dicen que «la última» o «la primera» hora
+  es la de la lista de `ver_huecos`. Con eso la cambia a la primera, sin
+  revisión, 4 de 4 veces.
+- **Una foto sin descripción guardada.** El prompt dice «SIEMPRE llama a
+  guardar_descripcion_imagen», pero una de cada cinco veces el modelo se lo
+  saltaba (sobre todo si además consultaba el catálogo). Sin descripción, la
+  foto se vuelve a mandar a OpenAI en cada turno y el panel no sabe qué era.
+  Ahora hay una red que se lo obliga (llamada forzada solo a esa
+  herramienta) y, si copia mal el id y solo hay una foto, se usa esa.
+- **Una nota de voz: «¿qué tipo de corte prefieres?» en vez de dar horas.**
+  El modelo llamaba a ver_huecos sin el servicio, y la agenda preguntaba.
+  Ahora, si no lo pasa o no cuadra, la agenda lo busca en las palabras del
+  propio cliente («cortarme el pelo» → «Corte de pelo»); para eso las raíces
+  de palabras entienden verbos y pronombres pegados (cortarme, cortar, corte
+  → «cort»). Y la transcripción del audio ya queda en memoria para las redes
+  de seguridad, que antes veían el mensaje de audio en blanco.
+- **`ai_logs.contexto_snapshot.revisiones`**: qué redes de seguridad han
+  saltado en cada pasada (las primeras palabras de cada «REVISIÓN:»). Sin
+  esto no había forma de saber si una respuesta rara venía del modelo o de
+  una revisión; con esto se encontraron las tres anteriores en minutos.
+- La batería tiene `CONSERVAR=1` para dejar las conversaciones y sus
+  `ai_logs` sin borrar y poder mirarlos.
+
+Y en las baterías antiguas: las de agenda apartan los servicios reservables
+del negocio real mientras corren; el canal de prueba del Meta simulado
+reutiliza la fila del WhatsApp real (solo cabe uno por sucursal) y la
+salvaguarda la repone; se quitaron las comprobaciones del flujo «pedir plan
+para que lo apruebe superadmin», que Jorge eliminó el 13-09.
+
+### Resultado final (14-09-2026)
+Cuatro pasadas completas de la batería grande con el OpenAI real: 17 fallos
+en la primera, 3 en la segunda, 6 en la tercera (una regresión por el
+identificador de cita, dos redes de seguridad peleándose, el PDF sin caso y
+la variación de la promoción) y **78 de 78 en la cuarta**. Después, una
+pasada de estabilidad con cada escenario dos veces (`REPS=2`): 155 de 156,
+y ese fallo (el «¿te gustaría que lo confirmara?») destapó los de una entre
+tres o cinco veces que cuenta la lista de arriba. Cada uno se reprodujo
+aparte (el escenario 3 a 6 veces seguidas, con `CONSERVAR=1` para leer las
+`revisiones`), se arregló y se volvió a pasar la batería entera: 76 de 78,
+77 de 79, 78 de 79 y **79 de 79 en la última**, con el catálogo, la agenda
+y los adjuntos repetidos 3 a 6 veces cada uno sin fallar.
+
+Barrido de todas las baterías antiguas contra el negocio nuevo, una detrás
+de otra: whatsapp 25/25, plantillas 44/44, plantillas-versiones 32/32,
+páginas de Meta 26/26, agenda 52/52, reserva pública 37/37, bloqueos 6/6,
+créditos y planes 13/13, Stripe 23/23, app de Shopify 29/29,
+automatizaciones 29/29, motor de automatizaciones 73/73 (el único fallo del
+barrido, una plantilla rechazada que no se podía volver a enviar, está en
+`incidentes-resueltos.md`) y asistente 44/44.
+
+Coste: la cuenta de pruebas pasó de 3005 créditos (tras la recarga) a
+2342 (unas 660 respuestas de la IA, contando las pasadas de estabilidad y las repeticiones de cada fallo) entre todas las pasadas; ya no hay «saldo a 7», Jorge usa esa
+cuenta y se le dice la cifra.
+
+Lo que sigue sin cerrar de este tramo está en `pendientes.md` («Esperando
+una decisión de Jorge»): la skill de presupuestos oculta y la etiqueta única
+por conversación.

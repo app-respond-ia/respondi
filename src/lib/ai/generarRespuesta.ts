@@ -180,6 +180,11 @@ export async function generarRespuesta(conv: any) {
       systemPrompt += `Tono: ${profile.tono}\n`
     }
     
+    // El nombre y la dirección de la sucursal. Medido el 14-09-2026: sin
+    // esto, a "¿dónde estáis?" contestaba "en el centro de Madrid", que era
+    // lo único que decía la descripción, y no daba la calle.
+    if (branch?.nombre) systemPrompt += `Negocio: ${branch.nombre}\n`
+    if (branch?.direccion) systemPrompt += `Dirección: ${branch.direccion}\n`
     if (profile.servicios) {
       let infoLimpia = profile.servicios;
       if (infoLimpia.length > 500) {
@@ -230,7 +235,7 @@ export async function generarRespuesta(conv: any) {
   // --- NOVEDADES DEL DÍA --- (cambian cada día, así que también van al final)
   if (dailyUpdates && dailyUpdates.length > 0) {
     contextoDelCliente += `\n--- NOVEDADES Y AVISOS ACTIVOS HOY ---\n`;
-    contextoDelCliente += `Ten en cuenta esta información temporal al responder:\n`;
+    contextoDelCliente += `Son avisos de HOY y mandan sobre lo demás. Si alguno afecta a lo que pregunta el cliente (un descuento en el servicio por el que pregunta, una persona que no está, un cambio de horario), DILO en la respuesta aunque no lo pregunte: un cliente que pregunta el precio del tinte tiene que enterarse de que esta semana tiene descuento.\n`;
     dailyUpdates.forEach((u: any) => {
       const tipo = u.tipos_novedad?.nombre || 'Aviso';
       contextoDelCliente += `- [${tipo}]: ${u.descripcion}\n`;
@@ -261,7 +266,8 @@ export async function generarRespuesta(conv: any) {
   if (activeSkills.has('consultar_politicas')) {
     // Los modelos pequeños contestaban de memoria ("puedes venir con tu perro,
     // tenemos patio") en vez de mirar la norma del negocio
-    systemPrompt += `- Antes de responder sobre condiciones o sobre qué se permite (devoluciones, envíos, reservas, pagos, mascotas, normas del local...), consulta SIEMPRE las políticas con consultar_politicas. No supongas nada.\n`
+    systemPrompt += `- Antes de responder sobre condiciones o sobre qué se permite (devoluciones, envíos, reservas, pagos, mascotas, normas del local...), consulta SIEMPRE las políticas con consultar_politicas. No supongas nada. Cuando contestes con una política, da los plazos y las cifras EXACTOS que diga (días, horas, porcentajes): no los resumas ni los omitas.\n`
+    systemPrompt += `- Si el cliente PREGUNTA por las condiciones (qué pasa si cancela, si se cobra algo, plazos, retrasos) sin pedir cancelar ni mover una cita concreta, es una consulta de políticas: contesta con consultar_politicas y NO toques su agenda.\n`
   }
   if (!esCorreo) systemPrompt += `- Eres un asistente, responde de manera concisa y natural.\n`
   if (activeSkills.has('presupuestos')) {
@@ -283,6 +289,8 @@ export async function generarRespuesta(conv: any) {
     // Detectado probando el motor con un cliente pidiendo hablar con alguien.
     systemPrompt += `- Si el mensaje del cliente encaja con alguna de las Reglas de Caso listadas más abajo, DEBES invocar escalar_humano con el ID de esa regla.\n`
     systemPrompt += `- NUNCA digas que vas a avisar al equipo, pasar la conversación a una persona, derivar el caso o similar sin haber invocado antes escalar_humano. Si no invocas la herramienta, no se avisa a nadie y el cliente se queda esperando.\n`
+    systemPrompt += `- Cuando derives, di que "una persona del equipo" seguirá con ello; no digas "un humano" ni "he escalado tu caso", que suena a máquina.\n`
+    systemPrompt += `- Si el cliente cuenta un daño, dolor, picor, reacción alérgica o cualquier problema de salud tras un servicio, invoca escalar_humano EN ESA MISMA RESPUESTA con la regla que encaje, antes que nada. No des consejos médicos ni le mandes "a un profesional": la persona del equipo se pondrá en contacto.\n`
   } else {
     // Sin escalado activado no hay forma de avisar a nadie: prometerlo es
     // dejar al cliente esperando a alguien que no va a llegar.
@@ -329,6 +337,9 @@ export async function generarRespuesta(conv: any) {
   // 5. Preparar Mensajes para OpenAI
   const openAiMessages: any[] = [{ role: 'system', content: systemPrompt }]
   let hasImage = false
+  // Un archivo que la IA no puede leer (PDF, Word...) siempre lo revisa una
+  // persona: el caso se abre en código, no se deja en manos del modelo
+  let adjuntoSinLeerEnEstaPasada: string | null = null
 
   for (const m of allMessages) {
     let role = m.remitente === 'cliente' ? 'user' : 'assistant'
@@ -388,6 +399,9 @@ export async function generarRespuesta(conv: any) {
         
         const textoExtraido = transcription.text
         await supabaseAdmin.from('messages').update({ contenido: textoExtraido }).eq('id', m.id)
+        // También en memoria: las redes de seguridad leen el texto del
+        // cliente de allMessages y un audio quedaba en blanco para ellas
+        m.contenido = textoExtraido
         openAiMessages.push({ role, content: textoExtraido })
       } catch (err) {
         await registrarError({
@@ -405,9 +419,10 @@ export async function generarRespuesta(conv: any) {
       // ENTERARSE de que ha llegado algo: si no, le llega un mensaje vacío,
       // no entiende nada y no puede derivar el caso a una persona como se le
       // pide en las instrucciones.
+      if (m.agrupado !== true) adjuntoSinLeerEnEstaPasada = m.media_tipo
       openAiMessages.push({
         role,
-        content: `[El cliente ha enviado un archivo adjunto de tipo ${m.media_tipo} que no puedes abrir ni leer. Dile que lo has recibido pero que no puedes procesarlo, y deriva el caso a una persona.]${m.contenido ? ` Texto que lo acompaña: ${m.contenido}` : ''}`
+        content: `[El cliente ha enviado un archivo adjunto de tipo ${m.media_tipo} que no puedes abrir ni leer. En tu respuesta di EXPLÍCITAMENTE que has recibido el archivo pero que no puedes abrirlo, y que una persona del equipo lo revisará (el caso se abre solo, no hace falta escalar_humano).]${m.contenido ? ` Texto que lo acompaña: ${m.contenido}` : ''}`
       })
     } else {
       openAiMessages.push({ role, content: esCorreo && role === 'user' ? correoParaIA(m.asunto, m.contenido || '') : (m.contenido || '') })
@@ -563,6 +578,9 @@ export async function generarRespuesta(conv: any) {
   // solo si la agenda de la sucursal está activada y hay algo reservable.
   const { cargarHerramientasDeAgenda, ejecutarHerramientaDeAgenda, esHerramientaDeAgenda } = await import('@/lib/agenda/herramientas-ia')
   const herramientasAgenda = await cargarHerramientasDeAgenda(branchId, contactId, conversationId)
+  // Lo que ha escrito (o dicho) el cliente en este turno: si el modelo llama
+  // a ver_huecos sin decir el servicio, la agenda lo busca en sus palabras
+  if (herramientasAgenda.contexto) herramientasAgenda.contexto.texto_cliente = allMessages.filter((m: any) => m.remitente === 'cliente' && m.agrupado !== true).map((m: any) => m.contenido || '').join(' ')
   if (herramientasAgenda.definiciones.length) {
     tools.push(...herramientasAgenda.definiciones)
     openAiMessages.push({ role: 'system', content: herramientasAgenda.instrucciones })
@@ -908,8 +926,13 @@ export async function generarRespuesta(conv: any) {
         if (!error && args.busqueda) {
           const b = normalizar(args.busqueda)
           const enNombre = (p: any) => normalizar(p.nombre).includes(b) || contienePalabras(p.nombre, args.busqueda)
+          // Lo buscado puede ser el nombre de una categoría ("color",
+          // "barbería", "productos"): entonces entran todos los de esa
+          // categoría, aunque la palabra no salga en su nombre. Visto el
+          // 14-09-2026: "servicios de color" traía el tinte y no las mechas.
+          const enCategoria = (p: any) => { const c = (p.categorias_precios as any)?.nombre || ''; return !!c && (normalizar(c).includes(b) || contienePalabras(b, c) || contienePalabras(c, args.busqueda)) }
           productos = productos
-            .filter(p => enNombre(p) || normalizar(p.descripcion || '').includes(b) || contienePalabras(`${p.nombre} ${p.descripcion || ''}`, args.busqueda))
+            .filter(p => enNombre(p) || enCategoria(p) || normalizar(p.descripcion || '').includes(b) || contienePalabras(`${p.nombre} ${p.descripcion || ''}`, args.busqueda))
             .sort((a, z) => Number(enNombre(z)) - Number(enNombre(a)))
         }
         if (!error && Array.isArray(args.etiquetas) && args.etiquetas.length > 0) {
@@ -1014,15 +1037,109 @@ export async function generarRespuesta(conv: any) {
     }
   }
 
+  // Red de seguridad de la imagen: el cliente ha mandado una foto y el modelo
+  // no ha llamado a guardar_descripcion_imagen (el prompt dice SIEMPRE, pero
+  // medido el 14-09-2026 se lo salta de vez en cuando cuando además consulta
+  // el catálogo). Sin descripción guardada, la foto se vuelve a mandar a
+  // OpenAI en cada turno y el panel no sabe qué era. Se le obliga.
+  const describioImagen = () => openAiMessages.some((m: any) => m?.role === 'assistant' && Array.isArray(m.tool_calls) && m.tool_calls.some((t: any) => t.function?.name === 'guardar_descripcion_imagen'))
+  if (hasImage && !describioImagen()) {
+    try {
+      const herramientaImagen = tools.find((t: any) => t.function?.name === 'guardar_descripcion_imagen')
+      const imagenesPendientes = allMessages.filter((m: any) => String(m.media_tipo || '').startsWith('image') && m.agrupado !== true)
+      openAiMessages.push({ role: 'system', content: 'REVISIÓN: el cliente ha mandado una imagen y no has guardado su descripción. Llama ahora a guardar_descripcion_imagen con el ID_Mensaje_Imagen y una descripción útil de lo que se ve (colores, objetos, texto legible). No escribas respuesta.' })
+      const revision = await openai.chat.completions.create({
+        model: MODELO_IA,
+        messages: openAiMessages,
+        tools: [herramientaImagen],
+        tool_choice: { type: 'function', function: { name: 'guardar_descripcion_imagen' } }
+      })
+      tokensInput += revision.usage?.prompt_tokens || 0
+      tokensCacheados += revision.usage?.prompt_tokens_details?.cached_tokens || 0
+      tokensOutput += revision.usage?.completion_tokens || 0
+      const r: any = revision.choices[0].message
+      const llamadas: any[] = (r.tool_calls || []).filter((t: any) => t.function?.name === 'guardar_descripcion_imagen')
+      if (llamadas.length) {
+        openAiMessages.push(r)
+        for (const llamada of llamadas) {
+          const args = (() => { try { return JSON.parse(llamada.function.arguments || '{}') } catch { return {} } })()
+          // Si copia mal el id y solo hay una foto sin describir, es esa
+          const idImagen = args.message_id && allMessages.some((m: any) => m.id === args.message_id) ? args.message_id : (imagenesPendientes.length === 1 ? imagenesPendientes[0].id : null)
+          let resultado = 'Error: message_id no pertenece a la conversación actual.'
+          if (idImagen && args.descripcion) {
+            const { error } = await supabaseAdmin.from('messages').update({ contenido: String(args.descripcion) }).eq('id', idImagen)
+            resultado = error ? `Error DB: ${error.message}` : 'Descripción de imagen guardada en base de datos correctamente.'
+          }
+          openAiMessages.push({ role: 'tool', tool_call_id: llamada.id, content: resultado })
+        }
+      }
+    } catch (err: any) {
+      console.error('Revisión de la imagen fallida:', err?.message)
+    }
+  }
+
+  // Red de seguridad del catálogo: la IA dice que algo no se ofrece o que no
+  // tiene información sin haber mirado el catálogo. Medido el 14-09-2026: a
+  // "¿hacéis manicura?" contestaba que no sin consultar, y con la descripción
+  // del negocio delante se fiaba de ella en vez de la lista de precios. Se le
+  // obliga a mirar y a contestar de nuevo con lo que salga (si de verdad no
+  // está, dirá que no, pero ya con fundamento).
+  const NIEGA = /no (lo |los |la |las )?(tenemos|ofrecemos|hacemos|realizamos|disponemos|vendemos|contamos)|no (tengo|dispongo de) (esa )?informaci|no est[áa] (disponible|en nuestro)|no (se )?(hace|ofrece|vende) (aqu[íi]|en)/i
+  const herramientaCatalogo = tools.find((t: any) => t.function?.name === 'consultar_catalogo')
+  const miroCatalogo = () => openAiMessages.some((m: any) => m?.role === 'assistant' && (m.tool_calls || []).some((t: any) => t.function?.name === 'consultar_catalogo'))
+  const ultimoTextoCliente = [...allMessages].reverse().find((m: any) => m.remitente === 'cliente')?.contenido || ''
+  if (herramientaCatalogo && responseMsg?.content && NIEGA.test(responseMsg.content) && !miroCatalogo() && ultimoTextoCliente.length > 3) {
+    try {
+      openAiMessages.push({ role: 'assistant', content: responseMsg.content })
+      openAiMessages.push({ role: 'system', content: 'REVISIÓN: has dicho que algo no se ofrece o que no tienes información sin mirar el catálogo. Búscalo ahora con consultar_catalogo (con lo que ha pedido el cliente) y contesta de nuevo con lo que encuentres. Si de verdad no está, dilo; si está, da precio y detalles.' })
+      const revision = await openai.chat.completions.create({
+        model: MODELO_IA,
+        messages: openAiMessages,
+        tools: [herramientaCatalogo],
+        tool_choice: { type: 'function', function: { name: 'consultar_catalogo' } }
+      })
+      tokensInput += revision.usage?.prompt_tokens || 0
+      tokensCacheados += revision.usage?.prompt_tokens_details?.cached_tokens || 0
+      tokensOutput += revision.usage?.completion_tokens || 0
+      const r: any = revision.choices[0].message
+      const llamada: any = r.tool_calls?.find((t: any) => t.function?.name === 'consultar_catalogo')
+      if (llamada) {
+        const args = (() => { try { return JSON.parse(llamada.function.arguments || '{}') } catch { return {} } })()
+        // La misma búsqueda que hace la herramienta en la primera pasada
+        const { normalizar, contienePalabras } = await import('@/lib/ai/comparar-texto')
+        const { data: todos } = await supabaseAdmin.from('price_list').select('id, nombre, tipo, precio, precio_tipo, moneda, descripcion, categorias_precios (nombre)').eq('branch_id', branchId).eq('visible_ia', true).eq('disponible', true).limit(2000)
+        const b = normalizar(args.busqueda || ultimoTextoCliente)
+        const hallados = (todos || []).filter((p: any) => normalizar(p.nombre).includes(b) || contienePalabras(`${p.nombre} ${p.descripcion || ''} ${(p.categorias_precios as any)?.nombre || ''}`, args.busqueda || ultimoTextoCliente)).slice(0, 15)
+        const resultado = hallados.length
+          ? 'Catálogo encontrado:\n' + hallados.map((p: any) => `- ${p.nombre} | ${p.precio_tipo === 'consultar' ? 'Precio: A consultar' : p.precio_tipo === 'desde' ? `Precio: Desde ${p.precio} ${p.moneda}` : `Precio: ${p.precio} ${p.moneda}`}${p.descripcion ? `\n  Descripción: ${p.descripcion}` : ''}`).join('\n')
+          : 'No se encontraron productos o servicios que coincidan con la búsqueda.'
+        openAiMessages.push(r)
+        openAiMessages.push({ role: 'tool', tool_call_id: llamada.id, content: resultado })
+        const final = await openai.chat.completions.create({ model: MODELO_IA, messages: openAiMessages })
+        tokensInput += final.usage?.prompt_tokens || 0
+        tokensCacheados += final.usage?.prompt_tokens_details?.cached_tokens || 0
+        tokensOutput += final.usage?.completion_tokens || 0
+        if (final.choices[0].message.content) responseMsg.content = final.choices[0].message.content
+      }
+    } catch (e: any) {
+      console.error('Revisión de catálogo fallida:', e?.message)
+    }
+  }
+
   // Red de seguridad: el cliente pide un total o un presupuesto y la IA ha
   // contestado sin usar `hacer_presupuesto` (visto en pruebas: decía el precio
   // de un producto y del otro "no tengo información, te respondo luego", en
   // vez de calcularlo). Se le pide que lo haga con la herramienta.
-  const PIDE_PRESUPUESTO = /presupuesto|precio total|en total|cu[áa]nto (me )?(ser[íi]a|costar[íi]a|cuesta|vale|sale)|cuanto seria|qu[ée] precio.*(todo|junto)/i
+  // Solo cuando pide un total o el precio de VARIAS cosas. «¿Cuánto cuesta un
+  // corte?» se contesta con el catálogo: forzar aquí el presupuesto costaba
+  // dos llamadas más y daba respuestas de «presupuesto» a una pregunta simple
+  // (medido el 14-09-2026; una vez acabó pidiendo día y hora sin dar el precio)
+  const PIDE_PRESUPUESTO = /presupuesto|precio total|en total|cu[áa]nto (me )?(ser[íi]a|costar[íi]a|saldr[íi]a)|cuanto seria|qu[ée] precio.*(todo|junto)/i
+  const PRECIO_DE_VARIOS = /cu[áa]nto (me )?(cuesta|vale|sale|cuestan|valen|salen)\b.*(\d|\b(dos|tres|cuatro|cinco|seis|varios|varias|todo|todos|juntos?)\b|\by (un|una|el|la|los|las)\b|\bm[áa]s (un|una|el|la|los|las)\b)/i
   const pendientesCliente = allMessages.filter((m: any) => m.remitente === 'cliente' && m.agrupado !== true).map((m: any) => m.contenido || '')
   // Con la tienda conectada y su presupuesto encendido, manda el de la tienda
   const herramientaPresupuesto = tools.find((t: any) => t.function?.name === 'presupuesto_de_tienda') || tools.find((t: any) => t.function?.name === 'hacer_presupuesto')
-  if (herramientaPresupuesto && !presupuestoEnEstaPasada && responseMsg?.content && pendientesCliente.some(t => PIDE_PRESUPUESTO.test(t))) {
+  if (herramientaPresupuesto && !presupuestoEnEstaPasada && responseMsg?.content && pendientesCliente.some(t => PIDE_PRESUPUESTO.test(t) || PRECIO_DE_VARIOS.test(t))) {
     try {
       openAiMessages.push({ role: 'assistant', content: responseMsg.content })
       openAiMessages.push({
@@ -1160,7 +1277,12 @@ export async function generarRespuesta(conv: any) {
   const ultimoDeLaIA = [...allMessages].reverse().find((m: any) => m.remitente === 'ia')?.contenido || ''
   const textoCliente = pendientesCliente.join(' ')
   const ultimoCliente = pendientesCliente[pendientesCliente.length - 1] || ''
-  const quiereCancelar = !NIEGA_CANCELAR.test(textoCliente) && (PIDE_CANCELAR.test(textoCliente) || (/cancel|anul/i.test(ultimoDeLaIA) && AFIRMA.test(ultimoCliente)))
+  // "¿Me cobráis si cancelo?" es una pregunta sobre las condiciones, no una
+  // orden de cancelar: la agenda no tiene que actuar (14-09-2026: la red de
+  // la agenda pisaba a la de políticas y contestaba "no tienes ninguna cita").
+  const PREGUNTA_CONDICIONES_AGENDA = /cobr[áa]is|cobran|me cobr|penaliz|qu[ée] pasa si|sin coste|gratis|plazo|si no (puedo ir|voy)|si llego tarde/i
+  const preguntaCondiciones = PREGUNTA_CONDICIONES_AGENDA.test(textoCliente) && !PIDE_CANCELAR.test(textoCliente)
+  const quiereCancelar = !preguntaCondiciones && !NIEGA_CANCELAR.test(textoCliente) && (PIDE_CANCELAR.test(textoCliente) || (/cancel|anul/i.test(ultimoDeLaIA) && AFIRMA.test(ultimoCliente)))
   const quiereCambiar = !quiereCancelar && (
     (/c[aá]mbi|mu[eé]v|pasar(la|me)|otra hora|otro d[ií]a/i.test(textoCliente) && HORA_EN_TEXTO.test(textoCliente))
     || (/c[aá]mbi|mu[eé]v/i.test(ultimoDeLaIA) && AFIRMA.test(ultimoCliente) && HORA_EN_TEXTO.test(`${ultimoDeLaIA} ${ultimoCliente}`))
@@ -1213,22 +1335,45 @@ export async function generarRespuesta(conv: any) {
   // falta sin inventar horas.
   const PIDE_AGENDA = /\breserv|\bcita\b|\bcitas\b|\bhueco|disponib|mesa para|hora (tienes|ten[ée]is|hay|me das)|c[oó]geme|ap[uú]nta(me|r)|cancel|cambiar (la |mi )?(cita|reserva|hora)|otro d[ií]a|otra hora/i
   // Pide cancelar o cambiar de forma clara: entonces no basta con haber consultado
-  const PIDE_ACCION_AGENDA = /cancel|anul|c[aá]mbia(me|la)|cambiar (la |mi )?(cita|reserva|hora)|mu[eé]ve(me|la)|pasar(la|me) a|ap[uú]ntame en la lista/i
+  // «¿Me la puedes cambiar a la última hora?» también es pedirlo (medido el
+  // 14-09-2026: sin cubrir esa forma la IA miraba huecos y preguntaba
+  // «¿te gustaría que lo confirmara?» en vez de cambiarla)
+  const PIDE_ACCION_AGENDA = /canc[eé]l|anul|c[aá]mbia(me|la|mela)?\b|cambiar(me|la|mela)? (la |mi |a |para |de )|mu[eé]ve(me|la|mela)?\b|mover(la|me|mela)?\b|pasar(la|me|mela)? a|adel[aá]nt(a|ar)(me|la|mela)?\b|retr[aá]s(a|ar)(me|la|mela)?\b|aplaz|pospon|ap[uú]ntame en la lista/i
   // Y la propia respuesta promete hacerlo "en un momento": eso es justo lo que
   // no puede pasar (nadie lo hará luego)
-  const PROMETE_ACCION = /un momento|lo gestiono|procedo|ahora mismo|enseguida|en breve|voy a (cancelar|cambiar|mover|reservar|gestionar|apuntar|comprobar|consultar)|te (cambio|reservo|cancelo|apunto|muevo) (la |tu |el |una )?(cita|reserva|hora)/i
-  const faltaAgenda = !agendaEnEstaPasada || (!agendaAccionEnEstaPasada && pendientesCliente.some(t => PIDE_ACCION_AGENDA.test(t)))
+  // Solo promesas en primera persona: «si deseas proceder con la reserva,
+  // dime día y hora» es una oferta, no una promesa (medido el 14-09-2026: la
+  // revisión reescribía una respuesta de precio y el precio desaparecía)
+  const PROMETE_ACCION = /un momento|un segundo|lo gestiono|procedo a|proceder[ée] a|voy a proceder|voy a reprogramar|reprogramar[ée]|te (la |lo )?reprogramo|ahora mismo|enseguida|en breve|voy a (cancelar|cambiar|mover|reservar|gestionar|apuntar|comprobar|consultar|reprogramar|cambiarla|moverla|cancelarla|reservarla)|te (cambio|reservo|cancelo|apunto|muevo) (la |tu |el |una )?(cita|reserva|hora)/i
+  const faltaAgenda = !preguntaCondiciones && (!agendaEnEstaPasada || (!agendaAccionEnEstaPasada && pendientesCliente.some(t => PIDE_ACCION_AGENDA.test(t))))
   const prometeSinHacer = !agendaAccionEnEstaPasada && PROMETE_ACCION.test(responseMsg?.content || '')
-  if (herramientasAgenda.contexto && (faltaAgenda || prometeSinHacer) && responseMsg?.content && (prometeSinHacer || pendientesCliente.some(t => PIDE_AGENDA.test(t)))) {
+  // «¿Me la puedes cambiar a la última hora?» no dice «cita» ni «reserva»:
+  // vale con que pida la acción (medido el 14-09-2026: la red no entraba y
+  // la IA se quedaba en «¿te la confirmo?»)
+  if (herramientasAgenda.contexto && (faltaAgenda || prometeSinHacer) && responseMsg?.content && (prometeSinHacer || pendientesCliente.some(t => PIDE_AGENDA.test(t) || PIDE_ACCION_AGENDA.test(t)))) {
     try {
-      const deAgenda = tools.filter((t: any) => esHerramientaDeAgenda(t.function?.name))
+      // Si pide CAMBIAR, cancelar_cita ni se le ofrece (medido el 14-09-2026:
+      // con las dos a mano, a «cámbiamela a la última hora» una vez la
+      // canceló y el cliente se quedó sin cita). Y al revés si pide cancelar.
+      const pideCambio = !quiereCancelar && pendientesCliente.some(t => /c[aá]mbi|mu[eé]v|mover|pasar(la|me|mela)? a|adel[aá]nt|retr[aá]s|aplaz|pospon/i.test(t))
+      const deAgenda = tools.filter((t: any) => {
+        const n = t.function?.name
+        if (!esHerramientaDeAgenda(n)) return false
+        if (quiereCancelar && n === 'cambiar_cita') return false
+        if (pideCambio && n === 'cancelar_cita') return false
+        return true
+      })
       openAiMessages.push({ role: 'assistant', content: responseMsg.content })
       openAiMessages.push({
         role: 'system',
         content: prometeSinHacer
-          ? 'REVISIÓN: en tu respuesta dices que lo gestionas "en un momento", pero nadie lo hará luego: o lo haces AHORA con la herramienta que toque (reservar_cita, cambiar_cita, cancelar_cita, apuntar_espera_agenda; con ver_huecos antes si necesitas la hora), o escribes de nuevo tu respuesta completa preguntando el dato que te falta. Nunca "un momento".'
+          ? 'REVISIÓN: en tu respuesta dices que lo gestionas "en un momento", pero nadie lo hará luego: o lo haces AHORA con la herramienta que toque (reservar_cita, cambiar_cita, cancelar_cita, apuntar_espera_agenda; con ver_huecos antes si necesitas la hora), o escribes de nuevo tu respuesta completa preguntando el dato que te falta y conservando todo lo demás que decías (precios, datos). Nunca "un momento".'
           : agendaEnEstaPasada
-          ? 'REVISIÓN: el cliente pide claramente cancelar o cambiar su cita (o apuntarse en la lista de espera) y solo has consultado, sin hacerlo. Si sabes qué cita y, en un cambio, a qué hora (una que ver_huecos haya dado libre), llama ahora a cancelar_cita, cambiar_cita o apuntar_espera_agenda: la herramienta aplica el plazo y avisa al equipo si no está en plazo. No consultes políticas ni digas que lo mirarás luego. Si de verdad te falta un dato, escribe de nuevo tu respuesta completa preguntándolo.'
+          ? (pideCambio
+            ? 'REVISIÓN: el cliente pide claramente CAMBIAR su cita y solo has consultado, sin cambiarla. Llama ahora a cambiar_cita con la hora nueva: una que ver_huecos haya dado libre (si ha dicho "la última" o "la primera", es la última o la primera de esa lista). La cita se mueve, no se cancela: NUNCA uses cancelar_cita para un cambio. La herramienta aplica el plazo y avisa al equipo si no está en plazo. No consultes políticas ni digas que lo mirarás luego. Solo si de verdad te falta un dato, escribe de nuevo tu respuesta completa preguntándolo.'
+            : quiereCancelar
+            ? 'REVISIÓN: el cliente pide claramente CANCELAR su cita y solo has consultado, sin hacerlo. Llama ahora a cancelar_cita: la herramienta aplica el plazo y avisa al equipo si no está en plazo. No consultes políticas ni digas que lo mirarás luego. Solo si de verdad te falta un dato, escribe de nuevo tu respuesta completa preguntándolo.'
+            : 'REVISIÓN: el cliente pide claramente una gestión de su cita (o apuntarse en la lista de espera) y solo has consultado, sin hacerlo. Si sabes qué cita y, en un cambio, a qué hora (una que ver_huecos haya dado libre), llama ahora a la herramienta que toque (cambiar_cita para mover, cancelar_cita para anular, apuntar_espera_agenda para la lista de espera): aplica el plazo y avisa al equipo si no está en plazo. No consultes políticas ni digas que lo mirarás luego. Si de verdad te falta un dato, escribe de nuevo tu respuesta completa preguntándolo.')
           : 'REVISIÓN: el cliente habla de una reserva o cita y has contestado sin usar las herramientas de la agenda. Si ya sabes el servicio y el día, llama ahora a ver_huecos (o a cambiar_cita, cancelar_cita o mis_citas si es eso lo que pide). Si te falta algún dato, escribe de nuevo tu respuesta completa preguntándolo, sin proponer horas de memoria ni decir que confirmarás luego.'
       })
       const revision = await openai.chat.completions.create({ model: MODELO_IA, messages: openAiMessages, tools: deAgenda })
@@ -1246,10 +1391,28 @@ export async function generarRespuesta(conv: any) {
         }
         agendaEnEstaPasada = true
         if (llamadas.some((t: any) => ACCIONES_AGENDA.has(t.function?.name))) agendaAccionEnEstaPasada = true
-        const final = await openai.chat.completions.create({ model: MODELO_IA, messages: openAiMessages })
+        // Segundo paso con las herramientas a mano: "cámbiamela a la última
+        // hora" es mirar huecos Y DESPUÉS cambiar. Con un solo paso se quedaba
+        // en "te la cambio a las 19:00, un momento" sin cambiarla.
+        let final = await openai.chat.completions.create({ model: MODELO_IA, messages: openAiMessages, tools: deAgenda })
         tokensInput += final.usage?.prompt_tokens || 0
-    tokensCacheados += final.usage?.prompt_tokens_details?.cached_tokens || 0
+        tokensCacheados += final.usage?.prompt_tokens_details?.cached_tokens || 0
         tokensOutput += final.usage?.completion_tokens || 0
+        const r2: any = final.choices[0].message
+        const llamadas2: any[] = (r2.tool_calls || []).filter((t: any) => t.type === 'function' && esHerramientaDeAgenda(t.function?.name))
+        if (llamadas2.length) {
+          openAiMessages.push(r2)
+          for (const llamada of llamadas2) {
+            const args = (() => { try { return JSON.parse(llamada.function.arguments || '{}') } catch { return {} } })()
+            const resultado = await ejecutarHerramientaDeAgenda(llamada.function.name, args, herramientasAgenda.contexto)
+            openAiMessages.push({ role: 'tool', tool_call_id: llamada.id, content: resultado })
+          }
+          if (llamadas2.some((t: any) => ACCIONES_AGENDA.has(t.function?.name))) agendaAccionEnEstaPasada = true
+          final = await openai.chat.completions.create({ model: MODELO_IA, messages: openAiMessages })
+          tokensInput += final.usage?.prompt_tokens || 0
+          tokensCacheados += final.usage?.prompt_tokens_details?.cached_tokens || 0
+          tokensOutput += final.usage?.completion_tokens || 0
+        }
         if (final.choices[0].message.content) responseMsg.content = final.choices[0].message.content
       } else if (r.content) {
         responseMsg.content = r.content
@@ -1259,6 +1422,88 @@ export async function generarRespuesta(conv: any) {
     }
   }
   if (herramientasAgenda.contexto?.gestion?.caso) escaladoEnEstaPasada = true
+
+  // Red de seguridad de las políticas: el cliente pregunta por CONDICIONES
+  // (qué pasa si cancela, si se cobra algo, plazos, devoluciones, pagos) y la
+  // IA ha contestado sin consultar las políticas. Medido el 14-09-2026: a "si
+  // tengo cita mañana y no puedo ir, ¿me cobráis algo?" miraba la agenda,
+  // veía que no había cita y contestaba "no tienes ninguna cita", sin decir
+  // nunca la norma de las 24 h. Se le obliga a consultar y a contestar de nuevo.
+  const PIDE_CONDICIONES = /cobr[áa]is|cobran|me cobr|penaliz|qu[ée] pasa si|sin coste|gratis|plazo|devolver|devoluci|reembols|garant[íi]a|acept[áa]is|admit[íi]s|puedo (ir|llevar|traer|pagar|cancelar|cambiar|venir)|se puede (cancelar|cambiar|pagar|devolver)|condiciones|pol[íi]tica|retras|llego tarde|si no voy|si no puedo ir/i
+  const herramientaPoliticas = tools.find((t: any) => t.function?.name === 'consultar_politicas')
+  const miroPoliticas = () => openAiMessages.some((m: any) => m?.role === 'assistant' && (m.tool_calls || []).some((t: any) => t.function?.name === 'consultar_politicas'))
+  const pendientesParaPoliticas = allMessages.filter((m: any) => m.remitente === 'cliente' && m.agrupado !== true).map((m: any) => m.contenido || '')
+  if (herramientaPoliticas && responseMsg?.content && !miroPoliticas() && pendientesParaPoliticas.some(t => PIDE_CONDICIONES.test(t))) {
+    try {
+      const consulta = pendientesParaPoliticas.join(' ').slice(0, 400)
+      const encontrado = await politicasRelacionadas(consulta, 5)
+      if (encontrado) {
+        openAiMessages.push({ role: 'assistant', content: responseMsg.content })
+        openAiMessages.push({ role: 'system', content: `REVISIÓN: el cliente pregunta por las condiciones del negocio y has contestado sin consultar las políticas. Estas son las normas que aplican:\n${encontrado}\n\nEscribe de nuevo tu respuesta completa contestando a lo que pregunta CON estas normas, con sus plazos y cifras exactos. Si además preguntaba otra cosa (su cita, un precio), mantenlo.` })
+        const final = await openai.chat.completions.create({ model: MODELO_IA, messages: openAiMessages })
+        tokensInput += final.usage?.prompt_tokens || 0
+        tokensCacheados += final.usage?.prompt_tokens_details?.cached_tokens || 0
+        tokensOutput += final.usage?.completion_tokens || 0
+        if (final.choices[0].message.content) responseMsg.content = final.choices[0].message.content
+        // Que quede apuntado que se consultaron (para el registro de herramientas usadas)
+        openAiMessages.push({ role: 'assistant', content: null, tool_calls: [{ id: 'politicas_revision', type: 'function', function: { name: 'consultar_politicas', arguments: JSON.stringify({ consulta }) } }] })
+        openAiMessages.push({ role: 'tool', tool_call_id: 'politicas_revision', content: encontrado })
+      }
+    } catch (e: any) {
+      console.error('Revisión de políticas fallida:', e?.message)
+    }
+  }
+
+
+  // Red de seguridad de las novedades del día: hay un aviso que afecta a lo
+  // que pregunta el cliente (un descuento en ese servicio, alguien ausente) y
+  // la respuesta no lo menciona. Medido el 14-09-2026: con "10 % en tintes"
+  // activo, a "¿cuánto vale el tinte?" contestaba 45 € y se callaba la
+  // oferta unas veces sí y otras no. Se le obliga a decirlo.
+  if (canUseNovedades && dailyUpdates?.length && responseMsg?.content) {
+    try {
+      const { contienePalabras, normalizar } = await import('@/lib/ai/comparar-texto')
+      const textoPendiente = allMessages.filter((m: any) => m.remitente === 'cliente' && m.agrupado !== true).map((m: any) => m.contenido || '').join(' ')
+      const palabrasCliente = normalizar(textoPendiente).split(/[^a-z0-9ñ]+/).filter(w => w.length >= 4)
+      const relevantes = (dailyUpdates as any[]).filter(u => palabrasCliente.some(w => contienePalabras(u.descripcion || '', w)))
+      const respuestaTexto: string = responseMsg.content || ''
+      const yaMencionada = (u: any) => {
+        // Las palabras que ya usó el cliente ("tinte") salen en cualquier
+        // respuesta y no prueban nada: lo que cuenta es el resto del aviso
+        // (el "10", "descuento", "semana")
+        const claves = normalizar(u.descripcion || '').split(/[^a-z0-9ñ%]+/)
+          .filter(w => w.length >= 5 || /^\d+%?$/.test(w))
+          .filter(w => !palabrasCliente.some(pc => contienePalabras(w, pc) || contienePalabras(pc, w)))
+        const enRespuesta = claves.filter(w => contienePalabras(respuestaTexto, w) || normalizar(respuestaTexto).includes(w))
+        return enRespuesta.length >= Math.min(2, claves.length)
+      }
+      const olvidadas = relevantes.filter(u => !yaMencionada(u))
+      if (olvidadas.length) {
+        openAiMessages.push({ role: 'assistant', content: responseMsg.content })
+        openAiMessages.push({ role: 'system', content: `REVISIÓN: hay avisos de hoy que afectan a lo que pregunta el cliente y no los has mencionado:\n${olvidadas.map((u: any) => `- ${u.descripcion}`).join('\n')}\nEscribe de nuevo tu respuesta completa incluyéndolos de forma natural (si es un descuento, dilo junto al precio; si alguien no está, dilo antes de ofrecer horas con esa persona).` })
+        const final = await openai.chat.completions.create({ model: MODELO_IA, messages: openAiMessages })
+        tokensInput += final.usage?.prompt_tokens || 0
+        tokensCacheados += final.usage?.prompt_tokens_details?.cached_tokens || 0
+        tokensOutput += final.usage?.completion_tokens || 0
+        if (final.choices[0].message.content) responseMsg.content = final.choices[0].message.content
+      }
+    } catch (e: any) {
+      console.error('Revisión de novedades fallida:', e?.message)
+    }
+  }
+
+  // Un archivo que la IA no puede leer: el caso se abre aquí, en código, con
+  // la regla "documento no procesable" si existe. Medido el 14-09-2026: el
+  // modelo decía "una persona del equipo lo revisará" y no llamaba a
+  // escalar_humano, así que nadie se enteraba.
+  if (adjuntoSinLeerEnEstaPasada && !escaladoEnEstaPasada) {
+    const reglaDocumento = (rules || []).find((r: any) => /documento|archivo|adjunto|procesable/i.test(`${r.nombre} ${r.tipo_caso} ${r.descripcion_intencion || ''}`))
+    const idCaso = await crearCasoDesdeSistema(conversationId, tenantId, branchId, contactId, `[${reglaDocumento?.nombre || 'Archivo sin leer'}] El cliente ha enviado un archivo de tipo ${adjuntoSinLeerEnEstaPasada} que la IA no puede abrir. Hay que revisarlo a mano.`, 'normal', reglaDocumento?.prioridad_default || 'normal')
+    if (idCaso) {
+      await supabaseAdmin.from('conversations').update({ ia_pausada: true }).eq('id', conversationId)
+      escaladoEnEstaPasada = true
+    }
+  }
 
   // Si una gestión de la tienda (devolución, cambio de dirección, producto
   // dañado, reclamación) ya ha abierto caso o ha apartado a la IA en esta
@@ -1294,11 +1539,19 @@ export async function generarRespuesta(conv: any) {
   // pruebas con gpt-4.1-mini). Se le pide que lo revise con las reglas de caso
   // delante: o escala con la que encaje, o reescribe su respuesta.
   const pendientesDelCliente = allMessages.filter((m: any) => m.remitente === 'cliente' && m.agrupado !== true).map((m: any) => m.contenido || '')
-  if (!isFallback && canEscalate && !escaladoEnEstaPasada && clientePidePersona(pendientesDelCliente)) {
+  // Un daño o una reacción tras un servicio es lo único que NUNCA puede
+  // quedarse en un consejo de la IA (medido el 14-09-2026: a "me pica la
+  // cabeza y tengo rojeces desde el tinte" contestaba "consulta con un
+  // profesional" sin abrir caso). Con una regla que lo cubra, se escala sí o sí.
+  const DESCRIBE_DANIO = /alerg|\bpic(a|or|az[oó]n)\b|me pica|quemaz|roje|escoz|irrita|da[ñn]o|dolor|duele|sangr|herid|reacci[oó]n|hinchaz|ampoll|se me cae el pelo|calva|quemad/i
+  const cuentaUnDanio = pendientesDelCliente.some(t => DESCRIBE_DANIO.test(t))
+  if (!isFallback && canEscalate && !escaladoEnEstaPasada && (clientePidePersona(pendientesDelCliente) || cuentaUnDanio)) {
     openAiMessages.push({ role: 'assistant', content: finalContent })
     openAiMessages.push({
       role: 'system',
-      content: 'REVISIÓN: el cliente pide expresamente hablar con una persona y no has invocado escalar_humano, así que nadie del equipo se ha enterado. Si alguna de las Reglas de Caso encaja, invoca escalar_humano ahora con esa regla. Si ninguna encaja, escribe de nuevo tu respuesta completa.'
+      content: cuentaUnDanio && !clientePidePersona(pendientesDelCliente)
+        ? 'REVISIÓN: el cliente describe un daño, dolor o reacción tras un servicio y no has invocado escalar_humano: nadie del equipo se ha enterado y esto no puede quedarse en un consejo. Invoca escalar_humano AHORA con la regla que encaje (la de reacciones o daños si existe; si no, la de reclamaciones o la más parecida). Después escribe una respuesta corta: que lo sientes, que una persona del equipo se pondrá en contacto enseguida, sin consejos médicos.'
+        : 'REVISIÓN: el cliente pide expresamente hablar con una persona y no has invocado escalar_humano, así que nadie del equipo se ha enterado. Si alguna de las Reglas de Caso encaja, invoca escalar_humano ahora con esa regla. Si ninguna encaja, escribe de nuevo tu respuesta completa.'
     })
     try {
       const revision = await openai.chat.completions.create({
@@ -1472,9 +1725,15 @@ export async function generarRespuesta(conv: any) {
     // hace falta cuando "la IA no ha hecho X" y hay que saber si podía
     contexto_snapshot: {
       herramientas: tools.map((t: any) => t.function?.name).filter(Boolean),
-      usadas: ((responseMsg?.tool_calls || []) as any[]).map(t => t.function?.name).filter(Boolean),
+      usadas: [...new Set(openAiMessages.filter((m: any) => m?.role === 'assistant' && Array.isArray(m.tool_calls)).flatMap((m: any) => m.tool_calls.map((t: any) => t.function?.name)).filter(Boolean))],
       tienda: !!herramientasTienda.contexto,
       agenda: !!herramientasAgenda.contexto,
+      // Qué redes de seguridad han saltado en esta pasada (cada una mete un
+      // mensaje de sistema que empieza por "REVISIÓN:"). Sin esto no se sabe
+      // si una respuesta rara viene del modelo o de una revisión.
+      revisiones: openAiMessages
+        .filter((m: any) => m?.role === 'system' && typeof m.content === 'string' && m.content.startsWith('REVISIÓN'))
+        .map((m: any) => m.content.replace(/^REVISIÓN:\s*/, '').slice(0, 70)),
       // Cuánto del prompt ha venido de la caché (se cobra a mitad de precio).
       // Sirve para comprobar que lo estable va delante y lo variable detrás.
       tokens_cacheados: tokensCacheados

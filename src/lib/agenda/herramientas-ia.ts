@@ -21,8 +21,21 @@ export interface ContextoAgenda {
   branch_id: string
   contacto: { id: string | null; canal: string | null; identificador: string | null; nombre: string | null }
   conversation_id: string | null
+  // Lo que ha escrito el cliente en este turno (el motor lo rellena): si el
+  // modelo no pasa el servicio, se busca en sus palabras antes de preguntar
+  texto_cliente?: string
   // Lo que ha dejado hecho la última herramienta, para el motor de la IA
   gestion?: { caso: boolean; pausa: boolean; avisado: boolean }
+}
+
+// El servicio que pide: por lo que pasa el modelo y, si no lo pasa o no
+// cuadra, por las palabras del propio cliente (medido el 14-09-2026: a «hueco
+// mañana para cortarme el pelo» ver_huecos llegaba sin servicio y la IA
+// preguntaba «¿qué tipo de corte?» en vez de dar horas)
+async function servicioPedido(ctx: ContextoAgenda, dicho: any, personas: number) {
+  const s = await buscarServicio(ctx, dicho, personas)
+  if (s || !ctx.texto_cliente) return s
+  return await buscarServicio(ctx, ctx.texto_cliente, personas)
 }
 
 const NOMBRES = ['ver_huecos', 'reservar_cita', 'cambiar_cita', 'cancelar_cita', 'mis_citas', 'apuntar_espera_agenda']
@@ -66,7 +79,9 @@ export async function cargarHerramientasDeAgenda(branchId: string, contactId: st
     a.confirmacion === 'manual' ? 'Las reservas quedan PENDIENTES hasta que alguien del equipo las confirme: dilo así, no digas que está confirmada.' : 'Las reservas quedan confirmadas al momento.',
     a.instrucciones_ia ? `Indicaciones del negocio: ${a.instrucciones_ia}` : '',
     'CÓMO RESERVAR: 1) averigua qué servicio, qué día y a qué hora prefiere (y cuántas personas si es una mesa o una clase); 2) llama a ver_huecos; 3) ofrece 2 o 4 de las opciones que te dé, tal cual; 4) cuando el cliente elija una, llama a reservar_cita; 5) confirma con día, hora, servicio y profesional. NUNCA digas que está reservado, cambiado o cancelado si la herramienta no lo ha confirmado. Si ver_huecos no da opciones ese día, ofrece los días que te diga o apúntale en lista de espera con apuntar_espera_agenda.',
-    'CAMBIAR O CANCELAR: si el cliente lo pide claramente, llama a cancelar_cita (o a cambiar_cita, a una hora que ver_huecos dé libre) en la misma respuesta, sin pedirle otra confirmación, sin consultar políticas y sin decir que lo mirarás luego: la herramienta ya aplica el plazo de cancelación y, si no está en plazo, avisa al equipo por ti. Solo pregunta si de verdad no sabes qué cita o qué hora quiere. Nunca contestes "un momento, lo gestiono": o llamas a la herramienta en esta misma respuesta, o preguntas lo que falta.'
+    'HORAS DEL DÍA: "por la mañana" es antes de las 14:00 y "por la tarde" es a partir de las 15:00. Si el cliente dice mañana o tarde, pasa esa franja a ver_huecos y ofrece SOLO horas de esa franja.',
+    'Si el cliente solo PREGUNTA por las condiciones (qué pasa si cancela, si se cobra, plazos) sin pedir cancelar ni mover una cita, no toques la agenda: es una consulta de políticas.',
+    'CAMBIAR O CANCELAR: si el cliente lo pide claramente, hazlo en la misma respuesta: para cambiar de hora o de día, cambiar_cita (a una hora que ver_huecos dé libre; si dice "la última" o "la primera" hora, es la última o la primera de la lista de ver_huecos); para anular, cancelar_cita. Un cambio NUNCA se hace cancelando: la cita se mueve y sigue siendo suya. Sin pedirle otra confirmación, sin consultar políticas y sin decir que lo mirarás luego: la herramienta ya aplica el plazo de cancelación y, si no está en plazo, avisa al equipo por ti. Solo pregunta si de verdad no sabes qué cita o qué hora quiere. Nunca contestes "un momento, lo gestiono": o llamas a la herramienta en esta misma respuesta, o preguntas lo que falta.'
   ].filter(Boolean)
 
   const definiciones: any[] = [
@@ -248,7 +263,9 @@ function horaEnMinutos(hora?: string) {
 function elegirOpciones(huecos: { inicio: string; recursos: string[]; plazas?: number }[], zona: string, preferida: number | null, franja?: string) {
   let lista = huecos.map(h => ({ ...h, minutos: (() => { const p = partesEnZona(new Date(h.inicio), zona); return p.hora * 60 + p.minuto })() }))
   if (franja === 'manana') lista = lista.filter(h => h.minutos < 14 * 60).length ? lista.filter(h => h.minutos < 14 * 60) : lista
-  if (franja === 'tarde') lista = lista.filter(h => h.minutos >= 14 * 60).length ? lista.filter(h => h.minutos >= 14 * 60) : lista
+  // "Por la tarde" en España es después de comer: desde las 15:00. Las 14:00
+  // son mediodía y nadie que pide tarde quiere esa hora (14-09-2026).
+  if (franja === 'tarde') lista = lista.filter(h => h.minutos >= 15 * 60).length ? lista.filter(h => h.minutos >= 15 * 60) : lista
   if (preferida !== null) {
     lista.sort((a, b) => Math.abs(a.minutos - preferida) - Math.abs(b.minutos - preferida))
     return lista.slice(0, 5).sort((a, b) => a.minutos - b.minutos)
@@ -263,7 +280,7 @@ function elegirOpciones(huecos: { inicio: string; recursos: string[]; plazas?: n
 
 async function verHuecos(args: any, ctx: ContextoAgenda) {
   const personasDichas = Number(args?.personas) || 0
-  const servicio = await buscarServicio(ctx, args?.servicio, personasDichas || 1)
+  const servicio = await servicioPedido(ctx, args?.servicio, personasDichas || 1)
   if (!servicio) return noHayServicio(ctx)
   const fecha = leerFecha(args?.fecha) ? String(args.fecha) : null
   if (!fecha) return 'La fecha tiene que ir como AAAA-MM-DD. Pregunta al cliente qué día quiere.'
@@ -305,7 +322,7 @@ function fechaPartes(fecha: string): [number, number, number] {
 async function reservar(args: any, ctx: ContextoAgenda) {
   if (!ctx.contacto.id) return 'No se puede reservar: el cliente no está identificado en esta conversación. Pide que escriba desde su WhatsApp o correo.'
   const personas = Math.max(1, Math.round(Number(args?.personas) || 1))
-  const servicio = await buscarServicio(ctx, args?.servicio, personas)
+  const servicio = await servicioPedido(ctx, args?.servicio, personas)
   if (!servicio) return noHayServicio(ctx)
   const fecha = leerFecha(args?.fecha) ? String(args.fecha) : null
   const minutos = horaEnMinutos(args?.hora)
@@ -357,7 +374,12 @@ async function citaDelCliente(ctx: ContextoAgenda, citaId?: string): Promise<Cit
   if (!citas.length) return 'Este cliente no tiene ninguna cita próxima.'
   if (citaId) {
     const c = citas.find(x => x.id === citaId)
-    return c || 'Esa cita no es de este cliente o ya no está activa. Usa mis_citas para ver las suyas.'
+    if (c) return c
+    // Los modelos baratos copian mal los identificadores largos (medido el
+    // 14-09-2026: "no puedo cancelar la cita porque no se ha encontrado" con
+    // la cita delante). Si el cliente solo tiene una, no hay duda posible.
+    if (citas.length === 1) return citas[0]
+    return 'Esa cita no es de este cliente o ya no está activa. Usa mis_citas para ver las suyas.'
   }
   if (citas.length === 1) return citas[0]
   return `Tiene varias citas: pregunta cuál y vuelve a llamar con cita_id.\n${citas.map(c => `- ${c.id}: ${c.servicio_nombre}, ${textoFechaHora(c.inicio, ctx.agenda.zona)}`).join('\n')}`
@@ -435,6 +457,12 @@ async function abrirCasoAgenda(ctx: ContextoAgenda, descripcion: string): Promis
   if (!ctx.conversation_id || !ctx.contacto.id) return false
   const { crearCasoDesdeSistema } = await import('@/lib/casos/crearCasoDesdeSistema')
   const id = await crearCasoDesdeSistema(ctx.conversation_id, ctx.tenant_id, ctx.branch_id, ctx.contacto.id, `[Agenda] ${descripcion}`, 'normal', 'normal')
-  if (id) ctx.gestion = { caso: true, pausa: false, avisado: true }
+  if (id) {
+    // Si lo va a llevar una persona, la IA se aparta, igual que cuando escala
+    // por una regla. Antes abría el caso y seguía contestando encima del
+    // equipo (visto el 14-09-2026 con una reserva de grupo).
+    await supabaseAdmin.from('conversations').update({ ia_pausada: true }).eq('id', ctx.conversation_id)
+    ctx.gestion = { caso: true, pausa: true, avisado: true }
+  }
   return !!id
 }

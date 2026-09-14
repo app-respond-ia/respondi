@@ -79,6 +79,13 @@ export async function crearVersion(auth: any, canal: any, v: {
   // Meta puede cambiar la categoría si no encaja con el texto
   const categoria = enMeta.category.toUpperCase() === 'MARKETING' ? 'marketing' : enMeta.category.toUpperCase() === 'AUTHENTICATION' ? 'autenticacion' : 'utilidad'
   const estado = estadoDesdeMeta(enMeta.status)
+  // Solo una versión por familia puede estar en uso (índice único parcial):
+  // si esta entra en uso desde ya, la anterior (p. ej. una rechazada) lo deja
+  if (v.enUso) {
+    await supabaseAdmin.from('whatsapp_templates')
+      .update({ en_uso: false, updated_at: new Date().toISOString() })
+      .eq('channel_id', canal.id).eq('familia', v.familia).eq('idioma', v.idioma).eq('en_uso', true)
+  }
   const { data: fila, error } = await supabaseAdmin
     .from('whatsapp_templates')
     .upsert({

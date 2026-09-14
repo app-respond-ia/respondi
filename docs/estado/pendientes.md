@@ -426,20 +426,23 @@ Lo de Jorge está aparte, en `pendientes-jorge.md`. Esto es lo mío, por orden
 de lo que más ahorra o desbloquea.
 
 ### Puedo hacerlo ya, sin depender de nadie
-- [ ] **Encoger el prompt del motor** (idea de Jorge, 14-09-2026). Cada
-      respuesta manda ~4.800 tokens de entrada y el 84 % del coste es
-      entrada. Ahí van la lista entera de etiquetas, la de reglas, la ficha
-      del negocio y las novedades, se usen o no. Parte puede pasar a
-      herramientas de consulta bajo demanda, como ya se hace con el catálogo
-      y las políticas. Hay que medir antes y después con
-      `probar-modelos.mjs`, que ya da tokens y aciertos.
-- [ ] **Caché de prompt**. OpenAI cobra la entrada repetida a mitad de precio
-      en 4o mini, pero solo si lo estable va primero y siempre igual. Hoy el
-      bloque del cliente concreto (notas, conversaciones anteriores,
-      novedades) va EN MEDIO del prompt y corta la caché para todo lo que
-      viene detrás. Moverlo al final no cambia ni una respuesta.
-- [ ] **Modelo de transcripción**. Los audios usan `whisper-1`, el modelo más
-      antiguo que nos queda. Mirar qué hay hoy y cuánto cuesta.
+- [x] **Caché de prompt** (14-09-2026): lo que cambia por conversación se ha
+      movido al final. El 67 % de la entrada entra ya en la caché y el coste
+      por respuesta baja de 0,00079 $ a 0,00055 $, un 30 % menos, sin tocar
+      la calidad. `ai_logs.contexto_snapshot.tokens_cacheados` lo vigila.
+- [x] **Modelo de transcripción** (14-09-2026): de `whisper-1` a
+      `gpt-4o-mini-transcribe`. Mitad de precio y el doble de rápido, misma
+      transcripción, probado con una nota de voz real en ogg opus.
+- [ ] **Encoger el prompt** (idea de Jorge). Con la caché llevándose el 67 %,
+      el margen es menor de lo que parecía. La lista de etiquetas NO se puede
+      quitar del prompt: la herramienta solo lleva los identificadores, no los
+      nombres, y sin nombres el modelo no puede elegir. Lo que queda por
+      mirar son las definiciones de las herramientas, que son el bloque
+      grande y fijo (y que ya se cachea).
+- [ ] **Arreglar la ficha de la sucursal de pruebas**: dice «Cafetería de
+      barrio» y el único servicio es un corte de pelo. Esa contradicción hace
+      que la IA falle 1 de cada 4 veces al preguntar el precio. Es de Jorge,
+      pero conviene, porque falsea las pruebas.
 - [ ] **Sembrar automatizaciones y etiquetas** al crear una organización, para
       que el cliente no empiece con las pantallas vacías (no está decidido,
       es una idea).

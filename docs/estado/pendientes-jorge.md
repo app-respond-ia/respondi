@@ -4,12 +4,12 @@ Lo que solo puedes hacer tú desde fuera de Respondi: cuentas, claves,
 dominios. Estado a 14-09-2026. Están ordenados por lo que desbloquea más.
 Cuando cierres un punto, márcalo aquí.
 
-**Empieza por el 1 y el 2**: son diez minutos y dejan la cuenta de pruebas
-funcionando otra vez. El resto puede esperar al día que tengas rato.
+**El 1 ya está hecho** (WhatsApp vuelve a contestar). Sigue por el 2, que es
+la tienda, y el resto cuando tengas rato.
 
 ---
 
-## 1. Volver a pegar las claves de WhatsApp (5 minutos)
+## 1. Volver a pegar las claves de WhatsApp — HECHO (14-09-2026, 18:57)
 
 Las pruebas automáticas borraron tu canal de WhatsApp con sus claves (lo
 cuento en `incidentes-resueltos.md`). **Ya te he repuesto la fila con su
@@ -47,8 +47,19 @@ Solo faltan las claves, que no se pueden recuperar.
 - [ ] Guarda. Si el canal se queda en «pendiente», entra en tu app de Meta →
       WhatsApp → Configuración → Webhooks y pulsa **Verificar y guardar** otra
       vez con la misma dirección y el mismo código. No hace falta cambiarlos.
-- [ ] Escríbete un WhatsApp al número de pruebas: la IA debe contestar en
+- [x] Escríbete un WhatsApp al número de pruebas: la IA debe contestar en
       menos de un minuto.
+- [x] Suscrito `message_template_status_update` en los campos del webhook,
+      para enterarse de cuándo Meta aprueba o rechaza una plantilla.
+
+**Cómo fue.** Los dos identificadores estaban en el historial y se
+recuperaron; la clave secreta se sacó de Meta y el token se regeneró. Al
+guardar, el canal quedó en «pendiente» y el primer mensaje no se contestó:
+salió un fallo nuestro, no de Meta (el webhook aceptaba mensajes en
+«pendiente» pero la parte de enviar exigía «activo», así que la IA contestaba
+y la respuesta se tiraba). Arreglado el mismo día: ahora un aviso firmado da
+el canal por activo solo. Ver `incidentes-resueltos.md`. Segundo intento:
+mensaje a las 18:56:49, respuesta entregada a las 18:57:28.
 
 ## 2. Volver a conectar la tienda de Shopify (5 minutos)
 

@@ -19,11 +19,31 @@ Solo faltan las claves, que no se pueden recuperar.
 
 - [ ] Respondi → **Canales** → tarjeta de WhatsApp (la verás en rojo, con el
       motivo escrito) → **Cambiar claves**.
-- [ ] Pega las cuatro cosas de tu app de Meta:
-      - Identificador del número de teléfono
-      - Identificador de la cuenta de WhatsApp Business
-      - El token permanente que generaste
-      - La clave secreta de la app
+- [ ] Pega las cuatro cosas de tu app de Meta. Dónde está cada una:
+
+      **1 y 2. Identificador del número y de la cuenta de WhatsApp Business.**
+      developers.facebook.com → tu app «Respondi Pruebas» → menú izquierdo
+      WhatsApp → **Configuración de la API**. En esa pantalla salen los dos,
+      uno debajo del otro: «Identificador del número de teléfono» e
+      «Identificador de la cuenta de WhatsApp Business». Son números largos,
+      no son secretos, se pueden copiar tal cual.
+
+      **3. Clave secreta de la app.** Misma web → Configuración → **Básica** →
+      «Clave secreta de la app» → botón **Mostrar** (te pedirá la contraseña
+      de Facebook). Esta sí es secreta: no la pegues en ningún chat.
+
+      **4. Token permanente.** Este NO se puede volver a ver: Meta solo lo
+      enseña una vez, al generarlo. Hay que sacar uno nuevo, que tarda medio
+      minuto y no rompe nada (el viejo simplemente deja de usarse):
+      business.facebook.com/settings → **Usuarios del sistema** → el usuario
+      «Respondi» → **Generar token** → elige la app «Respondi Pruebas»,
+      marca `whatsapp_business_messaging` y `whatsapp_business_management`,
+      y en caducidad pon **Nunca** → Generar. Cópialo en ese momento.
+
+      Aviso: ninguna de las cuatro se puede recuperar de Respondi. El token y
+      la clave secreta iban cifrados en la caja fuerte y se borraron con las
+      pruebas; los dos identificadores estaban en la fila del canal, que
+      también se borró. Por eso hay que ir a Meta a por ellos.
 - [ ] Guarda. Si el canal se queda en «pendiente», entra en tu app de Meta →
       WhatsApp → Configuración → Webhooks y pulsa **Verificar y guardar** otra
       vez con la misma dirección y el mismo código. No hace falta cambiarlos.

@@ -378,9 +378,12 @@ export async function generarRespuesta(conv: any) {
         const audioBlob = await audioResponse.blob()
         const file = new File([audioBlob], 'audio.ogg', { type: audioBlob.type || 'audio/ogg' })
         
+        // whisper-1 es el modelo antiguo y cuesta el doble: 0,006 $ por
+        // minuto frente a 0,003 $ de gpt-4o-mini-transcribe, que además es
+        // mejor. Mismo endpoint y misma respuesta (14-09-2026).
         const transcription = await openai.audio.transcriptions.create({
           file: file,
-          model: 'whisper-1'
+          model: process.env.TRANSCRIPCION_MODELO_IA || 'gpt-4o-mini-transcribe'
         })
         
         const textoExtraido = transcription.text

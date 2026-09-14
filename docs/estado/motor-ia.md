@@ -289,4 +289,20 @@ del negocio contradice al catálogo, gana la descripción**.
   del prompt porque la herramienta solo lleva los identificadores, no los
   nombres. Lo que queda por mirar son las definiciones de las herramientas,
   que son el bloque grande y fijo.
-- **Transcripción**: `whisper-1` es el modelo más antiguo que usamos.
+## Transcripción de audios (14-09-2026)
+
+Los audios de WhatsApp pasaban por `whisper-1`, que es el modelo viejo.
+Ahora usan `gpt-4o-mini-transcribe` (variable `TRANSCRIPCION_MODELO_IA`).
+
+Probado con una nota de voz real en español, en el mismo formato que manda
+WhatsApp (ogg opus) y montada igual que lo hace la app (un `File` con tipo
+`audio/ogg`, no un stream):
+
+| Modelo | Precio | Tarda | Transcripción |
+|---|---|---|---|
+| whisper-1 | 0,006 $/min | 2.528 ms | correcta |
+| gpt-4o-mini-transcribe | 0,003 $/min | 1.244 ms | correcta |
+| gpt-4o-transcribe | 0,006 $/min | 1.399 ms | correcta |
+
+La mitad de precio y el doble de rápido, con la misma transcripción palabra
+por palabra. Fuente de precios: la página de precios de OpenAI de 2026.

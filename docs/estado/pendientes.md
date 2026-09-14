@@ -418,3 +418,53 @@ se traga en silencio.
       `/api/cron/revisar-bloqueos`, que esperaba a la IA dentro de un
       `after()` y con eso mantenía la conexión abierta. Ahora solo desbloquea
       y lo recoge el reparto de la IA. Detalle en `incidentes-resueltos.md`
+
+
+## Lo que me queda a mí (Claude), a 14-09-2026
+
+Lo de Jorge está aparte, en `pendientes-jorge.md`. Esto es lo mío, por orden
+de lo que más ahorra o desbloquea.
+
+### Puedo hacerlo ya, sin depender de nadie
+- [ ] **Encoger el prompt del motor** (idea de Jorge, 14-09-2026). Cada
+      respuesta manda ~4.800 tokens de entrada y el 84 % del coste es
+      entrada. Ahí van la lista entera de etiquetas, la de reglas, la ficha
+      del negocio y las novedades, se usen o no. Parte puede pasar a
+      herramientas de consulta bajo demanda, como ya se hace con el catálogo
+      y las políticas. Hay que medir antes y después con
+      `probar-modelos.mjs`, que ya da tokens y aciertos.
+- [ ] **Caché de prompt**. OpenAI cobra la entrada repetida a mitad de precio
+      en 4o mini, pero solo si lo estable va primero y siempre igual. Hoy el
+      bloque del cliente concreto (notas, conversaciones anteriores,
+      novedades) va EN MEDIO del prompt y corta la caché para todo lo que
+      viene detrás. Moverlo al final no cambia ni una respuesta.
+- [ ] **Modelo de transcripción**. Los audios usan `whisper-1`, el modelo más
+      antiguo que nos queda. Mirar qué hay hoy y cuánto cuesta.
+- [ ] **Sembrar automatizaciones y etiquetas** al crear una organización, para
+      que el cliente no empiece con las pantallas vacías (no está decidido,
+      es una idea).
+
+### Esperando una decisión de Jorge
+- [ ] **Tope de automatizaciones por plan**. Las mencionó como diferenciador
+      y hoy no existe ni la columna. Mi consejo es NO ponerlo: las
+      automatizaciones son lo que hace que el cliente gaste créditos, que es
+      lo que factura.
+- [ ] **Números de los planes**. Los topes de sucursales y usuarios que puse
+      (1/2, 1/3, 3/10, 10/sin tope) son una propuesta; se cambian en
+      Superadmin sin tocar código.
+
+### Esperando algo que solo puede crear Jorge
+- [ ] **Google Calendar** en la agenda: necesita un proyecto de Google Cloud
+      con la API de Calendar y credenciales OAuth.
+- [ ] **Outlook / Microsoft 365** en el correo: necesita una app registrada
+      en Microsoft Entra.
+- [ ] **Instalación real de la app de Shopify**: necesita que cree la app en
+      el Dev Dashboard y ponga las claves en Vercel.
+
+### Descartado, para no volver a mirarlo
+- Los **gpt-5.6** (Luna, Terra, Sol) y **gpt-6-astra** no funcionan con las
+  herramientas del motor. Medido el 14-09-2026: Luna no contestó nada en
+  ninguno de los cinco casos. No volver a intentarlo sin rehacer la parte de
+  herramientas.
+- **Descuentos a mano desde el chat**: descartado por Jorge, no todos los
+  clientes tienen tienda.

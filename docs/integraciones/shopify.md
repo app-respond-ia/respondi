@@ -457,5 +457,5 @@ un aviso sin firma; Tienda online, Canales y Facturación cargan.
   en la tienda de pruebas. Ahí se confirma la versión de la API (`2026-01`).
 - Registrar los webhooks desde una app **personalizada** no es posible: en
   ese camino se queda a mano y explicado en la pantalla.
-- El mapa visual (cajas y flechas): la misma receta que ya edita el editor
-  de lista; solo cambia la piel.
+- El mapa visual (cajas y flechas) ya está hecho (14-09-2026): interruptor
+  Lista/Mapa en Automatizaciones, `MapaReceta.tsx`.

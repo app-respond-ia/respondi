@@ -238,12 +238,55 @@ El resumen tenía `gpt-5.6-luna` escrito a fuego con el comentario «mantenemos
 el estándar del proyecto», y no era el estándar de nada: era el único sitio
 donde se usaba, y encima más caro (0,20/1,20 frente a 0,15/0,60).
 
+## La caché del prompt (14-09-2026)
+
+OpenAI cobra a mitad de precio la parte del prompt que llega repetida, pero
+solo cuenta el trozo del PRINCIPIO que coincide: en cuanto algo cambia, se
+acabó la caché para todo lo que viene detrás.
+
+El bloque que cambia en cada conversación (nota del contacto, resúmenes de
+conversaciones anteriores, novedades del día) estaba **en medio** del prompt,
+así que dejaba fuera de la caché a las instrucciones, las etiquetas y las
+reglas, que son idénticas para toda la sucursal. Ahora se guarda en
+`contextoDelCliente` y se pega al final. No cambia ni una palabra de lo que
+lee el modelo, solo el orden.
+
+| | Antes | Después |
+|---|---|---|
+| Entrada por respuesta | ~4.800 tokens | ~4.900 tokens |
+| De eso, cacheado | 0 | 3.300 (67 %) |
+| Coste por respuesta | 0,00079 $ | 0,00055 $ |
+
+Un 30 % menos sin tocar la calidad. Business a tope pasa de 3,9 $ a 2,7 $ de
+coste. `ai_logs.contexto_snapshot.tokens_cacheados` lo apunta en cada
+respuesta, así que se puede vigilar: si baja de golpe, alguien ha metido algo
+variable al principio del prompt.
+
+**Regla para el futuro**: lo que sea igual para toda la sucursal va arriba;
+lo que cambie por conversación o por día, abajo del todo.
+
+## La IA decía «no lo tenemos» sin mirar el catálogo (14-09-2026)
+
+Salió al montar `probar-modelos.mjs`. Preguntando «¿cuánto cuesta cortarme el
+pelo?» a un negocio que **sí** lo vende, la IA contestaba 2 de cada 4 veces
+«no tengo información, consulta con una barbería», **sin llamar a
+consultar_catalogo**. Se fiaba de la descripción del negocio en vez de mirar
+la lista de precios. Eso es mandar un cliente a la competencia.
+
+Añadida una instrucción explícita: nunca decir que no se ofrece algo sin
+haber consultado el catálogo antes; la descripción del negocio no es la lista
+completa. Pasó de 2/4 a 3/4.
+
+El 1 de 4 que queda es culpa de los datos de la sucursal de pruebas, que se
+contradicen: la ficha dice «Cafetería de barrio» y el único servicio es un
+corte de pelo. El modelo se agarra a la descripción. Conviene arreglar esa
+ficha, y de paso vale como aviso para clientes reales: **si la descripción
+del negocio contradice al catálogo, gana la descripción**.
+
 ### Pendiente de abaratar más
-- **Encoger el prompt** (idea de Jorge): hoy van 4.800 tokens de entrada por
-  respuesta y el 84 % del coste es entrada. Mucho de eso es la lista entera
-  de etiquetas y reglas, la ficha del negocio y las novedades, vaya o no a
-  hacer falta. Se puede pasar parte a herramientas de consulta bajo demanda.
-- **Caché de prompt**: OpenAI cobra la entrada cacheada al 50 % en 4o mini.
-  Para que entre, lo estable tiene que ir primero y lo del cliente concreto
-  al final; hoy el bloque del cliente va en medio y corta la caché.
+- **Encoger el prompt**: la caché ya se lleva el 67 %, así que el margen que
+  queda es menor de lo que parecía. La lista de etiquetas no se puede quitar
+  del prompt porque la herramienta solo lleva los identificadores, no los
+  nombres. Lo que queda por mirar son las definiciones de las herramientas,
+  que son el bloque grande y fijo.
 - **Transcripción**: `whisper-1` es el modelo más antiguo que usamos.

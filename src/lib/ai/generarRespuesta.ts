@@ -190,40 +190,52 @@ export async function generarRespuesta(conv: any) {
     }
   }
 
-  // --- CONTEXTO ESPECÍFICO DEL CLIENTE ---
+  // LO QUE CAMBIA EN CADA CONVERSACIÓN VA AL FINAL (14-09-2026).
+  //
+  // OpenAI cobra a mitad de precio la parte del prompt que se repite igual,
+  // pero solo cuenta el trozo del PRINCIPIO que coincide: en cuanto algo
+  // cambia, se acabó la caché para todo lo que viene detrás. Este bloque
+  // (nota del contacto, conversaciones anteriores, novedades del día) es
+  // distinto en cada conversación, y estaba puesto EN MEDIO, así que dejaba
+  // fuera de la caché a las instrucciones, las etiquetas y las reglas, que
+  // son idénticas para toda la sucursal.
+  //
+  // Se guarda aparte y se pega al final. No cambia ni una palabra de lo que
+  // lee el modelo, solo el orden.
+  let contextoDelCliente = ''
   let contextAdded = false;
   
   // La nota es la que ha puesto ESTA tienda (`contactos_sucursal`); la de otra
   // tienda no se comparte. La trae /api/ai/process en `ficha_contacto`.
   if (conv.ficha_contacto?.nota) {
-    if (!contextAdded) { systemPrompt += `\n--- CONTEXTO ESPECÍFICO DEL CLIENTE ---\n`; contextAdded = true; }
+    if (!contextAdded) { contextoDelCliente += `\n--- CONTEXTO ESPECÍFICO DEL CLIENTE ---\n`; contextAdded = true; }
     let notaLimpia = conv.ficha_contacto.nota;
     if (notaLimpia.length > 300) {
       const cutPoint = notaLimpia.substring(0, 300).lastIndexOf(' ');
       notaLimpia = notaLimpia.substring(0, cutPoint > 0 ? cutPoint : 300) + '...';
     }
-    systemPrompt += `Nota interna sobre este cliente:\n${notaLimpia}\n\n`;
+    contextoDelCliente += `Nota interna sobre este cliente:\n${notaLimpia}\n\n`;
   }
 
   if (pastConvs && pastConvs.length > 0) {
-    if (!contextAdded) { systemPrompt += `\n--- CONTEXTO ESPECÍFICO DEL CLIENTE ---\n`; contextAdded = true; }
-    systemPrompt += `Historial reciente de conversaciones CERRADAS con este mismo cliente (para tener contexto, NO respondas a esto, es solo informativo):\n`;
+    if (!contextAdded) { contextoDelCliente += `\n--- CONTEXTO ESPECÍFICO DEL CLIENTE ---\n`; contextAdded = true; }
+    contextoDelCliente += `Historial reciente de conversaciones CERRADAS con este mismo cliente (para tener contexto, NO respondas a esto, es solo informativo):\n`;
     pastConvs.forEach(c => {
       const fechaCierre = new Date(c.fecha_cierre).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
-      systemPrompt += `- [${fechaCierre}]: ${c.resumen}\n`;
+      contextoDelCliente += `- [${fechaCierre}]: ${c.resumen}\n`;
     });
-    systemPrompt += `\n`;
+    contextoDelCliente += `\n`;
   }
 
-  // --- NOVEDADES DEL DÍA ---
+  // --- NOVEDADES DEL DÍA --- (cambian cada día, así que también van al final)
   if (dailyUpdates && dailyUpdates.length > 0) {
-    systemPrompt += `\n--- NOVEDADES Y AVISOS ACTIVOS HOY ---\n`;
-    systemPrompt += `Ten en cuenta esta información temporal al responder:\n`;
+    contextoDelCliente += `\n--- NOVEDADES Y AVISOS ACTIVOS HOY ---\n`;
+    contextoDelCliente += `Ten en cuenta esta información temporal al responder:\n`;
     dailyUpdates.forEach((u: any) => {
       const tipo = u.tipos_novedad?.nombre || 'Aviso';
-      systemPrompt += `- [${tipo}]: ${u.descripcion}\n`;
+      contextoDelCliente += `- [${tipo}]: ${u.descripcion}\n`;
     });
-    systemPrompt += `\n`;
+    contextoDelCliente += `\n`;
   }
 
   // El idioma sale de dos ajustes que hasta ahora no hacía nada ninguno: la
@@ -237,6 +249,15 @@ export async function generarRespuesta(conv: any) {
     systemPrompt += `- Responde SIEMPRE en ${idiomaBase}, aunque el cliente te escriba en otro idioma.\n`
   }
   systemPrompt += `- No inventes información. Si no lo sabes, indícalo${canEscalate ? ' o usa escalar_humano' : ''}.\n`
+  // Antes de decir "no lo tenemos", MIRAR. Medido el 14-09-2026: preguntando
+  // "¿cuánto cuesta cortarme el pelo?" a un negocio que sí lo vende, la IA
+  // contestaba 2 de cada 4 veces "no tengo información, consulta con una
+  // barbería" SIN llamar a consultar_catalogo. Se fiaba de la descripción del
+  // negocio ("Cafetería de barrio") en vez de mirar la lista de precios. Eso
+  // es mandar un cliente a la competencia.
+  if (activeSkills.has('consultar_catalogo')) {
+    systemPrompt += `- NUNCA digas que no ofrecéis algo, ni que no tienes información sobre un producto o servicio, sin haber llamado antes a consultar_catalogo. La descripción del negocio no es la lista completa: lo que se vende está en el catálogo. Solo si el catálogo no lo tiene, dices que no lo ofrecéis.\n`
+  }
   if (activeSkills.has('consultar_politicas')) {
     // Los modelos pequeños contestaban de memoria ("puedes venir con tu perro,
     // tenemos patio") en vez de mirar la norma del negocio
@@ -301,6 +322,9 @@ export async function generarRespuesta(conv: any) {
       systemPrompt += `- ID: ${r.id} | Nombre: ${r.nombre} | Tipo: ${r.tipo_caso} | Info: ${r.descripcion_intencion || ''}\n`
     })
   }
+
+  // Y aquí, al final del todo, lo que cambia en cada conversación
+  systemPrompt += contextoDelCliente
 
   // 5. Preparar Mensajes para OpenAI
   const openAiMessages: any[] = [{ role: 'system', content: systemPrompt }]
@@ -557,6 +581,9 @@ export async function generarRespuesta(conv: any) {
   })
 
   let tokensInput = 0
+  // Lo que OpenAI da por repetido y cobra a mitad de precio. Se apunta para
+  // poder comprobar que el orden del prompt entra en la caché (14-09-2026).
+  let tokensCacheados = 0
   let tokensOutput = 0
 
   // 7. Llamada a OpenAI (Paso 1)
@@ -570,6 +597,7 @@ export async function generarRespuesta(conv: any) {
 
     responseMsg = response.choices[0].message
     tokensInput += response.usage?.prompt_tokens || 0
+    tokensCacheados += response.usage?.prompt_tokens_details?.cached_tokens || 0
     tokensOutput += response.usage?.completion_tokens || 0
 
   } catch (error: any) {
@@ -935,6 +963,7 @@ export async function generarRespuesta(conv: any) {
       })
       responseMsg = secondResponse.choices[0].message
       tokensInput += secondResponse.usage?.prompt_tokens || 0
+    tokensCacheados += secondResponse.usage?.prompt_tokens_details?.cached_tokens || 0
       tokensOutput += secondResponse.usage?.completion_tokens || 0
     } catch (error: any) {
       console.error('Error OpenAI Paso 2:', error)
@@ -970,6 +999,7 @@ export async function generarRespuesta(conv: any) {
           tool_choice: { type: 'function', function: { name: 'etiquetar_conversacion' } }
         })
         tokensInput += forzado.usage?.prompt_tokens || 0
+    tokensCacheados += forzado.usage?.prompt_tokens_details?.cached_tokens || 0
         tokensOutput += forzado.usage?.completion_tokens || 0
         const llamada: any = forzado.choices[0].message.tool_calls?.[0]
         if (llamada?.function?.arguments) {
@@ -1004,6 +1034,7 @@ export async function generarRespuesta(conv: any) {
         tool_choice: { type: 'function', function: { name: herramientaPresupuesto.function.name } }
       })
       tokensInput += revision.usage?.prompt_tokens || 0
+    tokensCacheados += revision.usage?.prompt_tokens_details?.cached_tokens || 0
       tokensOutput += revision.usage?.completion_tokens || 0
       const r: any = revision.choices[0].message
       const llamada: any = r.tool_calls?.find((t: any) => t.function?.name === herramientaPresupuesto.function.name)
@@ -1018,6 +1049,7 @@ export async function generarRespuesta(conv: any) {
         openAiMessages.push({ role: 'tool', tool_call_id: llamada.id, content: resultado })
         const final = await openai.chat.completions.create({ model: MODELO_IA, messages: openAiMessages })
         tokensInput += final.usage?.prompt_tokens || 0
+    tokensCacheados += final.usage?.prompt_tokens_details?.cached_tokens || 0
         tokensOutput += final.usage?.completion_tokens || 0
         if (final.choices[0].message.content) responseMsg.content = final.choices[0].message.content
       } else if (r.content) {
@@ -1049,6 +1081,7 @@ export async function generarRespuesta(conv: any) {
         tool_choice: { type: 'function', function: { name: 'enlace_de_compra' } }
       })
       tokensInput += revision.usage?.prompt_tokens || 0
+    tokensCacheados += revision.usage?.prompt_tokens_details?.cached_tokens || 0
       tokensOutput += revision.usage?.completion_tokens || 0
       const r: any = revision.choices[0].message
       const llamada: any = r.tool_calls?.find((t: any) => t.function?.name === 'enlace_de_compra')
@@ -1061,6 +1094,7 @@ export async function generarRespuesta(conv: any) {
           openAiMessages.push({ role: 'tool', tool_call_id: llamada.id, content: resultado })
           const final = await openai.chat.completions.create({ model: MODELO_IA, messages: openAiMessages })
           tokensInput += final.usage?.prompt_tokens || 0
+    tokensCacheados += final.usage?.prompt_tokens_details?.cached_tokens || 0
           tokensOutput += final.usage?.completion_tokens || 0
           if (final.choices[0].message.content) responseMsg.content = final.choices[0].message.content
         }
@@ -1091,6 +1125,7 @@ export async function generarRespuesta(conv: any) {
         tool_choice: { type: 'function', function: { name: 'detectar_intencion' } }
       })
       tokensInput += revision.usage?.prompt_tokens || 0
+    tokensCacheados += revision.usage?.prompt_tokens_details?.cached_tokens || 0
       tokensOutput += revision.usage?.completion_tokens || 0
       const r: any = revision.choices[0].message
       const llamada: any = r.tool_calls?.find((t: any) => t.function?.name === 'detectar_intencion')
@@ -1102,6 +1137,7 @@ export async function generarRespuesta(conv: any) {
         openAiMessages.push({ role: 'tool', tool_call_id: llamada.id, content: resultado })
         const final = await openai.chat.completions.create({ model: MODELO_IA, messages: openAiMessages })
         tokensInput += final.usage?.prompt_tokens || 0
+    tokensCacheados += final.usage?.prompt_tokens_details?.cached_tokens || 0
         tokensOutput += final.usage?.completion_tokens || 0
         if (final.choices[0].message.content) responseMsg.content = final.choices[0].message.content
       }
@@ -1143,6 +1179,7 @@ export async function generarRespuesta(conv: any) {
           tool_choice: { type: 'function', function: { name: nombreAccion } }
         })
         tokensInput += revision.usage?.prompt_tokens || 0
+    tokensCacheados += revision.usage?.prompt_tokens_details?.cached_tokens || 0
         tokensOutput += revision.usage?.completion_tokens || 0
         const r: any = revision.choices[0].message
         const llamada: any = r.tool_calls?.find((t: any) => t.function?.name === nombreAccion)
@@ -1155,6 +1192,7 @@ export async function generarRespuesta(conv: any) {
           openAiMessages.push({ role: 'tool', tool_call_id: llamada.id, content: resultado })
           const final = await openai.chat.completions.create({ model: MODELO_IA, messages: openAiMessages })
           tokensInput += final.usage?.prompt_tokens || 0
+    tokensCacheados += final.usage?.prompt_tokens_details?.cached_tokens || 0
           tokensOutput += final.usage?.completion_tokens || 0
           if (final.choices[0].message.content) responseMsg.content = final.choices[0].message.content
         }
@@ -1192,6 +1230,7 @@ export async function generarRespuesta(conv: any) {
       })
       const revision = await openai.chat.completions.create({ model: MODELO_IA, messages: openAiMessages, tools: deAgenda })
       tokensInput += revision.usage?.prompt_tokens || 0
+    tokensCacheados += revision.usage?.prompt_tokens_details?.cached_tokens || 0
       tokensOutput += revision.usage?.completion_tokens || 0
       const r: any = revision.choices[0].message
       const llamadas: any[] = (r.tool_calls || []).filter((t: any) => t.type === 'function' && esHerramientaDeAgenda(t.function?.name))
@@ -1206,6 +1245,7 @@ export async function generarRespuesta(conv: any) {
         if (llamadas.some((t: any) => ACCIONES_AGENDA.has(t.function?.name))) agendaAccionEnEstaPasada = true
         const final = await openai.chat.completions.create({ model: MODELO_IA, messages: openAiMessages })
         tokensInput += final.usage?.prompt_tokens || 0
+    tokensCacheados += final.usage?.prompt_tokens_details?.cached_tokens || 0
         tokensOutput += final.usage?.completion_tokens || 0
         if (final.choices[0].message.content) responseMsg.content = final.choices[0].message.content
       } else if (r.content) {
@@ -1264,6 +1304,7 @@ export async function generarRespuesta(conv: any) {
         tools: tools.filter((t: any) => t.function?.name === 'escalar_humano')
       })
       tokensInput += revision.usage?.prompt_tokens || 0
+    tokensCacheados += revision.usage?.prompt_tokens_details?.cached_tokens || 0
       tokensOutput += revision.usage?.completion_tokens || 0
       const r: any = revision.choices[0].message
       const llamada: any = r.tool_calls?.find((t: any) => t.type === 'function' && t.function?.name === 'escalar_humano')
@@ -1274,6 +1315,7 @@ export async function generarRespuesta(conv: any) {
         openAiMessages.push({ role: 'tool', tool_call_id: llamada.id, content: resultado })
         const final = await openai.chat.completions.create({ model: MODELO_IA, messages: openAiMessages })
         tokensInput += final.usage?.prompt_tokens || 0
+    tokensCacheados += final.usage?.prompt_tokens_details?.cached_tokens || 0
         tokensOutput += final.usage?.completion_tokens || 0
         if (final.choices[0].message.content) finalContent = final.choices[0].message.content
       } else if (r.content) {
@@ -1308,6 +1350,7 @@ export async function generarRespuesta(conv: any) {
         ...(canEscalate ? { tools: tools.filter((t: any) => t.function?.name === 'escalar_humano') } : {})
       })
       tokensInput += revision.usage?.prompt_tokens || 0
+    tokensCacheados += revision.usage?.prompt_tokens_details?.cached_tokens || 0
       tokensOutput += revision.usage?.completion_tokens || 0
       const r = revision.choices[0].message
       const llamada: any = r.tool_calls?.find((t: any) => t.type === 'function' && t.function?.name === 'escalar_humano')
@@ -1324,6 +1367,7 @@ export async function generarRespuesta(conv: any) {
           openAiMessages.push({ role: 'system', content: 'No se ha podido pasar la conversación a una persona. Escribe de nuevo tu respuesta completa al cliente sin decirle que le va a atender una persona.' })
           const otra = await openai.chat.completions.create({ model: MODELO_IA, messages: openAiMessages })
           tokensInput += otra.usage?.prompt_tokens || 0
+    tokensCacheados += otra.usage?.prompt_tokens_details?.cached_tokens || 0
           tokensOutput += otra.usage?.completion_tokens || 0
           const texto = otra.choices[0].message.content || ''
           finalContent = texto && !parecePrometerPersona(texto)
@@ -1427,7 +1471,10 @@ export async function generarRespuesta(conv: any) {
       herramientas: tools.map((t: any) => t.function?.name).filter(Boolean),
       usadas: ((responseMsg?.tool_calls || []) as any[]).map(t => t.function?.name).filter(Boolean),
       tienda: !!herramientasTienda.contexto,
-      agenda: !!herramientasAgenda.contexto
+      agenda: !!herramientasAgenda.contexto,
+      // Cuánto del prompt ha venido de la caché (se cobra a mitad de precio).
+      // Sirve para comprobar que lo estable va delante y lo variable detrás.
+      tokens_cacheados: tokensCacheados
     }
   })
   if (errorLog) console.error('Error insertando ai_log:', errorLog)

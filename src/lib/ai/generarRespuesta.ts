@@ -12,6 +12,11 @@ const openai = new OpenAI({ apiKey: OPENAI_API_KEY })
 // plan desde /superadmin/planes: el cliente siempre paga 1 crédito por
 // respuesta, pero a Respondi le cuesta distinto según el modelo del plan, y
 // de ahí sale el margen.
+const NOMBRE_IDIOMA: Record<string, string> = {
+    es: 'español', en: 'inglés', pt: 'portugués', fr: 'francés',
+    it: 'italiano', de: 'alemán', ca: 'catalán', gl: 'gallego', eu: 'euskera'
+  }
+
 const PRECIO_POR_DEFECTO = { input: 0.20, output: 1.20 }
 
 // Indicios de que una respuesta le dice al cliente que le va a atender una
@@ -160,7 +165,15 @@ export async function generarRespuesta(conv: any) {
   // Un correo se escribe distinto que un chat (ver estilo-email.ts)
   const esCorreo = conv.canal === 'email'
   const { instruccionesEmail, correoParaIA, limpiarRespuestaEmail } = await import('@/lib/ai/estilo-email')
+  const idiomaBase = NOMBRE_IDIOMA[profile?.idioma_base || 'es'] || profile?.idioma_base || 'español'
   let systemPrompt = `Eres el asistente virtual del negocio.\n`
+  // El idioma, lo primero de todo. Iba solo al final, dentro de
+  // "INSTRUCCIONES ESTRICTAS", y a esas alturas del prompt los modelos
+  // baratos se lo saltaban: contestaban en español a un cliente inglés.
+  // Medido el 14-09-2026 con probar-modelos.mjs.
+  systemPrompt += activeSkills.has('idioma_multi')
+    ? `IDIOMA (regla nº 1, por encima de todo lo demás): contesta SIEMPRE en el mismo idioma en el que te escribe el cliente, sea cual sea. Si te escribe en inglés, contestas en inglés; si en francés, en francés. Solo si no se entiende en qué idioma escribe, contestas en ${idiomaBase}.\n`
+    : `IDIOMA: contesta SIEMPRE en ${idiomaBase}, aunque el cliente te escriba en otro idioma.\n`
   if (esCorreo) systemPrompt += instruccionesEmail()
   if (profile) {
     if (profile.tono) {
@@ -216,11 +229,6 @@ export async function generarRespuesta(conv: any) {
   // El idioma sale de dos ajustes que hasta ahora no hacía nada ninguno: la
   // skill "Idioma multi" no se consultaba en el motor, y `idioma_base` se
   // configuraba en Perfil de sucursal, se guardaba en la base y nadie la leía.
-  const NOMBRE_IDIOMA: Record<string, string> = {
-    es: 'español', en: 'inglés', pt: 'portugués', fr: 'francés',
-    it: 'italiano', de: 'alemán', ca: 'catalán', gl: 'gallego', eu: 'euskera'
-  }
-  const idiomaBase = NOMBRE_IDIOMA[profile?.idioma_base || 'es'] || profile?.idioma_base || 'español'
 
   systemPrompt += `\nINSTRUCCIONES ESTRICTAS:\n`
   if (activeSkills.has('idioma_multi')) {

@@ -186,3 +186,64 @@ llegaría): se manda la plantilla de reapertura de la sucursal si la hay
 (`channels.plantilla_reapertura_id`, sin cobrar) o la conversación queda
 parada (`ventana_cerrada`) para el equipo, y se desbloquea sola en cuanto el
 cliente vuelve a escribir.
+
+## Qué modelo usa cada cosa (decidido con Jorge, 14-09-2026)
+
+Jorge: «el modelo más barato en todos los planes; los planes se diferencian
+por créditos, sucursales, usuarios, canales y automatizaciones».
+
+**Todos los planes usan `gpt-4o-mini`.** No es el más barato de la lista, es
+el más barato **que funciona**, que no es lo mismo. Se midió antes de
+decidir, porque hasta ahora ninguna batería comprobaba la CALIDAD de la IA,
+solo que las tuberías funcionaban.
+
+`probar-modelos.mjs` manda cinco mensajes de cliente de verdad al motor y
+mira qué hace con cada uno: que diga el precio real del catálogo, que ofrezca
+horas de la agenda, que abra un caso cuando piden una persona (se comprueba
+la fila en `cases`, no el nombre de la herramienta), que conteste en el
+idioma del cliente y que no se invente un servicio que no existe. Cada caso,
+tres veces, porque un modelo no contesta igual dos veces: con una sola pasada
+se saca la conclusión equivocada.
+
+| Modelo | Acierta | Coste por respuesta |
+|---|---|---|
+| gpt-4o-mini | 15/15 | 0,00079 $ |
+| gpt-4.1-nano | 12/15 | 0,00064 $ |
+| gpt-4.1 | 15/15 | 0,01105 $ |
+| gpt-5.6-luna | 0/15 | no contesta |
+
+- **Nano** es un 20 % más barato pero se salta la agenda y el idioma: no vale.
+- **GPT-4.1** acierta lo mismo que 4o mini y cuesta **catorce veces más**.
+  Business a tope pasa de 27 $ de coste a 3,9 $.
+- **Los gpt-5.6** (Luna, Terra, Sol) no funcionan con las herramientas del
+  motor: en la prueba no contestaron nada. Confirma lo que ya se sospechaba.
+
+De paso salió un fallo real que no era del modelo: la regla de «contesta en
+el idioma del cliente» iba enterrada al final de un prompt de miles de
+tokens y **los tres modelos baratos se la saltaban**; solo GPT-4.1 la
+respetaba. Subida al principio del prompt, 4o mini pasa de fallar a acertar
+3 de 3. O sea: parte de lo que parecía «modelo malo» era prompt mal puesto.
+
+Los demás sitios donde se llama a OpenAI:
+
+| Para qué | Modelo | De dónde sale |
+|---|---|---|
+| Atender clientes | gpt-4o-mini | `plans.modelo_ia` |
+| Resumir conversación | gpt-4o-mini | `RESUMEN_MODELO_IA` |
+| Asistente del panel | gpt-4o-mini | `ASISTENTE_MODELO_IA` |
+| Transcribir audios | whisper-1 | escrito a fuego |
+| Buscar políticas | text-embedding-3-small | escrito a fuego |
+
+El resumen tenía `gpt-5.6-luna` escrito a fuego con el comentario «mantenemos
+el estándar del proyecto», y no era el estándar de nada: era el único sitio
+donde se usaba, y encima más caro (0,20/1,20 frente a 0,15/0,60).
+
+### Pendiente de abaratar más
+- **Encoger el prompt** (idea de Jorge): hoy van 4.800 tokens de entrada por
+  respuesta y el 84 % del coste es entrada. Mucho de eso es la lista entera
+  de etiquetas y reglas, la ficha del negocio y las novedades, vaya o no a
+  hacer falta. Se puede pasar parte a herramientas de consulta bajo demanda.
+- **Caché de prompt**: OpenAI cobra la entrada cacheada al 50 % en 4o mini.
+  Para que entre, lo estable tiene que ir primero y lo del cliente concreto
+  al final; hoy el bloque del cliente va en medio y corta la caché.
+- **Transcripción**: `whisper-1` es el modelo más antiguo que usamos.

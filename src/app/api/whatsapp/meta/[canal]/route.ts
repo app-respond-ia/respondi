@@ -119,6 +119,19 @@ export async function POST(req: Request, { params }: Ctx) {
   // insista)
   if (canal.estado === 'desconectado') return NextResponse.json({ ok: true })
 
+  // Si llega un aviso FIRMADO, el canal funciona: Meta nos encuentra y la
+  // clave secreta es la buena. Así que se da por activo aunque siguiera en
+  // "pendiente".
+  //
+  // Esto no es cosmético (14-09-2026): recibir funcionaba con el canal en
+  // pendiente, pero ENVIAR no (`salida.ts` exige 'activo'). Resultado: el
+  // cliente escribía, la IA contestaba, y la respuesta se tiraba a la basura
+  // sin que nadie se enterara. Pasó con el número de Jorge al reconectarlo.
+  if (canal.estado !== 'activo') {
+    await supabaseAdmin.from('channels').update({ estado: 'activo', ultimo_error: null }).eq('id', canal.id)
+    canal.estado = 'activo'
+  }
+
   try {
     for (const entrada of datos.entry || []) {
       for (const cambio of entrada.changes || []) {

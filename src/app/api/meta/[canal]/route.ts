@@ -96,6 +96,15 @@ export async function POST(req: Request, { params }: Ctx) {
   }
   if (canal.estado === 'desconectado') return NextResponse.json({ ok: true })
 
+  // Un aviso FIRMADO demuestra que el canal funciona: se da por activo aunque
+  // siguiera en "pendiente". Recibir funcionaba en pendiente pero ENVIAR no
+  // (`salida.ts` exige 'activo'), así que la respuesta de la IA se tiraba sin
+  // avisar a nadie. Visto en WhatsApp el 14-09-2026.
+  if (canal.estado !== 'activo') {
+    await supabaseAdmin.from('channels').update({ estado: 'activo', ultimo_error: null }).eq('id', canal.id)
+    canal.estado = 'activo'
+  }
+
   // Messenger avisa con object "page"; Instagram, con "instagram". Cada canal
   // solo atiende lo suyo (la misma app puede tener las dos cosas).
   const objeto = String(datos.object || '')

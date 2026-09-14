@@ -1078,13 +1078,26 @@ export async function getPlanes() {
   return { success: true, planes: data }
 }
 
+// Los topes que se pueden dejar en blanco ("sin tope") llegan del formulario
+// como cadena vacía y la base de datos los rechaza por ser columnas de
+// número. Vacío significa NULL, que es como el código lee "sin tope".
+const TOPES_OPCIONALES = ['canales_max', 'sucursales_max', 'usuarios_max']
+function limpiarTopes(data: any) {
+  const salida = { ...data }
+  for (const campo of TOPES_OPCIONALES) {
+    const v = salida[campo]
+    if (v === '' || v === undefined || (typeof v === 'number' && Number.isNaN(v))) salida[campo] = null
+  }
+  return salida
+}
+
 export async function crearPlan(data: any) {
   const auth = await requireSuperAdmin()
   if (!superadminHasPermission(auth, 'planes', 'escritura')) {
     return { success: false, error: 'No tienes permiso para esta acción' }
   }
   const { supabase } = auth
-  const { data: result, error } = await supabase.from('plans').insert(data).select().single()
+  const { data: result, error } = await supabase.from('plans').insert(limpiarTopes(data)).select().single()
   if (error) return { success: false, error: error.message }
   revalidatePath('/superadmin/planes')
   return { success: true, plan: result }
@@ -1097,7 +1110,7 @@ export async function actualizarPlan(id: string, data: any) {
     return { success: false, error: 'No tienes permiso para esta acción' }
   }
   const { supabase } = auth
-  const { data: result, error } = await supabase.from('plans').update(data).eq('id', id).select().single()
+  const { data: result, error } = await supabase.from('plans').update(limpiarTopes(data)).eq('id', id).select().single()
   if (error) return { success: false, error: error.message }
   revalidatePath('/superadmin/planes')
   return { success: true, plan: result }

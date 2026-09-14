@@ -22,7 +22,7 @@ export default function PlanesPage() {
   const canWrite = hasPermission('planes', 'escritura')
 
   const defaultFormData = {
-    nombre: '', precio_usd: 0, creditos_mensuales: 1000, canales_max: 1, sucursales_max: 1, 
+    nombre: '', precio_usd: 0, creditos_mensuales: 1000, canales_max: '', sucursales_max: 1, 
     usuarios_max: 1,
     dias_retencion_mensajes: 30, dias_trial: 0, creditos_diarios_trial: 0, modelo_ia: 'gpt-4o-mini',
     precio_input_usd_millon: 0.20, precio_output_usd_millon: 1.20,
@@ -52,7 +52,7 @@ export default function PlanesPage() {
         nombre: plan.nombre || '',
         precio_usd: plan.precio_usd || 0,
         creditos_mensuales: plan.creditos_mensuales || 0,
-        canales_max: plan.canales_max || 0,
+        canales_max: plan.canales_max ?? '',
         sucursales_max: plan.sucursales_max || 0,
         usuarios_max: plan.usuarios_max || 0,
         dias_retencion_mensajes: plan.dias_retencion_mensajes || 30,
@@ -217,7 +217,7 @@ export default function PlanesPage() {
                     </li>
                     <li className="flex items-center gap-3">
                       <svg className={`w-5 h-5 shrink-0 ${isPro ? 'text-brand-500' : 'text-ink-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
-                      <span className="text-ink-700"><strong className="font-600 text-ink-900">{p.canales_max}</strong> canales en total</span>
+                      <span className="text-ink-700">{p.canales_max === null || p.canales_max >= 999 ? <><strong className="font-600 text-ink-900">Todos</strong> los canales</> : <><strong className="font-600 text-ink-900">{p.canales_max}</strong> canales en total</>}</span>
                     </li>
                     <li className="flex items-center gap-3">
                       <svg className={`w-5 h-5 shrink-0 ${isPro ? 'text-brand-500' : 'text-ink-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
@@ -334,8 +334,9 @@ export default function PlanesPage() {
                       <input type="number" value={formData.creditos_mensuales} onChange={e => setFormData({...formData, creditos_mensuales: parseInt(e.target.value)})} className="w-full h-10 px-3 rounded-lg border border-slate-300 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-100" />
                     </div>
                     <div>
-                      <label className="block text-xs font-500 text-ink-600 mb-1.5">Canales máximos (en total)</label>
-                      <input type="number" value={formData.canales_max} onChange={e => setFormData({...formData, canales_max: parseInt(e.target.value)})} className="w-full h-10 px-3 rounded-lg border border-slate-300 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-100" />
+                      <label className="block text-xs font-500 text-ink-600 mb-1.5">Tope de canales (vacío = sin tope)</label>
+                      <input type="number" min="0" placeholder="Sin tope" value={formData.canales_max === null || formData.canales_max === undefined ? '' : String(formData.canales_max)} onChange={e => setFormData({...formData, canales_max: e.target.value === '' ? '' : (parseInt(e.target.value) as any)})} className="w-full h-10 px-3 rounded-lg border border-slate-300 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-100" />
+                      <p className="text-[11px] text-ink-400 mt-1">Déjalo vacío: los planes se diferencian por sucursales, usuarios y créditos, no por canales. Solo hay cuatro tipos (WhatsApp, Instagram, Facebook y correo) y cada sucursal puede tener uno de cada, así que el tope no separa planes, solo estorba.</p>
                     </div>
                     <div>
                       <label className="block text-xs font-500 text-ink-600 mb-1.5">Sucursales máximas</label>

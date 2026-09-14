@@ -247,3 +247,53 @@ El selector de modelo solo ofrece modelos de OpenAI. Ofrecía también "Claude
 elegir cualquiera de los dos dejaba sin IA a todos los clientes de ese plan,
 sin ningún aviso. Si algún día se añade otro proveedor, hay que tocar el
 motor antes que el desplegable.
+
+## Qué diferencia a un plan de otro (decidido con Jorge, 14-09-2026)
+
+Antes el plan decidía tres cosas: el modelo de IA, el tope de canales y el
+tamaño (sucursales, usuarios, créditos). Han caído las dos primeras.
+
+**El modelo ya no diferencia.** Todos los planes usan `gpt-4o-mini`, elegido
+midiendo calidad y coste (ver `motor-ia.md`). GPT-4.1 acertaba lo mismo y
+costaba catorce veces más.
+
+**El tope de canales tampoco.** Jorge: «yo no miraría los planes por la
+cantidad de canales, sino por la cantidad de sucursales que tiene el
+negocio». Tiene razón, y hay un motivo técnico que lo confirma: solo existen
+cuatro tipos de canal (WhatsApp, Instagram, Facebook y correo) y `channels`
+tiene `UNIQUE (tenant_id, branch_id, tipo)`, así que **una sucursal nunca
+puede pasar de cuatro canales**. El tope no hacía pequeño a un plan, solo
+obligaba a una peluquería que quería WhatsApp e Instagram a saltar de 29 $ a
+59 $. Los 999 de Business tampoco significaban nada.
+
+Ahora `canales_max` es NULL en los cuatro planes (migración
+`20260914130000_topes_plan_opcionales.sql`, que permite nulos en
+`canales_max` y `sucursales_max`). El código ya entendía NULL como «sin
+tope»; lo que faltaba era poder guardarlo.
+
+| Plan | Precio | Créditos | Canales | Sucursales | Usuarios |
+|---|---|---|---|---|---|
+| Trial | 0 $ | 100 | todos | 1 | 2 |
+| Starter | 29 $ | 500 | todos | 1 | 3 |
+| Pro | 59 $ | 1500 | todos | 3 | 10 |
+| Business | 99 $ | 5000 | todos | 10 | sin tope |
+
+Argumento de venta que queda: **todos los canales incluidos en todos los
+planes**; se paga por tamaño del negocio (sucursales y usuarios) y por
+volumen (créditos). Los números se cambian en Superadmin → Planes sin tocar
+código.
+
+Dos arreglos que salieron por el camino:
+- El formulario de Superadmin convertía un tope vacío en `0`, y un `0` en
+  `canales_max` **bloquea todos los canales** de ese plan sin avisar
+  (`fueraDelPlan` compara `enUso < max`). Ahora vacío es vacío y se guarda
+  como NULL (`limpiarTopes` en `superadmin.ts`).
+- El desplegable de modelo dice ahora qué acierta y qué cuesta cada uno.
+
+### Pendiente
+- Las **automatizaciones no tienen tope por plan** (no existe la columna).
+  Jorge las mencionó como diferenciador: si se quiere, hay que añadir el
+  campo y aplicarlo en `cambiarAutomatizacion`.
+- El tope de canales, si algún día vuelve, cuenta canales de TODA la
+  organización, no por sucursal. Para un plan con varias sucursales eso se
+  queda corto enseguida.

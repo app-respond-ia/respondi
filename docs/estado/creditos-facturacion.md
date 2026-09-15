@@ -297,3 +297,21 @@ Dos arreglos que salieron por el camino:
 - El tope de canales, si algún día vuelve, cuenta canales de TODA la
   organización, no por sucursal. Para un plan con varias sucursales eso se
   queda corto enseguida.
+
+## «Managed Payments» de Stripe y el código fiscal (15-09-2026)
+
+Al probar el pago real en la cuenta de Stripe de Jorge (modo prueba), el
+Checkout falló con «the product tax code is missing … Product tax code is
+required for Managed Payments, which is enabled by default on your account».
+Las cuentas nuevas de Stripe traen activado **Managed Payments**: Stripe
+actúa como vendedor registrado (merchant of record), cobra más comisión y
+liquida los impuestos (IVA) por ti, y para eso cada producto necesita un
+código fiscal.
+
+Arreglo en `src/lib/stripe.ts`: los productos de los planes llevan siempre
+`tax_code = txcd_10103001` (software como servicio, uso profesional; a los ya
+creados se les pone al pasar por `asegurarPrecioDelPlan`), y el Checkout se
+crea con `managed_payments.enabled = false`, es decir, vende y factura
+Propulse System LLC, como está diseñado. Activar Managed Payments es una
+decisión de negocio de Jorge (ver `pendientes.md`); si se activa, con el
+código fiscal ya puesto funcionaría sin tocar código.

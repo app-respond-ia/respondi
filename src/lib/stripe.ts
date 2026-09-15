@@ -24,6 +24,14 @@ export function stripeConfigurado() {
   return !!process.env.STRIPE_SECRET_KEY
 }
 
+// Código fiscal de Stripe para «software como servicio, uso profesional».
+// Las cuentas nuevas de Stripe traen activado «Managed Payments» (Stripe
+// actúa como vendedor y liquida impuestos) y con eso el pago falla si el
+// producto no lleva código fiscal (visto el 15-09-2026 en la cuenta de
+// Jorge). Se pone siempre: no molesta si está desactivado y hace falta si
+// algún día se activa.
+const CODIGO_FISCAL_SAAS = 'txcd_10103001'
+
 export function stripe(): Stripe {
   if (cliente) return cliente
   const clave = process.env.STRIPE_SECRET_KEY
@@ -56,9 +64,13 @@ export async function asegurarPrecioDelPlan(plan: Plan): Promise<string> {
 
   let productoId = plan.stripe_product_id
   if (!productoId) {
-    const producto = await s.products.create({ name: `Respondi · ${plan.nombre}`, metadata: { plan_id: plan.id } })
+    const producto = await s.products.create({ name: `Respondi · ${plan.nombre}`, metadata: { plan_id: plan.id }, tax_code: CODIGO_FISCAL_SAAS })
     productoId = producto.id
     await supabaseAdmin.from('plans').update({ stripe_product_id: productoId }).eq('id', plan.id)
+  } else {
+    // Los productos creados antes del 15-09-2026 no llevaban código fiscal
+    const producto = await s.products.retrieve(productoId)
+    if (!producto.tax_code) await s.products.update(productoId, { tax_code: CODIGO_FISCAL_SAAS })
   }
 
   if (plan.stripe_price_id) {
@@ -103,7 +115,11 @@ export async function crearCheckout(p: { org: { id: string; nombre: string; stri
     locale: 'es',
     allow_promotion_codes: true,
     subscription_data: { metadata: { tenant_id: p.org.id, plan_id: p.plan.id } },
-    metadata: { tenant_id: p.org.id, plan_id: p.plan.id }
+    metadata: { tenant_id: p.org.id, plan_id: p.plan.id },
+    // Sin «Managed Payments»: Respondi (Propulse System LLC) es quien vende y
+    // factura, como está diseñado. Activarlo es una decisión de negocio
+    // (Stripe cobra más comisión y liquida el IVA por ti); está apuntada.
+    ...({ managed_payments: { enabled: false } } as any)
   })
   if (!sesion.url) throw new Error('Stripe no ha devuelto la página de pago.')
   return sesion.url

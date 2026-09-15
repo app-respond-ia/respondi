@@ -7,6 +7,27 @@ Cuando cierres un punto, márcalo aquí.
 **El 1 ya está hecho** (WhatsApp vuelve a contestar). Sigue por el 2, que es
 la tienda, y el resto cuando tengas rato.
 
+## 0. URGENTE — Vercel no despliega desde las 02:02 del 15-09 (hora de Madrid)
+
+Los dos últimos commits (2bcd2bd «Precios y totales + una etiqueta por
+intención» y el vacío e600d9c) fallan al desplegar. No es el código: probé
+ocho ramas de prueba, incluida una idéntica al commit anterior (490ec25),
+que había desplegado bien a las 01:1x, y **todas fallan**. Desde aquí no
+puedo leer el registro de build (no hay sesión de Vercel en este ordenador).
+
+- [ ] Entra en vercel.com → proyecto respondi → Deployments → el último
+      (rojo) → pestaña **Build Logs**, y pégame las últimas 30 líneas (o
+      una captura). Con eso lo arreglo en minutos.
+- [ ] Si arriba del panel sale un aviso de límite del plan Hobby (uso,
+      «paused» o «resource limited»), es eso: es el punto de pasar Vercel a
+      Pro que ya tenías en la lista.
+
+Mientras tanto producción sigue con 490ec25 (la versión de anoche, que
+funciona). La base de datos ya lleva la migración de «Precios y totales»:
+con el código viejo, el único efecto es que la calculadora de totales no
+existe en producción hasta que despliegue lo nuevo.
+
+
 ---
 
 ## 1. Volver a pegar las claves de WhatsApp — HECHO (14-09-2026, 18:57)

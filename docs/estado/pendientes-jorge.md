@@ -119,6 +119,13 @@ Jorge — Propulse System LLC
 
 ## 4. Correo del negocio — probar el canal de email
 
+Antes de conectar, el 15-09-2026 se hizo el filtro que pediste: la IA solo
+contesta a clientes; los avisos de plataformas, la publicidad, los correos
+internos, los que llegan en copia y los remitentes que marques quedan sin
+contestar y se ven en Canales → Email («correos que la IA no ha contestado»),
+con «Tratar como cliente» por si se equivoca. Ya puedes conectar un buzón
+que tenga de todo.
+
 - [ ] Usa un Gmail que no sea personal: la IA contesta todo lo que llegue.
       Si hace falta, crea uno solo para esto.
 - [ ] En esa cuenta de Google → Seguridad → activa la verificación en dos

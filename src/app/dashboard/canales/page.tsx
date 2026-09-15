@@ -10,6 +10,7 @@ import { useToast } from '@/components/ui/Toast'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { nombreCanal } from '@/lib/canales/nombres'
 import { ConectarCorreo } from './ConectarCorreo'
+import { CorreosDescartados } from './CorreosDescartados'
 
 type TipoCanal = 'instagram' | 'whatsapp' | 'facebook' | 'email'
 type MetodoCanal = 'whaticket' | 'meta_oficial' | 'imap_smtp'
@@ -366,10 +367,11 @@ export default function CanalesPage() {
                 <p className="text-xs text-ink-700">
                   {canal.ultimo_error
                     ? <><strong>La última vez no se pudo revisar el buzón:</strong> {canal.ultimo_error} Se vuelve a intentar cada minuto.</>
-                    : <>Revisamos la bandeja de entrada cada minuto y la IA contesta desde esta dirección, dentro del mismo hilo del correo.</>}
+                    : <>Revisamos la bandeja de entrada cada minuto y la IA contesta desde esta dirección, dentro del mismo hilo del correo. Los avisos automáticos, la publicidad y los correos internos se apartan sin contestar.</>}
                 </p>
               </div>
             )}
+            {isActivo && canal.metodo === 'imap_smtp' && <CorreosDescartados puedeEscribir={nivelPermiso === 'escritura'} />}
             {isActivo && canal.metodo === 'whaticket' && (
               <div className="mt-4 flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200">
                 <svg className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0L3.16 16.25A2 2 0 005 19z"/></svg>

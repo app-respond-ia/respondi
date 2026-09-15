@@ -11,6 +11,7 @@ import { sinPermiso } from '@/lib/permisos-servidor'
 import { comprobarNumero, numeroEsDeLaCuenta, guardarCredencialesMeta, caducidadDelToken, ErrorMeta, suscribirAppALaCuenta, comprobarPagina, suscribirAppAPagina } from '@/lib/canales/meta'
 import { sincronizarPlantillas } from '@/lib/canales/plantillas'
 import { comprobarCorreo, guardarContrasenaCorreo, leerContrasenaCorreo, ErrorCorreo, type ConfigCorreo } from '@/lib/canales/correo'
+import { normalizarNoContestar } from '@/lib/canales/correo-filtro'
 import { proveedorCorreo, esServidorMicrosoft, esDireccionMicrosoft, AVISO_MICROSOFT } from '@/lib/canales/proveedores-correo'
 import { promises as dns } from 'dns'
 import { after } from 'next/server'
@@ -519,6 +520,8 @@ export async function conectarCorreo(datos: {
   smtp?: { host: string; puerto: number; seguro: boolean }
   nombreRemitente?: string
   firma?: string
+  // Remitentes o dominios a los que la IA nunca contesta
+  noContestar?: string[]
 }) {
   const denegado = await sinPermiso('canales')
   if (denegado) return { success: false, error: denegado }
@@ -579,7 +582,8 @@ export async function conectarCorreo(datos: {
   }
   if (!contrasena) return { success: false, error: 'Escribe la contraseña del buzón.' }
 
-  const config: ConfigCorreo = { imap, smtp, usuario, direccion, nombre_remitente: nombreRemitente, firma, lectura: null }
+  const noContestar = normalizarNoContestar(datos.noContestar ?? anterior?.no_contestar ?? [])
+  const config: ConfigCorreo = { imap, smtp, usuario, direccion, nombre_remitente: nombreRemitente, firma, no_contestar: noContestar, lectura: null }
 
   // 1. ¿Funcionan? Se entra en el buzón y en el servidor de salida
   let lectura
@@ -634,8 +638,101 @@ export async function conectarCorreo(datos: {
     registro_id: canal.id,
     // Nunca la contraseña
     valor_anterior: anterior ? { direccion: anterior.direccion, imap: anterior.imap?.host, smtp: anterior.smtp?.host } : null,
-    valor_nuevo: { direccion, imap: imap.host, smtp: smtp.host, nombre_remitente: nombreRemitente }
+    valor_nuevo: { direccion, imap: imap.host, smtp: smtp.host, nombre_remitente: nombreRemitente, no_contestar: noContestar }
   })
 
   return { success: true, data: { id: canal.id, direccion } }
+}
+
+// ---------- Correos que la IA no ha contestado ----------
+// Lo que el filtro del buzón ha descartado (avisos, publicidad, internos…):
+// el negocio lo ve, y si nos hemos equivocado lo trata como cliente.
+
+export async function getCorreosDescartados() {
+  const supabase = await createClient()
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+  const { data, error } = await supabase
+    .from('correos_descartados')
+    .select('id, de, nombre, asunto, motivo, adjuntos, recibido_en, tratado_en')
+    .eq('branch_id', auth.branch_id)
+    .is('tratado_en', null)
+    .order('recibido_en', { ascending: false })
+    .limit(30)
+  if (error) return { success: false, error: error.message }
+  return { success: true, data: data || [] }
+}
+
+// El filtro se equivocó: se abre la conversación con ese correo y la IA lo
+// contesta como a cualquier cliente
+export async function tratarCorreoComoCliente(id: string) {
+  const denegado = await sinPermiso('canales')
+  if (denegado) return { success: false, error: denegado }
+  const supabase = await createClient()
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+  const { data: c, error } = await supabase
+    .from('correos_descartados')
+    .select('id, channel_id, de, nombre, asunto, texto, adjuntos, message_id, referencias, tratado_en')
+    .eq('id', id)
+    .eq('branch_id', auth.branch_id)
+    .maybeSingle()
+  if (error) return { success: false, error: error.message }
+  if (!c) return { success: false, error: 'Ese correo ya no está.' }
+  if (c.tratado_en) return { success: false, error: 'Ese correo ya se pasó a conversación.' }
+
+  const { registrarMensajeEntrante } = await import('@/lib/canales/entrada')
+  const r = await registrarMensajeEntrante({
+    canal: { id: c.channel_id, tenant_id: auth.tenant_id!, branch_id: auth.branch_id!, tipo: 'email' },
+    contactoExterno: c.de,
+    nombreContacto: c.nombre || c.de,
+    mensajeExterno: c.message_id || `descartado-${c.id}`,
+    contenido: (c.texto || '(correo sin texto)') + (c.adjuntos ? `\n\n(El correo traía ${c.adjuntos === 1 ? 'un archivo adjunto' : c.adjuntos + ' archivos adjuntos'} que no se guardaron al descartarlo.)` : ''),
+    asunto: c.asunto || null,
+    referencias: c.referencias || []
+  })
+  if (!r.ok) return { success: false, error: r.error }
+  await supabase.from('correos_descartados').update({ tratado_en: new Date().toISOString() }).eq('id', id)
+  await registrarAuditoria({
+    tenant_id: auth.tenant_id,
+    user_id: auth.user_id,
+    accion: `pasó a conversación un correo que el filtro había descartado (de ${c.de})`,
+    tabla_afectada: 'canales',
+    registro_id: c.channel_id,
+    valor_nuevo: { de: c.de, asunto: c.asunto }
+  })
+  return { success: true }
+}
+
+// «A este remitente (o a todo su dominio) no le contestes nunca»
+export async function ignorarRemitenteCorreo(valor: string) {
+  const denegado = await sinPermiso('canales')
+  if (denegado) return { success: false, error: denegado }
+  const supabase = await createClient()
+  const auth = await getAuthContext(supabase)
+  if (auth.error) return { success: false, error: auth.error }
+  const [nuevo] = normalizarNoContestar([valor])
+  if (!nuevo) return { success: false, error: 'Escribe un correo (hola@sitio.com) o un dominio (sitio.com).' }
+  const { data: canal } = await supabase
+    .from('channels')
+    .select('id, configuracion')
+    .eq('tenant_id', auth.tenant_id)
+    .eq('branch_id', auth.branch_id)
+    .eq('tipo', 'email')
+    .maybeSingle()
+  if (!canal) return { success: false, error: 'No hay ningún correo conectado en esta sucursal.' }
+  const config = (canal.configuracion || {}) as ConfigCorreo
+  const lista = normalizarNoContestar([...(config.no_contestar || []), nuevo])
+  const { error } = await supabase.from('channels').update({ configuracion: { ...config, no_contestar: lista } }).eq('id', canal.id)
+  if (error) return { success: false, error: error.message }
+  await registrarAuditoria({
+    tenant_id: auth.tenant_id,
+    user_id: auth.user_id,
+    accion: `marcó "${nuevo}" como remitente al que el correo no contesta`,
+    tabla_afectada: 'canales',
+    registro_id: canal.id,
+    valor_anterior: { no_contestar: config.no_contestar || [] },
+    valor_nuevo: { no_contestar: lista }
+  })
+  return { success: true, data: { no_contestar: lista } }
 }

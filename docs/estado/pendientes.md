@@ -456,6 +456,17 @@ de lo que más ahorra o desbloquea.
       es una idea).
 
 ### Esperando una decisión de Jorge
+- [ ] **Meta como «Tech Provider» (conexión en un clic)** (15-09-2026):
+      hoy cada cliente monta su propia app de Meta y pega cuatro claves para
+      WhatsApp (y lo mismo para Instagram y Facebook), como manda la regla 8
+      de CLAUDE.md. La alternativa que usan todos los SaaS de WhatsApp es que
+      Atsura se registre en Meta como Tech Provider y el cliente conecte con
+      «Conectar con Facebook», elija su número y listo (Embedded Signup).
+      Mucho mejor para el cliente, pero va contra la regla actual y exige
+      verificar Atsura en Meta y pasar su revisión. Jorge lo mirará con calma.
+- [ ] **«Conectar con Google» para el correo**: hoy Gmail se conecta con una
+      contraseña de aplicación (cinco minutos con la guía). Con el proyecto
+      de Google Cloud que hace falta para la agenda, podría ser un botón.
 - [x] **«Managed Payments» de Stripe**: decidido el 15-09-2026, activado
       (Stripe vende, factura y liquida el IVA). Falta probarlo con un pago
       nuevo; ver `creditos-facturacion.md`.

@@ -20,6 +20,9 @@ export interface ConfigCorreo {
   direccion: string
   nombre_remitente?: string | null
   firma?: string | null
+  // Remitentes o dominios a los que nunca se contesta (en minúsculas):
+  // "facturas@proveedor.com" o "proveedor.com"
+  no_contestar?: string[] | null
   // Hasta qué correo se ha leído (para no volver a leerlo ni leer lo antiguo)
   lectura?: { uidvalidity: string; ultimo_uid: number } | null
 }
@@ -141,6 +144,9 @@ export async function comprobarCorreo(config: ConfigCorreo, contrasena: string) 
 export interface CorreoEntrante {
   uid: number
   de: { direccion: string; nombre: string | null }
+  // A quién iba (para saber si el buzón solo estaba en copia)
+  para: string[]
+  cc: string[]
   asunto: string
   texto: string
   messageId: string | null
@@ -213,9 +219,12 @@ export async function leerCorreosNuevos(config: ConfigCorreo, contrasena: string
           ...(p.inReplyTo ? [p.inReplyTo] : [])
         ].filter((x: string, i: number, a: string[]) => x && a.indexOf(x) === i)
         const cuerpo = p.text || (p.html ? String(p.html).replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<br\s*\/?>/gi, '\n').replace(/<\/p>/gi, '\n\n').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ') : '')
+        const direcciones = (x: any) => ((x?.value || []) as any[]).map(v => String(v.address || '').toLowerCase()).filter(Boolean)
         correos.push({
           uid: m.uid,
           de: { direccion: String(de.address || '').toLowerCase(), nombre: de.name || null },
+          para: direcciones(p.to),
+          cc: direcciones(p.cc),
           asunto: (p.subject || '').trim(),
           texto: sinCitas(cuerpo),
           messageId: p.messageId || null,

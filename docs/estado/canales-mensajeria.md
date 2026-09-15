@@ -250,6 +250,27 @@ sin tocar el resto.
   citado del correo anterior. Lo leído se apunta con
   `guardar_lectura_correo`, que solo toca eso (antes se guardaba la
   configuración entera y podía pisar una firma recién cambiada).
+- **Qué se contesta y qué no** (15-09-2026, `src/lib/canales/correo-filtro.ts`):
+  un buzón real recibe de todo, y la IA solo debe contestar a clientes. Dos
+  capas. (1) Reglas sin coste: además de las automáticas de arriba, se
+  descartan los correos en los que el buzón solo va en copia (si va en
+  «Para», o no aparece porque llega por un alias tipo info@, se trata como
+  normal), los remitentes o dominios que el negocio ha marcado en «Remitentes
+  que nunca se contestan» (ventana de conectar el correo;
+  `configuracion.no_contestar`, con subdominios), y los del propio dominio
+  del negocio si no es un dominio público (un Gmail escribiendo a otro Gmail
+  no es «interno»). (2) Si pasa las reglas, `gpt-4o-mini` decide si es
+  «cliente» (persona o proveedor que espera respuesta), «notificacion»
+  (banco, Google, Stripe, Shopify…), «publicidad», «interno» (gestoría,
+  equipo) u «otro» (spam); ante la duda, cliente, y si OpenAI falla, cliente.
+  No gasta créditos (no es una respuesta). Lo descartado queda en
+  `correos_descartados` (60 días) y se ve en Canales → Email: «N correos
+  que la IA no ha contestado», con su motivo, y dos botones: **Tratar como
+  cliente** (abre la conversación con ese correo; los adjuntos no se
+  guardaron, se avisa en el mensaje) y **No contestar nunca** (añade el
+  remitente a la lista). Ambos quedan en el registro de cambios. Prueba:
+  `probar-correo-filtro.mjs` (35 comprobaciones: reglas, doce correos
+  típicos con el OpenAI real, y las acciones del panel).
 - **Contestar**: la IA usa el mismo motor y herramientas, con otra forma de
   escribir (`src/lib/ai/estilo-email.ts`): saludo con el nombre, párrafos,
   despedida, sin formato de chat y sin firmar (la firma se añade sola). La

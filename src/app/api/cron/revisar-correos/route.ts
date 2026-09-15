@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/utils/supabase/admin'
 import { registrarError } from '@/lib/errores'
 import { registrarMensajeEntrante } from '@/lib/canales/entrada'
 import { leerCorreosNuevos, leerContrasenaCorreo, ErrorCorreo, type ConfigCorreo } from '@/lib/canales/correo'
+import { motivoDescarteRapido, clasificarCorreoEntrante, type MotivoDescarte } from '@/lib/canales/correo-filtro'
 
 async function guardarLectura(channelId: string, direccion: string, lectura: { uidvalidity: string; ultimo_uid: number }) {
   const { error } = await supabaseAdmin.rpc('guardar_lectura_correo', { p_channel_id: channelId, p_direccion: direccion, p_lectura: lectura })
@@ -49,8 +50,29 @@ export async function POST(req: Request) {
 
       const { correos, lectura } = await leerCorreosNuevos(config, contrasena)
       let metidos = 0
+      let descartados = 0
+      let negocio: { nombre: string; direccion: string } | null = null
       for (const c of correos) {
-        if (!c.automatico && c.de.direccion) {
+        if (!c.de.direccion) { await guardarLectura(canal.id, config.direccion, { uidvalidity: lectura.uidvalidity, ultimo_uid: c.uid }); continue }
+        // ¿Es un cliente escribiendo al negocio? Primero las reglas sin coste,
+        // después el modelo. Lo que no lo es se apunta y no se contesta.
+        let motivo: MotivoDescarte | null = motivoDescarteRapido(c, config)
+        if (!motivo) {
+          if (!negocio) {
+            const { data: suc } = await supabaseAdmin.from('sucursales').select('nombre, direccion').eq('id', canal.branch_id).maybeSingle()
+            negocio = { nombre: suc?.nombre || 'el negocio', direccion: config.direccion }
+          }
+          const tipo = await clasificarCorreoEntrante({ de: c.de, asunto: c.asunto, texto: c.texto, adjuntos: c.adjuntos.length }, negocio)
+          if (tipo !== 'cliente') motivo = tipo
+        }
+        if (motivo) {
+          await supabaseAdmin.from('correos_descartados').upsert({
+            tenant_id: canal.tenant_id, branch_id: canal.branch_id, channel_id: canal.id,
+            de: c.de.direccion, nombre: c.de.nombre, asunto: c.asunto || null, texto: (c.texto || '').slice(0, 20000), adjuntos: c.adjuntos.length,
+            message_id: c.messageId, referencias: c.messageId ? [...c.referencias, c.messageId] : c.referencias, motivo
+          }, { onConflict: 'channel_id,message_id', ignoreDuplicates: true })
+          descartados++
+        } else {
           const r = await registrarMensajeEntrante({
             canal: { id: canal.id, tenant_id: canal.tenant_id, branch_id: canal.branch_id, tipo: 'email' },
             contactoExterno: c.de.direccion,
@@ -75,7 +97,7 @@ export async function POST(req: Request) {
         ultima_actividad: new Date().toISOString(),
         ultimo_error: null
       }).eq('id', canal.id)
-      resumen[canal.id] = `${metidos} correo(s) nuevo(s)`
+      resumen[canal.id] = `${metidos} correo(s) nuevo(s)${descartados ? `, ${descartados} sin contestar` : ''}`
     } catch (e: any) {
       const texto = e?.message || 'Error al leer el buzón'
       if (e instanceof ErrorCorreo && e.tipo === 'credenciales') {

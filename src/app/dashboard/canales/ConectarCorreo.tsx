@@ -16,6 +16,7 @@ interface CanalCorreo {
   configuracion?: {
     imap?: Servidor
     smtp?: Servidor
+    no_contestar?: string[] | null
     usuario?: string
     direccion?: string
     nombre_remitente?: string | null
@@ -44,6 +45,7 @@ export function ConectarCorreo({ canal, onCerrar, onConectado }: { canal: CanalC
   const [smtp, setSmtp] = useState<Servidor>(cfg?.smtp || { host: '', puerto: 465, seguro: true })
   const [nombreRemitente, setNombreRemitente] = useState(cfg?.nombre_remitente || '')
   const [firma, setFirma] = useState(cfg?.firma || '')
+  const [noContestar, setNoContestar] = useState((cfg?.no_contestar || []).join('\n'))
   const [verServidores, setVerServidores] = useState(proveedorInicial === 'otro')
   const [guardando, setGuardando] = useState(false)
 
@@ -99,7 +101,8 @@ export function ConectarCorreo({ canal, onCerrar, onConectado }: { canal: CanalC
       imap,
       smtp,
       nombreRemitente,
-      firma
+      firma,
+      noContestar: noContestar.split(/[\n,;]+/).map(x => x.trim()).filter(Boolean)
     })
     setGuardando(false)
     if (!r.success) {
@@ -185,6 +188,12 @@ export function ConectarCorreo({ canal, onCerrar, onConectado }: { canal: CanalC
                   <label htmlFor="correo-firma" className="block text-sm font-600 text-ink-900 mb-1">Firma <span className="font-400 text-ink-400">(opcional)</span></label>
                   <textarea id="correo-firma" value={firma} onChange={e => setFirma(e.target.value)} maxLength={1000} rows={3} placeholder={'Un saludo,\nEl equipo de Tu Negocio\nwww.tunegocio.com'} className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 resize-none" />
                   <p className="text-xs text-ink-500 mt-1">Se añade al final de cada respuesta.</p>
+                </div>
+
+                <div>
+                  <label htmlFor="correo-no-contestar" className="block text-sm font-600 text-ink-900 mb-1">Remitentes que nunca se contestan <span className="font-400 text-ink-400">(opcional)</span></label>
+                  <textarea id="correo-no-contestar" value={noContestar} onChange={e => setNoContestar(e.target.value)} maxLength={4000} rows={3} placeholder={'facturas@miproveedor.com\nmibanco.com'} className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-sm text-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition resize-y" />
+                  <p className="text-xs text-ink-500 mt-1">Uno por línea: un correo o un dominio entero. Los avisos automáticos, la publicidad y los correos de tu propio equipo ya se apartan solos; esto es para lo que se cuele.</p>
                 </div>
 
                 {p && (

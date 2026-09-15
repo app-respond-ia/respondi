@@ -462,3 +462,34 @@ un aviso sin firma; Tienda online, Canales y Facturación cargan.
   ese camino se queda a mano y explicado en la pantalla.
 - El mapa visual (cajas y flechas) ya está hecho (14-09-2026): interruptor
   Lista/Mapa en Automatizaciones, `MapaReceta.tsx`.
+
+## Instalación real con la app de Respondi (15-09-2026)
+
+La app «Respondi» existe en dev.shopify.com (organización Propulse System)
+con distribución personalizada para `respondi-pruebas.myshopify.com`, y sus
+credenciales están en Vercel (`SHOPIFY_CLIENT_ID`, `SHOPIFY_CLIENT_SECRET`).
+Dos ajustes del panel nuevo de Shopify que hacen falta y no son evidentes:
+
+- **«Incrustar app en el panel de control de Shopify»: desmarcada.** Respondi
+  no vive dentro del panel de Shopify.
+- **«Usar flujo de instalación heredado»: marcada.** Respondi usa el método
+  clásico (authorize → callback con código → token). Sin esa casilla Shopify
+  espera el método nuevo, que solo vale para apps incrustadas.
+
+Lo que pasó al conectar: el botón «Ir a Shopify e instalar» dio un **404 de
+Shopify** (`admin.shopify.com/store/respondi-pruebas/app/grant`) la primera
+vez. Con las apps del panel nuevo, la tienda tiene que instalar la app una
+primera vez desde el **enlace de instalación** que da la pantalla de
+Distribución (`admin.shopify.com/oauth/install_custom_app?...`). Después de
+eso, el botón de Respondi conectó a la primera: tienda activa, token en la
+caja fuerte, 12 permisos (los 10 pedidos más `read_discounts` y
+`read_draft_orders`, que Shopify añade solos con los de escritura), los seis
+avisos registrados y la prueba de conexión bien.
+
+Para clientes reales hará falta distribución pública (revisión de Shopify y
+acceso a datos protegidos de clientes), que pide dominio propio, política de
+privacidad y correo de soporte: después del punto 5 de la lista de Jorge.
+Conviene comprobar entonces si con la distribución pública sigue haciendo
+falta ese primer paso por el enlace de instalación, o si el botón de
+Respondi basta; si hace falta, la pantalla de Tienda online debería
+enseñárselo al cliente.

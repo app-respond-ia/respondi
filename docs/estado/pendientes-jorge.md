@@ -59,7 +59,7 @@ y la respuesta se tiraba). Arreglado el mismo día: ahora un aviso firmado da
 el canal por activo solo. Ver `incidentes-resueltos.md`. Segundo intento:
 mensaje a las 18:56:49, respuesta entregada a las 18:57:28.
 
-## 2. Volver a conectar la tienda de Shopify (5 minutos)
+## 2. Volver a conectar la tienda de Shopify — HECHO (15-09-2026, 12:25)
 
 Igual que arriba: te he repuesto la fila de la tienda con su mismo
 identificador, así que **los seis avisos que pegaste a mano en Shopify siguen
@@ -76,7 +76,15 @@ caminos:
   token nuevo. Pégalo en Respondi → **Tienda online** junto con la clave de
   firma de los webhooks.
 
-- [ ] Hecho, por el camino que sea.
+- [x] Hecho por el camino bueno: instalada con la app de Respondi (15-09-2026).
+      Comprobado desde producción: activa, token guardado, 12 permisos, avisos
+      registrados solos, ninguno fallido, y la prueba de conexión responde.
+
+**Cómo fue.** Desde Respondi, «Ir a Shopify e instalar» dio un 404 de
+Shopify (`admin.shopify.com/store/…/app/grant`) la primera vez: con las apps
+del panel nuevo, la tienda tiene que instalar la app una primera vez desde el
+enlace de instalación de Distribución. Después, el botón de Respondi funcionó
+a la primera. Queda apuntado en `docs/integraciones/shopify.md`.
 
 ---
 
@@ -154,17 +162,24 @@ Resend**. A cualquier otra persona no le llega. Hace falta un dominio.
 - [ ] La clave que hay en Vercel es de ese mismo proyecto. No hay que
       cambiarla.
 
-## 7. Shopify — crear la app de Respondi
+## 7. Shopify — crear la app de Respondi — HECHO para pruebas (15-09-2026)
 
 Con esto tus clientes conectan su tienda con un clic, sin tokens ni webhooks
 a mano. Las apps personalizadas ya no se pueden crear desde el 1 de enero de
 2026. Es **una sola app**, creada una vez, para todos los clientes.
 
-- [ ] Entra en https://dev.shopify.com con la cuenta con la que creaste la
+App creada en dev.shopify.com (organización Propulse System, app
+«Respondi»), con distribución personalizada para respondi-pruebas, y las
+credenciales en Vercel. Dos casillas que no estaban en esta lista y que hacen
+falta: **desmarcar «Incrustar app en el panel de Shopify»** y **marcar «Usar
+flujo de instalación heredado»** (Respondi conecta por el método clásico).
+Pendiente solo lo de clientes reales (distribución pública), abajo.
+
+- [x] Entra en https://dev.shopify.com con la cuenta con la que creaste la
       tienda de pruebas. Si te pide crear una organización de desarrollo,
       créala: es gratis.
-- [ ] **Create app** → nombre «Respondi» → crear desde cero, no desde la CLI.
-- [ ] En **Configuration**:
+- [x] **Create app** → nombre «Respondi» → crear desde cero, no desde la CLI.
+- [x] En **Configuration**:
       - App URL: `https://respondi.vercel.app`
       - Allowed redirection URL(s):
         `https://respondi.vercel.app/api/tiendas/shopify/oauth/callback`

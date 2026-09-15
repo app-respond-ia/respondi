@@ -28,8 +28,7 @@ export function stripeConfigurado() {
 // Las cuentas nuevas de Stripe traen activado «Managed Payments» (Stripe
 // actúa como vendedor y liquida impuestos) y con eso el pago falla si el
 // producto no lleva código fiscal (visto el 15-09-2026 en la cuenta de
-// Jorge). Se pone siempre: no molesta si está desactivado y hace falta si
-// algún día se activa.
+// Jorge). Se pone siempre; Jorge decidió activar Managed Payments ese mismo día.
 const CODIGO_FISCAL_SAAS = 'txcd_10103001'
 
 export function stripe(): Stripe {
@@ -116,10 +115,11 @@ export async function crearCheckout(p: { org: { id: string; nombre: string; stri
     allow_promotion_codes: true,
     subscription_data: { metadata: { tenant_id: p.org.id, plan_id: p.plan.id } },
     metadata: { tenant_id: p.org.id, plan_id: p.plan.id },
-    // Sin «Managed Payments»: Respondi (Propulse System LLC) es quien vende y
-    // factura, como está diseñado. Activarlo es una decisión de negocio
-    // (Stripe cobra más comisión y liquida el IVA por ti); está apuntada.
-    ...({ managed_payments: { enabled: false } } as any)
+    // Con «Managed Payments» (decisión de Jorge, 15-09-2026): Stripe es el
+    // vendedor de cara al cliente, emite la factura y liquida los impuestos
+    // (IVA) de cada país; a cambio se queda una comisión mayor. Para eso los
+    // productos llevan código fiscal (CODIGO_FISCAL_SAAS).
+    ...({ managed_payments: { enabled: true } } as any)
   })
   if (!sesion.url) throw new Error('Stripe no ha devuelto la página de pago.')
   return sesion.url

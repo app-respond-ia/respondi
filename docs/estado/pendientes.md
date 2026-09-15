@@ -456,13 +456,9 @@ de lo que más ahorra o desbloquea.
       es una idea).
 
 ### Esperando una decisión de Jorge
-- [ ] **«Managed Payments» de Stripe** (15-09-2026): Stripe lo activa por
-      defecto en las cuentas nuevas. Con él, Stripe es el vendedor de cara al
-      cliente, cobra más comisión y liquida el IVA de la UE por ti (útil para
-      una LLC de EE. UU. vendiendo en España). Hoy el pago lo desactiva y
-      vende Propulse System LLC. Si se quiere activar: quitar
-      `managed_payments.enabled=false` en `src/lib/stripe.ts`; el código
-      fiscal de los productos ya está puesto. Ver `creditos-facturacion.md`.
+- [x] **«Managed Payments» de Stripe**: decidido el 15-09-2026, activado
+      (Stripe vende, factura y liquida el IVA). Falta probarlo con un pago
+      nuevo; ver `creditos-facturacion.md`.
 - [ ] **Tope de automatizaciones por plan**. Las mencionó como diferenciador
       y hoy no existe ni la columna. Mi consejo es NO ponerlo: las
       automatizaciones son lo que hace que el cliente gaste créditos, que es

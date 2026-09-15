@@ -310,8 +310,11 @@ código fiscal.
 
 Arreglo en `src/lib/stripe.ts`: los productos de los planes llevan siempre
 `tax_code = txcd_10103001` (software como servicio, uso profesional; a los ya
-creados se les pone al pasar por `asegurarPrecioDelPlan`), y el Checkout se
-crea con `managed_payments.enabled = false`, es decir, vende y factura
-Propulse System LLC, como está diseñado. Activar Managed Payments es una
-decisión de negocio de Jorge (ver `pendientes.md`); si se activa, con el
-código fiscal ya puesto funcionaría sin tocar código.
+creados se les pone al pasar por `asegurarPrecioDelPlan`). Primero se probó
+el pago con `managed_payments.enabled = false` (vende Propulse System LLC):
+funcionó y quedó comprobado. Ese mismo día **Jorge decidió activar Managed
+Payments** («es mejor que Stripe se encargue de todo»): el Checkout se crea
+con `managed_payments.enabled = true`, Stripe es el vendedor de cara al
+cliente, emite la factura y liquida el IVA. Pendiente de probar con un pago
+nuevo (la organización de pruebas ya tiene suscripción; hace falta una
+organización nueva o dar de baja la suscripción y volver a pagar).

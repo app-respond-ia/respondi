@@ -153,7 +153,7 @@ Resend**. A cualquier otra persona no le llega. Hace falta un dominio.
       defecto de Supabase tiene un límite de unos pocos correos por hora.
       Dime cuando llegues aquí y te guío.
 
-## 6. OpenAI — que no se vuelva a cortar
+## 6. OpenAI — que no se vuelva a cortar — HECHO (15-09-2026)
 
 - [ ] https://platform.openai.com → Settings → Billing → **Auto recharge**
       activado. Por ejemplo, al bajar de 10 $ recargar 50 $. La cifra la
@@ -207,23 +207,31 @@ Pendiente solo lo de clientes reales (distribución pública), abajo.
       Debe volver con «Tienda conectada» y la tarjeta en verde «Instalada con
       la app de Respondi». Los seis avisos se registran solos.
 
-## 8. Stripe — terminar la conexión
+## 8. Stripe — terminar la conexión — HECHO en modo prueba (15-09-2026)
 
-El código está listo desde el 13-09-2026.
+Hecho el 15-09-2026: webhook creado en Stripe (6 eventos, API
+2026-08-26.dahlia), clave de firma en Vercel, portal de clientes guardado,
+planes sincronizados y un pago de prueba de Business con la tarjeta 4242.
+Comprobado desde la base: los tres avisos llegaron firmados, la
+organización quedó en Business con suscripción activa hasta el 15/10, el
+saldo en 5000 y la notificación de pago salió. Sorpresa del camino: la
+cuenta de Stripe trae activado «Managed Payments» y el pago fallaba por el
+código fiscal; arreglado en código (ver `creditos-facturacion.md`) y
+apuntada la decisión en `pendientes.md`. Queda solo el paso a claves reales.
 
-- [ ] Comprueba en Vercel que `STRIPE_SECRET_KEY` es la clave **de prueba**
+- [x] Comprueba en Vercel que `STRIPE_SECRET_KEY` es la clave **de prueba**
       (`sk_test_…`) mientras probamos. Con una real se crearían productos y
       cobros de verdad.
-- [ ] Stripe (modo prueba) → Developers → Webhooks → **Add endpoint**:
+- [x] Stripe (modo prueba) → Developers → Webhooks → **Add endpoint**:
       dirección `https://respondi.vercel.app/api/stripe/webhook`, y marca:
       `checkout.session.completed`, `invoice.paid`, `invoice.payment_failed`,
       `customer.subscription.created`, `customer.subscription.updated`,
       `customer.subscription.deleted`.
-- [ ] Copia la **clave de firma** del webhook (`whsec_…`) y ponla en Vercel
+- [x] Copia la **clave de firma** del webhook (`whsec_…`) y ponla en Vercel
       como `STRIPE_WEBHOOK_SECRET` (producción). Vuelve a desplegar.
-- [ ] Stripe → Settings → Billing → Customer portal: activa el portal y
+- [x] Stripe → Settings → Billing → Customer portal: activa el portal y
       permite actualizar el método de pago y cancelar la suscripción.
-- [ ] Prueba: Superadmin → Planes → «Sincronizar con Stripe». Luego, con la
+- [x] Prueba: Superadmin → Planes → «Sincronizar con Stripe». Luego, con la
       organización de pruebas, Facturación → «Elegir y pagar» con la tarjeta
       4242 4242 4242 4242. El plan se activa solo y los créditos se recargan.
 - [ ] Cuando pases a cobrar de verdad: cambia a las claves reales

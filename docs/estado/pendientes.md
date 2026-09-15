@@ -4,6 +4,37 @@ Checklist activo. Marca lo que se cierre y anota el resultado en el
 archivo de `docs/estado/` que corresponda (no aquí — este archivo es
 solo la lista viva).
 
+## Prioridad alta — visto en la prueba real del correo (15-09-2026)
+
+Jorge conectó su Gmail y mandó «¿cuánto cuesta un corte y tenéis hueco el
+viernes por la tarde?». La IA contestó «He reservado tu cita para el
+miércoles 16 a las 16:00». Registro: `usadas` = calcular_total, ver_huecos,
+reservar_cita; `revisiones` = la de «prometes hacerlo en un momento».
+
+- [ ] **La IA nunca reserva sin que el cliente elija hora.** La revisión de
+      agenda en dos pasos (puesta el 14-09 para «cámbiamela a la última
+      hora») deja que el segundo paso llame a `reservar_cita`. Ese segundo
+      paso solo puede `cambiar_cita` o `cancelar_cita` cuando el cliente lo
+      ha pedido de forma explícita; `reservar_cita` solo si el cliente ha
+      dicho una hora concreta (`HORA_EN_TEXTO`). Además miró el miércoles
+      cuando preguntaba por el viernes: comprobar cómo pasa la fecha.
+- [ ] **El correo, en la batería del motor.** `probar-negocio-completo`
+      habla siempre por WhatsApp; el correo usa otro estilo de redacción
+      (`estilo-email.ts`) y esto no habría salido allí. Pasar los
+      escenarios (o los de agenda, precios, escalado y políticas) también
+      con `canal: 'email'`.
+- [ ] **«Un saludo» repetido**: la IA cierra con «Un saludo,» y la firma
+      del buzón vuelve a ponerlo. Si hay firma, que no despida; o quitar la
+      despedida al pegar la firma.
+- [ ] **Todo el panel en vivo (Realtime).** Chats no enseña los mensajes
+      nuevos hasta recargar; lo mismo con lo que hacen otros usuarios
+      (contestar, asignarse un caso). Supabase Realtime (`postgres_changes`)
+      en Chats, Conversaciones, Casos, notificaciones, Agenda y Canales, con
+      la publicación `supabase_realtime` en esas tablas y respetando RLS.
+      Tramo propio, después de la lista de Jorge.
+- [ ] Estético: el WhatsApp de Jorge pone «Desde el Desconocido» porque a
+      la fila repuesta le falta `fecha_conexion`.
+
 ## Prioridad 1 — Antes de la ronda de pruebas grande de Fase 0
 - [x] UI de horarios: no distingue horario del negocio vs. horario de
       respuesta de la IA — resuelto (tramos A/B/C de horarios)

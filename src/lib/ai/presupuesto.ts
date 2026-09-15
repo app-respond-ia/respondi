@@ -1,10 +1,11 @@
 import { supabaseAdmin } from '@/utils/supabase/admin'
 import { normalizar, contienePalabras } from '@/lib/ai/comparar-texto'
 
-// Presupuestos de la IA con los precios reales del catálogo de la sucursal
-// (skill "Hacer presupuestos"). La IA solo dice qué productos y cuántos; las
+// Totales de la IA con los precios reales del catálogo de la sucursal (va
+// dentro de la skill de precios; desde el 15-09-2026 ya no hay una skill
+// aparte de «presupuestos»). La IA solo dice qué productos y cuántos; las
 // cuentas las hace esto: un modelo de lenguaje se equivoca multiplicando y
-// sumando, y un presupuesto con el total mal calculado es peor que no darlo.
+// sumando, y un total mal calculado es peor que no darlo.
 // Lo que no está en el catálogo, lo que es ambiguo y lo que no tiene precio
 // fijo se le devuelve aparte para que no se lo invente.
 
@@ -36,7 +37,7 @@ const euros = (n: number, moneda: string) =>
 
 export async function calcularPresupuesto(branchId: string, lineas: LineaPresupuesto[]): Promise<string> {
   if (!Array.isArray(lineas) || lineas.length === 0) return 'Error: indica al menos un producto con su cantidad.'
-  if (lineas.length > 30) return 'Error: como mucho 30 productos por presupuesto.'
+  if (lineas.length > 30) return 'Error: como mucho 30 productos por cálculo.'
 
   const { data: catalogo, error } = await supabaseAdmin
     .from('price_list')
@@ -45,8 +46,8 @@ export async function calcularPresupuesto(branchId: string, lineas: LineaPresupu
     .eq('visible_ia', true)
     .eq('disponible', true)
     .limit(2000)
-  if (error) return 'Error interno al leer el catálogo. No des un presupuesto ahora; di al cliente que lo confirmará el equipo.'
-  if (!catalogo?.length) return 'El catálogo de esta sucursal está vacío: no se puede hacer un presupuesto. No inventes precios.'
+  if (error) return 'Error interno al leer el catálogo. No des un total ahora; di al cliente que lo confirmará el equipo.'
+  if (!catalogo?.length) return 'El catálogo de esta sucursal está vacío: no se puede calcular el total. No inventes precios.'
 
   const partidas: string[] = []
   const totales: Record<string, number> = {}
@@ -90,7 +91,7 @@ export async function calcularPresupuesto(branchId: string, lineas: LineaPresupu
 
   let texto = ''
   if (partidas.length) {
-    texto += 'Presupuesto calculado con los precios del catálogo:\n' + partidas.join('\n') + '\n'
+    texto += 'Total calculado con los precios del catálogo:\n' + partidas.join('\n') + '\n'
     const monedas = Object.keys(totales)
     texto += monedas.length === 1
       ? `TOTAL: ${conDesde.length ? 'desde ' : ''}${euros(totales[monedas[0]], monedas[0])}\n`

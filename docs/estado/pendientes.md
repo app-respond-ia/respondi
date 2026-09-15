@@ -444,14 +444,13 @@ de lo que más ahorra o desbloquea.
       «La batería completa del motor».
 
 ### Esperando una decisión de Jorge (nuevas, 14-09-2026)
-- [ ] **La skill «Hacer presupuestos» está oculta para clientes**
-      (`visible_cliente=false` en Superadmin → Skills). Ningún cliente puede
-      encenderla desde su panel. Mi consejo: hacerla visible y activa por
-      defecto; cualquier negocio con lista de precios la quiere.
-- [ ] **Una etiqueta por conversación.** La conversación se etiqueta con la
-      primera intención y no se vuelve a etiquetar aunque cambie de tema
-      (pide cita y luego cancela → queda «Reserva»). Es como está diseñado;
-      si se quiere una etiqueta por tema, hay que decidirlo.
+- [x] **La skill «Hacer presupuestos»**: decidido el 15-09-2026, la
+      calculadora va dentro de «Precios y totales» y la skill aparte se
+      retiró (también «Presupuesto de tienda» en Shopify, fundida en «Venta
+      asistida»). Ver `motor-ia.md`.
+- [x] **Una etiqueta por cada intención** (15-09-2026): la IA añade una
+      etiqueta por cada intención distinta de la conversación, y Métricas
+      tiene la sección «Intenciones» con los recorridos. Ver `motor-ia.md`.
 - [ ] **Sembrar automatizaciones y etiquetas** al crear una organización, para
       que el cliente no empiece con las pantallas vacías (no está decidido,
       es una idea).

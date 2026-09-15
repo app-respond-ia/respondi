@@ -142,8 +142,10 @@ Todas nacen **apagadas**. El cliente enciende las que quiera, una a una.
 14. Bajó de precio · 15. Cliente dormido · 16. Recompra / reposición
 
 ### Vender desde el chat
-17. Venta asistida · 18. Carrito armado por la IA · 19. Producto relacionado ·
-20. Presupuesto · 21. Reserva o lista de espera
+17. Venta asistida (incluye el total de varias cosas con los precios de la
+tienda; la antigua «Presupuesto de tienda» se fundió aquí el 15-09-2026) ·
+18. Carrito armado por la IA · 19. Producto relacionado · 21. Reserva o lista
+de espera
 
 ### Posventa
 22. Pedir reseña · 23. Cómo usarlo / cuidados · 24. Garantía por vencer ·
@@ -251,8 +253,9 @@ puede hacerla Claude).
     automatizaciones encendidas: cambio de dirección, devolución, dañado,
     reclamación) lanza la automatización sobre esa misma conversación y
     devuelve a la IA cómo contestar; `apuntar_lista_espera`;
-    `presupuesto_de_tienda` (con la misma red forzada que el presupuesto de
-    catálogo); relacionados por tipo de producto; intereses al buscar.
+    `total_de_tienda` (dentro de Venta asistida, con la misma red forzada que
+    el total de catálogo); relacionados por tipo de producto; intereses al
+    buscar.
   - Repasos nuevos en el cron: vuelve el stock (cada hora), bajó de precio
     (10 h), aniversario (9 h, una compra de hace un año: Shopify no guarda
     cumpleaños), dormidos y recompras (11 h), garantías (10 h), catálogo (a la
@@ -366,8 +369,8 @@ valor). Por correo no hace falta nada de esto.
   cambian).
 - `probar-herramientas-tienda-2.mjs` (19, OpenAI real): devolución,
   dañado, reclamación (la IA se aparta), cambio de dirección tarde y a
-  tiempo (en la misma conversación que la devolución), presupuesto con
-  precios de la tienda. Esta prueba destapó dos fallos reales, ya
+  tiempo (en la misma conversación que la devolución), total con precios
+  de la tienda. Esta prueba destapó dos fallos reales, ya
   arreglados: el filtro de herramientas de tienda solo conocía las cuatro
   primeras y contestaba "no disponible" a `detectar_intencion` y a
   `presupuesto_de_tienda` (la IA decía "voy a consultar y te digo"); y

@@ -51,8 +51,8 @@ Resumen; el detalle y el porqué están en `docs/arquitectura.md`, sección
   configurado para esa sucursal
 - Con la tienda conectada (12-09-2026): buscar_en_tienda, estado_del_pedido,
   enlace_de_compra, apuntar_lista_espera, detectar_intencion,
-  presupuesto_de_tienda; cada una existe solo si su automatización está
-  encendida (`docs/integraciones/shopify.md`)
+  total_de_tienda (va con «Venta asistida»); cada una existe solo si su
+  automatización está encendida (`docs/integraciones/shopify.md`)
 - Con la agenda activada (12-09-2026): ver_huecos, reservar_cita,
   cambiar_cita, cancelar_cita, mis_citas, apuntar_espera_agenda; solo toca
   las citas del contacto que escribe y lo raro abre un caso
@@ -96,11 +96,10 @@ Tablas `skills` (por tenant/sucursal, con `skill_global_id`) y
 `activa_por_defecto`). Pendiente confirmar si faltan FKs entre ambas
 (ver Sueltos, abajo).
 
-## Pendiente — Herramienta de presupuestos
-La skill "Hacer presupuestos" está visible/activable en el panel como
-las demás, pero sin ninguna herramienta real detrás todavía (hoy solo
-reutiliza `consultar_catalogo`). Construir la herramienta real es
-tarea aparte, futura.
+## Cerrado — la calculadora de totales va con «Precios y totales» (15-09-2026)
+La antigua skill «Hacer presupuestos» se retiró: la calculadora
+(`calcular_total`) forma parte de la skill de precios. Ver «Precios y
+totales, y varias etiquetas por conversación», abajo.
 
 ## Probado de punta a punta (10-09-2026)
 Ya no está bloqueado: con la clave puesta se hicieron tres rondas de pruebas
@@ -130,8 +129,8 @@ respuesta y el bloque entero de multimedia.
 - Ronda de pruebas rigurosa escenario-por-escenario de toda la
   jerarquía de pausa/horario, antes de tener clientes reales
 
-## Presupuestos y búsqueda en el catálogo (11-09-2026)
-- **`hacer_presupuesto`** (skill "Hacer presupuestos", apagada por defecto):
+## Totales y búsqueda en el catálogo (11-09-2026)
+- **`hacer_presupuesto`** (hoy `calcular_total`, dentro de «Precios y totales»):
   la IA le pasa los productos y las cantidades y la herramienta calcula
   partidas y total con los precios reales del catálogo
   (`src/lib/ai/presupuesto.ts`). El modelo no hace cuentas: se equivocaba
@@ -495,3 +494,64 @@ cuenta y se le dice la cifra.
 Lo que sigue sin cerrar de este tramo está en `pendientes.md` («Esperando
 una decisión de Jorge»): la skill de presupuestos oculta y la etiqueta única
 por conversación.
+
+## Precios y totales, y varias etiquetas por conversación (15-09-2026)
+
+Dos decisiones de Jorge del 15-09-2026, cerradas el mismo día.
+
+### La calculadora de totales va con la skill de precios
+«No son presupuestos, es un total y ya.» La skill aparte «Hacer
+presupuestos» (oculta para clientes, encendida solo en la sucursal de
+pruebas) se retiró con la migración `20260915090000_precios_y_totales.sql`,
+que además renombra la skill de precios a **«Precios y totales»** («la IA
+responde precios de tu lista y suma el total de varios artículos, servicios o
+cantidades»). En el motor la herramienta pasa a llamarse `calcular_total` y
+existe siempre que la skill de precios esté encendida; la red de seguridad
+que la fuerza es la misma (solo cuando pide un total o el precio de varias
+cosas). El texto que devuelve ya no dice «presupuesto» en ningún sitio.
+
+En la tienda de Shopify, lo mismo: la automatización aparte «Presupuesto de
+tienda» desaparece del catálogo y el total con los precios de la tienda
+(`total_de_tienda`) va dentro de **«Venta asistida»**. No había ninguna
+sucursal con esa automatización encendida.
+
+### Una etiqueta por cada intención
+Antes la IA etiquetaba la primera intención y no volvía a mirar: «pregunta
+por su pedido y luego pide un reembolso» quedaba solo como pedido. La tabla
+`conversation_tags` ya admitía varias (clave única por conversación y
+etiqueta), el panel ya las pintaba todas y el filtro de la bandeja ya
+buscaba en todas; lo que faltaba era que la IA las pusiera.
+
+Cómo va ahora, en `generarRespuesta.ts`:
+- Al final del prompt (la parte que cambia por conversación) va la lista de
+  etiquetas que ya lleva, con la instrucción de añadir otra si el mensaje
+  trae una intención nueva. Solo con eso el modelo barato no lo hacía
+  (0 de 4), así que además:
+- **Revisión de etiquetas en cada turno** en el que no se ha añadido una
+  etiqueta nueva: una llamada aparte con dos salidas posibles
+  (`etiquetar_conversacion`, con la lista limitada a las etiquetas que aún
+  no lleva y sin la de respaldo, o `sin_intencion_nueva`) y
+  `tool_choice: 'required'`. Así no puede repetir ni inventar, y puede decir
+  «nada nuevo». Queda apuntada en `contexto_snapshot.revisiones`. Cuesta una
+  llamada corta más por turno (la entrada va casi toda en caché).
+- El etiquetado obligatorio de la primera etiqueta sigue igual.
+- La primera etiqueta por fecha es la «principal»; las demás salen al lado.
+
+Métricas → sección nueva **Intenciones**: intenciones detectadas en el
+periodo (una conversación cuenta varias), conversaciones etiquetadas, cuántas
+llevan más de una, media por conversación, reparto por etiqueta y los
+**recorridos más frecuentes** (de qué intención pasa el cliente a cuál dentro
+de la misma conversación, en orden de aparición). Sale de
+`conversation_tags.created_at`, sin tablas nuevas.
+
+Medido con la batería del motor: «pide cita y luego pone una reclamación»
+lleva las dos etiquetas 3 de 3; «pide cita y luego la cambia» 4 de 4 (una
+vez corregida la descripción de la etiqueta «Reserva de cita» del negocio de
+pruebas, que también decía «cambiar» y se solapaba con «Cancelación o
+cambio»: con descripciones que se pisan, el modelo elige una, y con razón).
+Pasada completa después del cambio: 81 de 82, y el único fallo era de la
+propia batería, no del motor (leía los registros de la IA por sucursal y
+hora, y se le coló el registro tardío del escenario anterior; ahora los lee
+por identificador de mensaje). Ese escenario, aparte, 4 de 4. La sección de
+Métricas tiene su prueba, `probar-metricas.mjs` (16 comprobaciones, contrasta
+la acción con `conversation_tags`).

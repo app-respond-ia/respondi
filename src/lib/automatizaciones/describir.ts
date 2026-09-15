@@ -29,7 +29,6 @@ const NOMBRE_INTENCION: Record<string, string> = {
   cambio_direccion: 'Cuando un cliente pide cambiar la dirección',
   busca_producto: 'Cuando un cliente pregunta por un producto',
   quiere_comprar: 'Cuando un cliente quiere comprar algo',
-  pide_presupuesto: 'Cuando un cliente pide un presupuesto',
   devolucion: 'Cuando un cliente quiere devolver algo',
   producto_danado: 'Cuando un cliente dice que le llegó dañado o equivocado',
   reclamacion: 'Cuando un cliente pone una reclamación'

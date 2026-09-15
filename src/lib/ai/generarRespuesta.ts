@@ -270,10 +270,10 @@ export async function generarRespuesta(conv: any) {
     systemPrompt += `- Si el cliente PREGUNTA por las condiciones (qué pasa si cancela, si se cobra algo, plazos, retrasos) sin pedir cancelar ni mover una cita concreta, es una consulta de políticas: contesta con consultar_politicas y NO toques su agenda.\n`
   }
   if (!esCorreo) systemPrompt += `- Eres un asistente, responde de manera concisa y natural.\n`
-  if (activeSkills.has('presupuestos')) {
+  if (activeSkills.has('consultar_catalogo')) {
     // Los totales los calcula la herramienta con los precios reales: el
     // modelo se equivoca haciendo cuentas
-    systemPrompt += `- Si el cliente pide un presupuesto o el total de varios productos o cantidades, llama a hacer_presupuesto en ese mismo momento (sin preguntar antes detalles que no cambian el precio) y da exactamente las cifras que devuelve. NUNCA calcules tú precios ni totales.\n`
+    systemPrompt += `- Si el cliente pide el total o el precio de varios productos, varios servicios o varias unidades, llama a calcular_total en ese mismo momento (sin preguntar antes detalles que no cambian el precio) y da exactamente las cifras que devuelve. NUNCA calcules tú precios ni totales.\n`
   }
   // Cuando el negocio estaba cerrado se le manda al cliente un aviso
   // automático y la conversación queda en espera. Al abrir, esa respuesta
@@ -332,6 +332,22 @@ export async function generarRespuesta(conv: any) {
   }
 
   // Y aquí, al final del todo, lo que cambia en cada conversación
+  // Etiquetas que ya lleva esta conversación. Una conversación lleva una por
+  // cada intención distinta (Jorge, 15-09-2026: «si alguien pregunta por su
+  // pedido y luego pide un reembolso, son dos etiquetas»). Sin decirle cuáles
+  // lleva, el modelo etiquetaba la primera intención y ya no volvía a mirar.
+  if (canTag) {
+    const { data: puestas } = await supabaseAdmin
+      .from('conversation_tags')
+      .select('created_at, message_categories(nombre)')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: true })
+    const nombres = (puestas || []).map((t: any) => t.message_categories?.nombre).filter(Boolean)
+    contextoDelCliente += `\n--- ETIQUETAS DE ESTA CONVERSACIÓN ---\n`
+    contextoDelCliente += nombres.length ? `Ya lleva: ${nombres.join(', ')}.\n` : `Todavía no lleva ninguna.\n`
+    contextoDelCliente += `Una conversación lleva una etiqueta por cada intención distinta del cliente. Si en este mensaje muestra una intención NUEVA que encaja con otra etiqueta de la lista (por ejemplo pidió una cita y ahora pone una reclamación, o preguntó por un pedido y ahora quiere devolverlo), llama a etiquetar_conversacion con esa otra etiqueta además de contestar. No repitas una que ya lleva, y no uses la de respaldo si ya lleva una específica.\n`
+  }
+
   systemPrompt += contextoDelCliente
 
   // 5. Preparar Mensajes para OpenAI
@@ -475,25 +491,25 @@ export async function generarRespuesta(conv: any) {
             busqueda: { type: "string", description: "Texto libre para buscar en el nombre o descripción." },
             categoria: { type: "string", description: "Nombre de la categoría de productos que busca el cliente." },
             etiquetas: { type: "array", items: { type: "string" }, description: "Características mencionadas (ej. 'vegano', 'frio', 'madera')." },
-            precio_maximo: { type: "number", description: "Precio máximo en caso de que el cliente especifique un presupuesto." }
+            precio_maximo: { type: "number", description: "Precio máximo, si el cliente dice hasta cuánto quiere gastar." }
           }
         }
       }
     })
   }
 
-  if (activeSkills.has('presupuestos')) {
+  if (activeSkills.has('consultar_catalogo')) {
     tools.push({
       type: "function" as const,
       function: {
-        name: "hacer_presupuesto",
-        description: "Calcula un presupuesto exacto con los precios reales del catálogo. Úsala SIEMPRE, en cuanto el cliente diga qué productos y cuántos, cuando pida un presupuesto o el precio total de varios productos o de una cantidad. Pasa cada producto con el nombre que ha dicho el cliente (o el del catálogo) y su cantidad; la herramienta los encuentra aunque no estén escritos igual. No pidas detalles que no cambian el precio y no hagas tú las cuentas.",
+        name: "calcular_total",
+        description: "Calcula el total exacto con los precios reales del catálogo. Úsala SIEMPRE, en cuanto el cliente diga qué productos o servicios y cuántos, cuando pida el total o el precio de varias cosas o de varias unidades. Pasa cada producto con su cantidad.",
         parameters: {
           type: "object",
           properties: {
             lineas: {
               type: "array",
-              description: "Los productos del presupuesto.",
+              description: "Los productos o servicios a sumar, con su cantidad.",
               items: {
                 type: "object",
                 properties: {
@@ -717,6 +733,9 @@ export async function generarRespuesta(conv: any) {
   // Poner una etiqueta a la conversación (la llama la herramienta y, si la IA
   // se la salta, el etiquetado obligatorio de más abajo)
   let etiquetadoEnEstaPasada = false
+  // Solo cuando de verdad se añade una: si el modelo repite la que ya lleva,
+  // la revisión de intenciones nuevas tiene que seguir haciéndose
+  let etiquetaNuevaEnEstaPasada = false
   let presupuestoEnEstaPasada = false
   const aplicarEtiqueta = async (categoryId: string): Promise<string> => {
     let toolResult = ''
@@ -779,6 +798,7 @@ export async function generarRespuesta(conv: any) {
       }
     }
     if (/^Etiqueta aplicada|^Ignorado/.test(toolResult)) etiquetadoEnEstaPasada = true
+    if (/^Etiqueta aplicada/.test(toolResult)) etiquetaNuevaEnEstaPasada = true
     // Aviso a las automatizaciones que llevan las etiquetas a Shopify
     if (/^Etiqueta aplicada/.test(toolResult) && targetCategory) {
       try {
@@ -962,7 +982,7 @@ export async function generarRespuesta(conv: any) {
           }
         }
       }
-      else if (toolCall.function.name === 'hacer_presupuesto') {
+      else if (toolCall.function.name === 'calcular_total') {
         const { calcularPresupuesto } = await import('@/lib/ai/presupuesto')
         toolResult = await calcularPresupuesto(branchId, Array.isArray(args.lineas) ? args.lineas : [])
         presupuestoEnEstaPasada = true
@@ -1010,13 +1030,62 @@ export async function generarRespuesta(conv: any) {
   // etiqueta, que es justo lo que se usa para contar qué pregunta la gente.
   // Si la conversación sigue sin ninguna, se le pide solo eso, obligando a
   // usar la herramienta.
-  if (canTag && !etiquetadoEnEstaPasada) {
-    const { count } = await supabaseAdmin
+  if (canTag && !etiquetaNuevaEnEstaPasada) {
+    const { data: yaPuestas } = await supabaseAdmin
       .from('conversation_tags')
-      .select('category_id', { count: 'exact', head: true })
+      .select('category_id')
       .eq('conversation_id', conversationId)
+    const count = yaPuestas?.length || 0
     const herramienta = tools.find((t: any) => t.function?.name === 'etiquetar_conversacion')
-    if (!count && herramienta) {
+    // Ya lleva alguna: ¿este mensaje trae una intención NUEVA? Una
+    // conversación lleva una etiqueta por intención (Jorge, 15-09-2026), y
+    // con solo pedírselo en el prompt el modelo no volvía a etiquetar nunca
+    // (medido: 0 de 4). Se le pregunta aparte, con dos salidas posibles y
+    // solo las etiquetas que aún no lleva, para que no pueda repetir ni
+    // inventar: o etiqueta con una nueva, o dice que no hay nada nuevo.
+    const ultimoTextoDelCliente = allMessages.filter((m: any) => m.remitente === 'cliente' && m.agrupado !== true).map((m: any) => m.contenido || '').join(' ').trim()
+    if (count && herramienta && ultimoTextoDelCliente.length >= 8) {
+      const puestasIds = new Set((yaPuestas || []).map((t: any) => t.category_id))
+      const candidatas = (categories || []).filter((c: any) => !puestasIds.has(c.id) && !c.es_fallback)
+      if (candidatas.length) {
+        try {
+          const nombresPuestas = (categories || []).filter((c: any) => puestasIds.has(c.id)).map((c: any) => c.nombre).join(', ')
+          const soloNuevas = {
+            type: 'function' as const,
+            function: {
+              name: 'etiquetar_conversacion',
+              description: 'Añade a la conversación la etiqueta de una intención NUEVA del cliente (además de las que ya lleva).',
+              parameters: { type: 'object', properties: { category_id: { type: 'string', enum: candidatas.map((c: any) => c.id), description: 'UUID de la etiqueta nueva.' } }, required: ['category_id'] }
+            }
+          }
+          const nadaNuevo = {
+            type: 'function' as const,
+            function: { name: 'sin_intencion_nueva', description: 'El último mensaje del cliente no trae ninguna intención distinta de las que ya lleva la conversación.', parameters: { type: 'object', properties: {} } }
+          }
+          const avisoEtiquetas = { role: 'system' as const, content: `REVISIÓN de etiquetas: la conversación ya lleva ${nombresPuestas}. Mira SOLO el último mensaje del cliente ("${ultimoTextoDelCliente.slice(0, 300)}"). Si muestra una intención distinta que encaje con una de estas etiquetas, llama a etiquetar_conversacion con ella:\n${candidatas.map((c: any) => `- ${c.id}: ${c.nombre} (${c.descripcion_intencion || ''})`).join('\n')}\nSi solo sigue con lo mismo (responde a una pregunta, confirma, da un dato, elige una hora), llama a sin_intencion_nueva.` }
+          const revision = await openai.chat.completions.create({
+            model: MODELO_IA,
+            messages: [...openAiMessages, avisoEtiquetas],
+            tools: [soloNuevas, nadaNuevo],
+            tool_choice: 'required'
+          })
+          // Queda apuntada en el registro (contexto_snapshot.revisiones); ya
+          // no hay más llamadas al modelo después de esta
+          openAiMessages.push(avisoEtiquetas)
+          tokensInput += revision.usage?.prompt_tokens || 0
+          tokensCacheados += revision.usage?.prompt_tokens_details?.cached_tokens || 0
+          tokensOutput += revision.usage?.completion_tokens || 0
+          const llamada: any = revision.choices[0].message.tool_calls?.find((t: any) => t.function?.name === 'etiquetar_conversacion')
+          if (llamada?.function?.arguments) {
+            const id = JSON.parse(llamada.function.arguments).category_id
+            if (candidatas.some((c: any) => c.id === id)) await aplicarEtiqueta(id)
+          }
+        } catch (e: any) {
+          console.error('Revisión de etiquetas fallida:', e?.message)
+        }
+      }
+    }
+    if (!count && herramienta && !etiquetadoEnEstaPasada) {
       try {
         const forzado = await openai.chat.completions.create({
           model: MODELO_IA,
@@ -1126,8 +1195,8 @@ export async function generarRespuesta(conv: any) {
     }
   }
 
-  // Red de seguridad: el cliente pide un total o un presupuesto y la IA ha
-  // contestado sin usar `hacer_presupuesto` (visto en pruebas: decía el precio
+  // Red de seguridad: el cliente pide el total de varias cosas y la IA ha
+  // contestado sin usar `calcular_total` (visto en pruebas: decía el precio
   // de un producto y del otro "no tengo información, te respondo luego", en
   // vez de calcularlo). Se le pide que lo haga con la herramienta.
   // Solo cuando pide un total o el precio de VARIAS cosas. «¿Cuánto cuesta un
@@ -1138,13 +1207,13 @@ export async function generarRespuesta(conv: any) {
   const PRECIO_DE_VARIOS = /cu[áa]nto (me )?(cuesta|vale|sale|cuestan|valen|salen)\b.*(\d|\b(dos|tres|cuatro|cinco|seis|varios|varias|todo|todos|juntos?)\b|\by (un|una|el|la|los|las)\b|\bm[áa]s (un|una|el|la|los|las)\b)/i
   const pendientesCliente = allMessages.filter((m: any) => m.remitente === 'cliente' && m.agrupado !== true).map((m: any) => m.contenido || '')
   // Con la tienda conectada y su presupuesto encendido, manda el de la tienda
-  const herramientaPresupuesto = tools.find((t: any) => t.function?.name === 'presupuesto_de_tienda') || tools.find((t: any) => t.function?.name === 'hacer_presupuesto')
+  const herramientaPresupuesto = tools.find((t: any) => t.function?.name === 'total_de_tienda') || tools.find((t: any) => t.function?.name === 'calcular_total')
   if (herramientaPresupuesto && !presupuestoEnEstaPasada && responseMsg?.content && pendientesCliente.some(t => PIDE_PRESUPUESTO.test(t) || PRECIO_DE_VARIOS.test(t))) {
     try {
       openAiMessages.push({ role: 'assistant', content: responseMsg.content })
       openAiMessages.push({
         role: 'system',
-        content: `REVISIÓN: el cliente está pidiendo un total o un presupuesto y has contestado sin usar ${herramientaPresupuesto.function.name}. Úsala ahora con lo que ha pedido: el nombre de cada cosa tal como la ha dicho el cliente y su cantidad. Si no ha pedido nada concreto, pásale una lista vacía.`
+        content: `REVISIÓN: el cliente está pidiendo el total o el precio de varias cosas y has contestado sin usar ${herramientaPresupuesto.function.name}. Úsala ahora con lo que ha pedido: el nombre de cada cosa tal como la ha dicho el cliente y su cantidad. Si no ha pedido nada concreto, pásale una lista vacía.`
       })
       // Obligada: si se le deja elegir, a veces contesta "te lo digo luego"
       const revision = await openai.chat.completions.create({
@@ -1161,8 +1230,8 @@ export async function generarRespuesta(conv: any) {
       if (llamada) {
         const { calcularPresupuesto } = await import('@/lib/ai/presupuesto')
         const args = (() => { try { return JSON.parse(llamada.function.arguments || '{}') } catch { return {} } })()
-        const resultado = llamada.function.name === 'presupuesto_de_tienda' && herramientasTienda.contexto
-          ? await ejecutarHerramientaDeTienda('presupuesto_de_tienda', args, herramientasTienda.contexto)
+        const resultado = llamada.function.name === 'total_de_tienda' && herramientasTienda.contexto
+          ? await ejecutarHerramientaDeTienda('total_de_tienda', args, herramientasTienda.contexto)
           : await calcularPresupuesto(branchId, Array.isArray(args.lineas) ? args.lineas : [])
         presupuestoEnEstaPasada = true
         openAiMessages.push(r)

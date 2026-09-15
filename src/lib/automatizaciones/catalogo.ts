@@ -397,7 +397,7 @@ const BASE: Automatizacion[] = [
     clave: 'venta_asistida',
     nombre: 'Venta asistida',
     descripcion: 'La IA busca en tu tienda y recomienda con precios y stock reales.',
-    detalle: 'Cuando alguien pregunta por un producto, la IA lo busca en tu catálogo de Shopify: precio de hoy, si queda, y el enlace. Sin inventarse nada.',
+    detalle: 'Cuando alguien pregunta por un producto, la IA lo busca en tu catálogo de Shopify: precio de hoy, si queda, y el enlace. Y si pide el total de varias cosas o unidades, lo calcula con esos mismos precios. Sin inventarse nada.',
     categoria: 'vender',
     estado: 'lista',
     requiereTienda: true,
@@ -448,23 +448,6 @@ const BASE: Automatizacion[] = [
     receta: {
       disparador: { tipo: 'mensaje_cliente', intencion: 'quiere_comprar' },
       pasos: [{ tipo: 'ia_responde', instruccion: 'Sugiere un producto que acompañe a lo que se lleva, sin insistir.' }]
-    }
-  },
-  {
-    clave: 'presupuesto_tienda',
-    nombre: 'Presupuesto con precios de la tienda',
-    descripcion: 'Presupuestos con los precios de Shopify, no con una lista aparte.',
-    detalle: 'Cuando el cliente pide un presupuesto, la IA lo hace con los precios y las existencias de tu tienda, y lo deja escrito en la conversación.',
-    categoria: 'vender',
-    estado: 'lista',
-    requiereTienda: true,
-    permisos: ['read_products'],
-    escribeAlCliente: false,
-    marketing: false,
-    campos: [],
-    receta: {
-      disparador: { tipo: 'mensaje_cliente', intencion: 'pide_presupuesto' },
-      pasos: [{ tipo: 'ia_responde', instruccion: 'Haz el presupuesto con los precios reales de la tienda.' }]
     }
   },
   {

@@ -205,6 +205,52 @@ export default function MetricasPage() {
             </div>
           </section>
 
+          {/* ── INTENCIONES ── */}
+          {data.intenciones && (
+            <section>
+              <SectionTitle>Intenciones</SectionTitle>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+                <StatCard label="Intenciones detectadas" value={data.intenciones.total} sub="Una conversación puede tener varias" />
+                <StatCard label="Conversaciones etiquetadas" value={data.intenciones.conversaciones} />
+                <StatCard label="Con más de una intención" value={data.intenciones.conVarias} color="text-brand-600" />
+                <StatCard label="Media por conversación" value={data.intenciones.mediaPorConversacion} />
+              </div>
+              {data.intenciones.porEtiqueta.length > 0 && (
+                <div className="bg-white rounded-2xl border border-slate-200 p-5">
+                  <p className="text-sm font-600 text-ink-700 mb-4">Por etiqueta</p>
+                  <div className="space-y-3">
+                    {data.intenciones.porEtiqueta.map((e: any) => (
+                      <div key={e.nombre}>
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: e.color || '#94a3b8' }} />
+                            <span className="text-sm font-500 text-ink-700">{e.nombre}{e.respaldo ? ' (respaldo)' : ''}</span>
+                          </div>
+                          <span className="text-sm font-600 text-ink-900">{e.total}</span>
+                        </div>
+                        <MiniBar value={e.total} max={data.intenciones.total} color="bg-brand-500" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {data.intenciones.recorridos.length > 0 && (
+                <div className="bg-white rounded-2xl border border-slate-200 p-5 mt-4">
+                  <p className="text-sm font-600 text-ink-700 mb-1">Recorridos más frecuentes</p>
+                  <p className="text-xs text-ink-400 mb-4">De qué intención pasa el cliente a cuál dentro de la misma conversación</p>
+                  <div className="space-y-2">
+                    {data.intenciones.recorridos.map((r: any) => (
+                      <div key={r.recorrido} className="flex items-center justify-between text-sm">
+                        <span className="text-ink-700">{r.recorrido}</span>
+                        <span className="font-600 text-ink-900">{r.total}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
+
           {/* ── MENSAJES ── */}
           <section>
             <SectionTitle>Mensajes</SectionTitle>

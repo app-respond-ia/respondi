@@ -292,10 +292,49 @@ export async function getMetricas(periodo: 'hoy' | 'semana' | 'mes' | 'total' = 
     hora: `${hora}h`, total
   }))
 
+  // ── INTENCIONES (etiquetas) ─────────────────────────────────
+  // Una conversación lleva una etiqueta por cada intención distinta, así que
+  // aquí se cuentan intenciones, no conversaciones: «pregunta por su pedido
+  // y luego pide un reembolso» son dos. Los recorridos son el orden en que
+  // aparecen dentro de una misma conversación.
+  const { data: etiquetasPuestas } = await supabase
+    .from('conversation_tags')
+    .select('conversation_id, created_at, message_categories!inner(nombre, color, es_fallback, branch_id)')
+    .eq('message_categories.branch_id', branchId)
+    .gte('created_at', desde)
+    .order('created_at', { ascending: true })
+  const porEtiqueta: Record<string, { nombre: string; color: string | null; total: number; respaldo: boolean }> = {}
+  const porConversacion: Record<string, string[]> = {}
+  for (const t of etiquetasPuestas || []) {
+    const cat: any = t.message_categories
+    if (!cat?.nombre) continue
+    if (!porEtiqueta[cat.nombre]) porEtiqueta[cat.nombre] = { nombre: cat.nombre, color: cat.color || null, total: 0, respaldo: !!cat.es_fallback }
+    porEtiqueta[cat.nombre].total++
+    ;(porConversacion[t.conversation_id] ||= []).push(cat.nombre)
+  }
+  const recorridos: Record<string, number> = {}
+  for (const lista of Object.values(porConversacion)) {
+    for (let i = 1; i < lista.length; i++) {
+      const clave = `${lista[i - 1]} → ${lista[i]}`
+      recorridos[clave] = (recorridos[clave] || 0) + 1
+    }
+  }
+  const convsEtiquetadas = Object.keys(porConversacion).length
+  const totalIntenciones = Object.values(porEtiqueta).reduce((a, e) => a + e.total, 0)
+  const intenciones = {
+    total: totalIntenciones,
+    conversaciones: convsEtiquetadas,
+    conVarias: Object.values(porConversacion).filter(l => l.length > 1).length,
+    mediaPorConversacion: convsEtiquetadas ? Math.round((totalIntenciones / convsEtiquetadas) * 10) / 10 : 0,
+    porEtiqueta: Object.values(porEtiqueta).sort((a, b) => b.total - a.total),
+    recorridos: Object.entries(recorridos).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([recorrido, total]) => ({ recorrido, total }))
+  }
+
   return {
     success: true,
     data: {
       periodo,
+      intenciones,
       conversaciones: {
         total: totalConvs,
         activas: convsActivas,

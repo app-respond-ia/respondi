@@ -1094,3 +1094,26 @@ la versión nueva entra en uso desde ya, quita antes `en_uso` a cualquier
 otra versión de esa familia. Vale para todos los que llaman a
 `crearVersion`, no solo para las prediseñadas. `probar-motor-automatizaciones`
 73/73, `probar-plantillas-versiones` 32/32, `probar-plantillas` 44/44.
+
+## La batería de automatizaciones dejaba el canal de WhatsApp en error (15-09-2026, es de las pruebas, no de la app)
+
+Síntoma: `probar-motor-automatizaciones` fallaba a mitad con «no hay
+WhatsApp conectado» y el canal de la sucursal de pruebas aparecía en
+`error` con `ultimo_error` = «Meta ha rechazado las claves: Malformed access
+token EAATOKEN-DE-PRUEBA-…». Pasaba unas veces sí y otras no.
+
+Causa: la base de datos es la misma que la de producción. Mientras corre la
+batería, el canal lleva el token del Meta simulado, y los relojes de
+PRODUCCIÓN (la IA cada 20 s, `reintentar-envios` cada minuto) cogen
+mensajes de la prueba y los mandan al Meta REAL con ese token; Meta lo
+rechaza y `salida.ts` deja el canal en error, como debe. En cuanto el canal
+está en error, todo lo que sigue de la batería falla en cascada.
+
+Arreglo (solo en la batería): (1) al envejecer mensajes para cerrar la
+ventana de 24 h ya solo se envejecen los del cliente, no los salientes;
+(2) un «sanador» que, mientras corre la batería, deshace ese error concreto
+del canal (cualquier otro error sigue haciendo fallar); (3) las esperas
+fijas de 1-2,5 s pasaron a 3-6 s y los pasos que dependen del SMTP real de
+Ethereal esperan a que se cumpla la condición (hasta 20 s). Cómo verlo si
+vuelve: `vigilar-canal.mjs` (scratchpad) imprime cada cambio de estado del
+canal mientras corre una batería. Después: 73/73.

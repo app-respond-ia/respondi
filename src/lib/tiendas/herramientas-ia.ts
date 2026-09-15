@@ -53,7 +53,7 @@ const INTENCIONES: { intencion: string; clave: string; descripcion: string }[] =
 ]
 
 export function esHerramientaDeTienda(nombre: string) {
-  return nombre in GOBIERNAN || nombre === 'detectar_intencion' || nombre === 'presupuesto_de_tienda'
+  return nombre in GOBIERNAN || nombre === 'detectar_intencion' || nombre === 'total_de_tienda'
 }
 
 // Qué herramientas de tienda tiene esta sucursal, según lo que haya encendido
@@ -71,7 +71,7 @@ export async function cargarHerramientasDeTienda(branchId: string, contactId: st
     .select('id, clave, nombre, descripcion, activa, ajustes, receta, marketing')
     .eq('branch_id', branchId)
     .eq('activa', true)
-    .in('clave', [...Object.values(GOBIERNAN), ...COMPLEMENTARIAS, ...INTENCIONES.map(i => i.clave), 'presupuesto_tienda'])
+    .in('clave', [...Object.values(GOBIERNAN), ...COMPLEMENTARIAS, ...INTENCIONES.map(i => i.clave)])
   const encendidas = new Set<string>()
   const ajustes: Record<string, Record<string, any>> = {}
   const recetas: Record<string, any> = {}
@@ -82,7 +82,7 @@ export async function cargarHerramientasDeTienda(branchId: string, contactId: st
     ajustes[f.clave] = ajustesConDefectos(def, f.ajustes as any)
     recetas[f.clave] = def.receta
   }
-  const conHerramienta = [...Object.values(GOBIERNAN), ...INTENCIONES.map(i => i.clave), 'presupuesto_tienda']
+  const conHerramienta = [...Object.values(GOBIERNAN), ...INTENCIONES.map(i => i.clave)]
   if (![...encendidas].some(c => conHerramienta.includes(c))) return { contexto: null, definiciones: [], instrucciones: '' }
 
   let contacto = { id: contactId, canal: null as string | null, identificador: null as string | null, nombre: null as string | null }
@@ -191,12 +191,15 @@ export async function cargarHerramientasDeTienda(branchId: string, contactId: st
     notas.push('MUY IMPORTANTE: cuando el cliente quiera devolver algo, cambiar la dirección de un pedido, diga que le llegó roto o equivocado, o ponga una queja, llama PRIMERO a detectar_intencion (antes que a cualquier otra herramienta, incluidas las políticas) y sigue sus instrucciones al pie de la letra en la misma respuesta. No digas que vas a consultar y contestar luego.')
   }
 
-  if (encendidas.has('presupuesto_tienda')) {
+  // El total de varias cosas va con «Venta asistida» (15-09-2026: antes era
+  // una automatización aparte, «Presupuesto de tienda», y no tenía sentido
+  // poder buscar precios sin poder sumarlos)
+  if (encendidas.has('venta_asistida')) {
     definiciones.push({
       type: 'function',
       function: {
-        name: 'presupuesto_de_tienda',
-        description: 'Calcula un presupuesto con los precios reales de la tienda online. Úsala SIEMPRE que el cliente pida un presupuesto, un total o el precio de varias cosas o de varias unidades. Pasa cada producto con el nombre que ha dicho el cliente y la cantidad; no hagas tú las cuentas.',
+        name: 'total_de_tienda',
+        description: 'Calcula el total con los precios reales de la tienda online. Úsala SIEMPRE que el cliente pida el total o el precio de varias cosas o de varias unidades. Pasa cada producto con su cantidad.',
         parameters: {
           type: 'object',
           properties: {
@@ -206,7 +209,7 @@ export async function cargarHerramientasDeTienda(branchId: string, contactId: st
         }
       }
     })
-    notas.push('Los presupuestos se hacen con presupuesto_de_tienda (precios de la tienda), nunca de memoria.')
+    notas.push('El total de varias cosas o unidades se calcula con total_de_tienda (precios de la tienda), nunca de memoria.')
   }
 
   return {
@@ -221,14 +224,14 @@ export async function cargarHerramientasDeTienda(branchId: string, contactId: st
 // ---------------------------------------------------------------------------
 export async function ejecutarHerramientaDeTienda(nombre: string, args: any, ctx: ContextoTienda): Promise<string> {
   // Cada herramienta existe solo si está encendida la automatización que la
-  // gobierna: las cuatro de GOBIERNAN, el presupuesto por la suya, y
+  // gobierna: las cuatro de GOBIERNAN, el total por venta asistida, y
   // detectar_intencion por cualquiera de las gestiones. (Visto en pruebas:
   // este filtro solo conocía las cuatro primeras y a la IA se le decía "no
   // disponible" justo cuando pedía una devolución.)
   const disponible = nombre === 'detectar_intencion'
     ? INTENCIONES.some(i => ctx.encendidas.has(i.clave))
-    : nombre === 'presupuesto_de_tienda'
-      ? ctx.encendidas.has('presupuesto_tienda')
+    : nombre === 'total_de_tienda'
+      ? ctx.encendidas.has('venta_asistida')
       : !!GOBIERNAN[nombre] && ctx.encendidas.has(GOBIERNAN[nombre])
   if (!disponible) return 'Esta herramienta no está disponible en este negocio.'
   try {
@@ -237,7 +240,7 @@ export async function ejecutarHerramientaDeTienda(nombre: string, args: any, ctx
     if (nombre === 'enlace_de_compra') return await enlaceDeCompra(args, ctx)
     if (nombre === 'apuntar_lista_espera') return await apuntarListaEspera(args, ctx)
     if (nombre === 'detectar_intencion') return await detectarIntencion(args, ctx)
-    if (nombre === 'presupuesto_de_tienda') return await presupuestoDeTienda(args, ctx)
+    if (nombre === 'total_de_tienda') return await presupuestoDeTienda(args, ctx)
   } catch (e: any) {
     if (e instanceof ErrorShopify) return `No se ha podido consultar la tienda ahora mismo (${e.message}). Dile al cliente que lo comprobarás en un momento y no inventes datos.`
     return `No se ha podido consultar la tienda ahora mismo. Dile al cliente que lo comprobarás en un momento y no inventes datos.`
@@ -550,7 +553,7 @@ async function detectarIntencion(args: any, ctx: ContextoTienda) {
   return partes.join(' ')
 }
 
-// Presupuesto con los precios reales de la tienda
+// Total con los precios reales de la tienda
 async function presupuestoDeTienda(args: any, ctx: ContextoTienda) {
   const lineas = Array.isArray(args?.lineas) ? args.lineas : []
   if (!lineas.length) return 'Pregunta al cliente qué productos y cuántas unidades quiere.'
@@ -570,5 +573,5 @@ async function presupuestoDeTienda(args: any, ctx: ContextoTienda) {
     filas.push(`- ${cantidad} × ${producto.title} a ${dinero(unitario, ctx.tienda.moneda)} = ${dinero(subtotal, ctx.tienda.moneda)}${disponible(producto) ? '' : ' (AGOTADO ahora mismo)'}`)
   }
   if (!filas.length) return `No he encontrado en la tienda: ${noEncontrados.join(', ')}. Pregunta al cliente si se refiere a otro producto; no inventes precios.`
-  return `Presupuesto con los precios de hoy de la tienda:\n${filas.join('\n')}\nTOTAL: ${dinero(total, ctx.tienda.moneda)}${noEncontrados.length ? `\nNo encontrados (díselo): ${noEncontrados.join(', ')}` : ''}\nDáselo tal cual, sin cambiar cifras; los gastos de envío no van incluidos salvo que la tienda diga otra cosa.`
+  return `Total con los precios de hoy de la tienda:\n${filas.join('\n')}\nTOTAL: ${dinero(total, ctx.tienda.moneda)}${noEncontrados.length ? `\nNo encontrados (díselo): ${noEncontrados.join(', ')}` : ''}\nDáselo tal cual, sin cambiar cifras; los gastos de envío no van incluidos salvo que la tienda diga otra cosa.`
 }
